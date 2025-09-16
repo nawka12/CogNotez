@@ -1,0 +1,56 @@
+{
+  "name": "cognotez",
+  "version": "0.1.0",
+  "description": "CogNotez - An AI-powered note app with local LLM integration",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "electron-builder",
+    "dist": "electron-builder --publish=never",
+    "test-searxng": "node test-searxng.js",
+    "test-tool-calling": "OPENROUTER_API_KEY=your-key SEARXNG_URL=http://localhost:8080 node test-searxng.js"
+  },
+  "keywords": [
+    "notes",
+    "ai",
+    "electron",
+    "llm",
+    "privacy"
+  ],
+  "author": "nawka12",
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0"
+  },
+  "dependencies": {
+    "axios": "^1.4.0",
+    "cheerio": "^1.0.0-rc.12",
+    "express": "^4.18.0",
+    "marked": "^9.0.0",
+    "uuid": "^9.0.0"
+  },
+  "build": {
+    "appId": "com.kayfahaarukku.cognotez",
+    "productName": "CogNotez",
+    "directories": {
+      "output": "dist"
+    },
+    "files": [
+      "**/*",
+      "!dist/**/*",
+      "!build/**/*",
+      "!*.md"
+    ],
+    "mac": {
+      "category": "public.app-category.productivity"
+    },
+    "win": {
+      "target": "nsis"
+    },
+    "linux": {
+      "target": "AppImage"
+    }
+  }
+}
