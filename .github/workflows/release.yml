@@ -40,11 +40,24 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: List build artifacts
+      - name: List build artifacts (Linux/macOS)
+        if: runner.os != 'Windows'
         run: |
           echo "=== Build artifacts in dist/ ==="
-          ls -la dist/ 2>/dev/null || dir dist/ 2>/dev/null || echo "No dist directory found"
+          ls -la dist/ || echo "No dist directory found"
           echo "=== End of artifacts list ==="
+
+      - name: List build artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "=== Build artifacts in dist/ ==="
+          if (Test-Path dist) {
+            Get-ChildItem dist/ -Force
+          } else {
+            echo "No dist directory found"
+          }
+          echo "=== End of artifacts list ==="
+        shell: pwsh
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
