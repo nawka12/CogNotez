@@ -41,7 +41,10 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: List build artifacts
-        run: ls -la dist/
+        run: |
+          echo "=== Build artifacts in dist/ ==="
+          ls -la dist/ 2>/dev/null || dir dist/ 2>/dev/null || echo "No dist directory found"
+          echo "=== End of artifacts list ==="
 
       - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
