@@ -2,7 +2,7 @@
 
 An offline-first, privacy-focused note-taking application that leverages local Large Language Models (LLMs) for intelligent features. Built with Electron and featuring web scraping, advanced import/export capabilities, and seamless AI integration.
 
-## CogNotez is still on development, and some commits might have major bug that made the app unusable.
+## CogNotez is still on development.
 
 ## Features
 
@@ -64,7 +64,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 
 1. **Clone the repository**
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/nawka12/CogNotez
    cd cognotez
    ```
 
@@ -78,8 +78,8 @@ An offline-first, privacy-focused note-taking application that leverages local L
    # Install Ollama (if not already installed)
    curl -fsSL https://ollama.com/install.sh | sh
 
-   # Pull a language model (recommended: llama2)
-   ollama pull llama2
+   # Pull a language model (recommended: gemma3:latest)
+   ollama pull gemma3:latest
 
    # Start Ollama service
    ollama serve
@@ -206,8 +206,8 @@ Configure your AI integration through the **AI → AI Settings** menu:
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a model (recommended: llama2)
-ollama pull llama2
+# Pull a model (recommended: gemma3:latest)
+ollama pull gemma3:latest
 
 # Start the service
 ollama serve
@@ -375,7 +375,7 @@ MIT License - see LICENSE file for details.
 
 3. **Pull Models**:
    ```bash
-   ollama pull llama2
+   ollama pull gemma3:latest
    ```
 
 ### Application Won't Start
