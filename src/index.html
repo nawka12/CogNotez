@@ -38,24 +38,43 @@
                 </div>
             </aside>
 
-            <!-- Editor Area -->
-            <section class="editor-container">
-                <div class="editor-header">
-                    <div class="note-info">
-                        <input type="text" id="note-title" placeholder="Note title..." class="note-title-input">
-                        <span id="note-date" class="note-date"></span>
+            <!-- Main Content Area -->
+            <section class="main-content-area">
+                <!-- Editor Area -->
+                <div class="editor-container" id="editor-container">
+                    <div class="editor-header">
+                        <div class="note-info">
+                            <input type="text" id="note-title" placeholder="Note title..." class="note-title-input">
+                            <div id="note-tags-display" class="note-tags-display"></div>
+                            <span id="note-date" class="note-date"></span>
+                        </div>
+                        <div class="editor-actions">
+                            <button id="preview-toggle-btn" class="action-btn active" title="Toggle Preview/Edit">👁️</button>
+                            <button id="save-btn" class="action-btn" title="Save">💾</button>
+                            <button id="ai-summary-btn" class="action-btn" title="AI Summary">📝</button>
+                            <button id="generate-tags-btn" class="action-btn" title="Generate Tags">🏷️</button>
+                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags">✏️</button>
+                            <button id="export-btn" class="action-btn" title="Export">📤</button>
+                            <button id="share-btn" class="action-btn" title="Share">📢</button>
+                        </div>
                     </div>
-                    <div class="editor-actions">
-                        <button id="preview-toggle-btn" class="action-btn active" title="Toggle Preview/Edit">👁️</button>
-                        <button id="save-btn" class="action-btn" title="Save">💾</button>
-                        <button id="ai-summary-btn" class="action-btn" title="AI Summary">📝</button>
-                        <button id="export-btn" class="action-btn" title="Export">📤</button>
-                        <button id="share-btn" class="action-btn" title="Share">📢</button>
+                    <div class="editor-wrapper">
+                        <textarea id="note-editor" class="note-editor" placeholder="Start writing your note..."></textarea>
+                        <div id="markdown-preview" class="markdown-preview hidden"></div>
                     </div>
                 </div>
-                <div class="editor-wrapper">
-                    <textarea id="note-editor" class="note-editor" placeholder="Start writing your note..."></textarea>
-                    <div id="markdown-preview" class="markdown-preview hidden"></div>
+
+                <!-- No Note Selected Placeholder -->
+                <div class="no-note-placeholder hidden" id="no-note-placeholder">
+                    <div class="placeholder-content">
+                        <div class="placeholder-icon">📝</div>
+                        <h2 class="placeholder-title">Select a note to start</h2>
+                        <p class="placeholder-description">Choose a note from the sidebar or create a new one to begin writing</p>
+                        <button id="create-first-note-btn" class="create-note-btn">
+                            <span class="btn-icon">➕</span>
+                            Create New Note
+                        </button>
+                    </div>
                 </div>
             </section>
 

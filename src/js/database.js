@@ -130,11 +130,26 @@ class DatabaseManager {
 
         if (options.search) {
             const searchTerm = options.search.toLowerCase();
-            notes = notes.filter(note =>
-                note.title.toLowerCase().includes(searchTerm) ||
-                note.content.toLowerCase().includes(searchTerm) ||
-                (note.preview && note.preview.toLowerCase().includes(searchTerm))
-            );
+            notes = notes.filter(note => {
+                // Search in title, content, and preview
+                const textMatch = note.title.toLowerCase().includes(searchTerm) ||
+                                note.content.toLowerCase().includes(searchTerm) ||
+                                (note.preview && note.preview.toLowerCase().includes(searchTerm));
+
+                // Search in tags
+                let tagMatch = false;
+                if (note.tags && note.tags.length > 0) {
+                    for (const tagId of note.tags) {
+                        const tag = this.data.tags[tagId];
+                        if (tag && tag.name.toLowerCase().includes(searchTerm)) {
+                            tagMatch = true;
+                            break;
+                        }
+                    }
+                }
+
+                return textMatch || tagMatch;
+            });
         }
 
         if (options.isFavorite !== undefined) {

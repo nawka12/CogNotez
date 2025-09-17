@@ -116,6 +116,19 @@ class CogNotezApp {
             if (noteItem) {
                 const noteId = noteItem.dataset.id;
                 this.loadNoteById(noteId);
+            } else {
+                // Clicked on empty space in notes list - clear selection
+                if (this.currentNote) {
+                    this.showNoNotePlaceholder();
+                }
+            }
+        });
+
+        // Main content area click handler - clear note selection when clicking on empty editor area
+        document.querySelector('.main-content-area').addEventListener('click', (e) => {
+            // Only clear if clicking on the main content area itself, not on child elements
+            if (e.target === e.currentTarget && this.currentNote) {
+                this.showNoNotePlaceholder();
             }
         });
 
@@ -123,8 +136,13 @@ class CogNotezApp {
         document.getElementById('preview-toggle-btn').addEventListener('click', () => this.togglePreview());
         document.getElementById('save-btn').addEventListener('click', () => this.saveCurrentNote());
         document.getElementById('ai-summary-btn').addEventListener('click', () => this.summarizeNote());
+        document.getElementById('generate-tags-btn').addEventListener('click', () => this.generateTags());
+        document.getElementById('manage-tags-btn').addEventListener('click', () => this.showTagManager());
         document.getElementById('export-btn').addEventListener('click', () => this.exportNote());
         document.getElementById('share-btn').addEventListener('click', () => this.showShareOptions());
+
+        // Placeholder actions
+        document.getElementById('create-first-note-btn').addEventListener('click', () => this.createNewNote());
 
         // Editor input for real-time preview updates
         document.getElementById('note-editor').addEventListener('input', () => {
@@ -295,6 +313,26 @@ class CogNotezApp {
     async loadNotes() {
         if (this.notesManager) {
             await this.notesManager.renderNotesList();
+
+            // Check if there are any notes and show placeholder if none exist
+            let totalNotes = 0;
+            if (this.notesManager.db && this.notesManager.db.initialized) {
+                const options = { limit: 1 };
+                const notes = await this.notesManager.db.getAllNotes(options);
+                totalNotes = notes.length;
+            } else {
+                totalNotes = this.notes.length;
+            }
+
+            // If no notes exist, show the placeholder
+            if (totalNotes === 0) {
+                this.showNoNotePlaceholder();
+            } else {
+                // If we have notes but none is currently selected, still show placeholder
+                if (!this.currentNote) {
+                    this.showNoNotePlaceholder();
+                }
+            }
         }
     }
 
@@ -330,7 +368,8 @@ class CogNotezApp {
             id: Date.now().toString(),
             title: 'Untitled Note',
             content: '',
-            preview: ''
+            preview: '',
+            tags: []
         };
 
         try {
@@ -354,11 +393,21 @@ class CogNotezApp {
     }
 
     displayNote(note) {
+        if (!note) {
+            this.showNoNotePlaceholder();
+            return;
+        }
+
         this.currentNote = note;
+        this.showNoteEditor();
+
         document.getElementById('note-title').value = note.title;
         document.getElementById('note-editor').value = note.content;
         document.getElementById('note-date').textContent =
             `Modified: ${new Date(note.modified).toLocaleDateString()} ${new Date(note.modified).toLocaleTimeString()}`;
+
+        // Display tags in the editor header
+        this.displayNoteTags(note);
 
         // Update active note in sidebar
         document.querySelectorAll('.note-item').forEach(item => {
@@ -372,6 +421,296 @@ class CogNotezApp {
 
         // Load conversation history for this note
         this.loadConversationHistory(note.id);
+    }
+
+    // Show the note editor interface
+    showNoteEditor() {
+        const editorContainer = document.getElementById('editor-container');
+        const placeholder = document.getElementById('no-note-placeholder');
+
+        if (editorContainer) {
+            editorContainer.style.display = 'flex';
+            editorContainer.classList.remove('hidden');
+        }
+        if (placeholder) {
+            placeholder.style.display = 'none';
+            placeholder.classList.add('hidden');
+        }
+    }
+
+    // Show the no-note placeholder
+    showNoNotePlaceholder() {
+        const editorContainer = document.getElementById('editor-container');
+        const placeholder = document.getElementById('no-note-placeholder');
+
+        if (editorContainer) {
+            editorContainer.style.display = 'none';
+            editorContainer.classList.add('hidden');
+        }
+        if (placeholder) {
+            placeholder.style.display = 'flex';
+            placeholder.classList.remove('hidden');
+        }
+
+        // Clear current note
+        this.currentNote = null;
+
+        // Update sidebar to show no active note
+        document.querySelectorAll('.note-item').forEach(item => {
+            item.classList.remove('active');
+        });
+    }
+
+    // Helper method to display tags in the note editor header
+    displayNoteTags(note) {
+        const tagsDisplay = document.getElementById('note-tags-display');
+
+        if (!note.tags || note.tags.length === 0) {
+            tagsDisplay.innerHTML = '';
+            return;
+        }
+
+        let tagsHtml = '<div class="editor-note-tags">';
+        note.tags.forEach(tagId => {
+            const tagName = this.notesManager.getTagName(tagId);
+            tagsHtml += `<span class="editor-note-tag">${this.escapeHtml(tagName)}</span>`;
+        });
+        tagsHtml += '</div>';
+
+        tagsDisplay.innerHTML = tagsHtml;
+    }
+
+    // Helper method to escape HTML
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    // Show tag management dialog
+    showTagManager() {
+        if (!this.currentNote) {
+            this.showNotification('Please select a note first', 'info');
+            return;
+        }
+
+        const existingTags = this.currentNote.tags || [];
+        const allTags = this.notesManager.db && this.notesManager.db.initialized ?
+            this.notesManager.db.getAllTags() : [];
+
+        // Create modal HTML
+        const modalHtml = `
+            <div id="tag-manager-modal" class="modal">
+                <div class="modal-content tag-manager-content">
+                    <div class="modal-header">
+                        <h3>Manage Tags</h3>
+                        <button id="tag-manager-close" class="modal-close">✕</button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="tag-manager-section">
+                            <h4>Current Tags</h4>
+                            <div id="current-tags" class="current-tags">
+                                ${existingTags.length > 0 ?
+                                    existingTags.map(tagId => {
+                                        const tagName = this.notesManager.getTagName(tagId);
+                                        return `<span class="tag-item" data-tag-id="${tagId}">
+                                            ${this.escapeHtml(tagName)}
+                                            <button class="tag-remove" data-tag-id="${tagId}">×</button>
+                                        </span>`;
+                                    }).join('') :
+                                    '<span class="no-tags">No tags assigned</span>'
+                                }
+                            </div>
+                        </div>
+                        <div class="tag-manager-section">
+                            <h4>Add Tags</h4>
+                            <div class="tag-input-section">
+                                <input type="text" id="new-tag-input" placeholder="Enter tag name..." class="tag-input">
+                                <button id="add-tag-btn" class="btn-primary">Add Tag</button>
+                            </div>
+                            <div class="available-tags">
+                                <h5>Available Tags</h5>
+                                <div id="available-tags-list" class="available-tags-list">
+                                    ${allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
+                                        `<span class="available-tag" data-tag-id="${tag.id}">
+                                            ${this.escapeHtml(tag.name)}
+                                        </span>`
+                                    ).join('')}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        document.body.insertAdjacentHTML('beforeend', modalHtml);
+
+        // Set up event listeners
+        this.setupTagManagerEvents();
+    }
+
+    // Set up tag manager event listeners
+    setupTagManagerEvents() {
+        const modal = document.getElementById('tag-manager-modal');
+        const closeBtn = document.getElementById('tag-manager-close');
+        const addBtn = document.getElementById('add-tag-btn');
+        const tagInput = document.getElementById('new-tag-input');
+
+        // Close modal
+        closeBtn.addEventListener('click', () => modal.remove());
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.remove();
+        });
+
+        // Add new tag
+        addBtn.addEventListener('click', () => this.addNewTag());
+        tagInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.addNewTag();
+        });
+
+        // Remove tag
+        modal.addEventListener('click', (e) => {
+            if (e.target.classList.contains('tag-remove')) {
+                const tagId = e.target.dataset.tagId;
+                this.removeTagFromNote(tagId);
+            }
+        });
+
+        // Add existing tag
+        modal.addEventListener('click', (e) => {
+            if (e.target.classList.contains('available-tag')) {
+                const tagId = e.target.dataset.tagId;
+                this.addTagToNote(tagId);
+            }
+        });
+    }
+
+    // Add a new tag to the note
+    async addNewTag() {
+        const input = document.getElementById('new-tag-input');
+        const tagName = input.value.trim();
+
+        if (!tagName) {
+            this.showNotification('Please enter a tag name', 'warning');
+            return;
+        }
+
+        try {
+            // Check if tag already exists
+            let existingTag = null;
+            if (this.notesManager.db && this.notesManager.db.initialized) {
+                const allTags = this.notesManager.db.getAllTags();
+                existingTag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+            }
+
+            let tagId;
+            if (existingTag) {
+                tagId = existingTag.id;
+            } else {
+                // Create new tag
+                if (this.notesManager.db && this.notesManager.db.initialized) {
+                    tagId = this.notesManager.db.createTag({ name: tagName });
+                } else {
+                    tagId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                }
+            }
+
+            await this.addTagToNote(tagId);
+            input.value = '';
+
+        } catch (error) {
+            console.error('Error adding tag:', error);
+            this.showNotification('Failed to add tag', 'error');
+        }
+    }
+
+    // Add existing tag to note
+    async addTagToNote(tagId) {
+        if (!this.currentNote) return;
+
+        const updatedTags = [...(this.currentNote.tags || []), tagId];
+
+        try {
+            if (this.notesManager.db && this.notesManager.db.initialized) {
+                await this.notesManager.db.updateNote(this.currentNote.id, { tags: updatedTags });
+                this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
+            } else {
+                this.currentNote.tags = updatedTags;
+                this.saveNotes();
+            }
+
+            // Update UI
+            this.displayNoteTags(this.currentNote);
+            await this.notesManager.renderNotesList();
+
+            // Refresh the tag manager
+            this.refreshTagManager();
+
+            this.showNotification('Tag added successfully', 'success');
+        } catch (error) {
+            console.error('Error adding tag to note:', error);
+            this.showNotification('Failed to add tag', 'error');
+        }
+    }
+
+    // Remove tag from note
+    async removeTagFromNote(tagId) {
+        if (!this.currentNote) return;
+
+        const updatedTags = (this.currentNote.tags || []).filter(id => id !== tagId);
+
+        try {
+            if (this.notesManager.db && this.notesManager.db.initialized) {
+                await this.notesManager.db.updateNote(this.currentNote.id, { tags: updatedTags });
+                this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
+            } else {
+                this.currentNote.tags = updatedTags;
+                this.saveNotes();
+            }
+
+            // Update UI
+            this.displayNoteTags(this.currentNote);
+            await this.notesManager.renderNotesList();
+
+            // Refresh the tag manager
+            this.refreshTagManager();
+
+            this.showNotification('Tag removed successfully', 'success');
+        } catch (error) {
+            console.error('Error removing tag from note:', error);
+            this.showNotification('Failed to remove tag', 'error');
+        }
+    }
+
+    // Refresh the tag manager UI
+    refreshTagManager() {
+        const modal = document.getElementById('tag-manager-modal');
+        if (!modal) return;
+
+        const existingTags = this.currentNote.tags || [];
+        const allTags = this.notesManager.db && this.notesManager.db.initialized ?
+            this.notesManager.db.getAllTags() : [];
+
+        // Update current tags
+        const currentTagsEl = document.getElementById('current-tags');
+        currentTagsEl.innerHTML = existingTags.length > 0 ?
+            existingTags.map(tagId => {
+                const tagName = this.notesManager.getTagName(tagId);
+                return `<span class="tag-item" data-tag-id="${tagId}">
+                    ${this.escapeHtml(tagName)}
+                    <button class="tag-remove" data-tag-id="${tagId}">×</button>
+                </span>`;
+            }).join('') :
+            '<span class="no-tags">No tags assigned</span>';
+
+        // Update available tags
+        const availableTagsEl = document.getElementById('available-tags-list');
+        availableTagsEl.innerHTML = allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
+            `<span class="available-tag" data-tag-id="${tag.id}">
+                ${this.escapeHtml(tag.name)}
+            </span>`
+        ).join('');
     }
 
     async saveCurrentNote() {
@@ -900,9 +1239,6 @@ Please provide a helpful response based on the note content and conversation his
             </div>
             <div class="context-menu-item" data-action="generate-tags">
                 🏷️ Generate Tags
-            </div>
-            <div class="context-menu-item" data-action="custom-feature">
-                🎯 Create Custom Feature
             </div>
         `;
 
@@ -2042,7 +2378,12 @@ Please provide a helpful response based on the note content and conversation his
                     this.showLoading();
                     response = await this.aiManager.generateTags(this.selectedText);
                     await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'tags');
-                    this.showAIMessage(`🏷️ **Suggested Tags:**\n${response}`, 'assistant');
+
+                    // Parse and save tags to the current note
+                    const generatedTags = this.parseTagResponse(response);
+                    await this.saveTagsToCurrentNote(generatedTags);
+
+                    this.showAIMessage(`🏷️ **Suggested Tags:**\n${response}\n\n*Tags have been saved to this note*`, 'assistant');
                     this.hideLoading();
                     break;
 
@@ -2187,16 +2528,108 @@ Please provide a helpful response based on the note content and conversation his
         const editor = document.getElementById('note-editor');
         const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
 
+        // Use whole note content if no text is selected, otherwise use selected text
         if (!selectedText) {
-            this.showNotification('Please select some text to generate tags for', 'info');
-            return;
+            // Use the entire note content
+            const noteContent = editor.value.trim();
+            if (!noteContent) {
+                this.showNotification('Please write some content or select text to generate tags for', 'info');
+                return;
+            }
+            this.selectedText = noteContent;
+        } else {
+            this.selectedText = selectedText;
         }
 
-        this.selectedText = selectedText;
         // Process immediately without dialog
         this.processAIActionWithoutDialog('generate-tags');
     }
 
+    // Helper method to parse tag response from AI
+    parseTagResponse(response) {
+        // Extract tags from the response, handling various formats
+        const tags = [];
+        const lines = response.split('\n');
+
+        for (const line of lines) {
+            // Look for tags in various formats:
+            // - Lines starting with "- " or "* "
+            // - Comma-separated lists
+            // - Numbered lists
+            const trimmedLine = line.trim();
+
+            if (trimmedLine.startsWith('- ') || trimmedLine.startsWith('* ')) {
+                const tag = trimmedLine.substring(2).trim();
+                if (tag) tags.push(tag);
+            } else if (trimmedLine.match(/^\d+\./)) {
+                const tag = trimmedLine.replace(/^\d+\.\s*/, '').trim();
+                if (tag) tags.push(tag);
+            } else if (trimmedLine.includes(',')) {
+                // Handle comma-separated tags
+                const commaTags = trimmedLine.split(',').map(t => t.trim()).filter(t => t);
+                tags.push(...commaTags);
+            } else if (trimmedLine && !trimmedLine.includes('Tags:') && !trimmedLine.includes('Suggested tags:')) {
+                // Direct tag if it's a single word/phrase
+                tags.push(trimmedLine);
+            }
+        }
+
+        // Remove duplicates and clean up tags
+        return [...new Set(tags)].map(tag => tag.replace(/^["']|["']$/g, '')).filter(tag => tag.length > 0);
+    }
+
+    // Helper method to save tags to the current note
+    async saveTagsToCurrentNote(tags) {
+        if (!this.currentNote || !tags || tags.length === 0) return;
+
+        try {
+            // Create or get existing tags in the database
+            const tagIds = [];
+            for (const tagName of tags) {
+                let existingTag = null;
+
+                // Check if tag already exists
+                if (this.notesManager.db && this.notesManager.db.initialized) {
+                    const allTags = await this.notesManager.db.getAllTags();
+                    existingTag = allTags.find(t => t.name.toLowerCase() === tagName.toLowerCase());
+                }
+
+                let tagId;
+                if (existingTag) {
+                    tagId = existingTag.id;
+                } else {
+                    // Create new tag
+                    if (this.notesManager.db && this.notesManager.db.initialized) {
+                        tagId = await this.notesManager.db.createTag({ name: tagName });
+                    } else {
+                        // Fallback: create simple tag ID
+                        tagId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+                    }
+                }
+                tagIds.push(tagId);
+            }
+
+            // Update note with tags
+            const updatedTags = [...(this.currentNote.tags || []), ...tagIds];
+
+            if (this.notesManager.db && this.notesManager.db.initialized) {
+                await this.notesManager.db.updateNote(this.currentNote.id, { tags: updatedTags });
+                this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
+            } else {
+                // Fallback to localStorage
+                this.currentNote.tags = updatedTags;
+                this.saveNotes();
+            }
+
+            // Re-render notes list to show updated tags
+            await this.notesManager.renderNotesList();
+
+            this.showNotification(`Added ${tags.length} tag(s) to note`, 'success');
+        } catch (error) {
+            console.error('Error saving tags to note:', error);
+            this.showNotification('Failed to save tags to note', 'error');
+        }
+    }
 
     showAISettings() {
         if (!this.aiManager) {

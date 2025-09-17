@@ -2,6 +2,8 @@
 
 An offline-first, privacy-focused note-taking application that leverages local Large Language Models (LLMs) for intelligent features. Built with Electron and featuring web scraping, advanced import/export capabilities, and seamless AI integration.
 
+## CogNotez is still on development, and some commits might have major bug that made the app unusable.
+
 ## Features
 
 ### Core Functionality

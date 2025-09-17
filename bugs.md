@@ -4,4 +4,4 @@ Status information:
 [Half-working]: Some aspect of it are fixed, but some are still broken
 [Fixed]: Bugs has been squashed
 
-1. [Fixed] Restore from backup file type defaults to Markdown, not CogNotez Backup.
+1. [New] Scrolling is buggy. On long notes, user can only scroll using arrow keys, but the whole UI scrolls, not only the textarea.

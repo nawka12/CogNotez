@@ -1945,8 +1945,7 @@ Suggested tags:`;
         const fallbacks = {
             summarize: 'This appears to be a summary of the selected text. AI summarization is currently offline.',
             ask: 'I would analyze this text and provide an answer to your question. AI features are currently offline.',
-            edit: 'I would modify this text according to your instructions. AI features are currently offline.',
-            custom: 'I would create a custom feature based on your description. AI features are currently offline.'
+            edit: 'I would modify this text according to your instructions. AI features are currently offline.'
         };
         return fallbacks[action] || 'AI feature is currently unavailable.';
     }

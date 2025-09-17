@@ -60,10 +60,28 @@ class NotesManager {
             element.classList.add('active');
         }
 
+        // Generate tags HTML if tags exist
+        let tagsHtml = '';
+        if (note.tags && note.tags.length > 0) {
+            tagsHtml = '<div class="note-item-tags">';
+            // Limit to first 3 tags for display
+            const displayTags = note.tags.slice(0, 3);
+            displayTags.forEach(tagId => {
+                // Get tag name from database if available, otherwise show tag ID
+                const tagName = this.getTagName(tagId);
+                tagsHtml += `<span class="note-tag">${this.escapeHtml(tagName)}</span>`;
+            });
+            if (note.tags.length > 3) {
+                tagsHtml += `<span class="note-tag more-tags">+${note.tags.length - 3} more</span>`;
+            }
+            tagsHtml += '</div>';
+        }
+
         element.innerHTML = `
             <div class="note-item-content">
                 <div class="note-item-title">${this.escapeHtml(note.title)}</div>
                 <div class="note-item-preview">${this.escapeHtml(note.preview)}</div>
+                ${tagsHtml}
                 <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
             </div>
             <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">🗑️</button>
@@ -104,6 +122,28 @@ class NotesManager {
         return div.innerHTML;
     }
 
+    // Helper method to get tag name from tag ID
+    getTagName(tagId) {
+        try {
+            if (this.db && this.db.initialized) {
+                const tag = this.db.data.tags[tagId];
+                return tag ? tag.name : tagId;
+            } else {
+                // Fallback: try to find in app's notes data
+                for (const note of this.app.notes || []) {
+                    if (note.tags && note.tags.includes(tagId)) {
+                        // For now, return the tagId itself as we don't have tag names in localStorage
+                        return tagId;
+                    }
+                }
+                return tagId;
+            }
+        } catch (error) {
+            console.warn('Error getting tag name:', error);
+            return tagId;
+        }
+    }
+
     // Database methods
     async getNotesFromDatabase(searchQuery = '') {
         const options = {
@@ -139,11 +179,26 @@ class NotesManager {
         if (!query.trim()) return notes;
 
         const searchTerm = query.toLowerCase();
-        return notes.filter(note =>
-            note.title.toLowerCase().includes(searchTerm) ||
-            note.content.toLowerCase().includes(searchTerm) ||
-            note.preview.toLowerCase().includes(searchTerm)
-        );
+        return notes.filter(note => {
+            // Search in title, content, and preview
+            const textMatch = note.title.toLowerCase().includes(searchTerm) ||
+                            note.content.toLowerCase().includes(searchTerm) ||
+                            note.preview.toLowerCase().includes(searchTerm);
+
+            // Search in tags
+            let tagMatch = false;
+            if (note.tags && note.tags.length > 0) {
+                for (const tagId of note.tags) {
+                    const tagName = this.getTagName(tagId);
+                    if (tagName.toLowerCase().includes(searchTerm)) {
+                        tagMatch = true;
+                        break;
+                    }
+                }
+            }
+
+            return textMatch || tagMatch;
+        });
     }
 
     // Note operations
@@ -159,6 +214,7 @@ class NotesManager {
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
                         this.app.currentNote = null;
                         this.clearEditor();
+                        this.app.showNoNotePlaceholder();
                     }
 
                     await this.renderNotesList();
@@ -175,6 +231,7 @@ class NotesManager {
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
                         this.app.currentNote = null;
                         this.clearEditor();
+                        this.app.showNoNotePlaceholder();
                     }
 
                     this.app.saveNotes();
