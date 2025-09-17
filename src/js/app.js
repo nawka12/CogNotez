@@ -735,6 +735,17 @@ class CogNotezApp {
         ipcRenderer.on('menu-generate-tags', () => this.generateTags());
         ipcRenderer.on('menu-ai-settings', () => this.showAISettings());
         ipcRenderer.on('menu-general-settings', () => this.showGeneralSettings());
+
+        // Update-related menu actions
+        ipcRenderer.on('menu-check-updates', () => this.checkForUpdates());
+
+        // Update-related IPC events
+        ipcRenderer.on('update-checking', () => this.showUpdateStatus('Checking for updates...'));
+        ipcRenderer.on('update-available', (event, info) => this.showUpdateAvailable(info));
+        ipcRenderer.on('update-not-available', (event, info) => this.showUpdateNotAvailable(info));
+        ipcRenderer.on('update-error', (event, error) => this.showUpdateError(error));
+        ipcRenderer.on('download-progress', (event, progress) => this.showDownloadProgress(progress));
+        ipcRenderer.on('update-downloaded', (event, info) => this.showUpdateDownloaded(info));
     }
 
     // Theme management
@@ -3739,6 +3750,105 @@ Please provide a helpful response based on the note content and conversation his
 
         document.getElementById('ai-dialog').classList.remove('hidden');
         this.currentAIAction = action;
+    }
+
+    // Update-related methods
+    async checkForUpdates() {
+        try {
+            console.log('Checking for updates...');
+            await ipcRenderer.invoke('check-for-updates');
+        } catch (error) {
+            console.error('Failed to check for updates:', error);
+            this.showNotification('Failed to check for updates', 'error');
+        }
+    }
+
+    showUpdateStatus(message) {
+        this.showNotification(message, 'info');
+    }
+
+    showUpdateAvailable(info) {
+        const dialog = document.createElement('div');
+        dialog.className = 'update-dialog';
+        dialog.innerHTML = `
+            <div class="update-dialog-content">
+                <h3>Update Available</h3>
+                <p>A new version (${info.version}) is available. Would you like to download it?</p>
+                <div class="update-dialog-buttons">
+                    <button id="download-update" class="btn-primary">Download</button>
+                    <button id="cancel-update" class="btn-secondary">Later</button>
+                </div>
+            </div>
+        `;
+
+        // Style the dialog
+        Object.assign(dialog.style, {
+            position: 'fixed',
+            top: '0',
+            left: '0',
+            width: '100%',
+            height: '100%',
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'center',
+            zIndex: '10000'
+        });
+
+        // Style the content
+        const content = dialog.querySelector('.update-dialog-content');
+        Object.assign(content.style, {
+            background: 'var(--bg-color)',
+            padding: '24px',
+            borderRadius: '8px',
+            border: '1px solid var(--border-color)',
+            maxWidth: '400px',
+            width: '90%'
+        });
+
+        // Style buttons
+        const buttons = dialog.querySelector('.update-dialog-buttons');
+        Object.assign(buttons.style, {
+            display: 'flex',
+            gap: '12px',
+            justifyContent: 'flex-end',
+            marginTop: '20px'
+        });
+
+        document.body.appendChild(dialog);
+
+        // Event listeners
+        dialog.querySelector('#download-update').addEventListener('click', async () => {
+            try {
+                await ipcRenderer.invoke('download-update');
+                dialog.remove();
+            } catch (error) {
+                console.error('Failed to start download:', error);
+                this.showNotification('Failed to start download', 'error');
+            }
+        });
+
+        dialog.querySelector('#cancel-update').addEventListener('click', () => {
+            dialog.remove();
+        });
+    }
+
+    showUpdateNotAvailable(info) {
+        this.showNotification(`You're running the latest version (${info.version})`, 'success');
+    }
+
+    showUpdateError(error) {
+        this.showNotification(`Update check failed: ${error}`, 'error');
+    }
+
+    showDownloadProgress(progress) {
+        const percent = Math.round(progress.percent);
+        this.showNotification(`Downloading update: ${percent}%`, 'info');
+    }
+
+    showUpdateDownloaded(info) {
+        // This is handled by the main process with a dialog
+        console.log('Update downloaded:', info);
     }
 }
 

@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
+const { autoUpdater } = require('electron-updater');
 
 // Keep a global reference of the window object
 let mainWindow;
@@ -46,9 +47,69 @@ function createWindow() {
   });
 }
 
+// Configure auto-updater
+function setupAutoUpdater() {
+  // Configure auto-updater for GitHub releases
+  autoUpdater.autoDownload = false; // Don't download automatically, let user choose
+
+  // Auto-updater event handlers
+  autoUpdater.on('checking-for-update', () => {
+    console.log('Checking for update...');
+    mainWindow.webContents.send('update-checking');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    console.log('Update available:', info.version);
+    mainWindow.webContents.send('update-available', info);
+  });
+
+  autoUpdater.on('update-not-available', (info) => {
+    console.log('Update not available. Current version:', info.version);
+    mainWindow.webContents.send('update-not-available', info);
+  });
+
+  autoUpdater.on('error', (err) => {
+    console.error('Update error:', err);
+    mainWindow.webContents.send('update-error', err.message);
+  });
+
+  autoUpdater.on('download-progress', (progressObj) => {
+    let log_message = "Download speed: " + progressObj.bytesPerSecond;
+    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+    console.log(log_message);
+    mainWindow.webContents.send('download-progress', progressObj);
+  });
+
+  autoUpdater.on('update-downloaded', (info) => {
+    console.log('Update downloaded:', info.version);
+    mainWindow.webContents.send('update-downloaded', info);
+
+    // Show dialog asking user to restart
+    dialog.showMessageBox(mainWindow, {
+      type: 'info',
+      title: 'Update Ready',
+      message: 'A new version has been downloaded. Restart the application to apply the update?',
+      buttons: ['Restart', 'Later']
+    }).then((result) => {
+      if (result.response === 0) {
+        autoUpdater.quitAndInstall();
+      }
+    });
+  });
+
+  // Check for updates (only in production)
+  if (process.env.NODE_ENV !== 'development') {
+    setTimeout(() => {
+      autoUpdater.checkForUpdates();
+    }, 3000); // Wait 3 seconds after app start
+  }
+}
+
 // This method will be called when Electron has finished initialization
 function initApp() {
   createWindow();
+  setupAutoUpdater();
   createMenu();
 }
 
@@ -85,6 +146,23 @@ if (ipcMain) {
 
   ipcMain.handle('show-open-dialog', async (event, options) => {
     return await dialog.showOpenDialog(mainWindow, options);
+  });
+
+  // Auto-updater IPC handlers
+  ipcMain.handle('check-for-updates', () => {
+    autoUpdater.checkForUpdates();
+  });
+
+  ipcMain.handle('download-update', () => {
+    autoUpdater.downloadUpdate();
+  });
+
+  ipcMain.handle('quit-and-install', () => {
+    autoUpdater.quitAndInstall();
+  });
+
+  ipcMain.handle('get-app-version', () => {
+    return app.getVersion();
   });
 } else {
   console.error('ipcMain not available - Electron may not be properly initialized');
@@ -277,13 +355,20 @@ const createMenu = () => {
       label: 'Help',
       submenu: [
         {
+          label: 'Check for Updates',
+          click: () => {
+            mainWindow.webContents.send('menu-check-updates');
+          }
+        },
+        { type: 'separator' },
+        {
           label: 'About CogNotez',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
               title: 'About CogNotez',
               message: 'CogNotez - AI-Powered Note App',
-              detail: 'Version 0.1.0\nAn offline-first note-taking application with local LLM integration.'
+              detail: `Version ${app.getVersion()}\nAn offline-first note-taking application with local LLM integration.`
             });
           }
         }
