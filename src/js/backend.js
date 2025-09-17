@@ -48,6 +48,7 @@ class BackendAPI {
                 filters: [
                     { name: 'Markdown', extensions: ['md'] },
                     { name: 'Text', extensions: ['txt'] },
+                    { name: 'JSON', extensions: ['json'] },
                     { name: 'All Files', extensions: ['*'] }
                 ],
                 properties: ['openFile']
@@ -240,129 +241,7 @@ class BackendAPI {
         }
     }
 
-    // Import from Evernote export (ENEX format - simplified)
-    async importFromEvernote() {
-        try {
-            const fileData = await this.loadFile();
-            if (!fileData || !fileData.filename.endsWith('.enex')) {
-                throw new Error('Please select a valid Evernote ENEX file');
-            }
 
-            // Get database manager
-            if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
-                throw new Error('Database manager not available');
-            }
-
-            const dbManager = this.app.notesManager.db;
-            const content = fileData.content;
-            const notes = {};
-
-            // Simple parsing for demonstration - extract notes from ENEX
-            const noteMatches = content.match(/<note>[\s\S]*?<\/note>/g);
-            if (noteMatches) {
-                noteMatches.forEach((noteXml, index) => {
-                    const titleMatch = noteXml.match(/<title>(.*?)<\/title>/);
-                    const contentMatch = noteXml.match(/<content>(.*?)<\/content>/);
-
-                    const title = titleMatch ? titleMatch[1] : `Evernote Note ${index + 1}`;
-                    const noteContent = contentMatch ? contentMatch[1] : '';
-
-                    const noteId = this.generateId();
-                    notes[noteId] = {
-                        id: noteId,
-                        title: title,
-                        content: noteContent,
-                        created_at: new Date().toISOString(),
-                        updated_at: new Date().toISOString(),
-                        preview: this.generatePreview(noteContent),
-                        tags: [],
-                        category: null,
-                        is_favorite: false,
-                        is_archived: false,
-                        word_count: this.calculateWordCount(noteContent),
-                        char_count: noteContent.length,
-                        created: new Date(),
-                        modified: new Date(),
-                        imported: true,
-                        import_date: new Date().toISOString(),
-                        source: 'evernote'
-                    };
-                });
-            }
-
-            // Add notes to database
-            Object.assign(dbManager.data.notes, notes);
-            dbManager.saveToLocalStorage();
-
-            return {
-                notes: Object.values(notes),
-                metadata: {
-                    totalNotes: Object.keys(notes).length,
-                    source: 'Evernote ENEX'
-                }
-            };
-        } catch (error) {
-            console.error('Error importing from Evernote:', error);
-            throw new Error(`Evernote import failed: ${error.message}`);
-        }
-    }
-
-    // Import from OneNote export (simplified)
-    async importFromOneNote() {
-        try {
-            const fileData = await this.loadFile();
-            if (!fileData || (!fileData.filename.endsWith('.one') && !fileData.filename.endsWith('.onetoc2'))) {
-                throw new Error('Please select a valid OneNote file (.one or .onetoc2)');
-            }
-
-            // Get database manager
-            if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
-                throw new Error('Database manager not available');
-            }
-
-            const dbManager = this.app.notesManager.db;
-            const content = fileData.content;
-            const noteId = this.generateId();
-            const notes = {};
-
-            // This would require parsing OneNote's proprietary format
-            // For now, provide a simplified implementation
-            notes[noteId] = {
-                id: noteId,
-                title: this.extractTitleFromFilename(fileData.filename),
-                content: content,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString(),
-                preview: this.generatePreview(content),
-                tags: [],
-                category: null,
-                is_favorite: false,
-                is_archived: false,
-                word_count: this.calculateWordCount(content),
-                char_count: content.length,
-                created: new Date(),
-                modified: new Date(),
-                imported: true,
-                import_date: new Date().toISOString(),
-                source: 'onenote'
-            };
-
-            // Add note to database
-            dbManager.data.notes[noteId] = notes[noteId];
-            dbManager.saveToLocalStorage();
-
-            return {
-                notes: [notes[noteId]],
-                metadata: {
-                    totalNotes: 1,
-                    source: 'OneNote'
-                }
-            };
-        } catch (error) {
-            console.error('Error importing from OneNote:', error);
-            throw new Error(`OneNote import failed: ${error.message}`);
-        }
-    }
 
     // Bulk import from multiple files
     async importMultipleFiles() {
@@ -372,12 +251,10 @@ class BackendAPI {
 
             const result = await ipcRenderer.invoke('show-open-dialog', {
                 filters: [
-                    { name: 'All Supported Files', extensions: ['md', 'txt', 'json', 'enex', 'one', 'onetoc2'] },
+                    { name: 'All Supported Files', extensions: ['md', 'txt', 'json'] },
                     { name: 'Markdown', extensions: ['md'] },
                     { name: 'Text', extensions: ['txt'] },
-                    { name: 'JSON', extensions: ['json'] },
-                    { name: 'Evernote', extensions: ['enex'] },
-                    { name: 'OneNote', extensions: ['one', 'onetoc2'] }
+                    { name: 'JSON', extensions: ['json'] }
                 ],
                 properties: ['openFile', 'multiSelections']
             });

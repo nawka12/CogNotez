@@ -20,6 +20,436 @@ function renderMarkdown(text) {
     return marked.parse(text);
 }
 
+// Find and Replace Dialog
+class FindReplaceDialog {
+    constructor(app) {
+        this.app = app;
+        this.isVisible = false;
+        this.findText = '';
+        this.replaceText = '';
+        this.currentMatchIndex = -1;
+        this.matches = [];
+        this.caseSensitive = false;
+        this.wholeWord = false;
+        this.regex = false;
+        this.element = null;
+    }
+
+    createDialog() {
+        const dialog = document.createElement('div');
+        dialog.id = 'find-replace-dialog';
+        dialog.className = 'find-replace-dialog';
+        dialog.innerHTML = `
+            <div class="find-replace-header">
+                <h3>Find & Replace</h3>
+                <button id="find-replace-close" class="find-replace-close">✕</button>
+            </div>
+            <div class="find-replace-body">
+                <div class="find-section">
+                    <label for="find-input">Find:</label>
+                    <input type="text" id="find-input" class="find-input" placeholder="Search text...">
+                </div>
+                <div class="replace-section">
+                    <label for="replace-input">Replace:</label>
+                    <input type="text" id="replace-input" class="replace-input" placeholder="Replace with...">
+                </div>
+                <div class="options-section">
+                    <label><input type="checkbox" id="case-sensitive"> Case sensitive</label>
+                    <label><input type="checkbox" id="whole-word"> Whole word</label>
+                    <label><input type="checkbox" id="use-regex"> Regular expression</label>
+                </div>
+                <div class="results-section">
+                    <span id="match-count">No matches</span>
+                </div>
+                <div class="buttons-section">
+                    <button id="find-prev" class="btn-secondary">Previous</button>
+                    <button id="find-next" class="btn-secondary">Next</button>
+                    <button id="replace-next" class="btn-primary">Replace</button>
+                    <button id="replace-all" class="btn-primary">Replace All</button>
+                </div>
+            </div>
+        `;
+
+        // Style the dialog (positioning handled by CSS)
+        Object.assign(dialog.style, {
+            background: 'var(--bg-color)',
+            border: '1px solid var(--border-color)',
+            borderRadius: '8px',
+            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
+            zIndex: '1000',
+            fontSize: '14px',
+            display: 'none'
+        });
+
+        document.body.appendChild(dialog);
+        this.element = dialog;
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        if (!this.element) return;
+
+        // Close button
+        this.element.querySelector('#find-replace-close').addEventListener('click', () => {
+            this.hide();
+        });
+
+        // Find input
+        const findInput = this.element.querySelector('#find-input');
+        findInput.addEventListener('input', (e) => {
+            this.findText = e.target.value;
+            this.findMatches();
+        });
+
+        findInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                this.findNext();
+                // Focus will be handled by findNext() -> selectCurrentMatch(true)
+            } else if (e.key === 'Escape') {
+                this.hide();
+            }
+        });
+
+        // Replace input
+        const replaceInput = this.element.querySelector('#replace-input');
+        replaceInput.addEventListener('input', (e) => {
+            this.replaceText = e.target.value;
+        });
+
+        replaceInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                this.hide();
+            }
+        });
+
+        // Options
+        this.element.querySelector('#case-sensitive').addEventListener('change', (e) => {
+            this.caseSensitive = e.target.checked;
+            this.findMatches();
+        });
+
+        this.element.querySelector('#whole-word').addEventListener('change', (e) => {
+            this.wholeWord = e.target.checked;
+            this.findMatches();
+        });
+
+        this.element.querySelector('#use-regex').addEventListener('change', (e) => {
+            this.regex = e.target.checked;
+            this.findMatches();
+        });
+
+        // Buttons
+        this.element.querySelector('#find-prev').addEventListener('click', () => this.findPrevious());
+        this.element.querySelector('#find-next').addEventListener('click', () => this.findNext());
+        this.element.querySelector('#replace-next').addEventListener('click', () => this.replaceNext());
+        this.element.querySelector('#replace-all').addEventListener('click', () => this.replaceAll());
+    }
+
+    show(findOnly = false) {
+        if (!this.element) {
+            this.createDialog();
+        }
+
+        this.isVisible = true;
+        this.element.style.display = 'block';
+        this.element.querySelector('#find-input').focus();
+
+        if (findOnly) {
+            this.element.querySelector('.replace-section').style.display = 'none';
+            this.element.querySelector('#replace-next').style.display = 'none';
+            this.element.querySelector('#replace-all').style.display = 'none';
+            this.element.querySelector('h3').textContent = 'Find';
+        } else {
+            this.element.querySelector('.replace-section').style.display = 'block';
+            this.element.querySelector('#replace-next').style.display = 'inline-block';
+            this.element.querySelector('#replace-all').style.display = 'inline-block';
+            this.element.querySelector('h3').textContent = 'Find & Replace';
+        }
+
+        // Pre-fill with selected text
+        const editor = document.getElementById('note-editor');
+        if (editor && editor.selectionStart !== editor.selectionEnd) {
+            const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
+            this.element.querySelector('#find-input').value = selectedText;
+            this.findText = selectedText;
+            this.findMatches();
+            // Don't focus editor when dialog opens with pre-filled text
+        }
+    }
+
+    hide() {
+        if (this.element) {
+            this.isVisible = false;
+            this.element.style.display = 'none';
+            this.clearHighlights();
+        }
+    }
+
+    findMatches() {
+        const editor = document.getElementById('note-editor');
+        if (!editor || !this.findText) {
+            this.matches = [];
+            this.currentMatchIndex = -1;
+            this.updateMatchCount();
+            this.clearHighlights();
+            return;
+        }
+
+        const content = editor.value;
+        this.matches = [];
+        let searchText = this.findText;
+
+        if (!this.regex) {
+            // Escape special regex characters for literal search
+            searchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        }
+
+        if (this.wholeWord) {
+            searchText = `\\b${searchText}\\b`;
+        }
+
+        const flags = this.caseSensitive ? 'g' : 'gi';
+        const regex = new RegExp(searchText, flags);
+
+        let match;
+        while ((match = regex.exec(content)) !== null) {
+            this.matches.push({
+                start: match.index,
+                end: match.index + match[0].length,
+                text: match[0]
+            });
+        }
+
+        this.currentMatchIndex = this.matches.length > 0 ? 0 : -1;
+        this.updateMatchCount();
+        this.highlightMatches();
+        this.selectCurrentMatch(false); // Don't focus editor during typing
+    }
+
+    highlightMatches() {
+        this.clearHighlights();
+        if (this.matches.length === 0) return;
+
+        // For now, we'll skip visual highlighting in preview to avoid markdown conflicts
+        // The selection in the textarea provides sufficient visual feedback
+        const editor = document.getElementById('note-editor');
+        if (editor) {
+            this.selectCurrentMatch();
+        }
+    }
+
+    clearHighlights() {
+        // Reset preview to normal content
+        const preview = document.getElementById('markdown-preview');
+        const editor = document.getElementById('note-editor');
+        if (preview && editor) {
+            preview.innerHTML = marked.parse(editor.value);
+        }
+    }
+
+    selectCurrentMatch(focusEditor = false) {
+        if (this.currentMatchIndex >= 0 && this.currentMatchIndex < this.matches.length) {
+            const editor = document.getElementById('note-editor');
+            const match = this.matches[this.currentMatchIndex];
+            editor.setSelectionRange(match.start, match.end);
+
+            if (focusEditor) {
+                editor.focus();
+            }
+
+            // Scroll into view
+            const lineHeight = parseInt(getComputedStyle(editor).lineHeight);
+            const lines = editor.value.substring(0, match.start).split('\n').length;
+            editor.scrollTop = (lines - 1) * lineHeight;
+        }
+    }
+
+    findNext() {
+        if (this.matches.length === 0) return;
+
+        this.currentMatchIndex = (this.currentMatchIndex + 1) % this.matches.length;
+        this.highlightMatches();
+        this.selectCurrentMatch(true); // Focus editor when navigating
+    }
+
+    findPrevious() {
+        if (this.matches.length === 0) return;
+
+        this.currentMatchIndex = this.currentMatchIndex <= 0 ?
+            this.matches.length - 1 : this.currentMatchIndex - 1;
+        this.highlightMatches();
+        this.selectCurrentMatch(true); // Focus editor when navigating
+    }
+
+    replaceNext() {
+        if (this.currentMatchIndex < 0 || this.currentMatchIndex >= this.matches.length) return;
+
+        const editor = document.getElementById('note-editor');
+        const match = this.matches[this.currentMatchIndex];
+        const before = editor.value.substring(0, match.start);
+        const after = editor.value.substring(match.end);
+        const newContent = before + this.replaceText + after;
+
+        editor.value = newContent;
+
+        // Track history
+        if (!this.app.ignoreHistoryUpdate) {
+            const cursorPos = match.start + this.replaceText.length;
+            this.app.historyManager.pushState(newContent, cursorPos, cursorPos, cursorPos);
+        }
+
+        // Update current note
+        if (this.app.currentNote) {
+            this.app.currentNote.content = newContent;
+            this.app.saveCurrentNote();
+        }
+
+        // Update preview
+        this.app.updateNotePreview();
+
+        // Re-find matches with updated content
+        this.findMatches();
+
+        // Adjust current index if necessary
+        if (this.currentMatchIndex >= this.matches.length) {
+            this.currentMatchIndex = Math.max(0, this.matches.length - 1);
+        }
+
+        this.selectCurrentMatch(true); // Focus editor after replacement
+    }
+
+    replaceAll() {
+        if (this.matches.length === 0) return;
+
+        const editor = document.getElementById('note-editor');
+        let content = editor.value;
+        let offset = 0;
+
+        // Replace all matches
+        this.matches.forEach(match => {
+            const before = content.substring(0, match.start + offset);
+            const after = content.substring(match.end + offset);
+            content = before + this.replaceText + after;
+            offset += this.replaceText.length - match.text.length;
+        });
+
+        editor.value = content;
+
+        // Track history
+        if (!this.app.ignoreHistoryUpdate) {
+            this.app.historyManager.pushState(content, 0, 0, 0);
+        }
+
+        // Update current note
+        if (this.app.currentNote) {
+            this.app.currentNote.content = content;
+            this.app.saveCurrentNote();
+        }
+
+        // Update preview
+        this.app.updateNotePreview();
+
+        // Clear matches
+        this.matches = [];
+        this.currentMatchIndex = -1;
+        this.updateMatchCount();
+        this.clearHighlights();
+    }
+
+    updateMatchCount() {
+        const countElement = this.element.querySelector('#match-count');
+        if (this.matches.length === 0) {
+            countElement.textContent = 'No matches';
+        } else {
+            countElement.textContent = `${this.currentMatchIndex + 1} of ${this.matches.length} matches`;
+        }
+    }
+}
+
+// History Manager for undo/redo functionality
+class HistoryManager {
+    constructor(maxHistorySize = 100) {
+        this.history = [];
+        this.currentIndex = -1;
+        this.maxHistorySize = maxHistorySize;
+    }
+
+    // Add a new state to history
+    pushState(content, cursorPosition = 0, selectionStart = 0, selectionEnd = 0) {
+        const state = {
+            content: content,
+            cursorPosition: cursorPosition,
+            selectionStart: selectionStart,
+            selectionEnd: selectionEnd,
+            timestamp: Date.now()
+        };
+
+        // Remove any history after current index (for when we're not at the end)
+        this.history = this.history.slice(0, this.currentIndex + 1);
+
+        // Add new state
+        this.history.push(state);
+        this.currentIndex++;
+
+        // Limit history size
+        if (this.history.length > this.maxHistorySize) {
+            this.history.shift();
+            this.currentIndex--;
+        }
+    }
+
+    // Get current state
+    getCurrentState() {
+        if (this.currentIndex >= 0 && this.currentIndex < this.history.length) {
+            return this.history[this.currentIndex];
+        }
+        return null;
+    }
+
+    // Check if undo is available
+    canUndo() {
+        return this.currentIndex > 0;
+    }
+
+    // Check if redo is available
+    canRedo() {
+        return this.currentIndex < this.history.length - 1;
+    }
+
+    // Perform undo operation
+    undo() {
+        if (!this.canUndo()) return null;
+
+        this.currentIndex--;
+        return this.history[this.currentIndex];
+    }
+
+    // Perform redo operation
+    redo() {
+        if (!this.canRedo()) return null;
+
+        this.currentIndex++;
+        return this.history[this.currentIndex];
+    }
+
+    // Clear all history
+    clear() {
+        this.history = [];
+        this.currentIndex = -1;
+    }
+
+    // Get history statistics
+    getStats() {
+        return {
+            totalStates: this.history.length,
+            currentIndex: this.currentIndex,
+            canUndo: this.canUndo(),
+            canRedo: this.canRedo()
+        };
+    }
+}
+
 class CogNotezApp {
     constructor() {
         this.currentNote = null;
@@ -34,40 +464,49 @@ class CogNotezApp {
         this.aiManager = null;
         this.backendAPI = null;
         this.uiManager = null;
+        this.historyManager = new HistoryManager();
+        this.ignoreHistoryUpdate = false; // Flag to prevent history updates during undo/redo
+        this.findReplaceDialog = new FindReplaceDialog(this);
 
         this.init();
     }
 
     async init() {
         console.log('[DEBUG] Starting CogNotez application initialization...');
+
+        // Show splash screen immediately
+        this.showSplashScreen();
+        this.updateSplashProgress('Starting CogNotez...', 5);
+
         try {
             // Initialize database and managers
             console.log('[DEBUG] Initializing backend API...');
+            this.updateSplashProgress('Initializing backend services...', 15);
             this.backendAPI = new BackendAPI();
             this.backendAPI.setAppReference(this);
             await this.backendAPI.initialize();
 
             console.log('[DEBUG] Initializing notes manager...');
+            this.updateSplashProgress('Loading notes database...', 30);
             this.notesManager = new NotesManager(this);
             await this.notesManager.initialize();
 
             // Start auto-save if enabled in settings
-            const autoSaveEnabled = localStorage.getItem('autoSave') !== 'false'; // Default to true
-            if (autoSaveEnabled) {
-                console.log('[DEBUG] Starting auto-save...');
-                this.notesManager.startAutoSave();
-            }
+            this.initializeAutoSave();
 
             console.log('[DEBUG] Initializing AI manager...');
+            this.updateSplashProgress('Setting up AI features...', 50);
             this.aiManager = new AIManager(this);
             await this.aiManager.initialize();
 
             console.log('[DEBUG] Initializing UI manager...');
+            this.updateSplashProgress('Preparing user interface...', 70);
             this.uiManager = new UIManager(this);
             this.uiManager.initialize();
 
             // Setup UI and event listeners
             console.log('[DEBUG] Setting up event listeners and UI...');
+            this.updateSplashProgress('Finalizing setup...', 85);
             this.setupEventListeners();
             this.setupIPC();
             this.loadTheme();
@@ -76,23 +515,48 @@ class CogNotezApp {
             // Show welcome message in AI panel
             this.showAIMessage('Hello! I\'m your AI assistant. Select some text and right-click to use AI features.', 'assistant');
 
+            this.updateSplashProgress('Ready!', 100);
             console.log('[DEBUG] CogNotez application initialized successfully');
+
+            // Hide splash screen with a small delay to show completion
+            setTimeout(() => {
+                this.hideSplashScreen();
+            }, 800);
+
         } catch (error) {
             console.error('[DEBUG] Failed to initialize application:', error);
             // Continue with basic functionality even if database fails
             console.log('[DEBUG] Continuing with basic functionality...');
+            this.updateSplashProgress('Loading basic features...', 60);
             this.setupEventListeners();
             this.setupIPC();
             this.loadTheme();
             this.loadNotes();
 
             // Start auto-save if enabled in settings (fallback mode)
-            if (this.notesManager) {
-                const autoSaveEnabled = localStorage.getItem('autoSave') !== 'false'; // Default to true
-                if (autoSaveEnabled) {
-                    console.log('[DEBUG] Starting auto-save in fallback mode...');
-                    this.notesManager.startAutoSave();
-                }
+            this.initializeAutoSave();
+
+            this.updateSplashProgress('Ready!', 100);
+            setTimeout(() => {
+                this.hideSplashScreen();
+            }, 800);
+        }
+    }
+
+    // Initialize auto-save based on settings
+    initializeAutoSave() {
+        if (!this.notesManager) return;
+
+        const autoSaveEnabled = localStorage.getItem('autoSave') !== 'false'; // Default to true
+        if (autoSaveEnabled) {
+            if (!this.notesManager.autoSaveInterval) {
+                console.log('[DEBUG] Starting auto-save...');
+                this.notesManager.startAutoSave();
+            }
+        } else {
+            if (this.notesManager.autoSaveInterval) {
+                console.log('[DEBUG] Auto-save disabled in settings, stopping...');
+                this.notesManager.stopAutoSave();
             }
         }
     }
@@ -111,28 +575,46 @@ class CogNotezApp {
         });
 
         // Note list click handler (delegate to notes manager)
-        document.getElementById('notes-list').addEventListener('click', (e) => {
+        document.getElementById('notes-list').addEventListener('click', async (e) => {
             const noteItem = e.target.closest('.note-item');
             if (noteItem) {
                 const noteId = noteItem.dataset.id;
-                this.loadNoteById(noteId);
+                await this.switchToNoteWithWarning(noteId);
             } else {
                 // Clicked on empty space in notes list - clear selection
-                if (this.currentNote) {
+                // Check for unsaved changes before clearing
+                if (this.currentNote && this.notesManager && this.notesManager.hasUnsavedChanges()) {
+                    const shouldClear = await this.showUnsavedChangesWarning();
+                    if (shouldClear) {
+                        this.showNoNotePlaceholder();
+                    }
+                } else {
                     this.showNoNotePlaceholder();
                 }
             }
         });
 
         // Main content area click handler - clear note selection when clicking on empty editor area
-        document.querySelector('.main-content-area').addEventListener('click', (e) => {
+        document.querySelector('.main-content-area').addEventListener('click', async (e) => {
             // Only clear if clicking on the main content area itself, not on child elements
             if (e.target === e.currentTarget && this.currentNote) {
-                this.showNoNotePlaceholder();
+                // Check for unsaved changes before clearing
+                if (this.notesManager && this.notesManager.hasUnsavedChanges()) {
+                    const shouldClear = await this.showUnsavedChangesWarning();
+                    if (shouldClear) {
+                        this.showNoNotePlaceholder();
+                    }
+                } else {
+                    this.showNoNotePlaceholder();
+                }
             }
         });
 
         // Editor actions
+        document.getElementById('undo-btn').addEventListener('click', () => this.undo());
+        document.getElementById('redo-btn').addEventListener('click', () => this.redo());
+        document.getElementById('find-btn').addEventListener('click', () => this.showFindDialog());
+        document.getElementById('replace-btn').addEventListener('click', () => this.showReplaceDialog());
         document.getElementById('preview-toggle-btn').addEventListener('click', () => this.togglePreview());
         document.getElementById('save-btn').addEventListener('click', () => this.saveCurrentNote());
         document.getElementById('ai-summary-btn').addEventListener('click', () => this.summarizeNote());
@@ -198,6 +680,11 @@ class CogNotezApp {
         });
         editor.addEventListener('input', () => {
             this.updateNotePreview();
+            // Track history for undo/redo functionality
+            if (!this.ignoreHistoryUpdate) {
+                const cursorPos = editor.selectionStart;
+                this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+            }
             // Clear stored selection when user types
             this.selectionStart = -1;
             this.selectionEnd = -1;
@@ -239,8 +726,6 @@ class CogNotezApp {
         // Import menu actions
         ipcRenderer.on('menu-import-note', () => this.importNote());
         ipcRenderer.on('menu-import-multiple', () => this.importMultipleFiles());
-        ipcRenderer.on('menu-import-evernote', () => this.importFromEvernote());
-        ipcRenderer.on('menu-import-onenote', () => this.importFromOneNote());
         ipcRenderer.on('menu-restore-backup', () => this.restoreFromBackup());
         ipcRenderer.on('menu-migration-wizard', () => this.showMigrationWizard());
 
@@ -283,7 +768,6 @@ class CogNotezApp {
             editor.classList.remove('hidden');
             toggleBtn.textContent = '👁️';
             toggleBtn.title = 'Toggle Preview/Edit';
-            toggleBtn.classList.remove('active');
         } else {
             // Switch to preview mode
             editor.classList.add('hidden');
@@ -291,7 +775,6 @@ class CogNotezApp {
             this.renderMarkdownPreview();
             toggleBtn.textContent = '✏️';
             toggleBtn.title = 'Toggle Preview/Edit';
-            toggleBtn.classList.add('active');
         }
     }
 
@@ -336,16 +819,75 @@ class CogNotezApp {
         }
     }
 
+    // Check for unsaved changes and show warning before switching notes
+    async switchToNoteWithWarning(noteId) {
+        if (!this.notesManager) return;
+
+        // If no current note or no unsaved changes, switch immediately
+        if (!this.currentNote || !this.notesManager.hasUnsavedChanges()) {
+            await this.loadNoteById(noteId);
+            return;
+        }
+
+        // Show warning dialog for unsaved changes
+        const shouldSwitch = await this.showUnsavedChangesWarning();
+        if (shouldSwitch) {
+            await this.loadNoteById(noteId);
+        }
+    }
+
+    // Show warning dialog for unsaved changes
+    async showUnsavedChangesWarning() {
+        return new Promise((resolve) => {
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0 0 20px 0; color: var(--text-primary);">
+                        You have unsaved changes in the current note.
+                    </p>
+                    <p style="margin: 0 0 20px 0; color: var(--text-secondary); font-size: 14px;">
+                        What would you like to do?
+                    </p>
+                </div>
+            `;
+
+            const modal = this.createModal('Unsaved Changes', content, [
+                { text: 'Save and Switch', type: 'primary', action: 'save-switch' },
+                { text: 'Discard Changes', type: 'secondary', action: 'discard-switch' },
+                { text: 'Cancel', type: 'secondary', action: 'cancel' }
+            ]);
+
+            const saveBtn = modal.querySelector('[data-action="save-switch"]');
+            const discardBtn = modal.querySelector('[data-action="discard-switch"]');
+            const cancelBtn = modal.querySelector('[data-action="cancel"]');
+
+            saveBtn.addEventListener('click', async () => {
+                try {
+                    await this.saveCurrentNote();
+                    this.closeModal(modal);
+                    resolve(true);
+                } catch (error) {
+                    console.error('Error saving note:', error);
+                    this.showNotification('❌ Failed to save note', 'error');
+                    resolve(false);
+                }
+            });
+
+            discardBtn.addEventListener('click', () => {
+                this.closeModal(modal);
+                resolve(true);
+            });
+
+            cancelBtn.addEventListener('click', () => {
+                this.closeModal(modal);
+                resolve(false);
+            });
+        });
+    }
+
     async loadNoteById(noteId) {
         if (!this.notesManager) return;
 
         try {
-            // Auto-save current note before switching if there are unsaved changes
-            if (this.currentNote && this.notesManager.hasUnsavedChanges()) {
-                console.log('[DEBUG] Auto-saving current note before switching...');
-                await this.saveCurrentNote();
-            }
-
             let note;
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 note = await this.notesManager.db.getNote(noteId);
@@ -405,6 +947,9 @@ class CogNotezApp {
         document.getElementById('note-editor').value = note.content;
         document.getElementById('note-date').textContent =
             `Modified: ${new Date(note.modified).toLocaleDateString()} ${new Date(note.modified).toLocaleTimeString()}`;
+
+        // Initialize history for undo/redo functionality
+        this.initializeHistoryForNote(note.content);
 
         // Display tags in the editor header
         this.displayNoteTags(note);
@@ -713,7 +1258,7 @@ class CogNotezApp {
         ).join('');
     }
 
-    async saveCurrentNote() {
+    async saveCurrentNote(isAutoSave = false) {
         if (!this.currentNote || !this.notesManager) return;
 
         const title = document.getElementById('note-title').value.trim();
@@ -740,7 +1285,11 @@ class CogNotezApp {
             }
 
             await this.notesManager.renderNotesList();
-            this.showNotification('Note saved successfully!');
+
+            // Only show notification for manual saves, not auto-saves
+            if (!isAutoSave) {
+                this.showNotification('Note saved successfully!');
+            }
         } catch (error) {
             console.error('Error saving note:', error);
             this.showNotification('Failed to save note', 'error');
@@ -834,7 +1383,7 @@ class CogNotezApp {
                 <div class="note-item-date">${new Date(note.modified || note.created).toLocaleDateString()}</div>
             `;
 
-            element.addEventListener('click', () => this.displayNote(note));
+            element.addEventListener('click', () => this.switchToNoteWithWarning(note.id));
             notesListElement.appendChild(element);
         });
     }
@@ -1511,6 +2060,7 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    this.updateLoadingText('Rewriting text...');
                     this.showLoading();
                     try {
                         console.log('[DEBUG] handleAIAction rewrite: starting with selectedText:', this.selectedText.substring(0, 50) + '...');
@@ -1534,6 +2084,7 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    this.updateLoadingText('Extracting key points...');
                     this.showLoading();
                     try {
                         const keyPointsResponse = await this.aiManager.extractKeyPoints(this.selectedText);
@@ -1549,6 +2100,7 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    this.updateLoadingText('Generating tags...');
                     this.showLoading();
                     try {
                         const tagsResponse = await this.aiManager.generateTags(this.selectedText);
@@ -1569,6 +2121,79 @@ Please provide a helpful response based on the note content and conversation his
             this.showAIMessage('❌ AI action failed. Please check your Ollama connection.', 'assistant');
             this.hideLoading();
         }
+    }
+
+    // Undo/Redo functionality
+    undo() {
+        const editor = document.getElementById('note-editor');
+        if (!editor) return;
+
+        const previousState = this.historyManager.undo();
+        if (previousState) {
+            this.ignoreHistoryUpdate = true;
+            editor.value = previousState.content;
+            editor.selectionStart = previousState.selectionStart;
+            editor.selectionEnd = previousState.selectionEnd;
+            editor.focus();
+
+            // Update current note content
+            if (this.currentNote) {
+                this.currentNote.content = previousState.content;
+                this.saveCurrentNote();
+            }
+
+            this.updateNotePreview();
+            this.ignoreHistoryUpdate = false;
+
+            console.log('[DEBUG] Undo operation completed');
+        }
+    }
+
+    redo() {
+        const editor = document.getElementById('note-editor');
+        if (!editor) return;
+
+        const nextState = this.historyManager.redo();
+        if (nextState) {
+            this.ignoreHistoryUpdate = true;
+            editor.value = nextState.content;
+            editor.selectionStart = nextState.selectionStart;
+            editor.selectionEnd = nextState.selectionEnd;
+            editor.focus();
+
+            // Update current note content
+            if (this.currentNote) {
+                this.currentNote.content = nextState.content;
+                this.saveCurrentNote();
+            }
+
+            this.updateNotePreview();
+            this.ignoreHistoryUpdate = false;
+
+            console.log('[DEBUG] Redo operation completed');
+        }
+    }
+
+    // Initialize history when loading a note
+    initializeHistoryForNote(content = '') {
+        this.historyManager.clear();
+        const editor = document.getElementById('note-editor');
+        if (editor) {
+            this.historyManager.pushState(content, 0, 0, 0);
+        }
+    }
+
+    // Find and Replace methods
+    showFindDialog() {
+        this.findReplaceDialog.show(true); // Find only
+    }
+
+    showReplaceDialog() {
+        this.findReplaceDialog.show(false); // Find and replace
+    }
+
+    hideFindReplaceDialog() {
+        this.findReplaceDialog.hide();
     }
 
     // Selection helpers
@@ -1593,6 +2218,17 @@ Please provide a helpful response based on the note content and conversation his
         const newContent = editor.value.substring(0, start) + replacement + editor.value.substring(end);
         editor.value = newContent;
         console.log('[DEBUG] replaceSelection: updated editor content');
+
+        // Track history for undo/redo
+        if (!this.ignoreHistoryUpdate) {
+            const cursorPos = start + replacement.length;
+            this.historyManager.pushState(newContent, cursorPos, cursorPos, cursorPos);
+        }
+
+        // Dispatch input event to trigger word count update and other listeners
+        const inputEvent = new Event('input', { bubbles: true });
+        editor.dispatchEvent(inputEvent);
+        console.log('[DEBUG] replaceSelection: dispatched input event for word count update');
 
         // Update current note content
         if (this.currentNote) {
@@ -1800,45 +2436,7 @@ Please provide a helpful response based on the note content and conversation his
         }
     }
 
-    async importFromEvernote() {
-        if (!this.backendAPI) return;
 
-        try {
-            this.showLoading();
-            const result = await this.backendAPI.importFromEvernote();
-            if (result && result.notes.length > 0) {
-                this.notes.unshift(...result.notes);
-                await this.saveNotes();
-                this.renderNotesList();
-                this.showNotification(`Imported ${result.notes.length} notes from Evernote!`);
-            }
-            this.hideLoading();
-        } catch (error) {
-            console.error('Evernote import failed:', error);
-            this.showNotification('Failed to import from Evernote', 'error');
-            this.hideLoading();
-        }
-    }
-
-    async importFromOneNote() {
-        if (!this.backendAPI) return;
-
-        try {
-            this.showLoading();
-            const result = await this.backendAPI.importFromOneNote();
-            if (result && result.notes.length > 0) {
-                this.notes.unshift(...result.notes);
-                await this.saveNotes();
-                this.renderNotesList();
-                this.showNotification(`Imported ${result.notes.length} notes from OneNote!`);
-            }
-            this.hideLoading();
-        } catch (error) {
-            console.error('OneNote import failed:', error);
-            this.showNotification('Failed to import from OneNote', 'error');
-            this.hideLoading();
-        }
-    }
 
     // Refresh the legacy notes array from database data (for backward compatibility)
     async refreshLegacyNotesArray() {
@@ -1960,20 +2558,6 @@ Please provide a helpful response based on the note content and conversation his
                         </button>
                     </div>
 
-                    <div style="background: var(--context-menu-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <h5 style="margin: 0 0 8px 0; color: var(--text-primary);">📋 From Other Apps</h5>
-                        <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 13px;">
-                            Import from Evernote, OneNote, or other note-taking applications.
-                        </p>
-                        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                            <button class="migration-option-btn" data-action="migrate-evernote" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer;">
-                                Evernote
-                            </button>
-                            <button class="migration-option-btn" data-action="migrate-onenote" style="padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer;">
-                                OneNote
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
@@ -1988,7 +2572,7 @@ Please provide a helpful response based on the note content and conversation his
             </div>
         `;
 
-        const modal = this.showModal('Migration Wizard', content, 'migration-modal');
+        const modal = this.createModal('Migration Wizard', content);
 
         // Add event listeners for migration options
         const migrationButtons = modal.querySelectorAll('.migration-option-btn');
@@ -2007,13 +2591,6 @@ Please provide a helpful response based on the note content and conversation his
                 await this.performJSONMigration();
                 break;
 
-            case 'migrate-evernote':
-                this.importFromEvernote();
-                break;
-
-            case 'migrate-onenote':
-                this.importFromOneNote();
-                break;
 
             default:
                 console.warn('Unknown migration action:', action);
@@ -2120,11 +2697,55 @@ Please provide a helpful response based on the note content and conversation his
             </div>
         `;
 
-        this.showModal('Migration Complete', content);
+        this.createModal('Migration Complete', content);
     }
 
     generateId() {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
+    }
+
+    // Splash screen methods
+    showSplashScreen() {
+        const splash = document.getElementById('splash-screen');
+        const app = document.getElementById('app');
+        if (splash) {
+            splash.style.display = 'flex';
+            splash.style.opacity = '1';
+            splash.style.visibility = 'visible';
+        }
+        if (app) {
+            app.classList.add('app-hidden');
+            app.classList.remove('app-visible');
+        }
+    }
+
+    hideSplashScreen() {
+        const splash = document.getElementById('splash-screen');
+        const app = document.getElementById('app');
+        if (splash) {
+            splash.style.opacity = '0';
+            splash.style.visibility = 'hidden';
+            setTimeout(() => {
+                splash.style.display = 'none';
+            }, 500);
+        }
+        if (app) {
+            app.classList.remove('app-hidden');
+            app.classList.add('app-visible');
+        }
+    }
+
+    updateSplashProgress(text, percentage = null) {
+        const progressText = document.getElementById('progress-text');
+        const progressFill = document.getElementById('progress-fill');
+
+        if (progressText && text) {
+            progressText.textContent = text;
+        }
+
+        if (progressFill && percentage !== null) {
+            progressFill.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+        }
     }
 
     // Utility methods
@@ -2206,6 +2827,22 @@ Please provide a helpful response based on the note content and conversation his
 
         if (cmdOrCtrl) {
             switch (e.key) {
+                // Undo/Redo operations
+                case 'z':
+                    if (!e.shiftKey) {
+                        e.preventDefault();
+                        this.undo();
+                    } else {
+                        // Ctrl+Shift+Z is also redo
+                        e.preventDefault();
+                        this.redo();
+                    }
+                    break;
+                case 'y':
+                    e.preventDefault();
+                    this.redo();
+                    break;
+
                 // Basic note operations
                 case 's':
                     e.preventDefault();
@@ -2222,6 +2859,14 @@ Please provide a helpful response based on the note content and conversation his
                 case 'o':
                     e.preventDefault();
                     this.openNoteDialog();
+                    break;
+                case 'f':
+                    e.preventDefault();
+                    this.showFindDialog();
+                    break;
+                case 'h':
+                    e.preventDefault();
+                    this.showReplaceDialog();
                     break;
 
                 // AI shortcuts (with Shift)
@@ -2285,6 +2930,12 @@ Please provide a helpful response based on the note content and conversation his
             { key: 'Ctrl+S', description: 'Save current note' },
             { key: 'Ctrl+O', description: 'Open note' },
             { key: 'Ctrl+/', description: 'Focus search' },
+
+            // Text editing operations
+            { key: 'Ctrl+Z', description: 'Undo last change' },
+            { key: 'Ctrl+Y', description: 'Redo last undone change' },
+            { key: 'Ctrl+F', description: 'Find text in current note' },
+            { key: 'Ctrl+H', description: 'Find and replace text' },
 
             // AI operations (all require text selection)
             { key: 'Ctrl+Shift+S', description: 'Summarize selected text' },
@@ -2363,6 +3014,7 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    this.updateLoadingText('Extracting key points...');
                     this.showLoading();
                     response = await this.aiManager.extractKeyPoints(this.selectedText);
                     await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'key-points');
@@ -2375,6 +3027,7 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    this.updateLoadingText('Generating tags...');
                     this.showLoading();
                     response = await this.aiManager.generateTags(this.selectedText);
                     await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'tags');
@@ -2800,6 +3453,7 @@ Please provide a helpful response based on the note content and conversation his
         testBtn.addEventListener('click', async () => {
             const backend = modal.querySelector('#ai-backend').value;
 
+            this.updateLoadingText('Testing AI connection...');
             this.showLoading();
             try {
                 await this.aiManager.switchBackend(backend);
@@ -2913,14 +3567,25 @@ Please provide a helpful response based on the note content and conversation his
             this.theme = theme;
             this.loadTheme();
 
+            // Refresh word count display based on new settings
+            if (this.uiManager) {
+                this.uiManager.refreshWordCount();
+            }
+
             // Handle auto-save changes
             if (this.notesManager) {
-                if (autoSaveEnabled && !this.notesManager.autoSaveInterval) {
-                    this.notesManager.startAutoSave();
-                    console.log('[DEBUG] Auto-save enabled');
-                } else if (!autoSaveEnabled && this.notesManager.autoSaveInterval) {
-                    this.notesManager.stopAutoSave();
-                    console.log('[DEBUG] Auto-save disabled');
+                if (autoSaveEnabled) {
+                    // Ensure autosave is running
+                    if (!this.notesManager.autoSaveInterval) {
+                        this.notesManager.startAutoSave();
+                        console.log('[DEBUG] Auto-save enabled');
+                    }
+                } else {
+                    // Ensure autosave is stopped
+                    if (this.notesManager.autoSaveInterval) {
+                        this.notesManager.stopAutoSave();
+                        console.log('[DEBUG] Auto-save disabled');
+                    }
                 }
             }
 

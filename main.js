@@ -156,18 +156,6 @@ const createMenu = () => {
                 mainWindow.webContents.send('menu-import-multiple');
               }
             },
-            {
-              label: 'Import from Evernote',
-              click: () => {
-                mainWindow.webContents.send('menu-import-evernote');
-              }
-            },
-            {
-              label: 'Import from OneNote',
-              click: () => {
-                mainWindow.webContents.send('menu-import-onenote');
-              }
-            },
             { type: 'separator' },
             {
               label: 'Restore from Backup',

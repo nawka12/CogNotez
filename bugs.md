@@ -4,4 +4,5 @@ Status information:
 [Half-working]: Some aspect of it are fixed, but some are still broken
 [Fixed]: Bugs has been squashed
 
-1. [Fixed] Scrolling is buggy. On long notes, user can only scroll using arrow keys, but the whole UI scrolls, not only the textarea.
+1. [Fixed] "Note saved successfully" notification when Auto save is on is too aggresive. How to make this more subtle?
+2. [Fixed] Loading screen is not consistent. For example, some times it shows "Preparing to restore backup" when it should be "Processing with AI" vice versa.

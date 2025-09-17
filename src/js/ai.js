@@ -1812,6 +1812,7 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
+            this.app.updateLoadingText('Summarizing content...');
             this.app.showLoading();
             const summary = await this.summarize(text);
             this.app.showAIMessage(`${summary}`, 'assistant');
@@ -1831,6 +1832,7 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
+            this.app.updateLoadingText('Processing with AI...');
             this.app.showLoading();
             const answer = await this.askQuestion(question, context);
             this.app.showAIMessage(`${answer}`, 'assistant');
@@ -1853,6 +1855,7 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
+            this.app.updateLoadingText('Editing text with AI...');
             this.app.showLoading();
             
             console.log('[DEBUG] AI handleEditText: Starting with text:', text.substring(0, 50) + '...');
@@ -1865,8 +1868,7 @@ Suggested tags:`;
                 editedResult.includes('Failed to scrape') ||
                 editedResult.includes('Web scraper not available') ||
                 editedResult.includes('Tool execution failed') ||
-                editedResult.includes('All scraping attempts failed') ||
-                editedResult.length < 10 // Too short to be meaningful
+                editedResult.includes('All scraping attempts failed')
             )) {
                 toolExecutionSuccessful = false;
                 console.log('[DEBUG] AI handleEditText: Tool execution appears to have failed - will not edit note');

@@ -255,38 +255,7 @@ class UIManager {
     enhanceEditor() {
         const editor = document.getElementById('note-editor');
 
-        // Auto-resize textarea with improved scrolling behavior
-        const autoResize = () => {
-            // Store current scroll position
-            const scrollTop = editor.scrollTop;
-
-            // Only resize if the content height has actually changed significantly
-            const currentHeight = parseInt(editor.style.height) || 0;
-            const scrollHeight = editor.scrollHeight;
-            const maxHeight = parseInt(getComputedStyle(editor).maxHeight) || 0;
-
-            // Allow some tolerance to prevent constant resizing during typing
-            if (Math.abs(scrollHeight - currentHeight) > 20) {
-                // Don't exceed max-height
-                const newHeight = Math.min(scrollHeight, maxHeight);
-                editor.style.height = newHeight + 'px';
-            }
-
-            // Restore scroll position
-            editor.scrollTop = scrollTop;
-        };
-
-        // Throttle the resize function to prevent excessive calls
-        let resizeTimeout;
-        const throttledResize = () => {
-            clearTimeout(resizeTimeout);
-            resizeTimeout = setTimeout(autoResize, 150);
-        };
-
-        editor.addEventListener('input', throttledResize);
-        autoResize(); // Initial resize
-
-        // Handle scrolling properly
+        // Handle scrolling properly for textarea
         editor.addEventListener('keydown', (e) => {
             // Handle arrow keys for scrolling
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
@@ -307,6 +276,30 @@ class UIManager {
                 }
             }
         });
+
+        // Handle scrolling for markdown preview as well
+        const preview = document.getElementById('markdown-preview');
+        if (preview) {
+            preview.addEventListener('keydown', (e) => {
+                // Handle arrow keys for scrolling in preview mode
+                if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                    // Check if content overflows and we're at the boundaries
+                    const atTop = preview.scrollTop === 0;
+                    const atBottom = preview.scrollTop + preview.clientHeight >= preview.scrollHeight;
+
+                    if ((e.key === 'ArrowUp' && atTop) || (e.key === 'ArrowDown' && atBottom)) {
+                        // If we're at the boundary, let the event bubble up to parent elements
+                        return;
+                    }
+
+                    // If content overflows, handle scrolling within preview
+                    if (preview.scrollHeight > preview.clientHeight) {
+                        // Prevent event from bubbling to avoid page scrolling
+                        e.stopPropagation();
+                    }
+                }
+            });
+        }
 
         // Syntax highlighting (basic implementation)
         this.setupSyntaxHighlighting();
@@ -344,34 +337,36 @@ class UIManager {
     }
 
     setupWordCount() {
+        // Check if word count should be shown according to settings
+        const showWordCount = localStorage.getItem('showWordCount') !== 'false'; // Default to true if not set
+        if (!showWordCount) {
+            return; // Don't create word count if disabled in settings
+        }
+
         const editor = document.getElementById('note-editor');
         const aiPanel = document.getElementById('ai-panel');
         const wordCountElement = document.createElement('div');
         wordCountElement.id = 'word-count';
         wordCountElement.style.cssText = `
             position: absolute;
-            bottom: 10px;
-            right: 20px;
+            bottom: 15px;
+            right: 15px;
             font-size: 12px;
             color: var(--text-tertiary);
             background: var(--bg-primary);
             padding: 4px 8px;
             border-radius: 4px;
             border: 1px solid var(--border-color);
-            z-index: 10;
+            z-index: 100;
+            pointer-events: none;
         `;
 
         document.querySelector('.editor-wrapper').appendChild(wordCountElement);
 
         const updateWordCountPosition = () => {
-            // Adjust position when AI panel is visible to prevent overlap
-            if (aiPanel && !aiPanel.classList.contains('hidden')) {
-                // When AI panel is visible, position word count to the left of the panel
-                wordCountElement.style.right = '370px'; // 350px (AI panel width) + 20px (margin)
-            } else {
-                // Default position when AI panel is hidden
-                wordCountElement.style.right = '20px';
-            }
+            // Position the word count with adequate margin from the edge
+            // The editor-wrapper has padding: 20px, so we use a smaller right value
+            wordCountElement.style.right = '15px';
         };
 
         const updateWordCount = () => {
@@ -396,6 +391,28 @@ class UIManager {
 
         editor.addEventListener('input', updateWordCount);
         updateWordCount();
+
+        // Store references for potential re-initialization
+        this.wordCountElement = wordCountElement;
+        this.updateWordCountPosition = updateWordCountPosition;
+        this.updateWordCount = updateWordCount;
+    }
+
+    // Refresh word count based on settings
+    refreshWordCount() {
+        // Remove existing word count if it exists
+        const existingWordCount = document.getElementById('word-count');
+        if (existingWordCount) {
+            existingWordCount.remove();
+        }
+
+        // Clear stored references
+        this.wordCountElement = null;
+        this.updateWordCountPosition = null;
+        this.updateWordCount = null;
+
+        // Re-initialize word count with new settings
+        this.setupWordCount();
     }
 
     // Theme animations

@@ -87,11 +87,8 @@ class NotesManager {
             <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">🗑️</button>
         `;
 
-        // Click on the note content (not the delete button)
-        const contentElement = element.querySelector('.note-item-content');
-        contentElement.addEventListener('click', () => {
-            this.app.displayNote(note);
-        });
+        // Note selection is now handled by the app.js delegate event listener
+        // This prevents duplicate event handlers and double warnings
 
         // Delete button functionality
         const deleteBtn = element.querySelector('.note-delete-btn');
@@ -346,7 +343,7 @@ class NotesManager {
         this.autoSaveInterval = setInterval(() => {
             if (this.app.currentNote && this.hasUnsavedChanges()) {
                 console.log('[DEBUG] Time-based autosave triggered');
-                this.app.saveCurrentNote();
+                this.app.saveCurrentNote(true); // Pass true to indicate auto-save
             }
         }, 15000); // Auto-save every 15 seconds for better responsiveness
 
@@ -357,7 +354,7 @@ class NotesManager {
                 // Delay autosave slightly to avoid conflicts
                 this.blurTimeout = setTimeout(() => {
                     console.log('[DEBUG] Window blur autosave triggered');
-                    this.app.saveCurrentNote();
+                    this.app.saveCurrentNote(true); // Pass true to indicate auto-save
                 }, 500);
             }
         });
@@ -379,13 +376,21 @@ class NotesManager {
             this.typingTimeout = setTimeout(() => {
                 if (this.app.currentNote && this.hasUnsavedChanges()) {
                     console.log('[DEBUG] Typing pause autosave triggered');
-                    this.app.saveCurrentNote();
+                    this.app.saveCurrentNote(true); // Pass true to indicate auto-save
                 }
             }, 500); // Save after 0.5 seconds of no typing
         };
 
+        // Immediate autosave for title changes
+        const handleTitleChange = () => {
+            if (this.app.currentNote && this.hasUnsavedChanges()) {
+                console.log('[DEBUG] Title change autosave triggered');
+                this.app.saveCurrentNote(true); // Pass true to indicate auto-save
+            }
+        };
+
         // Attach typing listeners to title and content inputs
-        document.getElementById('note-title').addEventListener('input', handleTyping);
+        document.getElementById('note-title').addEventListener('input', handleTitleChange);
         document.getElementById('note-editor').addEventListener('input', handleTyping);
     }
 
@@ -456,8 +461,7 @@ class NotesManager {
     handleNoteContextAction(action, noteId) {
         switch (action) {
             case 'open':
-                const note = this.app.notes.find(n => n.id === noteId);
-                if (note) this.app.displayNote(note);
+                this.app.switchToNoteWithWarning(noteId);
                 break;
             case 'duplicate':
                 this.duplicateNote(noteId);

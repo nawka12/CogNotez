@@ -25,7 +25,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - **Multi-Model Support**: Choose from different Ollama models
 - **Web Scraping**: Extract content from websites, Reddit, and Fandom wikis
 - **Web Search Integration**: Optional SearXNG integration for enhanced AI queries
-- **Advanced Import/Export**: Support for Evernote, OneNote, JSON, and bulk file operations
+- **Advanced Import/Export**: Support for JSON and bulk file operations
 
 ### User Experience
 - **Keyboard Shortcuts**: Full keyboard navigation support
@@ -126,8 +126,6 @@ CogNotez includes powerful web scraping capabilities to extract content from var
 Comprehensive import and export capabilities for maximum data portability:
 
 - **JSON Export/Import**: Complete database export and import for backups
-- **Evernote ENEX Support**: Import notes from Evernote export files
-- **OneNote Compatibility**: Import content from OneNote files
 - **Bulk File Operations**: Import multiple files at once
 - **Migration Wizard**: Guided migration between CogNotez installations
 
@@ -342,7 +340,7 @@ MIT License - see LICENSE file for details.
 ### Recently Added Features ✅
 - ✅ Web scraping integration (Reddit, Fandom, generic sites)
 - ✅ SearXNG web search integration
-- ✅ Advanced import/export (Evernote, OneNote, JSON, bulk operations)
+- ✅ Advanced import/export (JSON, bulk operations)
 - ✅ Backup and restore functionality
 - ✅ Migration wizard
 - ✅ Enhanced sharing capabilities
@@ -423,10 +421,6 @@ MIT License - see LICENSE file for details.
    - Check for corrupted backup files
    - Ensure sufficient disk space
 
-2. **Evernote/OneNote Import**:
-   - Verify file format compatibility
-   - Check file encoding (UTF-8 recommended)
-   - Large files may require more processing time
 
 ## Support
 

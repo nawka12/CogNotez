@@ -4,11 +4,39 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>CogNotez - AI-Powered Notes</title>
+    <script>
+        // Apply theme immediately to prevent flashbang
+        (function() {
+            const theme = localStorage.getItem('theme') || 'light';
+            document.documentElement.setAttribute('data-theme', theme);
+        })();
+    </script>
     <link rel="stylesheet" href="./css/styles.css">
     <link rel="stylesheet" href="./css/themes.css">
 </head>
 <body>
-    <div id="app">
+    <!-- Splash Screen -->
+    <div id="splash-screen" class="splash-screen">
+        <div class="splash-content">
+            <div class="splash-logo">
+                <div class="splash-icon">📝</div>
+                <h1 class="splash-title">CogNotez</h1>
+                <p class="splash-subtitle">AI-Powered Note App</p>
+            </div>
+            <div class="splash-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="progress-text" id="progress-text">Initializing...</div>
+            </div>
+            <div class="splash-footer">
+                <p class="splash-version">Version 0.1.0</p>
+                <div class="splash-spinner"></div>
+            </div>
+        </div>
+    </div>
+
+    <div id="app" class="app-hidden">
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
@@ -49,18 +77,22 @@
                             <span id="note-date" class="note-date"></span>
                         </div>
                         <div class="editor-actions">
-                            <button id="preview-toggle-btn" class="action-btn active" title="Toggle Preview/Edit">👁️</button>
+                            <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)">↶</button>
+                            <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)">↷</button>
+                            <button id="find-btn" class="action-btn" title="Find (Ctrl+F)">🔍</button>
+                            <button id="replace-btn" class="action-btn" title="Replace (Ctrl+H)">🔄</button>
+                            <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit">✏️</button>
                             <button id="save-btn" class="action-btn" title="Save">💾</button>
                             <button id="ai-summary-btn" class="action-btn" title="AI Summary">📝</button>
                             <button id="generate-tags-btn" class="action-btn" title="Generate Tags">🏷️</button>
-                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags">✏️</button>
+                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags">📋</button>
                             <button id="export-btn" class="action-btn" title="Export">📤</button>
                             <button id="share-btn" class="action-btn" title="Share">📢</button>
                         </div>
                     </div>
                     <div class="editor-wrapper">
-                        <textarea id="note-editor" class="note-editor" placeholder="Start writing your note..."></textarea>
-                        <div id="markdown-preview" class="markdown-preview hidden"></div>
+                        <textarea id="note-editor" class="note-editor hidden" placeholder="Start writing your note..."></textarea>
+                        <div id="markdown-preview" class="markdown-preview"></div>
                     </div>
                 </div>
 
