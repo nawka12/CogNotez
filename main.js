@@ -220,7 +220,7 @@ const createMenu = () => {
         { type: 'separator' },
         {
           label: 'Rewrite Selection',
-          accelerator: 'CmdOrCtrl+Shift+R',
+          accelerator: 'CmdOrCtrl+Shift+W',
           click: () => {
             mainWindow.webContents.send('menu-rewrite');
           }

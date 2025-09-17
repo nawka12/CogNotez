@@ -2888,7 +2888,7 @@ Please provide a helpful response based on the note content and conversation his
                         this.editSelectionWithAI();
                     }
                     break;
-                case 'R': // Ctrl+Shift+R
+                case 'W': // Ctrl+Shift+W
                     if (e.shiftKey) {
                         e.preventDefault();
                         this.rewriteSelection();
@@ -2941,7 +2941,7 @@ Please provide a helpful response based on the note content and conversation his
             { key: 'Ctrl+Shift+S', description: 'Summarize selected text' },
             { key: 'Ctrl+Shift+A', description: 'Ask AI about selected text' },
             { key: 'Ctrl+Shift+E', description: 'Edit selected text with AI' },
-            { key: 'Ctrl+Shift+R', description: 'Rewrite selected text' },
+            { key: 'Ctrl+Shift+W', description: 'Rewrite selected text' },
             { key: 'Ctrl+Shift+K', description: 'Extract key points' },
             { key: 'Ctrl+Shift+T', description: 'Generate tags for selection' },
 
