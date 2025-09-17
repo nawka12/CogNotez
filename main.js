@@ -22,7 +22,7 @@ function createWindow() {
       contextIsolation: false,
       enableRemoteModule: true
     },
-    icon: path.join(__dirname, 'assets', 'icon.png'), // We'll add this later
+    icon: path.join(__dirname, 'assets', 'icon.svg'),
     titleBarStyle: 'default',
     show: false // Don't show until ready
   });

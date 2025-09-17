@@ -84,7 +84,7 @@ class NotesManager {
                 ${tagsHtml}
                 <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
             </div>
-            <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note">🗑️</button>
+            <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note"><i class="fas fa-trash"></i></button>
         `;
 
         // Note selection is now handled by the app.js delegate event listener
@@ -105,7 +105,7 @@ class NotesManager {
         emptyState.className = 'empty-state';
         emptyState.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: var(--text-tertiary);">
-                <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-sticky-note"></i></div>
                 <div style="font-size: 16px; margin-bottom: 8px;">No notes yet</div>
                 <div style="font-size: 14px;">Click the + button to create your first note</div>
             </div>

@@ -218,7 +218,7 @@ class UIManager {
                 el.style.display = isCollapsed ? 'none' : 'block';
             });
 
-            toggle.textContent = isCollapsed ? '☰' : '◁';
+            toggle.innerHTML = isCollapsed ? '<i class="fas fa-bars"></i>' : '<i class="fas fa-chevron-left"></i>';
         });
 
         // Note drag and drop (placeholder)

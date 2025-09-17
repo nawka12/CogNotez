@@ -11,6 +11,7 @@
             document.documentElement.setAttribute('data-theme', theme);
         })();
     </script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <link rel="stylesheet" href="./css/styles.css">
     <link rel="stylesheet" href="./css/themes.css">
 </head>
@@ -19,7 +20,7 @@
     <div id="splash-screen" class="splash-screen">
         <div class="splash-content">
             <div class="splash-logo">
-                <div class="splash-icon">📝</div>
+                <div class="splash-icon"><img src="../assets/icon.svg" alt="CogNotez Logo" width="64" height="64"></div>
                 <h1 class="splash-title">CogNotez</h1>
                 <p class="splash-subtitle">AI-Powered Note App</p>
             </div>
@@ -40,16 +41,19 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
-                <h1 class="app-title">CogNotez</h1>
+                <div class="app-title-container">
+                    <img src="../assets/icon.svg" alt="CogNotez Logo" class="app-logo" width="32" height="32">
+                    <h1 class="app-title">CogNotez</h1>
+                </div>
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
-                    <button id="search-button" class="search-button">🔍</button>
+                    <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
                 </div>
             </div>
             <div class="header-right">
-                <button id="theme-toggle" class="theme-toggle" title="Toggle theme">🌙</button>
-                <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant">🤖</button>
-                <button id="new-note-btn" class="new-note-btn" title="New note">➕</button>
+                <button id="theme-toggle" class="theme-toggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+                <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
+                <button id="new-note-btn" class="new-note-btn" title="New note"><i class="fas fa-plus"></i></button>
             </div>
         </header>
 
@@ -59,7 +63,7 @@
             <aside class="sidebar">
                 <div class="sidebar-header">
                     <h2>Notes</h2>
-                    <button id="sidebar-toggle" class="sidebar-toggle">☰</button>
+                    <button id="sidebar-toggle" class="sidebar-toggle"><i class="fas fa-bars"></i></button>
                 </div>
                 <div class="notes-list" id="notes-list">
                     <!-- Notes will be populated here -->
@@ -77,17 +81,17 @@
                             <span id="note-date" class="note-date"></span>
                         </div>
                         <div class="editor-actions">
-                            <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)">↶</button>
-                            <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)">↷</button>
-                            <button id="find-btn" class="action-btn" title="Find (Ctrl+F)">🔍</button>
-                            <button id="replace-btn" class="action-btn" title="Replace (Ctrl+H)">🔄</button>
-                            <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit">✏️</button>
-                            <button id="save-btn" class="action-btn" title="Save">💾</button>
-                            <button id="ai-summary-btn" class="action-btn" title="AI Summary">📝</button>
-                            <button id="generate-tags-btn" class="action-btn" title="Generate Tags">🏷️</button>
-                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags">📋</button>
-                            <button id="export-btn" class="action-btn" title="Export">📤</button>
-                            <button id="share-btn" class="action-btn" title="Share">📢</button>
+                            <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+                            <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+                            <button id="find-btn" class="action-btn" title="Find (Ctrl+F)"><i class="fas fa-search"></i></button>
+                            <button id="replace-btn" class="action-btn" title="Replace (Ctrl+H)"><i class="fas fa-exchange-alt"></i></button>
+                            <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit"><i class="fas fa-edit"></i></button>
+                            <button id="save-btn" class="action-btn" title="Save"><i class="fas fa-save"></i></button>
+                            <button id="ai-summary-btn" class="action-btn" title="AI Summary"><i class="fas fa-file-alt"></i></button>
+                            <button id="generate-tags-btn" class="action-btn" title="Generate Tags"><i class="fas fa-tags"></i></button>
+                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags"><i class="fas fa-clipboard-list"></i></button>
+                            <button id="export-btn" class="action-btn" title="Export"><i class="fas fa-download"></i></button>
+                            <button id="share-btn" class="action-btn" title="Share"><i class="fas fa-share"></i></button>
                         </div>
                     </div>
                     <div class="editor-wrapper">
@@ -99,11 +103,11 @@
                 <!-- No Note Selected Placeholder -->
                 <div class="no-note-placeholder hidden" id="no-note-placeholder">
                     <div class="placeholder-content">
-                        <div class="placeholder-icon">📝</div>
+                        <div class="placeholder-icon"><i class="fas fa-sticky-note"></i></div>
                         <h2 class="placeholder-title">Select a note to start</h2>
                         <p class="placeholder-description">Choose a note from the sidebar or create a new one to begin writing</p>
                         <button id="create-first-note-btn" class="create-note-btn">
-                            <span class="btn-icon">➕</span>
+                            <span class="btn-icon"><i class="fas fa-plus"></i></span>
                             Create New Note
                         </button>
                     </div>
@@ -115,8 +119,8 @@
                 <div class="ai-panel-header">
                     <h3>AI Assistant</h3>
                     <div class="ai-panel-actions">
-                        <button id="ai-reset-btn" class="ai-reset-btn" title="New Chat">🆕</button>
-                        <button id="ai-panel-close" class="ai-panel-close">✕</button>
+                        <button id="ai-reset-btn" class="ai-reset-btn" title="New Chat"><i class="fas fa-plus-circle"></i></button>
+                        <button id="ai-panel-close" class="ai-panel-close"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
                 <div class="ai-panel-content">
@@ -133,8 +137,8 @@
 
         <!-- Context Menu (hidden) -->
         <div id="context-menu" class="context-menu hidden">
-            <div class="context-menu-item" data-action="summarize">📝 Summarize Note</div>
-            <div class="context-menu-item" data-action="ask-ai">🤖 Ask AI About Note</div>
+            <div class="context-menu-item" data-action="summarize"><i class="fas fa-file-alt"></i> Summarize Note</div>
+            <div class="context-menu-item" data-action="ask-ai"><i class="fas fa-robot"></i> Ask AI About Note</div>
         </div>
 
         <!-- Modals/Dialogs -->
@@ -142,7 +146,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h3 id="ai-dialog-title">AI Assistant</h3>
-                    <button id="ai-dialog-close" class="modal-close">✕</button>
+                    <button id="ai-dialog-close" class="modal-close"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="modal-body">
                     <div id="ai-dialog-context" class="ai-dialog-context"></div>

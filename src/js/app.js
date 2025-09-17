@@ -42,7 +42,7 @@ class FindReplaceDialog {
         dialog.innerHTML = `
             <div class="find-replace-header">
                 <h3>Find & Replace</h3>
-                <button id="find-replace-close" class="find-replace-close">✕</button>
+                <button id="find-replace-close" class="find-replace-close"><i class="fas fa-times"></i></button>
             </div>
             <div class="find-replace-body">
                 <div class="find-section">
@@ -751,7 +751,7 @@ class CogNotezApp {
 
     updateThemeToggleButton() {
         const button = document.getElementById('theme-toggle');
-        button.textContent = this.theme === 'light' ? '🌙' : '☀️';
+        button.innerHTML = this.theme === 'light' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
     }
 
     // Preview/Edit mode toggle
@@ -766,14 +766,14 @@ class CogNotezApp {
             // Switch to edit mode
             preview.classList.add('hidden');
             editor.classList.remove('hidden');
-            toggleBtn.textContent = '👁️';
+            toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
             toggleBtn.title = 'Toggle Preview/Edit';
         } else {
             // Switch to preview mode
             editor.classList.add('hidden');
             preview.classList.remove('hidden');
             this.renderMarkdownPreview();
-            toggleBtn.textContent = '✏️';
+            toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
             toggleBtn.title = 'Toggle Preview/Edit';
         }
     }
@@ -1049,7 +1049,7 @@ class CogNotezApp {
                 <div class="modal-content tag-manager-content">
                     <div class="modal-header">
                         <h3>Manage Tags</h3>
-                        <button id="tag-manager-close" class="modal-close">✕</button>
+                        <button id="tag-manager-close" class="modal-close"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="modal-body">
                         <div class="tag-manager-section">
@@ -1365,7 +1365,7 @@ class CogNotezApp {
             emptyState.className = 'empty-state';
             emptyState.innerHTML = `
                 <div style="text-align: center; padding: 40px 20px; color: var(--text-tertiary);">
-                    <div style="font-size: 48px; margin-bottom: 16px;">📝</div>
+                    <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-sticky-note"></i></div>
                     <div style="font-size: 16px; margin-bottom: 8px;">No notes yet</div>
                     <div style="font-size: 14px;">Click the + button to create your first note</div>
                 </div>
@@ -1559,7 +1559,7 @@ Please provide a helpful response based on the note content and conversation his
                 console.log('[DEBUG] AI response received:', response.substring(0, 200) + '...');
             } else {
                 console.log('[DEBUG] AI Manager not connected, showing offline message');
-                response = '🤖 AI features are currently offline. Please ensure Ollama is running locally.';
+                response = '<i class="fas fa-robot"></i> AI features are currently offline. Please ensure Ollama is running locally.';
             }
 
             // Remove typing indicator and show actual response
@@ -1778,22 +1778,22 @@ Please provide a helpful response based on the note content and conversation his
 
         menu.innerHTML = `
             <div class="context-menu-item" data-action="summarize">
-                📝 Summarize Selection
+                <i class="fas fa-file-alt"></i> Summarize Selection
             </div>
             <div class="context-menu-item" data-action="ask-ai">
-                🤖 Ask AI About Selection
+                <i class="fas fa-robot"></i> Ask AI About Selection
             </div>
             <div class="context-menu-item" data-action="edit-ai">
-                ✏️ Edit Selection with AI
+                <i class="fas fa-edit"></i> Edit Selection with AI
             </div>
             <div class="context-menu-item" data-action="rewrite">
-                🎨 Rewrite Selection
+                <i class="fas fa-palette"></i> Rewrite Selection
             </div>
             <div class="context-menu-item" data-action="key-points">
-                📋 Extract Key Points
+                <i class="fas fa-clipboard-list"></i> Extract Key Points
             </div>
             <div class="context-menu-item" data-action="generate-tags">
-                🏷️ Generate Tags
+                <i class="fas fa-tags"></i> Generate Tags
             </div>
         `;
 
@@ -2095,7 +2095,7 @@ Please provide a helpful response based on the note content and conversation his
                     try {
                         const keyPointsResponse = await this.aiManager.extractKeyPoints(this.selectedText);
                         await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, keyPointsResponse, this.selectedText, 'key-points');
-                        this.showAIMessage(`📋 **Key Points:**\n${keyPointsResponse}`, 'assistant');
+                        this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${keyPointsResponse}`, 'assistant');
                     } finally {
                         this.hideLoading();
                     }
@@ -2111,7 +2111,7 @@ Please provide a helpful response based on the note content and conversation his
                     try {
                         const tagsResponse = await this.aiManager.generateTags(this.selectedText);
                         await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, tagsResponse, this.selectedText, 'tags');
-                        this.showAIMessage(`🏷️ **Suggested Tags:**\n${tagsResponse}`, 'assistant');
+                        this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${tagsResponse}`, 'assistant');
                     } finally {
                         this.hideLoading();
                     }
@@ -2547,7 +2547,7 @@ Please provide a helpful response based on the note content and conversation his
         const content = `
             <div style="max-width: 600px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);">🔄 Migration Wizard</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-exchange-alt"></i> Migration Wizard</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
                         Migrate your notes from another CogNotez installation or supported format.
                     </p>
@@ -2685,13 +2685,13 @@ Please provide a helpful response based on the note content and conversation his
 
                 ${conflicts.length > 0 ? `
                     <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #ffeaa7;">
-                        <strong>⚠️ ID Conflicts:</strong> ${conflicts.length} notes had conflicting IDs and were assigned new IDs.
+                        <strong><i class="fas fa-exclamation-triangle"></i> ID Conflicts:</strong> ${conflicts.length} notes had conflicting IDs and were assigned new IDs.
                     </div>
                 ` : ''}
 
                 ${warnings.length > 0 ? `
                     <div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #f5c6cb;">
-                        <strong>⚠️ Validation Warnings:</strong><br>
+                        <strong><i class="fas fa-exclamation-triangle"></i> Validation Warnings:</strong><br>
                         <small>${warnings.slice(0, 5).join('<br>')}${warnings.length > 5 ? `<br>... and ${warnings.length - 5} more` : ''}</small>
                     </div>
                 ` : ''}
@@ -3024,7 +3024,7 @@ Please provide a helpful response based on the note content and conversation his
                     this.showLoading();
                     response = await this.aiManager.extractKeyPoints(this.selectedText);
                     await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'key-points');
-                    this.showAIMessage(`📋 **Key Points:**\n${response}`, 'assistant');
+                    this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${response}`, 'assistant');
                     this.hideLoading();
                     break;
 
@@ -3042,7 +3042,7 @@ Please provide a helpful response based on the note content and conversation his
                     const generatedTags = this.parseTagResponse(response);
                     await this.saveTagsToCurrentNote(generatedTags);
 
-                    this.showAIMessage(`🏷️ **Suggested Tags:**\n${response}\n\n*Tags have been saved to this note*`, 'assistant');
+                    this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${response}\n\n*Tags have been saved to this note*`, 'assistant');
                     this.hideLoading();
                     break;
 
@@ -3303,7 +3303,7 @@ Please provide a helpful response based on the note content and conversation his
         const content = `
             <div style="max-width: 600px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);">🤖 AI Configuration</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-robot"></i> AI Configuration</h4>
                     <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <div style="width: 8px; height: 8px; border-radius: 50%; background: ${this.aiManager.isConnected ? '#28a745' : '#dc3545'};"></div>
@@ -3518,7 +3518,7 @@ Please provide a helpful response based on the note content and conversation his
         const content = `
             <div style="max-width: 400px;">
                 <div style="margin-bottom: 24px;">
-                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary);">⚙️ General Settings</h4>
+                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cog"></i> General Settings</h4>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 20px;">
@@ -3606,7 +3606,7 @@ Please provide a helpful response based on the note content and conversation his
         const content = `
             <div style="max-width: 400px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);">📢 Share "${this.currentNote.title}"</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-share"></i> Share "${this.currentNote.title}"</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
                         Choose how you want to share this note:
                     </p>
@@ -3614,7 +3614,7 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <button class="share-option-btn" data-action="clipboard-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📋</span>
+                        <span><i class="fas fa-clipboard"></i></span>
                         <div>
                             <div style="font-weight: 500;">Copy to Clipboard (Markdown)</div>
                             <div style="font-size: 12px; color: var(--text-secondary);">Share formatted content</div>
