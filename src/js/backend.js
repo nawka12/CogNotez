@@ -65,6 +65,31 @@ class BackendAPI {
         }
     }
 
+    async loadBackupFile() {
+        const { ipcRenderer } = require('electron');
+
+        try {
+            const result = await ipcRenderer.invoke('show-open-dialog', {
+                filters: [
+                    { name: 'CogNotez Backup', extensions: ['json'] },
+                    { name: 'JSON Files', extensions: ['json'] },
+                    { name: 'All Files', extensions: ['*'] }
+                ],
+                properties: ['openFile']
+            });
+
+            if (!result.canceled && result.filePaths.length > 0) {
+                const fs = require('fs').promises;
+                const content = await fs.readFile(result.filePaths[0], 'utf8');
+                const filename = require('path').basename(result.filePaths[0]);
+                return { content, filename, path: result.filePaths[0] };
+            }
+        } catch (error) {
+            console.error('Error loading backup file:', error);
+            throw error;
+        }
+    }
+
     // Export utilities
     async exportNote(note, format = 'markdown') {
         let content = '';
@@ -515,7 +540,7 @@ class BackendAPI {
         const fs = require('fs').promises;
 
         try {
-            const fileData = await this.loadFile();
+            const fileData = await this.loadBackupFile();
             if (!fileData) {
                 throw new Error('No backup file selected');
             }

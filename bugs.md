@@ -4,4 +4,4 @@ Status information:
 [Half-working]: Some aspect of it are fixed, but some are still broken
 [Fixed]: Bugs has been squashed
 
-1. [Fixed] After restoring from backup, the data is not shown immediately. User need to close the app first, then reopen the app for the data to be shown.
+1. [Fixed] Restore from backup file type defaults to Markdown, not CogNotez Backup.
