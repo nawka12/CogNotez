@@ -1779,7 +1779,9 @@ Key Points:`;
     }
 
     async generateTags(text, options = {}) {
-        const prompt = `Analyze the following text and suggest relevant tags that would help categorize and find this content. Provide 5-10 tags as a comma-separated list:
+        const prompt = `Analyze the following text and suggest the 3 most relevant and important tags that would help categorize and find this content. Focus on the most essential tags only.
+
+Provide exactly 3 tags (or fewer if the content doesn't warrant that many) as a comma-separated list:
 
 ${text}
 

@@ -1174,7 +1174,13 @@ class CogNotezApp {
     async addTagToNote(tagId) {
         if (!this.currentNote) return;
 
-        const updatedTags = [...(this.currentNote.tags || []), tagId];
+        const currentTags = this.currentNote.tags || [];
+        if (currentTags.length >= 3) {
+            this.showNotification('Maximum 3 tags per note reached', 'warning');
+            return;
+        }
+
+        const updatedTags = [...currentTags, tagId];
 
         try {
             if (this.notesManager.db && this.notesManager.db.initialized) {
@@ -3262,8 +3268,8 @@ Please provide a helpful response based on the note content and conversation his
                 tagIds.push(tagId);
             }
 
-            // Update note with tags
-            const updatedTags = [...(this.currentNote.tags || []), ...tagIds];
+            // Update note with tags (replace existing tags, maximum 3)
+            const updatedTags = tagIds.slice(0, 3);
 
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 await this.notesManager.db.updateNote(this.currentNote.id, { tags: updatedTags });
@@ -3277,7 +3283,7 @@ Please provide a helpful response based on the note content and conversation his
             // Re-render notes list to show updated tags
             await this.notesManager.renderNotesList();
 
-            this.showNotification(`Added ${tags.length} tag(s) to note`, 'success');
+            this.showNotification(`Saved ${Math.min(tags.length, 3)} tag(s) to note (max 3)`, 'success');
         } catch (error) {
             console.error('Error saving tags to note:', error);
             this.showNotification('Failed to save tags to note', 'error');
