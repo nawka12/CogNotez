@@ -38,7 +38,6 @@
   "build": {
     "appId": "com.kayfahaarukku.cognotez",
     "productName": "CogNotez",
-    "icon": "assets/icon.svg",
     "directories": {
       "output": "dist"
     },
@@ -48,20 +47,25 @@
       "!build/**/*",
       "!*.md"
     ],
-    "mac": {
-      "category": "public.app-category.productivity"
-    },
-    "win": {
-      "target": "nsis"
-    },
     "linux": {
       "target": "AppImage",
-      "category": "Office"
+      "category": "Office",
+      "icon": "assets/icon.png"
+    },
+    "mac": {
+      "target": "dmg",
+      "category": "public.app-category.productivity",
+      "icon": "assets/icon.png"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
     },
     "publish": {
       "provider": "github",
       "owner": "nawka12",
-      "repo": "CogNotez"
+      "repo": "CogNotez",
+      "releaseType": "release"
     }
   }
 }
