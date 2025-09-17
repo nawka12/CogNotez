@@ -1814,7 +1814,7 @@ Suggested tags:`;
             }
             this.app.showLoading();
             const summary = await this.summarize(text);
-            this.app.showAIMessage(`📝 Summary: ${summary}`, 'assistant');
+            this.app.showAIMessage(`${summary}`, 'assistant');
         } catch (error) {
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
@@ -1833,7 +1833,7 @@ Suggested tags:`;
             }
             this.app.showLoading();
             const answer = await this.askQuestion(question, context);
-            this.app.showAIMessage(`🤖 Answer: ${answer}`, 'assistant');
+            this.app.showAIMessage(`${answer}`, 'assistant');
         } catch (error) {
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();

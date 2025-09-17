@@ -255,14 +255,58 @@ class UIManager {
     enhanceEditor() {
         const editor = document.getElementById('note-editor');
 
-        // Auto-resize textarea
+        // Auto-resize textarea with improved scrolling behavior
         const autoResize = () => {
-            editor.style.height = 'auto';
-            editor.style.height = editor.scrollHeight + 'px';
+            // Store current scroll position
+            const scrollTop = editor.scrollTop;
+
+            // Only resize if the content height has actually changed significantly
+            const currentHeight = parseInt(editor.style.height) || 0;
+            const scrollHeight = editor.scrollHeight;
+            const maxHeight = parseInt(getComputedStyle(editor).maxHeight) || 0;
+
+            // Allow some tolerance to prevent constant resizing during typing
+            if (Math.abs(scrollHeight - currentHeight) > 20) {
+                // Don't exceed max-height
+                const newHeight = Math.min(scrollHeight, maxHeight);
+                editor.style.height = newHeight + 'px';
+            }
+
+            // Restore scroll position
+            editor.scrollTop = scrollTop;
         };
 
-        editor.addEventListener('input', autoResize);
+        // Throttle the resize function to prevent excessive calls
+        let resizeTimeout;
+        const throttledResize = () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(autoResize, 150);
+        };
+
+        editor.addEventListener('input', throttledResize);
         autoResize(); // Initial resize
+
+        // Handle scrolling properly
+        editor.addEventListener('keydown', (e) => {
+            // Handle arrow keys for scrolling
+            if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
+                // Check if content overflows and we're at the boundaries
+                const atTop = editor.scrollTop === 0;
+                const atBottom = editor.scrollTop + editor.clientHeight >= editor.scrollHeight;
+
+                if ((e.key === 'ArrowUp' && atTop) || (e.key === 'ArrowDown' && atBottom)) {
+                    // If we're at the boundary, let the event bubble up to parent elements
+                    // This allows page scrolling when textarea is at its limits
+                    return;
+                }
+
+                // If content overflows, handle scrolling within textarea
+                if (editor.scrollHeight > editor.clientHeight) {
+                    // Prevent event from bubbling to avoid page scrolling
+                    e.stopPropagation();
+                }
+            }
+        });
 
         // Syntax highlighting (basic implementation)
         this.setupSyntaxHighlighting();
