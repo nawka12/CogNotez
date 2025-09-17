@@ -6,8 +6,11 @@ on:
       - 'v*.*.*'
 
 jobs:
-  release:
+  build:
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write  # Required to create releases
+      packages: write  # Required for package publishing
 
     strategy:
       matrix:
@@ -37,7 +40,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Release
+      - name: List build artifacts
+        run: ls -la dist/
+
+      - name: Upload Release Assets
         uses: softprops/action-gh-release@v1
         with:
           files: |
@@ -46,5 +52,6 @@ jobs:
             dist/*.exe
             dist/latest*.yml
           generate_release_notes: true
+          fail_on_unmatched_files: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
