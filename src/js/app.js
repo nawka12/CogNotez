@@ -2139,7 +2139,7 @@ Please provide a helpful response based on the note content and conversation his
             // Update current note content
             if (this.currentNote) {
                 this.currentNote.content = previousState.content;
-                this.saveCurrentNote();
+                this.saveCurrentNote(true); // Pass true to indicate this is not a manual save
             }
 
             this.updateNotePreview();
@@ -2164,7 +2164,7 @@ Please provide a helpful response based on the note content and conversation his
             // Update current note content
             if (this.currentNote) {
                 this.currentNote.content = nextState.content;
-                this.saveCurrentNote();
+                this.saveCurrentNote(true); // Pass true to indicate this is not a manual save
             }
 
             this.updateNotePreview();
