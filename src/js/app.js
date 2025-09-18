@@ -2822,7 +2822,7 @@ Please provide a helpful response based on the note content and conversation his
 
     async updateSplashVersion() {
         try {
-            const version = await window.electronAPI.getAppVersion();
+            const version = await ipcRenderer.invoke('get-app-version');
             const versionElement = document.getElementById('splash-version');
             if (versionElement) {
                 versionElement.textContent = `Version ${version}`;
