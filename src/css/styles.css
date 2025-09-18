@@ -24,6 +24,8 @@
 .theme-toggle .fas,
 .new-note-btn .fas,
 .ai-toggle-btn .fas,
+.sync-settings-btn .fas,
+.sync-manual-btn .fas,
 .sidebar-toggle .fas,
 .ai-reset-btn .fas,
 .ai-panel-close .fas,
@@ -125,7 +127,7 @@ body {
     gap: 10px;
 }
 
-.theme-toggle, .new-note-btn, .ai-toggle-btn {
+.theme-toggle, .new-note-btn, .ai-toggle-btn, .sync-settings-btn {
     padding: 8px;
     background: var(--button-bg);
     border: 1px solid var(--border-color);
@@ -135,8 +137,76 @@ body {
     color: var(--text-secondary);
 }
 
-.theme-toggle:hover, .new-note-btn:hover, .ai-toggle-btn:hover {
+.theme-toggle:hover, .new-note-btn:hover, .ai-toggle-btn:hover, .sync-settings-btn:hover {
     background: var(--button-hover-bg);
+}
+
+/* Sync Status Styles */
+.sync-status-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: var(--surface-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 6px;
+    margin-right: 8px;
+}
+
+.sync-status-indicator {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.sync-status-indicator.connected {
+    color: var(--success-color);
+}
+
+.sync-status-indicator.disconnected {
+    color: var(--error-color);
+}
+
+.sync-status-indicator.syncing {
+    color: var(--warning-color);
+}
+
+.sync-status-indicator.syncing .sync-status-icon {
+    animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+.sync-status-indicator.error {
+    color: var(--error-color);
+}
+
+.sync-manual-btn {
+    padding: 4px 6px;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    color: var(--text-secondary);
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.sync-manual-btn:hover {
+    background: var(--button-hover-bg);
+}
+
+.sync-manual-btn.syncing {
+    animation: spin 2s linear infinite;
+}
+
+.sync-manual-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
 }
 
 /* Main Content */
@@ -1477,4 +1547,42 @@ body {
 /* Hide replace section when in find-only mode */
 .find-replace-dialog .replace-section.hidden {
     display: none;
+}
+
+/* Notification styles - ensure they appear above all modals and overlays */
+.notification {
+    position: fixed !important;
+    z-index: 10000 !important;
+    pointer-events: auto !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.notification-close {
+    background: none !important;
+    border: none !important;
+    color: white !important;
+    font-size: 18px !important;
+    cursor: pointer !important;
+    margin-left: 12px !important;
+    padding: 0 !important;
+    line-height: 1 !important;
+}
+
+/* Ensure notifications are never affected by modal backdrops */
+.modal .notification,
+.modal-backdrop .notification,
+.loading-overlay .notification {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    filter: none !important;
+    opacity: 1 !important;
+    visibility: visible !important;
 }

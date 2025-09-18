@@ -232,12 +232,36 @@ class BackendAPI {
             if (error.message.includes('No file selected')) {
                 throw new Error('Please select a file to import.');
             } else if (error.message.includes('Invalid JSON')) {
-                throw new Error('The selected file is not a valid JSON file. Please ensure it\'s a CogNotez export file.');
-            } else if (error.message.includes('missing or invalid notes data')) {
-                throw new Error('The selected file does not contain valid CogNotez data.');
+                throw new Error('The selected file is not a valid JSON file.');
             } else {
                 throw new Error(`Import failed: ${error.message}`);
             }
+        }
+    }
+
+    // Clear orphaned AI conversations (conversations for deleted notes)
+    async clearOrphanedAIConversations() {
+        try {
+            if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
+                throw new Error('Database not available');
+            }
+
+            const db = this.app.notesManager.db;
+            const deletedCount = db.clearOrphanedAIConversations();
+
+            console.log(`[Backend] Cleared ${deletedCount} orphaned AI conversations`);
+            return {
+                success: true,
+                deletedCount: deletedCount,
+                message: `Successfully cleared ${deletedCount} orphaned AI conversations`
+            };
+
+        } catch (error) {
+            console.error('[Backend] Failed to clear orphaned AI conversations:', error);
+            return {
+                success: false,
+                error: error.message
+            };
         }
     }
 
@@ -732,12 +756,164 @@ ${notes.map(note => `- **${note.title}** (${note.word_count || 0} words) - ${new
         return { valid, errors };
     }
 
+    // Google Drive sync methods
+    async connectGoogleDrive() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-authenticate');
+
+            if (result.success) {
+                // Enable sync in database
+                if (this.app && this.app.notesManager && this.app.notesManager.db) {
+                    this.app.notesManager.db.enableSync('google-drive');
+                }
+                console.log('[Backend] Google Drive connected successfully');
+                return { success: true, message: result.message };
+            } else {
+                console.error('[Backend] Google Drive authentication failed:', result.error);
+                return { success: false, error: result.error };
+            }
+        } catch (error) {
+            console.error('[Backend] Failed to connect Google Drive:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async disconnectGoogleDrive() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-disconnect');
+
+            if (result.success) {
+                console.log('[Backend] Google Drive disconnected successfully');
+                return { success: true };
+            } else {
+                console.error('[Backend] Failed to disconnect Google Drive:', result.error);
+                return { success: false, error: result.error };
+            }
+        } catch (error) {
+            console.error('[Backend] Failed to disconnect Google Drive:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getGoogleDriveAuthStatus() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const status = await ipcRenderer.invoke('google-drive-get-auth-status');
+            return status;
+        } catch (error) {
+            console.error('[Backend] Failed to get Google Drive auth status:', error);
+            return { isAuthenticated: false, error: error.message };
+        }
+    }
+
+    async syncWithGoogleDrive(options = {}) {
+        try {
+            const { ipcRenderer } = require('electron');
+
+            // If localData is provided, use it instead of getting from main process database
+            if (options.localData) {
+                console.log('[Backend] Using provided localData for sync');
+                if (options.localChecksum) {
+                    console.log('[Backend] Using provided localChecksum:', options.localChecksum.substring(0, 16) + '...');
+                }
+            }
+
+            const result = await ipcRenderer.invoke('google-drive-sync', options);
+
+            if (result.success) {
+                console.log('[Backend] Google Drive sync completed successfully');
+                return result;
+            } else {
+                console.error('[Backend] Google Drive sync failed:', result.error);
+                return result;
+            }
+        } catch (error) {
+            console.error('[Backend] Failed to sync with Google Drive:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async uploadToGoogleDrive() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-upload');
+
+            if (result.success) {
+                console.log('[Backend] Upload to Google Drive completed successfully');
+                return result;
+            } else {
+                console.error('[Backend] Upload to Google Drive failed:', result.error);
+                return result;
+            }
+        } catch (error) {
+            console.error('[Backend] Failed to upload to Google Drive:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async downloadFromGoogleDrive() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-download');
+
+            if (result.success) {
+                console.log('[Backend] Download from Google Drive completed successfully');
+                return result;
+            } else {
+                console.error('[Backend] Download from Google Drive failed:', result.error);
+                return result;
+            }
+        } catch (error) {
+            console.error('[Backend] Failed to download from Google Drive:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
+    async getGoogleDriveSyncStatus() {
+        try {
+            const { ipcRenderer } = require('electron');
+            const status = await ipcRenderer.invoke('google-drive-get-sync-status');
+            return status;
+        } catch (error) {
+            console.error('[Backend] Failed to get Google Drive sync status:', error);
+            return { error: error.message };
+        }
+    }
+
+    async setupGoogleDriveCredentials(credentialsPath) {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-setup-credentials', credentialsPath);
+
+            if (result.success) {
+                console.log('[Backend] Google Drive credentials setup successfully');
+                return result;
+            } else {
+                console.error('[Backend] Failed to setup Google Drive credentials:', result.error);
+                return result;
+            }
+        } catch (error) {
+            console.error('[Backend] Failed to setup Google Drive credentials:', error);
+            return { success: false, error: error.message };
+        }
+    }
+
     // Enhanced data synchronization
     async syncWithExternalSource(sourceConfig) {
-        // Placeholder for future cloud sync functionality
-        // This could integrate with services like Google Drive, Dropbox, etc.
-        console.log('Sync functionality not yet implemented');
-        return { success: false, message: 'Sync functionality not yet implemented' };
+        try {
+            if (sourceConfig.provider === 'google-drive') {
+                return await this.syncWithGoogleDrive(sourceConfig.options || {});
+            } else {
+                // Future support for other providers like Dropbox, etc.
+                console.log(`[Backend] Sync provider '${sourceConfig.provider}' not yet implemented`);
+                return { success: false, message: `Sync provider '${sourceConfig.provider}' not yet implemented` };
+            }
+        } catch (error) {
+            console.error('[Backend] External sync failed:', error);
+            return { success: false, error: error.message };
+        }
     }
 
     // Data integrity verification
@@ -800,4 +976,9 @@ ${notes.map(note => `- **${note.title}** (${note.word_count || 0} words) - ${new
 }
 
 // Export for use in main app
-window.BackendAPI = BackendAPI;
+// Use window for renderer process, module.exports for main process
+if (typeof window !== 'undefined') {
+    window.BackendAPI = BackendAPI;
+} else {
+    module.exports = { BackendAPI };
+}

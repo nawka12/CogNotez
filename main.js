@@ -107,10 +107,34 @@ function setupAutoUpdater() {
 }
 
 // This method will be called when Electron has finished initialization
-function initApp() {
+async function initApp() {
   createWindow();
   setupAutoUpdater();
   createMenu();
+
+  // Initialize database manager for Google Drive sync
+  try {
+    console.log('[Main] Initializing database manager for sync...');
+    const { DatabaseManager } = require('./src/js/database.js');
+    global.databaseManager = new DatabaseManager();
+    await global.databaseManager.initialize();
+    console.log('[Main] Database manager initialized successfully');
+  } catch (error) {
+    console.error('[Main] Failed to initialize database manager:', error);
+    // Continue without database - sync features will be disabled
+  }
+
+  // Initialize Google Auth Manager to ensure OAuth credentials are available on startup
+  try {
+    console.log('[Main] Initializing Google Auth Manager...');
+    const { GoogleAuthManager } = require('./src/js/google-auth.js');
+    global.googleAuthManager = new GoogleAuthManager();
+    await global.googleAuthManager.initialize();
+    console.log('[Main] Google Auth Manager initialized successfully');
+  } catch (error) {
+    console.error('[Main] Failed to initialize Google Auth Manager:', error);
+    // Continue without Google Auth - OAuth features will be disabled
+  }
 }
 
 // Initialize app when ready
@@ -164,6 +188,381 @@ if (ipcMain) {
   ipcMain.handle('get-app-version', () => {
     return app.getVersion();
   });
+
+  // Google Drive sync IPC handlers
+  ipcMain.handle('google-drive-authenticate', async () => {
+    try {
+      // Lazy load Google Auth Manager to avoid issues if not used
+      if (!global.googleAuthManager) {
+        const { GoogleAuthManager } = require('./src/js/google-auth.js');
+        global.googleAuthManager = new GoogleAuthManager();
+      }
+
+      const authResult = await global.googleAuthManager.authenticate();
+
+      if (authResult.needsAuth) {
+        // Open browser window for authentication
+        const authWindow = new BrowserWindow({
+          width: 800,
+          height: 600,
+          parent: mainWindow,
+          modal: true,
+          show: false,
+          title: 'Google Drive Authentication',
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true
+          }
+        });
+
+        authWindow.loadURL(authResult.authUrl);
+        authWindow.once('ready-to-show', () => {
+          authWindow.show();
+        });
+
+        return new Promise((resolve, reject) => {
+          // Listen for navigation to callback URL
+          authWindow.webContents.on('will-navigate', async (event, url) => {
+            // Handle OAuth callback URLs from any localhost port (common Google OAuth redirect)
+            if (url.includes('code=') && (url.includes('localhost') || url.includes('127.0.0.1'))) {
+              event.preventDefault();
+
+              // Extract authorization code from URL
+              const urlObj = new URL(url);
+              const code = urlObj.searchParams.get('code');
+
+              if (code) {
+                try {
+                  await global.googleAuthManager.handleAuthCallback(code);
+                  authWindow.close();
+
+                  // Notify frontend of successful authentication
+                  mainWindow.webContents.send('google-drive-auth-success', {
+                    message: 'Successfully connected to Google Drive!'
+                  });
+
+                  resolve({ success: true, message: 'Authentication successful' });
+                } catch (error) {
+                  authWindow.close();
+
+                  // Don't send error notification here - let the outer handler handle it
+                  reject({ success: false, error: error.message });
+                }
+              } else {
+                authWindow.close();
+                reject({ success: false, error: 'No authorization code received' });
+              }
+            }
+          });
+
+          // Also listen for did-navigate events in case will-navigate doesn't catch it
+          authWindow.webContents.on('did-navigate', async (event, url) => {
+            if (url.includes('code=') && (url.includes('localhost') || url.includes('127.0.0.1'))) {
+              // Extract authorization code from URL
+              const urlObj = new URL(url);
+              const code = urlObj.searchParams.get('code');
+
+              if (code) {
+                try {
+                  await global.googleAuthManager.handleAuthCallback(code);
+                  authWindow.close();
+
+                  // Notify frontend of successful authentication
+                  mainWindow.webContents.send('google-drive-auth-success', {
+                    message: 'Successfully connected to Google Drive!'
+                  });
+
+                  resolve({ success: true, message: 'Authentication successful' });
+                } catch (error) {
+                  authWindow.close();
+                  reject({ success: false, error: error.message });
+                }
+              }
+            }
+          });
+
+          // Handle window close without completing auth
+          authWindow.on('closed', () => {
+            reject({ success: false, error: 'Authentication cancelled' });
+          });
+        });
+      } else {
+        return { success: true, message: 'Already authenticated' };
+      }
+    } catch (error) {
+      console.error('Google Drive authentication failed:', error);
+
+      // Enhance error message for access_denied errors
+      let enhancedErrorMessage = error.message;
+      if (error.message.includes('access_denied') || error.message.includes('403')) {
+        enhancedErrorMessage = 'Google Drive access denied. Your email needs to be added as a test user in Google Cloud Console → OAuth consent screen → Audience → Test users → ADD USERS.';
+      }
+
+      // Notify frontend of the error
+      mainWindow.webContents.send('google-drive-auth-error', {
+        error: enhancedErrorMessage,
+        details: error.stack
+      });
+
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-get-auth-status', async () => {
+    try {
+      if (!global.googleAuthManager) {
+        return { isAuthenticated: false };
+      }
+
+      const status = await global.googleAuthManager.getAuthStatus();
+      return status;
+    } catch (error) {
+      console.error('Failed to get auth status:', error);
+      return { isAuthenticated: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-disconnect', async () => {
+    try {
+      if (global.googleAuthManager) {
+        await global.googleAuthManager.disconnect();
+      }
+
+      // Also disable sync in database
+      if (global.databaseManager) {
+        global.databaseManager.disableSync();
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to disconnect Google Drive:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-sync', async (event, options = {}) => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager);
+      }
+
+      // Get local data - use provided data or fallback to database manager
+      let localData;
+      if (options.localData) {
+        console.log('[Sync] Using provided localData from renderer process');
+        localData = {
+          data: options.localData,
+          checksum: options.localChecksum
+        };
+      } else {
+        if (!global.databaseManager) {
+          throw new Error('Database manager not available');
+        }
+        localData = global.databaseManager.exportDataForSync();
+      }
+
+      // Perform sync
+      const syncResult = await global.googleDriveSyncManager.sync({
+        localData: localData.data,
+        strategy: options.strategy || 'merge'
+      });
+
+      if (syncResult.success) {
+        // Update sync metadata in database
+        global.databaseManager.updateSyncMetadata({
+          lastSync: new Date().toISOString(),
+          lastSyncVersion: localData.data.metadata.version
+        });
+
+        // If we downloaded data, apply it
+        if (syncResult.action === 'download' || syncResult.action === 'merge') {
+          // Get the remote data that was downloaded
+          const remoteData = await global.googleDriveSyncManager.downloadData();
+          global.databaseManager.importDataFromSync(remoteData.data, {
+            mergeStrategy: 'merge',
+            force: false
+          });
+        }
+      }
+
+      return syncResult;
+    } catch (error) {
+      console.error('Google Drive sync failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-upload', async () => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager);
+      }
+
+      if (!global.databaseManager) {
+        throw new Error('Database manager not available');
+      }
+
+      const localData = global.databaseManager.exportDataForSync();
+      const uploadResult = await global.googleDriveSyncManager.uploadData(localData.data);
+
+      if (uploadResult.success) {
+        global.databaseManager.updateSyncMetadata({
+          lastSync: new Date().toISOString(),
+          lastSyncVersion: localData.data.metadata.version,
+          remoteFileId: uploadResult.fileId,
+          localChecksum: localData.checksum
+        });
+      }
+
+      return uploadResult;
+    } catch (error) {
+      console.error('Google Drive upload failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-download', async () => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager);
+      }
+
+      if (!global.databaseManager) {
+        throw new Error('Database manager not available');
+      }
+
+      const downloadResult = await global.googleDriveSyncManager.downloadData();
+
+      if (downloadResult.data) {
+        const importResult = global.databaseManager.importDataFromSync(downloadResult.data, {
+          mergeStrategy: 'merge',
+          force: false
+        });
+
+        return {
+          success: true,
+          ...downloadResult,
+          importResult: importResult
+        };
+      }
+
+      return downloadResult;
+    } catch (error) {
+      console.error('Google Drive download failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-get-sync-status', async () => {
+    try {
+      const status = {
+        isAuthenticated: false,
+        syncEnabled: false,
+        lastSync: null,
+        provider: null,
+        inProgress: false
+      };
+
+      if (global.googleAuthManager) {
+        const authStatus = await global.googleAuthManager.getAuthStatus();
+        console.log('[SyncStatus] Auth status:', { isAuthenticated: authStatus.isAuthenticated, hasCredentials: authStatus.hasCredentials });
+        status.isAuthenticated = authStatus.isAuthenticated;
+      }
+
+      if (global.databaseManager) {
+        status.syncEnabled = global.databaseManager.isSyncEnabled();
+        status.provider = global.databaseManager.getSyncProvider();
+        const syncMetadata = global.databaseManager.getSyncMetadata();
+        status.lastSync = syncMetadata.lastSync;
+      }
+
+      if (global.googleDriveSyncManager) {
+        const syncStatus = global.googleDriveSyncManager.getSyncStatus();
+        status.inProgress = syncStatus.inProgress;
+      }
+
+      return status;
+    } catch (error) {
+      console.error('Failed to get sync status:', error);
+      return { error: error.message };
+    }
+  });
+
+  ipcMain.handle('google-drive-setup-credentials', async (event, credentialsPath) => {
+    try {
+      if (!global.googleAuthManager) {
+        const { GoogleAuthManager } = require('./src/js/google-auth.js');
+        global.googleAuthManager = new GoogleAuthManager();
+      }
+
+      // Read credentials file
+      const fs = require('fs').promises;
+      const credentialsContent = await fs.readFile(credentialsPath, 'utf8');
+      const credentials = JSON.parse(credentialsContent);
+
+      // Validate credentials structure before saving
+      // Handle both direct OAuth2 format and nested "installed" format
+      let clientId, clientSecret, redirectUris;
+
+      if (credentials.installed) {
+        // OAuth2 client credentials format (nested under "installed")
+        clientId = credentials.installed.client_id;
+        clientSecret = credentials.installed.client_secret;
+        redirectUris = credentials.installed.redirect_uris;
+      } else if (credentials.client_id && credentials.client_secret) {
+        // Direct OAuth2 format
+        clientId = credentials.client_id;
+        clientSecret = credentials.client_secret;
+        redirectUris = credentials.redirect_uris;
+      } else {
+        throw new Error('Invalid credentials file: missing client_id or client_secret. Please ensure you have downloaded OAuth2 client credentials (not service account credentials) from Google Cloud Console.');
+      }
+
+      // Check if it's a service account key instead of OAuth2 client credentials
+      if (credentials.type === 'service_account') {
+        throw new Error('You have uploaded service account credentials, but OAuth2 client credentials are required. Please go to Google Cloud Console → APIs & Services → Credentials → Create Credentials → OAuth 2.0 Client IDs → Web application.');
+      }
+
+      // Validate required fields
+      if (!clientId || !clientSecret) {
+        throw new Error('Invalid credentials file: missing client_id or client_secret. Please ensure you have downloaded OAuth2 client credentials (not service account credentials) from Google Cloud Console.');
+      }
+
+      // For OAuth2 client credentials, redirect_uris should exist
+      if (!redirectUris || !Array.isArray(redirectUris) || redirectUris.length === 0) {
+        throw new Error('Invalid credentials file: missing or empty redirect_uris. Please ensure you have downloaded OAuth2 client credentials from Google Cloud Console.');
+      }
+
+      // Save credentials
+      const success = await global.googleAuthManager.saveCredentials(credentials);
+
+      if (success) {
+        // Try to setup OAuth2 client
+        await global.googleAuthManager.setupOAuth2Client();
+      }
+
+      return { success: success };
+    } catch (error) {
+      console.error('Failed to setup Google Drive credentials:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
 } else {
   console.error('ipcMain not available - Electron may not be properly initialized');
 }

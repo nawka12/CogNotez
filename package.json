@@ -36,6 +36,8 @@
     "cheerio": "^1.0.0-rc.12",
     "electron-updater": "^6.1.7",
     "express": "^4.18.0",
+    "google-auth-library": "^10.3.0",
+    "googleapis": "^160.0.0",
     "marked": "^12.0.0",
     "uuid": "^9.0.0"
   },

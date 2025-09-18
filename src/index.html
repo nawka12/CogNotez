@@ -51,8 +51,20 @@
                 </div>
             </div>
             <div class="header-right">
+                <!-- Sync Status -->
+                <div id="sync-status-container" class="sync-status-container" style="display: none;">
+                    <div class="sync-status-indicator" id="sync-status-indicator">
+                        <i class="fas fa-cloud" id="sync-status-icon"></i>
+                        <span class="sync-status-text" id="sync-status-text">Sync</span>
+                    </div>
+                    <button id="sync-manual-btn" class="sync-manual-btn" title="Manual Sync">
+                        <i class="fas fa-sync-alt"></i>
+                    </button>
+                </div>
+
                 <button id="theme-toggle" class="theme-toggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
                 <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
+                <button id="sync-settings-btn" class="sync-settings-btn" title="Sync Settings"><i class="fas fa-cog"></i></button>
                 <button id="new-note-btn" class="new-note-btn" title="New note"><i class="fas fa-plus"></i></button>
             </div>
         </header>

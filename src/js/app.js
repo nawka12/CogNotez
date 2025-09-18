@@ -467,6 +467,13 @@ class CogNotezApp {
         this.historyManager = new HistoryManager();
         this.ignoreHistoryUpdate = false; // Flag to prevent history updates during undo/redo
         this.findReplaceDialog = new FindReplaceDialog(this);
+        this.syncManager = null; // Sync status manager
+        this.syncStatus = {
+            isAuthenticated: false,
+            syncEnabled: false,
+            lastSync: null,
+            inProgress: false
+        };
 
         this.init();
     }
@@ -504,6 +511,10 @@ class CogNotezApp {
             this.uiManager = new UIManager(this);
             this.uiManager.initialize();
 
+            console.log('[DEBUG] Initializing sync manager...');
+            this.updateSplashProgress('Setting up cloud sync...', 80);
+            await this.initializeSync();
+
             // Setup UI and event listeners
             console.log('[DEBUG] Setting up event listeners and UI...');
             this.updateSplashProgress('Finalizing setup...', 85);
@@ -517,6 +528,9 @@ class CogNotezApp {
 
             this.updateSplashProgress('Ready!', 100);
             console.log('[DEBUG] CogNotez application initialized successfully');
+
+            // Setup external link handling
+            this.setupExternalLinkHandling();
 
             // Hide splash screen with a small delay to show completion
             setTimeout(() => {
@@ -537,6 +551,10 @@ class CogNotezApp {
             this.initializeAutoSave();
 
             this.updateSplashProgress('Ready!', 100);
+
+            // Setup external link handling even in fallback mode
+            this.setupExternalLinkHandling();
+
             setTimeout(() => {
                 this.hideSplashScreen();
             }, 800);
@@ -566,6 +584,8 @@ class CogNotezApp {
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
+        document.getElementById('sync-settings-btn').addEventListener('click', () => this.showSyncSettings());
+        document.getElementById('sync-manual-btn').addEventListener('click', () => this.manualSync());
         document.getElementById('search-button').addEventListener('click', () => this.searchNotes());
 
         // Search input
@@ -746,6 +766,30 @@ class CogNotezApp {
         ipcRenderer.on('update-error', (event, error) => this.showUpdateError(error));
         ipcRenderer.on('download-progress', (event, progress) => this.showDownloadProgress(progress));
         ipcRenderer.on('update-downloaded', (event, info) => this.showUpdateDownloaded(info));
+
+        // Google Drive authentication IPC handlers
+        ipcRenderer.on('google-drive-auth-success', (event, data) => {
+            this.showNotification(data.message || 'Google Drive authentication successful', 'success');
+            // Refresh sync status to show connected state
+            this.updateSyncStatus();
+        });
+
+        ipcRenderer.on('google-drive-auth-error', (event, data) => {
+            let errorMessage = 'Google Drive authentication failed';
+            if (data.error) {
+                if (data.error.includes('credentials not found') || data.error.includes('Google Drive credentials')) {
+                    errorMessage = 'Google Drive credentials file not found. Please upload your Google Drive credentials JSON file first by clicking "Import Credentials" in the sync settings.';
+                } else if (data.error.includes('access_denied') || data.error.includes('403')) {
+                    errorMessage = 'Google Drive access denied. Your email needs to be added as a test user in Google Cloud Console → OAuth consent screen → Audience → Test users → ADD USERS.';
+                } else {
+                    errorMessage = `Google Drive authentication failed: ${data.error}`;
+                }
+            }
+            this.showNotification(errorMessage, 'error');
+            // Refresh sync status to show error state
+            this.updateSyncStatus();
+        });
+
     }
 
     // Theme management
@@ -2801,14 +2845,15 @@ Please provide a helpful response based on the note content and conversation his
             color: 'white',
             padding: '12px 16px',
             borderRadius: '6px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: '1001',
+            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
+            zIndex: '10000', // Increased to appear above all modals and overlays
             maxWidth: '400px',
             fontSize: '14px',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            animation: 'slideInRight 0.3s ease'
+            animation: 'slideInRight 0.3s ease',
+            pointerEvents: 'auto' // Ensure it can be interacted with
         });
 
         // Close button functionality
@@ -2836,6 +2881,22 @@ Please provide a helpful response based on the note content and conversation his
                 }
             }, 300);
         }
+    }
+
+    setupExternalLinkHandling() {
+        // Handle clicks on external links to open in default browser
+        document.addEventListener('click', (event) => {
+            const link = event.target.closest('a[href^="http"]');
+            if (link) {
+                const href = link.getAttribute('href');
+                // Check if it's an external link that should open in browser
+                if (href && (href.includes('google.com') || href.includes('cloud.google') || href.includes('console.cloud.google'))) {
+                    event.preventDefault();
+                    const { shell } = require('electron');
+                    shell.openExternal(href);
+                }
+            }
+        });
     }
 
     handleKeyboardShortcuts(e) {
@@ -3849,6 +3910,683 @@ Please provide a helpful response based on the note content and conversation his
     showUpdateDownloaded(info) {
         // This is handled by the main process with a dialog
         console.log('Update downloaded:', info);
+    }
+
+    // Sync-related methods
+    async initializeSync() {
+        try {
+            // Check if sync is enabled
+            if (this.notesManager && this.notesManager.db) {
+                const syncEnabled = this.notesManager.db.isSyncEnabled();
+                if (syncEnabled) {
+                    // Initialize sync status
+                    await this.updateSyncStatus();
+
+                    // Show sync status container
+                    const syncContainer = document.getElementById('sync-status-container');
+                    if (syncContainer) {
+                        syncContainer.style.display = 'flex';
+                    }
+
+                    // Set up auto-sync if enabled
+                    if (this.notesManager.db.isAutoSyncEnabled()) {
+                        this.startAutoSync();
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('[Sync] Failed to initialize sync:', error);
+        }
+    }
+
+    async updateSyncStatus() {
+        try {
+            if (!this.backendAPI) return;
+
+            const status = await this.backendAPI.getGoogleDriveSyncStatus();
+            console.log('[UI] Received sync status:', status);
+            this.syncStatus = { ...this.syncStatus, ...status };
+
+            this.updateSyncUI();
+        } catch (error) {
+            console.error('[Sync] Failed to update sync status:', error);
+        }
+    }
+
+    updateSyncUI() {
+        const indicator = document.getElementById('sync-status-indicator');
+        const icon = document.getElementById('sync-status-icon');
+        const text = document.getElementById('sync-status-text');
+        const manualBtn = document.getElementById('sync-manual-btn');
+
+        if (!indicator || !icon || !text) return;
+
+        console.log('[UI] Updating sync UI with status:', {
+            isAuthenticated: this.syncStatus.isAuthenticated,
+            syncEnabled: this.syncStatus.syncEnabled,
+            inProgress: this.syncStatus.inProgress
+        });
+
+        // Update sync status indicator
+        if (this.syncStatus.inProgress) {
+            indicator.className = 'sync-status-indicator syncing';
+            icon.className = 'fas fa-spinner fa-spin';
+            text.textContent = 'Syncing...';
+            manualBtn.disabled = true;
+        } else if (this.syncStatus.isAuthenticated && this.syncStatus.syncEnabled) {
+            indicator.className = 'sync-status-indicator connected';
+            icon.className = 'fas fa-cloud';
+            text.textContent = 'Connected';
+            manualBtn.disabled = false;
+        } else if (this.syncStatus.isAuthenticated) {
+            indicator.className = 'sync-status-indicator disconnected';
+            icon.className = 'fas fa-cloud-upload';
+            text.textContent = 'Ready to sync';
+            manualBtn.disabled = false;
+        } else {
+            indicator.className = 'sync-status-indicator disconnected';
+            icon.className = 'fas fa-cloud-off';
+            text.textContent = 'Not connected';
+            manualBtn.disabled = true;
+        }
+
+        // Update last sync time
+        const lastSyncElement = document.getElementById('google-drive-last-sync');
+        if (lastSyncElement && this.syncStatus.lastSync) {
+            const lastSyncDate = new Date(this.syncStatus.lastSync);
+            const timeAgo = this.getTimeAgo(lastSyncDate);
+            lastSyncElement.textContent = `Last synced: ${timeAgo}`;
+        }
+    }
+
+    getTimeAgo(date) {
+        const now = new Date();
+        const diffMs = now - date;
+        const diffMins = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMins / 60);
+        const diffDays = Math.floor(diffHours / 24);
+
+        if (diffMins < 1) return 'just now';
+        if (diffMins < 60) return `${diffMins}m ago`;
+        if (diffHours < 24) return `${diffHours}h ago`;
+        if (diffDays < 7) return `${diffDays}d ago`;
+
+        return date.toLocaleDateString();
+    }
+
+    showSyncSettings() {
+        try {
+            const content = `
+                <div style="max-width: 700px;">
+                    <div style="margin-bottom: 24px;">
+                        <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cloud"></i> Google Drive Sync Settings</h4>
+                    </div>
+
+                    <div id="sync-settings-content">
+                        <!-- Status Section -->
+                        <div class="sync-section" style="margin-bottom: 24px;">
+                            <div id="sync-status-display">
+                                <div class="sync-status-card" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
+                                    <div class="sync-status-header" style="display: flex; align-items: center; margin-bottom: 12px;">
+                                        <div class="sync-status-indicator" id="modal-sync-indicator" style="width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;"></div>
+                                        <span class="sync-status-text" id="modal-sync-status-text" style="font-weight: 500;">Loading...</span>
+                                    </div>
+                                    <div class="sync-last-sync" id="modal-sync-last-sync" style="font-size: 0.9rem; color: var(--text-secondary);"></div>
+                                    <div class="sync-buttons" style="margin-top: 12px;">
+                                        <button id="modal-google-drive-connect-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px;">Connect Google Drive</button>
+                                        <button id="modal-google-drive-disconnect-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px; display: none;">Disconnect</button>
+                                        <button id="modal-google-drive-sync-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;" disabled>Sync Now</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Options Section -->
+                        <div class="sync-section" style="margin-bottom: 24px;">
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Options</h5>
+                            <div class="sync-options" style="display: grid; gap: 12px;">
+                                <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <input type="checkbox" id="modal-auto-sync" style="margin-right: 12px;">
+                                    <div>
+                                        <label for="modal-auto-sync" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Automatic Sync</label>
+                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Automatically sync changes every 5 minutes when connected</div>
+                                    </div>
+                                </div>
+                                <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color);">
+                                    <input type="checkbox" id="modal-sync-on-startup" style="margin-right: 12px;">
+                                    <div>
+                                        <label for="modal-sync-on-startup" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Sync on Startup</label>
+                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Sync data when the application starts</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Conflicts Section (hidden by default) -->
+                        <div id="modal-conflicts-section" class="sync-section" style="display: none;">
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Conflicts</h5>
+                            <div id="modal-conflicts-list" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px;">
+                                <!-- Conflicts will be populated here -->
+                            </div>
+                        </div>
+
+                        <!-- Setup Section -->
+                        <div class="sync-section">
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Setup Instructions</h5>
+                            <div class="sync-setup-section" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
+                                <div class="sync-setup-steps" style="counter-reset: step-counter;">
+                                    <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
+                                        <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">1</div>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Create Google Cloud Project</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Go to <a href="https://console.cloud.google.com/" target="_blank" style="color: var(--accent-color);">Google Cloud Console</a> and create a new project.</p>
+                                    </div>
+                                    <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
+                                        <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">2</div>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Enable Google Drive API</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">In the Cloud Console, enable the Google Drive API for your project.</p>
+                                    </div>
+                                    <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
+                                        <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">3</div>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Import Credentials</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Use the button below to load your OAuth credentials file.</p>
+                                    </div>
+                                </div>
+
+                                <div style="margin-top: 16px;">
+                                    <button id="modal-import-credentials-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Import Credentials File</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Advanced Options Section -->
+                        <div class="sync-section">
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Advanced Options</h5>
+                            <div class="sync-advanced-options" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
+                                <div class="sync-buttons" style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                    <button id="modal-clear-orphaned-ai-btn" class="sync-button" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear Orphaned AI Conversations</button>
+                                </div>
+                                <div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary);">
+                                    <strong>Clear Orphaned AI Conversations:</strong> Deletes AI conversations for notes that no longer exist. Useful for cleaning up conversations from deleted notes.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            const modal = this.createModal('Cloud Sync Settings', content, [
+                { text: 'Close', type: 'secondary', action: 'close-sync-settings' }
+            ]);
+
+            // Initialize sync status in modal
+            this.initializeModalSyncHandlers(modal);
+
+        } catch (error) {
+            console.error('[Sync] Failed to show sync settings modal:', error);
+            this.showNotification('Failed to open sync settings', 'error');
+        }
+    }
+
+    async initializeModalSyncHandlers(modal) {
+        try {
+            // Get sync status and update modal
+            await this.updateModalSyncStatus(modal);
+
+            // Setup event listeners for modal buttons
+            const connectBtn = modal.querySelector('#modal-google-drive-connect-btn');
+            const disconnectBtn = modal.querySelector('#modal-google-drive-disconnect-btn');
+            const syncBtn = modal.querySelector('#modal-google-drive-sync-btn');
+            const importBtn = modal.querySelector('#modal-import-credentials-btn');
+            const autoSyncCheckbox = modal.querySelector('#modal-auto-sync');
+            const startupSyncCheckbox = modal.querySelector('#modal-sync-on-startup');
+            const clearOrphanedAIBtn = modal.querySelector('#modal-clear-orphaned-ai-btn');
+
+            // Connect button
+            connectBtn.addEventListener('click', async () => {
+                try {
+                    connectBtn.disabled = true;
+                    connectBtn.textContent = 'Connecting...';
+
+                    const result = await this.backendAPI.connectGoogleDrive();
+
+                    if (result.success) {
+                        this.showNotification(result.message || 'Successfully connected to Google Drive', 'success');
+                        await this.updateModalSyncStatus(modal);
+                        await this.updateSyncStatus(); // Update main UI
+                    } else {
+                        // Don't show notification here - let the IPC error event handler do it
+                        // This prevents duplicate notifications
+                        console.log('[Sync] Google Drive connection failed:', result.error);
+                    }
+                } catch (error) {
+                    // Don't show notification here - let the IPC error event handler do it
+                    // This prevents duplicate notifications
+                    console.error('[Sync] Failed to connect Google Drive:', error);
+                } finally {
+                    connectBtn.disabled = false;
+                    connectBtn.textContent = 'Connect Google Drive';
+                }
+            });
+
+            // Disconnect button
+            disconnectBtn.addEventListener('click', async () => {
+                try {
+                    disconnectBtn.disabled = true;
+                    disconnectBtn.textContent = 'Disconnecting...';
+
+                    const result = await this.backendAPI.disconnectGoogleDrive();
+
+                    if (result.success) {
+                        this.showNotification('Successfully disconnected from Google Drive', 'success');
+                        await this.updateModalSyncStatus(modal);
+                        await this.updateSyncStatus(); // Update main UI
+                    } else {
+                        this.showNotification(result.error || 'Failed to disconnect from Google Drive', 'error');
+                    }
+                } catch (error) {
+                    console.error('[Sync] Failed to disconnect Google Drive:', error);
+                    this.showNotification('Failed to disconnect from Google Drive', 'error');
+                } finally {
+                    disconnectBtn.disabled = false;
+                    disconnectBtn.textContent = 'Disconnect';
+                }
+            });
+
+            // Sync now button
+            syncBtn.addEventListener('click', async () => {
+                try {
+                    syncBtn.disabled = true;
+                    syncBtn.textContent = 'Syncing...';
+
+                    // Export local data from the renderer process database manager
+                    let localData = null;
+                    let localChecksum = null;
+                    if (this.notesManager && this.notesManager.db) {
+                        const exportResult = this.notesManager.db.exportDataForSync();
+                        localData = exportResult.data;
+                        localChecksum = exportResult.checksum;
+                    }
+
+                    const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum });
+
+                    if (result.success) {
+                        let message = 'Sync completed successfully';
+                        if (result.stats) {
+                            const stats = result.stats;
+                            message += ` (${stats.uploaded} uploaded, ${stats.downloaded} downloaded`;
+                            if (stats.conflicts > 0) {
+                                message += `, ${stats.conflicts} conflicts`;
+                            }
+                            message += ')';
+                        }
+                        this.showNotification(message, 'success');
+                        await this.updateModalSyncStatus(modal);
+                        await this.updateSyncStatus(); // Update main UI
+                    } else {
+                        this.showNotification(result.error || 'Sync failed', 'error');
+                    }
+                } catch (error) {
+                    console.error('[Sync] Manual sync failed:', error);
+                    this.showNotification('Sync failed', 'error');
+                } finally {
+                    syncBtn.disabled = false;
+                    syncBtn.textContent = 'Sync Now';
+                }
+            });
+
+            // Import credentials button
+            importBtn.addEventListener('click', async () => {
+                try {
+                    const { ipcRenderer } = require('electron');
+
+                    const result = await ipcRenderer.invoke('show-open-dialog', {
+                        filters: [
+                            { name: 'JSON Files', extensions: ['json'] },
+                            { name: 'All Files', extensions: ['*'] }
+                        ],
+                        properties: ['openFile']
+                    });
+
+                    if (!result.canceled && result.filePaths.length > 0) {
+                        importBtn.disabled = true;
+                        importBtn.textContent = 'Importing...';
+
+                        const credentialsPath = result.filePaths[0];
+                        const setupResult = await this.backendAPI.setupGoogleDriveCredentials(credentialsPath);
+
+                        if (setupResult.success) {
+                            this.showNotification('Credentials imported successfully', 'success');
+                            // Update modal to show connection options
+                            modal.querySelector('.sync-setup-section').style.display = 'none';
+                        } else {
+                            this.showNotification(setupResult.error || 'Failed to import credentials', 'error');
+                        }
+                    }
+                } catch (error) {
+                    console.error('[Sync] Failed to import credentials:', error);
+                    this.showNotification('Failed to import credentials', 'error');
+                } finally {
+                    importBtn.disabled = false;
+                    importBtn.textContent = 'Import Credentials File';
+                }
+            });
+
+            // Auto sync checkbox
+            autoSyncCheckbox.addEventListener('change', async () => {
+                try {
+                    const enabled = autoSyncCheckbox.checked;
+
+                    if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+                        this.showNotification('Database not available', 'error');
+                        return;
+                    }
+
+                    const db = this.backend.app.notesManager.db;
+                    db.setAutoSync(enabled);
+
+                    this.showNotification(`Auto-sync ${enabled ? 'enabled' : 'disabled'}`, 'info');
+
+                    if (enabled) {
+                        this.startAutoSync();
+                    } else {
+                        this.stopAutoSync();
+                    }
+                } catch (error) {
+                    console.error('[Sync] Failed to toggle auto sync:', error);
+                    this.showNotification('Failed to update auto-sync setting', 'error');
+                }
+            });
+
+            // Sync on startup checkbox
+            startupSyncCheckbox.addEventListener('change', async () => {
+                try {
+                    const enabled = startupSyncCheckbox.checked;
+
+                    if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+                        this.showNotification('Database not available', 'error');
+                        return;
+                    }
+
+                    const db = this.backend.app.notesManager.db;
+                    const syncMetadata = db.getSyncMetadata();
+                    syncMetadata.syncOnStartup = enabled;
+                    db.updateSyncMetadata({ syncOnStartup: enabled });
+
+                    this.showNotification(`Sync on startup ${enabled ? 'enabled' : 'disabled'}`, 'info');
+                } catch (error) {
+                    console.error('[Sync] Failed to toggle sync on startup:', error);
+                    this.showNotification('Failed to update sync on startup setting', 'error');
+                }
+            });
+
+            // Clear orphaned AI conversations button
+            clearOrphanedAIBtn.addEventListener('click', async () => {
+                try {
+                    const confirmed = confirm('Are you sure you want to clear orphaned AI conversations? This will delete AI conversations for notes that no longer exist.');
+
+                    if (!confirmed) return;
+
+                    clearOrphanedAIBtn.disabled = true;
+                    clearOrphanedAIBtn.textContent = 'Clearing...';
+
+                    const result = await this.backendAPI.clearOrphanedAIConversations();
+
+                    if (result.success) {
+                        this.showNotification(result.message, 'success');
+                    } else {
+                        this.showNotification(result.error || 'Failed to clear orphaned AI conversations', 'error');
+                    }
+                } catch (error) {
+                    console.error('[Sync] Failed to clear orphaned AI conversations:', error);
+                    this.showNotification('Failed to clear orphaned AI conversations', 'error');
+                } finally {
+                    clearOrphanedAIBtn.disabled = false;
+                    clearOrphanedAIBtn.textContent = 'Clear Orphaned AI Conversations';
+                }
+            });
+
+        } catch (error) {
+            console.error('[Sync] Failed to initialize modal handlers:', error);
+        }
+    }
+
+    async updateModalSyncStatus(modal) {
+        try {
+            if (!this.backendAPI) return;
+
+            const status = await this.backendAPI.getGoogleDriveSyncStatus();
+
+            const indicator = modal.querySelector('#modal-sync-indicator');
+            const statusText = modal.querySelector('#modal-sync-status-text');
+            const lastSync = modal.querySelector('#modal-sync-last-sync');
+            const connectBtn = modal.querySelector('#modal-google-drive-connect-btn');
+            const disconnectBtn = modal.querySelector('#modal-google-drive-disconnect-btn');
+            const syncBtn = modal.querySelector('#modal-google-drive-sync-btn');
+            const autoSyncCheckbox = modal.querySelector('#modal-auto-sync');
+            const startupSyncCheckbox = modal.querySelector('#modal-sync-on-startup');
+
+            if (!indicator || !statusText) return;
+
+            // Initialize checkbox states from database
+            if (this.backend && this.backend.app && this.backend.app.notesManager && this.backend.app.notesManager.db) {
+                const db = this.backend.app.notesManager.db;
+                const syncMetadata = db.getSyncMetadata();
+
+                if (autoSyncCheckbox) {
+                    autoSyncCheckbox.checked = syncMetadata.autoSync || false;
+                }
+                if (startupSyncCheckbox) {
+                    startupSyncCheckbox.checked = syncMetadata.syncOnStartup || false;
+                }
+            }
+
+            // Update status indicator
+            if (status.isAuthenticated && status.syncEnabled) {
+                indicator.style.backgroundColor = 'var(--success-color)';
+                statusText.textContent = 'Connected';
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+                syncBtn.disabled = false;
+            } else if (status.isAuthenticated) {
+                indicator.style.backgroundColor = 'var(--warning-color)';
+                statusText.textContent = 'Ready to sync';
+                connectBtn.style.display = 'none';
+                disconnectBtn.style.display = 'inline-block';
+                syncBtn.disabled = false;
+            } else {
+                indicator.style.backgroundColor = 'var(--error-color)';
+                statusText.textContent = 'Not Connected';
+                connectBtn.style.display = 'inline-block';
+                disconnectBtn.style.display = 'none';
+                syncBtn.disabled = true;
+
+                // Add a note about credentials if they're missing
+                if (status.error && (status.error.includes('credentials not found') || status.error.includes('Google Drive credentials'))) {
+                    statusText.textContent = 'Setup Required';
+                    lastSync.textContent = 'Import Google Drive credentials to get started';
+                }
+            }
+
+            // Update last sync time
+            if (status.lastSync) {
+                const lastSyncDate = new Date(status.lastSync);
+                const timeAgo = this.getTimeAgo(lastSyncDate);
+                lastSync.textContent = `Last synced: ${timeAgo}`;
+            } else {
+                lastSync.textContent = 'Never synced';
+            }
+
+            // Check for and display conflicts
+            await this.displayModalConflicts(modal);
+
+        } catch (error) {
+            console.error('[Sync] Failed to update modal sync status:', error);
+        }
+    }
+
+    async displayModalConflicts(modal) {
+        try {
+            if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+                return;
+            }
+
+            const db = this.backend.app.notesManager.db;
+            const conflicts = db.getSyncConflicts();
+
+            const conflictsSection = modal.querySelector('#modal-conflicts-section');
+            const conflictsList = modal.querySelector('#modal-conflicts-list');
+
+            if (conflicts.length === 0) {
+                conflictsSection.style.display = 'none';
+                return;
+            }
+
+            conflictsSection.style.display = 'block';
+            conflictsList.innerHTML = '';
+
+            conflicts.forEach(conflict => {
+                const conflictElement = document.createElement('div');
+                conflictElement.style.cssText = `
+                    padding: 12px;
+                    border: 1px solid var(--warning-color);
+                    border-radius: 4px;
+                    margin-bottom: 8px;
+                    background: rgba(245, 158, 11, 0.1);
+                `;
+
+                conflictElement.innerHTML = `
+                    <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">${conflict.localTitle || 'Untitled Note'}</div>
+                    <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">
+                        Local: ${new Date(conflict.localModified).toLocaleString()}<br>
+                        Remote: ${new Date(conflict.remoteModified).toLocaleString()}
+                    </div>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="sync-button" style="background: var(--success-color); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" onclick="resolveModalConflict('${conflict.id}', 'local', '${modal.id}')">Use Local</button>
+                        <button class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" onclick="resolveModalConflict('${conflict.id}', 'remote', '${modal.id}')">Use Remote</button>
+                        <button class="sync-button" style="background: var(--error-color); color: white; border: none; padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.8rem;" onclick="resolveModalConflict('${conflict.id}', 'manual', '${modal.id}')">Resolve Manually</button>
+                    </div>
+                `;
+
+                conflictsList.appendChild(conflictElement);
+            });
+
+        } catch (error) {
+            console.error('[Sync] Failed to display modal conflicts:', error);
+        }
+    }
+
+    resolveModalConflict(conflictId, resolution, modalId) {
+        try {
+            if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+                this.showNotification('Database not available', 'error');
+                return;
+            }
+
+            const db = this.backend.app.notesManager.db;
+            const success = db.resolveSyncConflict(conflictId, resolution);
+
+            if (success) {
+                this.showNotification(`Conflict resolved using ${resolution} version`, 'success');
+
+                // Refresh conflicts display
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    this.displayModalConflicts(modal);
+                }
+            } else {
+                this.showNotification('Failed to resolve conflict', 'error');
+            }
+
+        } catch (error) {
+            console.error('[Sync] Failed to resolve modal conflict:', error);
+            this.showNotification('Failed to resolve conflict', 'error');
+        }
+    }
+
+    async manualSync() {
+        try {
+            if (!this.syncStatus.isAuthenticated) {
+                this.showNotification('Please connect to Google Drive first', 'warning');
+                return;
+            }
+
+            this.syncStatus.inProgress = true;
+            this.updateSyncUI();
+
+            // Export local data from the renderer process database manager
+            let localData = null;
+            let localChecksum = null;
+            if (this.notesManager && this.notesManager.db) {
+                const exportResult = this.notesManager.db.exportDataForSync();
+                localData = exportResult.data;
+                localChecksum = exportResult.checksum;
+                console.log('[UI] Exported local data for sync:', {
+                    notesCount: Object.keys(localData.notes || {}).length,
+                    conversationsCount: Object.keys(localData.ai_conversations || {}).length,
+                    checksum: localChecksum.substring(0, 16) + '...'
+                });
+            }
+
+            const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum });
+
+            if (result.success) {
+                let message = 'Sync completed successfully';
+                if (result.stats) {
+                    const stats = result.stats;
+                    message += ` (${stats.uploaded} uploaded, ${stats.downloaded} downloaded`;
+                    if (stats.conflicts > 0) {
+                        message += `, ${stats.conflicts} conflicts`;
+                    }
+                    message += ')';
+                }
+                this.showNotification(message, 'success');
+                await this.updateSyncStatus();
+            } else {
+                this.showNotification(result.error || 'Sync failed', 'error');
+            }
+
+        } catch (error) {
+            console.error('[Sync] Manual sync failed:', error);
+            this.showNotification('Sync failed', 'error');
+        } finally {
+            this.syncStatus.inProgress = false;
+            this.updateSyncUI();
+        }
+    }
+
+    startAutoSync() {
+        if (this.autoSyncInterval) {
+            clearInterval(this.autoSyncInterval);
+        }
+
+        const interval = this.notesManager && this.notesManager.db ?
+            this.notesManager.db.getSyncInterval() : 300000; // 5 minutes default
+
+        this.autoSyncInterval = setInterval(async () => {
+            try {
+                if (!this.syncStatus.inProgress && this.syncStatus.isAuthenticated && this.syncStatus.syncEnabled) {
+                    console.log('[Sync] Running auto-sync...');
+                    await this.manualSync();
+                }
+            } catch (error) {
+                console.error('[Sync] Auto-sync failed:', error);
+            }
+        }, interval);
+    }
+
+    stopAutoSync() {
+        if (this.autoSyncInterval) {
+            clearInterval(this.autoSyncInterval);
+            this.autoSyncInterval = null;
+        }
+    }
+
+}
+
+// Global function for modal conflict resolution
+function resolveModalConflict(conflictId, resolution, modalId) {
+    if (window.cognotezApp) {
+        window.cognotezApp.resolveModalConflict(conflictId, resolution, modalId);
     }
 }
 

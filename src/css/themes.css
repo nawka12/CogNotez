@@ -29,6 +29,10 @@
   --code-bg: rgba(0, 0, 0, 0.1);
   --code-color: #2c3e50;
   --link-color: #BDABE3;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --surface-bg: #ffffff;
 }
 
 /* Dark Theme */
@@ -61,6 +65,10 @@
   --code-bg: rgba(255, 255, 255, 0.1);
   --code-color: #e4e4e4;
   --link-color: #BDABE3;
+  --success-color: #10b981;
+  --warning-color: #f59e0b;
+  --error-color: #ef4444;
+  --surface-bg: #2d2d2d;
 }
 
 /* Base body styling that uses theme variables */

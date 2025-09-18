@@ -8,6 +8,18 @@ class DatabaseManager {
             settings: {},
             tags: {},
             note_tags: {},
+            sync: {
+                enabled: false,
+                provider: null, // 'google-drive', 'dropbox', etc.
+                lastSync: null,
+                lastSyncVersion: null,
+                remoteFileId: null,
+                localChecksum: null,
+                remoteChecksum: null,
+                syncConflicts: [],
+                autoSync: false,
+                syncInterval: 300000 // 5 minutes in milliseconds
+            },
             metadata: {
                 version: '1.0',
                 lastBackup: null,
@@ -20,7 +32,7 @@ class DatabaseManager {
         try {
             console.log('[DEBUG] Initializing localStorage-based database...');
 
-            // Load existing data from localStorage
+            // Load existing data from localStorage (only if available)
             this.loadFromLocalStorage();
 
             // Ensure data structure exists
@@ -38,11 +50,16 @@ class DatabaseManager {
 
     loadFromLocalStorage() {
         try {
-            const storedData = localStorage.getItem('cognotez_data');
-            if (storedData) {
-                const parsedData = JSON.parse(storedData);
-                this.data = { ...this.data, ...parsedData };
-                console.log('[DEBUG] Loaded data from localStorage');
+            // Check if localStorage is available (only in renderer process)
+            if (typeof localStorage !== 'undefined') {
+                const storedData = localStorage.getItem('cognotez_data');
+                if (storedData) {
+                    const parsedData = JSON.parse(storedData);
+                    this.data = { ...this.data, ...parsedData };
+                    console.log('[DEBUG] Loaded data from localStorage');
+                }
+            } else {
+                console.log('[DEBUG] localStorage not available (main process), skipping load');
             }
         } catch (error) {
             console.warn('[DEBUG] Failed to load data from localStorage:', error);
@@ -53,8 +70,13 @@ class DatabaseManager {
 
     saveToLocalStorage() {
         try {
-            localStorage.setItem('cognotez_data', JSON.stringify(this.data));
-            console.log('[DEBUG] Data saved to localStorage');
+            // Check if localStorage is available (only in renderer process)
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('cognotez_data', JSON.stringify(this.data));
+                console.log('[DEBUG] Data saved to localStorage');
+            } else {
+                console.log('[DEBUG] localStorage not available (main process), skipping save');
+            }
         } catch (error) {
             console.error('[DEBUG] Failed to save data to localStorage:', error);
             throw error;
@@ -67,6 +89,20 @@ class DatabaseManager {
         if (!this.data.settings) this.data.settings = {};
         if (!this.data.tags) this.data.tags = {};
         if (!this.data.note_tags) this.data.note_tags = {};
+        if (!this.data.sync) {
+            this.data.sync = {
+                enabled: false,
+                provider: null,
+                lastSync: null,
+                lastSyncVersion: null,
+                remoteFileId: null,
+                localChecksum: null,
+                remoteChecksum: null,
+                syncConflicts: [],
+                autoSync: false,
+                syncInterval: 300000
+            };
+        }
         if (!this.data.metadata) {
             this.data.metadata = {
                 version: '1.0',
@@ -240,6 +276,10 @@ class DatabaseManager {
 
     deleteNote(id) {
         if (this.data.notes[id]) {
+            // Delete associated AI conversations first
+            this.deleteAIConversations(id);
+
+            // Then delete the note itself
             delete this.data.notes[id];
             this.saveToLocalStorage();
             return true;
@@ -317,6 +357,30 @@ class DatabaseManager {
 
         if (deletedCount > 0) {
             this.saveToLocalStorage();
+        }
+
+        return deletedCount;
+    }
+
+    // Clear orphaned AI conversations (conversations for notes that no longer exist)
+    clearOrphanedAIConversations() {
+        const existingNoteIds = new Set(Object.keys(this.data.notes));
+        let deletedCount = 0;
+
+        const conversationsToDelete = Object.keys(this.data.ai_conversations).filter(id => {
+            const conversation = this.data.ai_conversations[id];
+            // Check if the conversation has a note_id and if that note still exists
+            return conversation.note_id && !existingNoteIds.has(conversation.note_id);
+        });
+
+        conversationsToDelete.forEach(id => {
+            delete this.data.ai_conversations[id];
+            deletedCount++;
+        });
+
+        if (deletedCount > 0) {
+            this.saveToLocalStorage();
+            console.log(`[Database] Cleared ${deletedCount} orphaned AI conversations`);
         }
 
         return deletedCount;
@@ -491,6 +555,294 @@ class DatabaseManager {
         }
     }
 
+    // Sync-related methods
+    enableSync(provider = 'google-drive') {
+        this.data.sync.enabled = true;
+        this.data.sync.provider = provider;
+        this.saveToLocalStorage();
+        console.log(`[DEBUG] Sync enabled for provider: ${provider}`);
+    }
+
+    disableSync() {
+        this.data.sync.enabled = false;
+        this.data.sync.provider = null;
+        this.saveToLocalStorage();
+        console.log('[DEBUG] Sync disabled');
+    }
+
+    isSyncEnabled() {
+        return this.data.sync.enabled === true;
+    }
+
+    getSyncProvider() {
+        return this.data.sync.provider;
+    }
+
+    updateSyncMetadata(syncData) {
+        if (syncData.lastSync) this.data.sync.lastSync = syncData.lastSync;
+        if (syncData.lastSyncVersion) this.data.sync.lastSyncVersion = syncData.lastSyncVersion;
+        if (syncData.remoteFileId) this.data.sync.remoteFileId = syncData.remoteFileId;
+        if (syncData.localChecksum) this.data.sync.localChecksum = syncData.localChecksum;
+        if (syncData.remoteChecksum) this.data.sync.remoteChecksum = syncData.remoteChecksum;
+        this.saveToLocalStorage();
+    }
+
+    getSyncMetadata() {
+        return { ...this.data.sync };
+    }
+
+    setAutoSync(enabled, interval = 300000) {
+        this.data.sync.autoSync = enabled;
+        this.data.sync.syncInterval = interval;
+        this.saveToLocalStorage();
+    }
+
+    isAutoSyncEnabled() {
+        return this.data.sync.autoSync === true;
+    }
+
+    getSyncInterval() {
+        return this.data.sync.syncInterval || 300000;
+    }
+
+    addSyncConflict(conflict) {
+        this.data.sync.syncConflicts.push({
+            ...conflict,
+            id: this.generateId(),
+            timestamp: new Date().toISOString(),
+            resolved: false
+        });
+        this.saveToLocalStorage();
+    }
+
+    getSyncConflicts() {
+        return this.data.sync.syncConflicts.filter(conflict => !conflict.resolved);
+    }
+
+    resolveSyncConflict(conflictId, resolution = 'local') {
+        const conflict = this.data.sync.syncConflicts.find(c => c.id === conflictId);
+        if (conflict) {
+            conflict.resolved = true;
+            conflict.resolution = resolution;
+            conflict.resolvedAt = new Date().toISOString();
+            this.saveToLocalStorage();
+            return true;
+        }
+        return false;
+    }
+
+    clearResolvedConflicts() {
+        this.data.sync.syncConflicts = this.data.sync.syncConflicts.filter(conflict => !conflict.resolved);
+        this.saveToLocalStorage();
+    }
+
+    // Enhanced export for sync (includes sync metadata)
+    exportDataForSync() {
+        const exportData = {
+            ...this.data,
+            metadata: {
+                ...this.data.metadata,
+                exportedForSync: true,
+                exportedAt: new Date().toISOString(),
+                exportVersion: '1.0'
+            }
+        };
+
+        // Calculate checksum based on content only (exclude sync state and timestamp metadata)
+        // This ensures checksum consistency across devices when content hasn't changed
+        const contentOnlyData = {
+            notes: this.data.notes,
+            ai_conversations: this.data.ai_conversations,
+            settings: this.data.settings,
+            tags: this.data.tags,
+            note_tags: this.data.note_tags,
+            metadata: {
+                ...this.data.metadata,
+                exportVersion: '1.0'
+                // Exclude exportedForSync and exportedAt from checksum calculation
+            }
+            // Exclude sync object entirely as it contains sync-specific state
+        };
+
+        const jsonString = JSON.stringify(exportData);
+        const contentJsonString = JSON.stringify(contentOnlyData);
+        const checksum = this.calculateChecksum(contentJsonString);
+
+        return {
+            data: exportData,
+            checksum: checksum,
+            jsonString: jsonString
+        };
+    }
+
+    // Import data from sync (with conflict detection)
+    importDataFromSync(syncData, options = {}) {
+        try {
+            const importData = syncData.data || syncData;
+
+            // Validate import data
+            if (!importData.notes || typeof importData.notes !== 'object') {
+                throw new Error('Invalid sync data: missing notes');
+            }
+
+            // Check for potential conflicts
+            const conflicts = this.detectSyncConflicts(importData);
+
+            if (conflicts.length > 0 && !options.force) {
+                // Return conflicts for resolution
+                return {
+                    success: false,
+                    conflicts: conflicts,
+                    requiresResolution: true
+                };
+            }
+
+            // Apply sync data
+            if (options.mergeStrategy === 'replace') {
+                // Complete replacement
+                this.data = importData;
+            } else {
+                // Merge strategy (default)
+                this.mergeSyncData(importData, options);
+            }
+
+            // Update sync metadata if provided
+            if (syncData.syncMetadata) {
+                this.updateSyncMetadata(syncData.syncMetadata);
+            }
+
+            this.saveToLocalStorage();
+
+            return {
+                success: true,
+                conflicts: conflicts,
+                mergedNotes: Object.keys(importData.notes).length
+            };
+
+        } catch (error) {
+            console.error('[DEBUG] Sync import failed:', error);
+            return {
+                success: false,
+                error: error.message
+            };
+        }
+    }
+
+    detectSyncConflicts(remoteData) {
+        const conflicts = [];
+        const localNotes = this.data.notes;
+        const remoteNotes = remoteData.notes || {};
+
+        // Check for conflicting notes
+        const allNoteIds = new Set([...Object.keys(localNotes), ...Object.keys(remoteNotes)]);
+
+        for (const noteId of allNoteIds) {
+            const localNote = localNotes[noteId];
+            const remoteNote = remoteNotes[noteId];
+
+            if (localNote && remoteNote) {
+                // Both have the note - check for conflicts
+                const localModified = new Date(localNote.updated_at || localNote.created_at);
+                const remoteModified = new Date(remoteNote.updated_at || remoteNote.created_at);
+
+                // If both were modified after last sync and content differs
+                if (this.hasContentChanged(localNote, remoteNote)) {
+                    conflicts.push({
+                        type: 'note',
+                        id: noteId,
+                        localTitle: localNote.title,
+                        remoteTitle: remoteNote.title,
+                        localModified: localModified,
+                        remoteModified: remoteModified,
+                        canMerge: true
+                    });
+                }
+            }
+        }
+
+        return conflicts;
+    }
+
+    mergeSyncData(remoteData, options = {}) {
+        // Merge notes
+        if (remoteData.notes) {
+            for (const [noteId, remoteNote] of Object.entries(remoteData.notes)) {
+                const localNote = this.data.notes[noteId];
+
+                if (!localNote) {
+                    // New note from remote
+                    this.data.notes[noteId] = { ...remoteNote };
+                } else {
+                    // Existing note - merge based on timestamps
+                    const localTime = new Date(localNote.updated_at || localNote.created_at);
+                    const remoteTime = new Date(remoteNote.updated_at || remoteNote.created_at);
+
+                    if (remoteTime > localTime) {
+                        // Remote is newer
+                        this.data.notes[noteId] = { ...remoteNote };
+                    }
+                    // If local is newer or same time, keep local
+                }
+            }
+        }
+
+        // Merge other data types (keep local versions for settings, tags, etc.)
+        // This is a simplified approach - you might want more sophisticated merging
+        if (remoteData.ai_conversations && options.mergeConversations) {
+            Object.assign(this.data.ai_conversations, remoteData.ai_conversations);
+        }
+
+        if (remoteData.tags && options.mergeTags) {
+            Object.assign(this.data.tags, remoteData.tags);
+        }
+
+        if (remoteData.note_tags && options.mergeTags) {
+            Object.assign(this.data.note_tags, remoteData.note_tags);
+        }
+    }
+
+    hasContentChanged(localNote, remoteNote) {
+        // Compare relevant fields
+        const fieldsToCompare = ['title', 'content', 'tags', 'is_favorite', 'is_archived'];
+
+        for (const field of fieldsToCompare) {
+            if (JSON.stringify(localNote[field]) !== JSON.stringify(remoteNote[field])) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    calculateChecksum(data) {
+        // Simple checksum calculation
+        let hash = 0;
+        const str = typeof data === 'string' ? data : JSON.stringify(data);
+
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+
+        return hash.toString(16);
+    }
+
+    // Get data summary for sync status
+    getSyncDataSummary() {
+        const notes = Object.values(this.data.notes);
+        const aiConversations = Object.values(this.data.ai_conversations);
+
+        return {
+            totalNotes: notes.length,
+            totalConversations: aiConversations.length,
+            lastModified: notes.length > 0 ?
+                Math.max(...notes.map(n => new Date(n.updated_at || n.created_at).getTime())) :
+                null,
+            checksum: this.calculateChecksum(JSON.stringify(this.data))
+        };
+    }
+
     // Cleanup
     close() {
         // For localStorage, we don't need to close connections
@@ -501,4 +853,9 @@ class DatabaseManager {
 }
 
 // Export for use in main app
-window.DatabaseManager = DatabaseManager;
+// Use window for renderer process, module.exports for main process
+if (typeof window !== 'undefined') {
+    window.DatabaseManager = DatabaseManager;
+} else {
+    module.exports = { DatabaseManager };
+}
