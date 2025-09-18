@@ -43,6 +43,40 @@ class GoogleDriveSyncManager {
         }
     }
 
+    // Build a content-only snapshot for checksum comparisons (exclude sync state and volatile metadata)
+    createContentOnlySnapshot(data) {
+        const metadata = data.metadata || {};
+        const snapshot = {
+            notes: data.notes || {},
+            ai_conversations: data.ai_conversations || {},
+            settings: data.settings || {},
+            tags: data.tags || {},
+            note_tags: data.note_tags || {},
+            metadata: {
+                ...metadata,
+                exportVersion: metadata.exportVersion || '1.0'
+            }
+        };
+        // Remove exportedAt/exportedForSync and any sync object if present
+        delete snapshot.metadata.exportedAt;
+        delete snapshot.metadata.exportedForSync;
+        delete snapshot.sync;
+        return snapshot;
+    }
+
+    calculateContentChecksum(dataObject) {
+        const contentSnapshot = this.createContentOnlySnapshot(dataObject);
+        const str = JSON.stringify(contentSnapshot);
+        // Simple 32-bit rolling hash to match DatabaseManager.calculateChecksum
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash;
+        }
+        return hash.toString(16);
+    }
+
     async ensureInitialized() {
         if (!this.initialized) {
             console.log('[GoogleDriveSync] Waiting for initialization...');
@@ -116,7 +150,8 @@ class GoogleDriveSyncManager {
             console.log('[GoogleDriveSync] Upload data contains', Object.keys(data.notes || {}).length, 'notes');
 
             const jsonData = JSON.stringify(data, null, 2);
-            const checksum = this.calculateChecksum(jsonData);
+            // Content-only checksum for robust equality across devices
+            const checksum = this.calculateContentChecksum(data);
 
             // Prepare file metadata
             const fileMetadata = {
@@ -219,12 +254,13 @@ class GoogleDriveSyncManager {
             });
 
             const jsonData = response.data;
-            const checksum = this.calculateChecksum(jsonData);
+            const parsed = JSON.parse(jsonData);
+            const checksum = this.calculateContentChecksum(parsed);
 
             console.log('[GoogleDriveSync] Download successful, size:', jsonData.length);
 
             return {
-                data: JSON.parse(jsonData),
+                data: parsed,
                 checksum: checksum,
                 size: jsonData.length
             };
@@ -330,7 +366,9 @@ class GoogleDriveSyncManager {
 
             // Get local data
             const localData = options.localData || await this.getLocalData();
-            const localChecksum = options.localChecksum || this.calculateChecksum(JSON.stringify(localData));
+            const localChecksum = this.calculateContentChecksum(localData);
+            // Track local checksum for status reporting
+            this.syncMetadata.localChecksum = localChecksum;
 
             console.log('[GoogleDriveSync] Local data summary:', {
                 notesCount: Object.keys(localData.notes || {}).length,
@@ -348,6 +386,7 @@ class GoogleDriveSyncManager {
                     const downloadResult = await this.downloadData();
                     remoteData = downloadResult.data;
                     remoteChecksum = downloadResult.checksum;
+                    this.syncMetadata.remoteChecksum = remoteChecksum;
 
                     console.log('[GoogleDriveSync] Remote data summary:', {
                         notesCount: Object.keys(remoteData.notes || {}).length,
@@ -382,6 +421,8 @@ class GoogleDriveSyncManager {
                 result.action = 'download';
                 result.stats.downloaded = 1;
                 result.success = true;
+                // After applying remote data, local content now matches remote
+                this.syncMetadata.localChecksum = this.syncMetadata.remoteChecksum;
 
             } else {
                 // Both have changes - handle conflicts
@@ -599,6 +640,7 @@ class GoogleDriveSyncManager {
     }
 
     calculateChecksum(data) {
+        // Legacy helper (not used for content equality)
         return crypto.createHash('md5').update(data).digest('hex');
     }
 

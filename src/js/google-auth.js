@@ -33,6 +33,12 @@ class GoogleAuthManager {
                 credentials: this.credentialsPath,
                 tokens: this.tokensPath
             });
+
+            // Attempt to eagerly setup OAuth2 client and load tokens for persistence
+            const setupOk = await this.setupOAuth2Client();
+            if (setupOk && this.isAuthenticated) {
+                console.log('[GoogleAuth] Persistent authentication detected on startup');
+            }
         } catch (error) {
             console.error('[GoogleAuth] Initialization failed:', error);
         }

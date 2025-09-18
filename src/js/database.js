@@ -584,6 +584,7 @@ class DatabaseManager {
         if (syncData.remoteFileId) this.data.sync.remoteFileId = syncData.remoteFileId;
         if (syncData.localChecksum) this.data.sync.localChecksum = syncData.localChecksum;
         if (syncData.remoteChecksum) this.data.sync.remoteChecksum = syncData.remoteChecksum;
+        if (typeof syncData.syncOnStartup === 'boolean') this.data.sync.syncOnStartup = syncData.syncOnStartup;
         this.saveToLocalStorage();
     }
 

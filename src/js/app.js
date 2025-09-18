@@ -511,6 +511,9 @@ class CogNotezApp {
             this.uiManager = new UIManager(this);
             this.uiManager.initialize();
 
+            // Register IPC listeners before any sync to ensure we catch startup sync events
+            this.setupIPC();
+
             console.log('[DEBUG] Initializing sync manager...');
             this.updateSplashProgress('Setting up cloud sync...', 80);
             await this.initializeSync();
@@ -519,7 +522,6 @@ class CogNotezApp {
             console.log('[DEBUG] Setting up event listeners and UI...');
             this.updateSplashProgress('Finalizing setup...', 85);
             this.setupEventListeners();
-            this.setupIPC();
             this.loadTheme();
             await this.loadNotes();
 
@@ -1350,6 +1352,23 @@ class CogNotezApp {
             }
 
             await this.notesManager.renderNotesList();
+
+            // After saving, recompute local checksum and update UI readiness if remote differs
+            try {
+                if (this.notesManager && this.notesManager.db) {
+                    const exportResult = this.notesManager.db.exportDataForSync();
+                    // Keep last known local checksum in syncStatus for comparison
+                    this.syncStatus = this.syncStatus || {};
+                    this.syncStatus.localChecksum = exportResult.checksum;
+                    // If remoteChecksum known and differs, reflect "Ready to sync"
+                    if (this.syncStatus.remoteChecksum && this.syncStatus.localChecksum !== this.syncStatus.remoteChecksum) {
+                        // Force re-render of sync UI with readiness state
+                        this.updateSyncUI();
+                    }
+                }
+            } catch (e) {
+                console.warn('[Sync] Failed to update local checksum after save:', e.message);
+            }
 
             // Only show notification for manual saves, not auto-saves
             if (!isAutoSave) {
@@ -3936,6 +3955,17 @@ Please provide a helpful response based on the note content and conversation his
                     if (this.notesManager.db.isAutoSyncEnabled()) {
                         this.startAutoSync();
                     }
+
+                    // If user opted to sync on startup and auth is ready, run a sync now
+                    const syncMeta = this.notesManager.db.getSyncMetadata();
+                    if (syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
+                        try {
+                            console.log('[Sync] Running startup sync...');
+                            await this.manualSync();
+                        } catch (e) {
+                            console.warn('[Sync] Startup sync failed:', e.message);
+                        }
+                    }
                 }
             }
         } catch (error) {
@@ -3950,6 +3980,13 @@ Please provide a helpful response based on the note content and conversation his
             const status = await this.backendAPI.getGoogleDriveSyncStatus();
             console.log('[UI] Received sync status:', status);
             this.syncStatus = { ...this.syncStatus, ...status };
+
+            // Prefer renderer DB for syncEnabled state to reflect user's choice in the UI
+            if (this.notesManager && this.notesManager.db) {
+                if (this.notesManager.db.isSyncEnabled()) {
+                    this.syncStatus.syncEnabled = true;
+                }
+            }
 
             this.updateSyncUI();
         } catch (error) {
@@ -4060,22 +4097,27 @@ Please provide a helpful response based on the note content and conversation his
             inProgress: this.syncStatus.inProgress
         });
 
+        // Determine if content is in sync using checksums when available
+        const contentInSync = !!(this.syncStatus.localChecksum && this.syncStatus.remoteChecksum && this.syncStatus.localChecksum === this.syncStatus.remoteChecksum);
+
         // Update sync status indicator
         if (this.syncStatus.inProgress) {
             indicator.className = 'sync-status-indicator syncing';
             icon.className = 'fas fa-spinner fa-spin';
             text.textContent = 'Syncing...';
             manualBtn.disabled = true;
-        } else if (this.syncStatus.isAuthenticated && this.syncStatus.syncEnabled) {
-            indicator.className = 'sync-status-indicator connected';
-            icon.className = 'fas fa-cloud';
-            text.textContent = 'Connected';
-            manualBtn.disabled = false;
         } else if (this.syncStatus.isAuthenticated) {
-            indicator.className = 'sync-status-indicator disconnected';
-            icon.className = 'fas fa-cloud-upload';
-            text.textContent = 'Ready to sync';
-            manualBtn.disabled = false;
+            if (contentInSync) {
+                indicator.className = 'sync-status-indicator connected';
+                icon.className = 'fas fa-cloud';
+                text.textContent = 'Content in sync';
+                manualBtn.disabled = false;
+            } else {
+                indicator.className = 'sync-status-indicator disconnected';
+                icon.className = 'fas fa-cloud-upload';
+                text.textContent = 'Ready to sync';
+                manualBtn.disabled = false;
+            }
         } else {
             indicator.className = 'sync-status-indicator disconnected';
             icon.className = 'fas fa-cloud-off';
@@ -4369,12 +4411,12 @@ Please provide a helpful response based on the note content and conversation his
                 try {
                     const enabled = autoSyncCheckbox.checked;
 
-                    if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+                    if (!this.notesManager || !this.notesManager.db) {
                         this.showNotification('Database not available', 'error');
                         return;
                     }
 
-                    const db = this.backend.app.notesManager.db;
+                    const db = this.notesManager.db;
                     db.setAutoSync(enabled);
 
                     this.showNotification(`Auto-sync ${enabled ? 'enabled' : 'disabled'}`, 'info');
@@ -4395,14 +4437,12 @@ Please provide a helpful response based on the note content and conversation his
                 try {
                     const enabled = startupSyncCheckbox.checked;
 
-                    if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+                    if (!this.notesManager || !this.notesManager.db) {
                         this.showNotification('Database not available', 'error');
                         return;
                     }
 
-                    const db = this.backend.app.notesManager.db;
-                    const syncMetadata = db.getSyncMetadata();
-                    syncMetadata.syncOnStartup = enabled;
+                    const db = this.notesManager.db;
                     db.updateSyncMetadata({ syncOnStartup: enabled });
 
                     this.showNotification(`Sync on startup ${enabled ? 'enabled' : 'disabled'}`, 'info');
@@ -4460,9 +4500,9 @@ Please provide a helpful response based on the note content and conversation his
 
             if (!indicator || !statusText) return;
 
-            // Initialize checkbox states from database
-            if (this.backend && this.backend.app && this.backend.app.notesManager && this.backend.app.notesManager.db) {
-                const db = this.backend.app.notesManager.db;
+            // Initialize checkbox states from database (renderer)
+            if (this.notesManager && this.notesManager.db) {
+                const db = this.notesManager.db;
                 const syncMetadata = db.getSyncMetadata();
 
                 if (autoSyncCheckbox) {
@@ -4473,8 +4513,11 @@ Please provide a helpful response based on the note content and conversation his
                 }
             }
 
+            // Prefer renderer DB for syncEnabled since main-process DB doesn't persist localStorage
+            const rendererSyncEnabled = (this.notesManager && this.notesManager.db) ? this.notesManager.db.isSyncEnabled() : false;
+
             // Update status indicator
-            if (status.isAuthenticated && status.syncEnabled) {
+            if (status.isAuthenticated && (status.syncEnabled || rendererSyncEnabled)) {
                 indicator.style.backgroundColor = 'var(--success-color)';
                 statusText.textContent = 'Connected';
                 connectBtn.style.display = 'none';
@@ -4519,11 +4562,11 @@ Please provide a helpful response based on the note content and conversation his
 
     async displayModalConflicts(modal) {
         try {
-            if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+            if (!this.notesManager || !this.notesManager.db) {
                 return;
             }
 
-            const db = this.backend.app.notesManager.db;
+            const db = this.notesManager.db;
             const conflicts = db.getSyncConflicts();
 
             const conflictsSection = modal.querySelector('#modal-conflicts-section');
@@ -4570,12 +4613,12 @@ Please provide a helpful response based on the note content and conversation his
 
     resolveModalConflict(conflictId, resolution, modalId) {
         try {
-            if (!this.backend || !this.backend.app || !this.backend.app.notesManager || !this.backend.app.notesManager.db) {
+            if (!this.notesManager || !this.notesManager.db) {
                 this.showNotification('Database not available', 'error');
                 return;
             }
 
-            const db = this.backend.app.notesManager.db;
+            const db = this.notesManager.db;
             const success = db.resolveSyncConflict(conflictId, resolution);
 
             if (success) {

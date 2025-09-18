@@ -376,7 +376,8 @@ if (ipcMain) {
         // Update sync metadata in database
         global.databaseManager.updateSyncMetadata({
           lastSync: new Date().toISOString(),
-          lastSyncVersion: localData.data.metadata.version
+          lastSyncVersion: localData.data.metadata.version,
+          localChecksum: localData.checksum
         });
 
         // If we downloaded data, apply it
@@ -486,6 +487,18 @@ if (ipcMain) {
           importResult: importResult
         };
 
+        // After importing, update localChecksum to current content-only checksum
+        try {
+          const currentExport = global.databaseManager.exportDataForSync();
+          global.databaseManager.updateSyncMetadata({
+            lastSync: new Date().toISOString(),
+            lastSyncVersion: currentExport.data.metadata.version,
+            localChecksum: currentExport.checksum
+          });
+        } catch (e) {
+          console.warn('[Sync] Failed to update local checksum after download:', e.message);
+        }
+
         // Notify renderer process that download completed successfully
         // Send updated data to refresh localStorage in renderer process
         const updatedData = global.databaseManager.exportDataAsJSON();
@@ -515,7 +528,9 @@ if (ipcMain) {
         syncEnabled: false,
         lastSync: null,
         provider: null,
-        inProgress: false
+        inProgress: false,
+        localChecksum: null,
+        remoteChecksum: null
       };
 
       if (global.googleAuthManager) {
@@ -534,6 +549,17 @@ if (ipcMain) {
       if (global.googleDriveSyncManager) {
         const syncStatus = global.googleDriveSyncManager.getSyncStatus();
         status.inProgress = syncStatus.inProgress;
+        status.remoteChecksum = syncStatus.remoteChecksum || null;
+        // Prefer databaseManager for local checksum if available
+        if (!status.localChecksum && global.databaseManager) {
+          const meta = global.databaseManager.getSyncMetadata();
+          status.localChecksum = meta.localChecksum || null;
+        } else {
+          status.localChecksum = syncStatus.localChecksum || null;
+        }
+      } else if (global.databaseManager) {
+        const meta = global.databaseManager.getSyncMetadata();
+        status.localChecksum = meta.localChecksum || null;
       }
 
       return status;
