@@ -525,6 +525,16 @@ class CogNotezApp {
             this.setupEventListeners();
             this.loadTheme();
             await this.loadNotes();
+            // After UI loads notes, run startup sync if enabled
+            try {
+                const syncMeta = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
+                if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
+                    console.log('[Sync] Running startup sync after initial note load...');
+                    await this.manualSync();
+                }
+            } catch (e) {
+                console.warn('[Sync] Post-load startup sync failed:', e.message);
+            }
 
             // Show welcome message in AI panel
             this.showAIMessage('Hello! I\'m your AI assistant. Select some text and right-click to use AI features.', 'assistant');
@@ -3969,16 +3979,8 @@ Please provide a helpful response based on the note content and conversation his
                         this.startAutoSync();
                     }
 
-                    // If user opted to sync on startup and auth is ready, run a sync now
-                    const syncMeta = this.notesManager.db.getSyncMetadata();
-                    if (syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
-                        try {
-                            console.log('[Sync] Running startup sync...');
-                            await this.manualSync();
-                        } catch (e) {
-                            console.warn('[Sync] Startup sync failed:', e.message);
-                        }
-                    }
+                    // Note: Startup sync is handled after initial note load to avoid duplicate triggers
+                    // See post-load startup sync in init()
                 }
             }
         } catch (error) {
@@ -4027,7 +4029,7 @@ Please provide a helpful response based on the note content and conversation his
 
                     // Prefer importing parsed object to ensure DB gets updated
                     const importResult = parsedData
-                        ? this.notesManager.db.importDataFromSync(parsedData, { force: true })
+                        ? this.notesManager.db.importDataFromSync(parsedData, { mergeStrategy: 'replace', force: true, preserveSyncMeta: false })
                         : { success: this.notesManager.db.importDataFromJSON(syncData.data) };
                     if (!importResult.success) {
                         console.warn('[Sync] Failed to update renderer database:', importResult.error);
@@ -4355,7 +4357,8 @@ Please provide a helpful response based on the note content and conversation his
                         localChecksum = exportResult.checksum;
                     }
 
-                    const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum });
+                    const lastSync = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata().lastSync : null;
+                    const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync });
 
                     if (result.success) {
                         let message = 'Sync completed successfully';
@@ -4676,7 +4679,8 @@ Please provide a helpful response based on the note content and conversation his
                 });
             }
 
-            const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum });
+            const lastSync = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata().lastSync : null;
+            const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync });
 
             if (result.success) {
                 let message = 'Sync completed successfully';

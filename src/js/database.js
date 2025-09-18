@@ -40,6 +40,7 @@ class DatabaseManager {
 
             this.initialized = true;
             console.log('[DEBUG] localStorage database initialized successfully');
+            console.log('[DEBUG] Database loaded with', Object.keys(this.data.notes).length, 'notes');
 
             return true;
         } catch (error) {
@@ -158,6 +159,7 @@ class DatabaseManager {
 
     getAllNotes(options = {}) {
         let notes = Object.values(this.data.notes).filter(note => !note.is_archived);
+        console.log('[DEBUG] getAllNotes called, found', notes.length, 'non-archived notes');
 
         // Apply filters
         if (options.category) {
@@ -698,6 +700,9 @@ class DatabaseManager {
                 };
             }
 
+            // Preserve local sync settings that should not be overridden by remote
+            const localSyncSettings = { ...(this.data && this.data.sync ? this.data.sync : {}) };
+
             // Apply sync data
             if (options.mergeStrategy === 'replace') {
                 // Complete replacement
@@ -710,6 +715,30 @@ class DatabaseManager {
             // Update sync metadata if provided
             if (syncData.syncMetadata) {
                 this.updateSyncMetadata(syncData.syncMetadata);
+            }
+
+            // Restore local sync controls and metadata (do not let remote toggle your sync settings)
+            // Preserve user toggles and existing sync metadata like lastSync/remoteFileId
+            if (!this.data.sync) this.data.sync = {};
+            const preservedToggles = {
+                enabled: localSyncSettings.enabled === true,
+                provider: localSyncSettings.provider || null,
+                autoSync: localSyncSettings.autoSync === true,
+                syncOnStartup: localSyncSettings.syncOnStartup === true,
+                syncInterval: localSyncSettings.syncInterval || 300000
+            };
+            this.data.sync = {
+                ...this.data.sync,
+                ...preservedToggles
+            };
+
+            // Optionally preserve sync metadata if explicitly requested (used in main process)
+            if (options && options.preserveSyncMeta) {
+                this.data.sync.lastSync = localSyncSettings.lastSync || this.data.sync.lastSync || null;
+                this.data.sync.lastSyncVersion = localSyncSettings.lastSyncVersion || this.data.sync.lastSyncVersion || this.data.metadata?.version || '1.0';
+                this.data.sync.remoteFileId = localSyncSettings.remoteFileId || this.data.sync.remoteFileId || null;
+                this.data.sync.localChecksum = localSyncSettings.localChecksum || this.data.sync.localChecksum || null;
+                this.data.sync.remoteChecksum = localSyncSettings.remoteChecksum || this.data.sync.remoteChecksum || null;
             }
 
             this.saveToLocalStorage();

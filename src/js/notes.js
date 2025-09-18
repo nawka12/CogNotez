@@ -25,12 +25,14 @@ class NotesManager {
             if (this.db && this.db.initialized) {
                 // Use database
                 notes = await this.getNotesFromDatabase(searchQuery);
+                console.log('[DEBUG] NotesManager.renderNotesList got', notes.length, 'notes from database');
             } else {
                 // Fallback to localStorage
                 notes = this.getNotesFromLocalStorage();
                 if (searchQuery) {
                     notes = this.filterNotesBySearch(notes, searchQuery);
                 }
+                console.log('[DEBUG] NotesManager.renderNotesList got', notes.length, 'notes from localStorage fallback');
             }
 
             this.currentNotes = notes;

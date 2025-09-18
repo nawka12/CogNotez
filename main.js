@@ -49,60 +49,78 @@ function createWindow() {
 
 // Configure auto-updater
 function setupAutoUpdater() {
-  // Configure auto-updater for GitHub releases
-  autoUpdater.autoDownload = false; // Don't download automatically, let user choose
+  try {
+    // Configure auto-updater for GitHub releases
+    autoUpdater.autoDownload = false; // Don't download automatically, let user choose
 
-  // Auto-updater event handlers
-  autoUpdater.on('checking-for-update', () => {
-    console.log('Checking for update...');
-    mainWindow.webContents.send('update-checking');
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    console.log('Update available:', info.version);
-    mainWindow.webContents.send('update-available', info);
-  });
-
-  autoUpdater.on('update-not-available', (info) => {
-    console.log('Update not available. Current version:', info.version);
-    mainWindow.webContents.send('update-not-available', info);
-  });
-
-  autoUpdater.on('error', (err) => {
-    console.error('Update error:', err);
-    mainWindow.webContents.send('update-error', err.message);
-  });
-
-  autoUpdater.on('download-progress', (progressObj) => {
-    let log_message = "Download speed: " + progressObj.bytesPerSecond;
-    log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
-    log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
-    console.log(log_message);
-    mainWindow.webContents.send('download-progress', progressObj);
-  });
-
-  autoUpdater.on('update-downloaded', (info) => {
-    console.log('Update downloaded:', info.version);
-    mainWindow.webContents.send('update-downloaded', info);
-
-    // Show dialog asking user to restart
-    dialog.showMessageBox(mainWindow, {
-      type: 'info',
-      title: 'Update Ready',
-      message: 'A new version has been downloaded. Restart the application to apply the update?',
-      buttons: ['Restart', 'Later']
-    }).then((result) => {
-      if (result.response === 0) {
-        autoUpdater.quitAndInstall();
+    // Auto-updater event handlers
+    autoUpdater.on('checking-for-update', () => {
+      console.log('Checking for update...');
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('update-checking');
       }
     });
-  });
 
-  // Check for updates (only in production)
-  if (process.env.NODE_ENV !== 'development') {
-    setTimeout(() => {
-      autoUpdater.checkForUpdates();
-    }, 3000); // Wait 3 seconds after app start
+    autoUpdater.on('update-available', (info) => {
+      console.log('Update available:', info.version);
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('update-available', info);
+      }
+    });
+
+    autoUpdater.on('update-not-available', (info) => {
+      console.log('Update not available. Current version:', info.version);
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('update-not-available', info);
+      }
+    });
+
+    autoUpdater.on('error', (err) => {
+      console.error('Update error:', err);
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('update-error', err.message);
+      }
+    });
+
+    autoUpdater.on('download-progress', (progressObj) => {
+      let log_message = "Download speed: " + progressObj.bytesPerSecond;
+      log_message = log_message + ' - Downloaded ' + progressObj.percent + '%';
+      log_message = log_message + ' (' + progressObj.transferred + "/" + progressObj.total + ')';
+      console.log(log_message);
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('download-progress', progressObj);
+      }
+    });
+
+    autoUpdater.on('update-downloaded', (info) => {
+      console.log('Update downloaded:', info.version);
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('update-downloaded', info);
+      }
+
+      // Show dialog asking user to restart
+      if (mainWindow) {
+        dialog.showMessageBox(mainWindow, {
+          type: 'info',
+          title: 'Update Ready',
+          message: 'A new version has been downloaded. Restart the application to apply the update?',
+          buttons: ['Restart', 'Later']
+        }).then((result) => {
+          if (result.response === 0) {
+            autoUpdater.quitAndInstall();
+          }
+        });
+      }
+    });
+
+    // Check for updates (only in production)
+    if (process.env.NODE_ENV !== 'development') {
+      setTimeout(() => {
+        autoUpdater.checkForUpdates();
+      }, 3000); // Wait 3 seconds after app start
+    }
+  } catch (error) {
+    console.warn('Auto-updater setup failed:', error.message);
   }
 }
 
@@ -355,10 +373,14 @@ if (ipcMain) {
         localData = global.databaseManager.exportDataForSync();
       }
 
-      // Perform sync
+      // Perform sync - use lastSync from renderer if provided, otherwise from main process DB
+      const dbSyncMeta = global.databaseManager ? global.databaseManager.getSyncMetadata() : {};
+      const lastSyncToUse = options.lastSync || (dbSyncMeta && dbSyncMeta.lastSync ? dbSyncMeta.lastSync : null);
+      console.log('[Sync] Using lastSync:', lastSyncToUse);
       const syncResult = await global.googleDriveSyncManager.sync({
         localData: localData.data,
-        strategy: options.strategy || 'merge'
+        strategy: options.strategy || 'merge',
+        lastSync: lastSyncToUse
       });
 
       if (syncResult.success) {
@@ -370,12 +392,21 @@ if (ipcMain) {
         });
 
         // If we downloaded data, apply it
-        if (syncResult.action === 'download' || syncResult.action === 'merge') {
+        if (syncResult.action === 'download') {
           // Get the remote data that was downloaded
           const remoteData = await global.googleDriveSyncManager.downloadData();
           const importResult = global.databaseManager.importDataFromSync(remoteData.data, {
             mergeStrategy: 'merge',
-            force: false
+            force: false,
+            preserveSyncMeta: true
+          });
+        } else if (syncResult.action === 'merge' && syncResult.mergedData) {
+          // For merge operations, import the merged data directly
+          console.log('[Sync] Applying merged data to main process database');
+          const importResult = global.databaseManager.importDataFromSync(syncResult.mergedData, {
+            mergeStrategy: 'replace', // Replace with merged data
+            force: true,
+            preserveSyncMeta: true
           });
         }
 

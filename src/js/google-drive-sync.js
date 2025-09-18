@@ -431,7 +431,19 @@ class GoogleDriveSyncManager {
                 console.log('[GoogleDriveSync] Local notes:', Object.keys(localData.notes || {}).length);
                 console.log('[GoogleDriveSync] Remote notes:', Object.keys(remoteData.notes || {}).length);
                 console.log('[GoogleDriveSync] Conflict detection - hasLocalChanges:', this.hasLocalChanges(localData, remoteData));
-                const conflictResult = await this.resolveConflicts(localData, remoteData, options.strategy || 'merge');
+                // Use the most recent known lastSync between renderer-provided and internal
+                const providedLastSync = options.lastSync ? new Date(options.lastSync).getTime() : null;
+                const internalLastSync = this.syncMetadata.lastSync ? new Date(this.syncMetadata.lastSync).getTime() : null;
+                let effectiveLastSync = null;
+                if (providedLastSync && internalLastSync) {
+                    effectiveLastSync = new Date(Math.max(providedLastSync, internalLastSync)).toISOString();
+                } else if (providedLastSync) {
+                    effectiveLastSync = new Date(providedLastSync).toISOString();
+                } else if (internalLastSync) {
+                    effectiveLastSync = new Date(internalLastSync).toISOString();
+                }
+                console.log('[GoogleDriveSync] Using effective lastSync:', effectiveLastSync);
+                const conflictResult = await this.resolveConflicts(localData, remoteData, options.strategy || 'merge', effectiveLastSync);
 
                 if (conflictResult.resolved) {
                     // Upload merged data
@@ -439,6 +451,7 @@ class GoogleDriveSyncManager {
                     console.log('[GoogleDriveSync] Uploading merged data after conflict resolution');
                     await this.uploadData(conflictResult.mergedData);
                     result.action = 'merge';
+                    result.mergedData = conflictResult.mergedData; // Include merged data in result
                     result.stats.uploaded = 1;
                     result.success = true;
                 } else {
@@ -476,11 +489,12 @@ class GoogleDriveSyncManager {
         }
     }
 
-    async resolveConflicts(localData, remoteData, strategy = 'merge') {
+    async resolveConflicts(localData, remoteData, strategy = 'merge', lastSyncIso = null) {
         const conflicts = [];
         const mergedData = JSON.parse(JSON.stringify(localData)); // Deep clone
 
         console.log('[GoogleDriveSync] Starting conflict resolution with strategy:', strategy);
+        console.log('[GoogleDriveSync] lastSyncIso:', lastSyncIso);
         console.log('[GoogleDriveSync] Local notes count:', Object.keys(localData.notes || {}).length);
         console.log('[GoogleDriveSync] Remote notes count:', Object.keys(remoteData.notes || {}).length);
 
@@ -491,15 +505,36 @@ class GoogleDriveSyncManager {
 
             const allNoteIds = new Set([...Object.keys(localNotes), ...Object.keys(remoteNotes)]);
 
+            const lastSyncTime = lastSyncIso ? new Date(lastSyncIso).getTime() : null;
             for (const noteId of allNoteIds) {
                 const localNote = localNotes[noteId];
                 const remoteNote = remoteNotes[noteId];
 
                 if (!localNote && remoteNote) {
-                    // Remote has new note
+                    // Note missing locally. If we have a lastSync and the remote wasn't
+                    // modified after lastSync, treat this as a local deletion and do NOT re-add.
+                    const remoteModifiedTime = new Date(remoteNote.updated_at || remoteNote.modified || remoteNote.created_at).getTime();
+                    console.log(`[GoogleDriveSync] Note ${noteId} missing locally, remote modified: ${new Date(remoteModifiedTime).toISOString()}, lastSync: ${lastSyncTime ? new Date(lastSyncTime).toISOString() : 'none'}`);
+                    if (lastSyncTime && remoteModifiedTime <= lastSyncTime) {
+                        console.log(`[GoogleDriveSync] Treating as local deletion - omitting from merged data`);
+                        // Respect local deletion: do nothing (omit from merged)
+                        continue;
+                    }
+                    console.log(`[GoogleDriveSync] Treating as new remote note - adding to merged data`);
+                    // Otherwise, treat as new remote note (added elsewhere) and keep it
                     mergedData.notes[noteId] = remoteNote;
                 } else if (localNote && !remoteNote) {
-                    // Local has new note - keep it
+                    // Remote missing the note. If we have lastSync and local wasn't
+                    // modified after lastSync, treat this as a remote deletion and drop it.
+                    const localModifiedTime = new Date(localNote.updated_at || localNote.modified || localNote.created_at).getTime();
+                    if (lastSyncTime && localModifiedTime <= lastSyncTime) {
+                        // Respect remote deletion: remove from merged if present
+                        if (mergedData.notes[noteId]) {
+                            delete mergedData.notes[noteId];
+                        }
+                        continue;
+                    }
+                    // Otherwise, it's a new/updated local note since last sync; keep it
                     continue;
                 } else if (localNote && remoteNote) {
                     // Both have the note - check for conflicts
