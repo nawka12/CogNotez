@@ -483,6 +483,7 @@ class CogNotezApp {
 
         // Show splash screen immediately
         this.showSplashScreen();
+        this.updateSplashVersion();
         this.updateSplashProgress('Starting CogNotez...', 5);
 
         try {
@@ -2816,6 +2817,18 @@ Please provide a helpful response based on the note content and conversation his
         if (app) {
             app.classList.remove('app-hidden');
             app.classList.add('app-visible');
+        }
+    }
+
+    async updateSplashVersion() {
+        try {
+            const version = await window.electronAPI.getAppVersion();
+            const versionElement = document.getElementById('splash-version');
+            if (versionElement) {
+                versionElement.textContent = `Version ${version}`;
+            }
+        } catch (error) {
+            console.warn('Failed to get app version for splash screen:', error);
         }
     }
 
