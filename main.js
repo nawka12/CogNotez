@@ -409,6 +409,12 @@ if (ipcMain) {
         }
       }
 
+      // Trigger Electron reload after successful sync
+      if (syncResult.success) {
+        console.log('[Main] Sync completed successfully, triggering app reload...');
+        mainWindow.reload();
+      }
+
       return syncResult;
     } catch (error) {
       console.error('Google Drive sync failed:', error);
@@ -441,6 +447,12 @@ if (ipcMain) {
           remoteFileId: uploadResult.fileId,
           localChecksum: localData.checksum
         });
+      }
+
+      // Trigger Electron reload after successful upload
+      if (uploadResult.success) {
+        console.log('[Main] Upload completed successfully, triggering app reload...');
+        mainWindow.reload();
       }
 
       return uploadResult;
@@ -478,6 +490,12 @@ if (ipcMain) {
           ...downloadResult,
           importResult: importResult
         };
+      }
+
+      // Trigger Electron reload after successful download
+      if (downloadResult.success) {
+        console.log('[Main] Download completed successfully, triggering app reload...');
+        mainWindow.reload();
       }
 
       return downloadResult;
