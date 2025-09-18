@@ -221,69 +221,58 @@ if (ipcMain) {
         });
 
         return new Promise((resolve, reject) => {
-          // Listen for navigation to callback URL
-          authWindow.webContents.on('will-navigate', async (event, url) => {
-            // Handle OAuth callback URLs from any localhost port (common Google OAuth redirect)
-            if (url.includes('code=') && (url.includes('localhost') || url.includes('127.0.0.1'))) {
-              event.preventDefault();
+          let handled = false;
 
-              // Extract authorization code from URL
+          const tryHandleAuthCallbackFromUrl = async (url, preventDefault) => {
+            if (handled) return;
+            try {
+              const isCallback = url.includes('code=') && (url.includes('localhost') || url.includes('127.0.0.1'));
+              if (!isCallback) return;
+              if (preventDefault && typeof preventDefault === 'function') preventDefault();
+
               const urlObj = new URL(url);
               const code = urlObj.searchParams.get('code');
+              if (!code) return;
 
-              if (code) {
-                try {
-                  await global.googleAuthManager.handleAuthCallback(code);
-                  authWindow.close();
-
-                  // Notify frontend of successful authentication
-                  mainWindow.webContents.send('google-drive-auth-success', {
-                    message: 'Successfully connected to Google Drive!'
-                  });
-
-                  resolve({ success: true, message: 'Authentication successful' });
-                } catch (error) {
-                  authWindow.close();
-
-                  // Don't send error notification here - let the outer handler handle it
-                  reject({ success: false, error: error.message });
-                }
-              } else {
-                authWindow.close();
-                reject({ success: false, error: 'No authorization code received' });
+              handled = true;
+              await global.googleAuthManager.handleAuthCallback(code);
+              authWindow.close();
+              if (mainWindow && mainWindow.webContents) {
+                mainWindow.webContents.send('google-drive-auth-success', { message: 'Successfully connected to Google Drive!' });
               }
+              resolve({ success: true, message: 'Authentication successful' });
+            } catch (error) {
+              handled = true;
+              try { authWindow.close(); } catch (_) {}
+              reject({ success: false, error: error.message });
             }
+          };
+
+          // Listen for navigation to callback URL
+          authWindow.webContents.on('will-navigate', async (event, url) => {
+            tryHandleAuthCallbackFromUrl(url, () => event.preventDefault());
           });
 
           // Also listen for did-navigate events in case will-navigate doesn't catch it
           authWindow.webContents.on('did-navigate', async (event, url) => {
-            if (url.includes('code=') && (url.includes('localhost') || url.includes('127.0.0.1'))) {
-              // Extract authorization code from URL
-              const urlObj = new URL(url);
-              const code = urlObj.searchParams.get('code');
+            tryHandleAuthCallbackFromUrl(url);
+          });
 
-              if (code) {
-                try {
-                  await global.googleAuthManager.handleAuthCallback(code);
-                  authWindow.close();
+          // Handle explicit redirect events (helps on Windows)
+          authWindow.webContents.on('will-redirect', async (event, url) => {
+            tryHandleAuthCallbackFromUrl(url, () => event.preventDefault());
+          });
 
-                  // Notify frontend of successful authentication
-                  mainWindow.webContents.send('google-drive-auth-success', {
-                    message: 'Successfully connected to Google Drive!'
-                  });
-
-                  resolve({ success: true, message: 'Authentication successful' });
-                } catch (error) {
-                  authWindow.close();
-                  reject({ success: false, error: error.message });
-                }
-              }
-            }
+          // Fallback for older Electron redirect event
+          authWindow.webContents.on('did-get-redirect-request', async (event, oldUrl, newUrl /*, isMainFrame, httpResponseCode, requestMethod, referrer, headers */) => {
+            tryHandleAuthCallbackFromUrl(newUrl, () => event.preventDefault && event.preventDefault());
           });
 
           // Handle window close without completing auth
           authWindow.on('closed', () => {
-            reject({ success: false, error: 'Authentication cancelled' });
+            if (!handled) {
+              reject({ success: false, error: 'Authentication cancelled' });
+            }
           });
         });
       } else {
