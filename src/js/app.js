@@ -767,6 +767,9 @@ class CogNotezApp {
         ipcRenderer.on('download-progress', (event, progress) => this.showDownloadProgress(progress));
         ipcRenderer.on('update-downloaded', (event, info) => this.showUpdateDownloaded(info));
 
+        // Sync-related IPC events
+        ipcRenderer.on('sync-data-updated', (event, syncData) => this.handleSyncDataUpdated(syncData));
+
         // Google Drive authentication IPC handlers
         ipcRenderer.on('google-drive-auth-success', (event, data) => {
             this.showNotification(data.message || 'Google Drive authentication successful', 'success');
@@ -3950,6 +3953,44 @@ Please provide a helpful response based on the note content and conversation his
             this.updateSyncUI();
         } catch (error) {
             console.error('[Sync] Failed to update sync status:', error);
+        }
+    }
+
+    async handleSyncDataUpdated(syncData) {
+        try {
+            console.log('[DEBUG] Received updated data from sync, updating localStorage...');
+
+            // Update localStorage with the new data
+            if (typeof localStorage !== 'undefined') {
+                localStorage.setItem('cognotez_data', syncData.data);
+                console.log('[DEBUG] localStorage updated with sync data');
+
+                // Reload notes from the updated data
+                await this.loadNotes();
+
+                // Update UI to reflect the changes
+                this.updateSyncStatus();
+
+                // Show notification about the sync
+                let message = 'Data synchronized successfully';
+                if (syncData.stats) {
+                    const stats = syncData.stats;
+                    if (stats.downloaded > 0) {
+                        message += ` - ${stats.downloaded} items downloaded`;
+                    }
+                    if (stats.uploaded > 0) {
+                        message += ` - ${stats.uploaded} items uploaded`;
+                    }
+                }
+                this.showNotification(message, 'success');
+
+            } else {
+                console.error('[DEBUG] localStorage not available in renderer process');
+            }
+
+        } catch (error) {
+            console.error('[DEBUG] Failed to handle sync data update:', error);
+            this.showNotification('Failed to update local data after sync', 'error');
         }
     }
 

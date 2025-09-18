@@ -100,7 +100,10 @@ class GoogleDriveSyncManager {
         }
     }
 
-    async uploadData(data, options = {}) {
+    async uploadData(data, options = {}, retryCount = 0) {
+        const maxRetries = 3;
+        const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
+
         try {
             // Ensure the sync manager is fully initialized before proceeding
             await this.ensureInitialized();
@@ -173,11 +176,31 @@ class GoogleDriveSyncManager {
 
         } catch (error) {
             console.error('[GoogleDriveSync] Upload failed:', error);
+
+            // Categorize error types for better handling
+            const isRetryableError = error.code === 429 || // Rate limit
+                                   error.code === 500 || // Server error
+                                   error.code === 502 || // Bad gateway
+                                   error.code === 503 || // Service unavailable
+                                   error.code === 504 || // Gateway timeout
+                                   (error.code >= 520 && error.code <= 527) || // Cloudflare errors
+                                   error.code === 403; // Quota exceeded (sometimes retryable)
+
+            // Retry for transient errors
+            if (isRetryableError && retryCount < maxRetries) {
+                console.log(`[GoogleDriveSync] Retrying upload in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                return this.uploadData(data, options, retryCount + 1);
+            }
+
             throw error;
         }
     }
 
-    async downloadData() {
+    async downloadData(retryCount = 0) {
+        const maxRetries = 3;
+        const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
+
         try {
             // Ensure the sync manager is fully initialized before proceeding
             await this.ensureInitialized();
@@ -209,9 +232,25 @@ class GoogleDriveSyncManager {
         } catch (error) {
             console.error('[GoogleDriveSync] Download failed:', error);
 
-            // If file not found, reset remote file ID
+            // Categorize error types for better handling
+            const isRetryableError = error.code === 429 || // Rate limit
+                                   error.code === 500 || // Server error
+                                   error.code === 502 || // Bad gateway
+                                   error.code === 503 || // Service unavailable
+                                   error.code === 504 || // Gateway timeout
+                                   (error.code >= 520 && error.code <= 527); // Cloudflare errors
+
+            // If file not found, reset remote file ID (not retryable)
             if (error.code === 404) {
                 this.syncMetadata.remoteFileId = null;
+                throw error;
+            }
+
+            // Retry for transient errors
+            if (isRetryableError && retryCount < maxRetries) {
+                console.log(`[GoogleDriveSync] Retrying download in ${retryDelay}ms (attempt ${retryCount + 1}/${maxRetries})`);
+                await new Promise(resolve => setTimeout(resolve, retryDelay));
+                return this.downloadData(retryCount + 1);
             }
 
             throw error;
@@ -266,6 +305,11 @@ class GoogleDriveSyncManager {
             this.syncInProgress = true;
             console.log('[GoogleDriveSync] Starting sync process');
 
+            // Progress callback support
+            const progressCallback = options.onProgress || (() => {});
+
+            progressCallback({ status: 'initializing', message: 'Preparing sync...' });
+
             const result = {
                 success: false,
                 action: null,
@@ -277,8 +321,12 @@ class GoogleDriveSyncManager {
                 }
             };
 
+            progressCallback({ status: 'checking_remote', message: 'Checking for remote data...' });
+
             // Ensure we have the latest remote file info
             await this.findRemoteFile();
+
+            progressCallback({ status: 'analyzing_local', message: 'Analyzing local data...' });
 
             // Get local data
             const localData = options.localData || await this.getLocalData();
@@ -295,6 +343,7 @@ class GoogleDriveSyncManager {
 
             // Download remote data if it exists
             if (this.syncMetadata.remoteFileId) {
+                progressCallback({ status: 'downloading', message: 'Downloading remote data...' });
                 try {
                     const downloadResult = await this.downloadData();
                     remoteData = downloadResult.data;
@@ -307,13 +356,17 @@ class GoogleDriveSyncManager {
                     });
                 } catch (error) {
                     console.warn('[GoogleDriveSync] Could not download remote data:', error.message);
+                    progressCallback({ status: 'error', message: 'Failed to download remote data' });
                 }
             }
 
             // Determine sync strategy
+            progressCallback({ status: 'analyzing_changes', message: 'Analyzing data changes...' });
             console.log('[GoogleDriveSync] Comparing data - remoteData exists:', !!remoteData);
+
             if (!remoteData) {
                 // First time sync - upload local data
+                progressCallback({ status: 'uploading', message: 'Uploading data to Google Drive...' });
                 console.log('[GoogleDriveSync] First time sync - uploading local data');
                 console.log('[GoogleDriveSync] Uploading data with', Object.keys(localData.notes || {}).length, 'notes');
                 await this.uploadData(localData);
@@ -323,6 +376,7 @@ class GoogleDriveSyncManager {
 
             } else if (!this.hasLocalChanges(localData, remoteData)) {
                 // No local changes - download remote data
+                progressCallback({ status: 'applying_remote', message: 'Applying remote data...' });
                 console.log('[GoogleDriveSync] No local changes - downloading remote data');
                 await this.applyRemoteData(remoteData);
                 result.action = 'download';
@@ -331,6 +385,7 @@ class GoogleDriveSyncManager {
 
             } else {
                 // Both have changes - handle conflicts
+                progressCallback({ status: 'resolving_conflicts', message: 'Resolving data conflicts...' });
                 console.log('[GoogleDriveSync] Both local and remote have changes - resolving conflicts');
                 console.log('[GoogleDriveSync] Local notes:', Object.keys(localData.notes || {}).length);
                 console.log('[GoogleDriveSync] Remote notes:', Object.keys(remoteData.notes || {}).length);
@@ -339,12 +394,14 @@ class GoogleDriveSyncManager {
 
                 if (conflictResult.resolved) {
                     // Upload merged data
+                    progressCallback({ status: 'uploading', message: 'Uploading merged data...' });
                     console.log('[GoogleDriveSync] Uploading merged data after conflict resolution');
                     await this.uploadData(conflictResult.mergedData);
                     result.action = 'merge';
                     result.stats.uploaded = 1;
                     result.success = true;
                 } else {
+                    progressCallback({ status: 'conflict_detected', message: 'Manual conflict resolution needed' });
                     console.log('[GoogleDriveSync] Conflicts detected and not auto-resolved');
                     result.action = 'conflict';
                     result.conflicts = conflictResult.conflicts;
@@ -356,11 +413,22 @@ class GoogleDriveSyncManager {
             this.syncMetadata.lastSync = new Date().toISOString();
             this.syncMetadata.localChecksum = localChecksum;
 
+            progressCallback({
+                status: 'completed',
+                message: `Sync completed: ${result.action}`,
+                result: result
+            });
+
             console.log('[GoogleDriveSync] Sync completed:', result);
             return result;
 
         } catch (error) {
             console.error('[GoogleDriveSync] Sync failed:', error);
+            progressCallback({
+                status: 'error',
+                message: `Sync failed: ${error.message}`,
+                error: error
+            });
             throw error;
         } finally {
             this.syncInProgress = false;
@@ -454,10 +522,24 @@ class GoogleDriveSyncManager {
     }
 
     hasLocalChanges(localData, remoteData) {
+        // Check if local has meaningful content that would be lost by downloading remote data
+        // This prevents treating empty local data as "changes" when remote has content
+
+        const localNotesCount = Object.keys(localData.notes || {}).length;
+        const localConversationsCount = Object.keys(localData.ai_conversations || {}).length;
+        const remoteNotesCount = Object.keys(remoteData.notes || {}).length;
+        const remoteConversationsCount = Object.keys(remoteData.ai_conversations || {}).length;
+
+        // If local is empty but remote has data, don't treat this as "local changes"
+        const localIsEmpty = localNotesCount === 0 && localConversationsCount === 0;
+        const remoteHasData = remoteNotesCount > 0 || remoteConversationsCount > 0;
+
+        if (localIsEmpty && remoteHasData) {
+            return false; // No local changes - just download remote data
+        }
+
         // Compare content only, excluding export-specific metadata
         // This prevents false positives due to export timestamps
-
-        // Create content-only versions for comparison
         const { exportedForSync, exportedAt, ...localMetadata } = localData.metadata || {};
         const localContent = {
             notes: localData.notes,
@@ -510,9 +592,10 @@ class GoogleDriveSyncManager {
     }
 
     async applyRemoteData(remoteData) {
-        // This should be implemented to apply downloaded data to the local database
-        // For now, just log
-        console.log('[GoogleDriveSync] Applying remote data to local database');
+        // Note: Data application is handled by the main process after sync completion
+        // This method is kept for interface consistency but actual data import
+        // happens in main.js via databaseManager.importDataFromSync()
+        console.log('[GoogleDriveSync] Remote data will be applied by main process database manager');
     }
 
     calculateChecksum(data) {

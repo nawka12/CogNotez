@@ -383,10 +383,20 @@ if (ipcMain) {
         if (syncResult.action === 'download' || syncResult.action === 'merge') {
           // Get the remote data that was downloaded
           const remoteData = await global.googleDriveSyncManager.downloadData();
-          global.databaseManager.importDataFromSync(remoteData.data, {
+          const importResult = global.databaseManager.importDataFromSync(remoteData.data, {
             mergeStrategy: 'merge',
             force: false
           });
+
+          if (importResult.success) {
+            // Send updated data back to renderer process to update localStorage
+            const updatedData = global.databaseManager.exportDataAsJSON();
+            event.sender.send('sync-data-updated', {
+              data: updatedData,
+              action: syncResult.action,
+              stats: syncResult.stats
+            });
+          }
         }
       }
 
