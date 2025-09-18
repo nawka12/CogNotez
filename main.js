@@ -397,6 +397,15 @@ if (ipcMain) {
               stats: syncResult.stats
             });
           }
+        } else {
+          // For upload-only syncs, still send updated data to refresh UI
+          // (sync metadata may have been updated, or other local changes need to be reflected)
+          const updatedData = global.databaseManager.exportDataAsJSON();
+          event.sender.send('sync-data-updated', {
+            data: updatedData,
+            action: syncResult.action,
+            stats: syncResult.stats
+          });
         }
       }
 
