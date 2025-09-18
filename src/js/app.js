@@ -769,6 +769,7 @@ class CogNotezApp {
 
         // Sync-related IPC events
         ipcRenderer.on('sync-data-updated', (event, syncData) => this.handleSyncDataUpdated(syncData));
+        ipcRenderer.on('sync-completed', (event, syncResult) => this.handleSyncCompleted(syncResult));
 
         // Google Drive authentication IPC handlers
         ipcRenderer.on('google-drive-auth-success', (event, data) => {
@@ -3958,12 +3959,30 @@ Please provide a helpful response based on the note content and conversation his
 
     async handleSyncDataUpdated(syncData) {
         try {
-            console.log('[DEBUG] Received updated data from sync, updating localStorage...');
+            console.log('[Sync] Received updated data from sync, updating local data...');
 
             // Update localStorage with the new data
             if (typeof localStorage !== 'undefined') {
                 localStorage.setItem('cognotez_data', syncData.data);
-                console.log('[DEBUG] localStorage updated with sync data');
+
+                // Also update the renderer process's database instance if it exists
+                if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                    console.log('[Sync] Updating renderer database with sync data');
+                    let parsedData = null;
+                    try {
+                        parsedData = typeof syncData.data === 'string' ? JSON.parse(syncData.data) : (syncData.data || syncData);
+                    } catch (e) {
+                        console.warn('[Sync] Failed to parse sync data JSON, attempting raw import', e);
+                    }
+
+                    // Prefer importing parsed object to ensure DB gets updated
+                    const importResult = parsedData
+                        ? this.notesManager.db.importDataFromSync(parsedData, { force: true })
+                        : { success: this.notesManager.db.importDataFromJSON(syncData.data) };
+                    if (!importResult.success) {
+                        console.warn('[Sync] Failed to update renderer database:', importResult.error);
+                    }
+                }
 
                 // Reload notes from the updated data
                 await this.loadNotes();
@@ -3985,12 +4004,45 @@ Please provide a helpful response based on the note content and conversation his
                 this.showNotification(message, 'success');
 
             } else {
-                console.error('[DEBUG] localStorage not available in renderer process');
+                console.error('[Sync] localStorage not available in renderer process');
             }
 
         } catch (error) {
-            console.error('[DEBUG] Failed to handle sync data update:', error);
+            console.error('[Sync] Failed to handle sync data update:', error);
             this.showNotification('Failed to update local data after sync', 'error');
+        }
+    }
+
+    async handleSyncCompleted(syncResult) {
+        try {
+            console.log('[Sync] Sync completed, refreshing UI...');
+
+            // Refresh notes list
+            await this.loadNotes();
+
+            // Update sync status UI
+            this.updateSyncStatus();
+
+            // Show notification about the sync completion
+            let message = 'Sync completed successfully';
+            if (syncResult.action) {
+                message += ` - ${syncResult.action}`;
+            }
+            if (syncResult.stats) {
+                const stats = syncResult.stats;
+                if (stats.downloaded > 0) {
+                    message += ` (${stats.downloaded} downloaded)`;
+                }
+                if (stats.uploaded > 0) {
+                    message += ` (${stats.uploaded} uploaded)`;
+                }
+            }
+            this.showNotification(message, 'success');
+
+            console.log('[Sync] UI refreshed after sync completion');
+        } catch (error) {
+            console.error('[Sync] Failed to handle sync completion:', error);
+            this.showNotification('Sync completed but UI refresh failed', 'warning');
         }
     }
 

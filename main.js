@@ -387,32 +387,19 @@ if (ipcMain) {
             mergeStrategy: 'merge',
             force: false
           });
-
-          if (importResult.success) {
-            // Send updated data back to renderer process to update localStorage
-            const updatedData = global.databaseManager.exportDataAsJSON();
-            event.sender.send('sync-data-updated', {
-              data: updatedData,
-              action: syncResult.action,
-              stats: syncResult.stats
-            });
-          }
-        } else {
-          // For upload-only syncs, still send updated data to refresh UI
-          // (sync metadata may have been updated, or other local changes need to be reflected)
-          const updatedData = global.databaseManager.exportDataAsJSON();
-          event.sender.send('sync-data-updated', {
-            data: updatedData,
-            action: syncResult.action,
-            stats: syncResult.stats
-          });
         }
-      }
 
-      // Trigger Electron reload after successful sync
-      if (syncResult.success) {
-        console.log('[Main] Sync completed successfully, triggering app reload...');
-        mainWindow.reload();
+        // Send updated data back to renderer process to update localStorage
+        const updatedData = global.databaseManager.exportDataAsJSON();
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-data-updated', {
+                data: updatedData,
+                action: syncResult.action,
+                stats: syncResult.stats
+            });
+            // Notify renderer process that sync completed successfully
+            mainWindow.webContents.send('sync-completed', syncResult);
+        }
       }
 
       return syncResult;
@@ -449,10 +436,18 @@ if (ipcMain) {
         });
       }
 
-      // Trigger Electron reload after successful upload
+      // Notify renderer process that upload completed successfully
       if (uploadResult.success) {
-        console.log('[Main] Upload completed successfully, triggering app reload...');
-        mainWindow.reload();
+        // Send updated data to refresh localStorage in renderer process
+        const updatedData = global.databaseManager.exportDataAsJSON();
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-data-updated', {
+                data: updatedData,
+                action: 'upload',
+                stats: { uploaded: 1 }
+            });
+            mainWindow.webContents.send('sync-completed', uploadResult);
+        }
       }
 
       return uploadResult;
@@ -485,17 +480,25 @@ if (ipcMain) {
           force: false
         });
 
-        return {
+        const result = {
           success: true,
           ...downloadResult,
           importResult: importResult
         };
-      }
 
-      // Trigger Electron reload after successful download
-      if (downloadResult.success) {
-        console.log('[Main] Download completed successfully, triggering app reload...');
-        mainWindow.reload();
+        // Notify renderer process that download completed successfully
+        // Send updated data to refresh localStorage in renderer process
+        const updatedData = global.databaseManager.exportDataAsJSON();
+        if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-data-updated', {
+                data: updatedData,
+                action: 'download',
+                stats: { downloaded: 1 }
+            });
+            mainWindow.webContents.send('sync-completed', result);
+        }
+
+        return result;
       }
 
       return downloadResult;
