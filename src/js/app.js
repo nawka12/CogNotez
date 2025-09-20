@@ -4436,6 +4436,9 @@ Please provide a helpful response based on the note content and conversation his
                         this.showNotification(message, 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
+                    } else if (result && result.encryptionRequired) {
+                        // Prompt for passphrase immediately
+                        await this.promptForDecryptionPassphrase({ message: 'Cloud data is encrypted. Enter your passphrase to decrypt.' });
                     } else {
                         this.showNotification(result.error || 'Sync failed', 'error');
                     }

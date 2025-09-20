@@ -476,6 +476,7 @@ if (ipcMain) {
               message: error.message || 'Remote data is encrypted and requires a passphrase to decrypt.'
             });
           }
+          // Stop sync and do not upload local data
           return { success: false, error: error.message, encryptionRequired: true };
         }
         throw error;

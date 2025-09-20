@@ -478,6 +478,10 @@ class GoogleDriveSyncManager {
                     });
                 } catch (error) {
                     console.warn('[GoogleDriveSync] Could not download remote data:', error.message);
+                    if (error && error.encryptionRequired) {
+                        // Propagate encryption requirement so caller can prompt user
+                        throw error;
+                    }
                     progressCallback({ status: 'error', message: 'Failed to download remote data' });
                 }
             }
