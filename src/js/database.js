@@ -1,4 +1,13 @@
 // localStorage-based Database Manager for CogNotez
+const fs = require('fs');
+const path = require('path');
+let electronApp = null;
+try {
+    const electron = require('electron');
+    electronApp = electron && electron.app ? electron.app : null;
+} catch (_) {
+    electronApp = null;
+}
 class DatabaseManager {
     constructor() {
         this.initialized = false;
@@ -66,7 +75,22 @@ class DatabaseManager {
                     console.log('[DEBUG] Loaded data from localStorage');
                 }
             } else {
-                console.log('[DEBUG] localStorage not available (main process), skipping load');
+                // In main process: attempt to load from persisted file
+                const filePath = this.getPersistenceFilePath();
+                try {
+                    if (fs.existsSync(filePath)) {
+                        const content = fs.readFileSync(filePath, 'utf8');
+                        if (content) {
+                            const parsed = JSON.parse(content);
+                            this.data = { ...this.data, ...parsed };
+                            console.log('[DEBUG] Loaded data from file:', filePath);
+                        }
+                    } else {
+                        console.log('[DEBUG] No persisted data file at', filePath);
+                    }
+                } catch (fileError) {
+                    console.warn('[DEBUG] Failed to load data file:', fileError.message);
+                }
             }
         } catch (error) {
             console.warn('[DEBUG] Failed to load data from localStorage:', error);
@@ -82,11 +106,33 @@ class DatabaseManager {
                 localStorage.setItem('cognotez_data', JSON.stringify(this.data));
                 console.log('[DEBUG] Data saved to localStorage');
             } else {
-                console.log('[DEBUG] localStorage not available (main process), skipping save');
+                // In main process: persist to file under userData
+                const filePath = this.getPersistenceFilePath();
+                try {
+                    const dir = path.dirname(filePath);
+                    if (!fs.existsSync(dir)) {
+                        fs.mkdirSync(dir, { recursive: true });
+                    }
+                    fs.writeFileSync(filePath, JSON.stringify(this.data, null, 2), 'utf8');
+                    console.log('[DEBUG] Data saved to file:', filePath);
+                } catch (fileError) {
+                    console.error('[DEBUG] Failed to save data file:', fileError);
+                }
             }
         } catch (error) {
             console.error('[DEBUG] Failed to save data to localStorage:', error);
             throw error;
+        }
+    }
+
+    getPersistenceFilePath() {
+        try {
+            const baseDir = electronApp && typeof electronApp.getPath === 'function'
+                ? electronApp.getPath('userData')
+                : (process.env.HOME || process.cwd());
+            return path.join(baseDir, 'cognotez_data.json');
+        } catch (_) {
+            return path.join(process.cwd(), 'cognotez_data.json');
         }
     }
 
@@ -421,6 +467,13 @@ class DatabaseManager {
 
     // Encryption operations
     setEncryptionSettings(settings) {
+        console.log('[Database] Setting encryption settings:', {
+            enabled: settings.enabled,
+            hasPassphrase: !!settings.passphrase,
+            hasSalt: !!settings.saltBase64,
+            iterations: settings.iterations
+        });
+
         const encryptionManager = require('./encryption');
 
         // Generate new salt if enabling encryption and no salt provided
@@ -443,12 +496,21 @@ class DatabaseManager {
             }
         }
 
+        // When disabling, clear passphrase and salt to avoid stale values
+        const isEnabling = settings.enabled === true;
         this.data.encryption = {
-            enabled: settings.enabled || false,
-            passphrase: settings.passphrase || null,
-            saltBase64: settings.saltBase64 || this.data.encryption.saltBase64,
+            enabled: isEnabling,
+            passphrase: isEnabling ? (settings.passphrase || null) : null,
+            saltBase64: isEnabling ? (settings.saltBase64 || this.data.encryption.saltBase64) : null,
             iterations: settings.iterations || this.data.encryption.iterations
         };
+
+        console.log('[Database] Final encryption settings:', {
+            enabled: this.data.encryption.enabled,
+            hasPassphrase: !!this.data.encryption.passphrase,
+            hasSalt: !!this.data.encryption.saltBase64,
+            iterations: this.data.encryption.iterations
+        });
 
         this.saveToLocalStorage();
         console.log('[DEBUG] Encryption settings updated:', {
@@ -689,10 +751,26 @@ class DatabaseManager {
     }
 
     getSyncConflicts() {
+        // Ensure sync structure exists before accessing
+        this.ensureDataStructure();
+
+        // Handle case where syncConflicts might not be an array
+        if (!Array.isArray(this.data.sync.syncConflicts)) {
+            this.data.sync.syncConflicts = [];
+        }
+
         return this.data.sync.syncConflicts.filter(conflict => !conflict.resolved);
     }
 
     resolveSyncConflict(conflictId, resolution = 'local') {
+        // Ensure sync structure exists before accessing
+        this.ensureDataStructure();
+
+        // Handle case where syncConflicts might not be an array
+        if (!Array.isArray(this.data.sync.syncConflicts)) {
+            this.data.sync.syncConflicts = [];
+        }
+
         const conflict = this.data.sync.syncConflicts.find(c => c.id === conflictId);
         if (conflict) {
             conflict.resolved = true;
@@ -705,14 +783,25 @@ class DatabaseManager {
     }
 
     clearResolvedConflicts() {
+        // Ensure sync structure exists before accessing
+        this.ensureDataStructure();
+
+        // Handle case where syncConflicts might not be an array
+        if (!Array.isArray(this.data.sync.syncConflicts)) {
+            this.data.sync.syncConflicts = [];
+        }
+
         this.data.sync.syncConflicts = this.data.sync.syncConflicts.filter(conflict => !conflict.resolved);
         this.saveToLocalStorage();
     }
 
-    // Enhanced export for sync (includes sync metadata)
+    // Enhanced export for sync (excludes local-only settings and secrets)
     exportDataForSync() {
         const exportData = {
-            ...this.data,
+            notes: this.data.notes,
+            ai_conversations: this.data.ai_conversations,
+            tags: this.data.tags,
+            note_tags: this.data.note_tags,
             metadata: {
                 ...this.data.metadata,
                 exportedForSync: true,
@@ -726,7 +815,6 @@ class DatabaseManager {
         const contentOnlyData = {
             notes: this.data.notes,
             ai_conversations: this.data.ai_conversations,
-            settings: this.data.settings,
             tags: this.data.tags,
             note_tags: this.data.note_tags,
             metadata: {
@@ -758,6 +846,11 @@ class DatabaseManager {
                 throw new Error('Invalid sync data: missing notes');
             }
 
+            // Never import settings, encryption, or sync objects from cloud
+            if (importData.settings) delete importData.settings;
+            if (importData.encryption) delete importData.encryption;
+            if (importData.sync) delete importData.sync;
+
             // Check for potential conflicts
             const conflicts = this.detectSyncConflicts(importData);
 
@@ -775,8 +868,13 @@ class DatabaseManager {
 
             // Apply sync data
             if (options.mergeStrategy === 'replace') {
-                // Complete replacement
+                // Complete replacement but preserve local-only data (settings, encryption)
+                const preservedSettings = { ...(this.data.settings || {}) };
+                const preservedEncryption = { ...(this.data.encryption || {}) };
                 this.data = importData;
+                // Restore preserved local-only fields
+                this.data.settings = preservedSettings;
+                this.data.encryption = preservedEncryption;
             } else {
                 // Merge strategy (default)
                 this.mergeSyncData(importData, options);

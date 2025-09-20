@@ -229,6 +229,13 @@ if (ipcMain) {
 
   ipcMain.handle('set-encryption-settings', async (event, settings) => {
     try {
+      console.log('[Main] Received encryption settings:', {
+        enabled: settings.enabled,
+        hasPassphrase: !!settings.passphrase,
+        hasSalt: !!settings.saltBase64,
+        iterations: settings.iterations
+      });
+
       if (!global.databaseManager) {
         throw new Error('Database manager not available');
       }
@@ -269,6 +276,43 @@ if (ipcMain) {
       };
     } catch (error) {
       console.error('Failed to validate encryption settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Set a temporary passphrase for decrypting cloud data during this session only
+  ipcMain.handle('set-sync-decryption-passphrase', async (event, payload) => {
+    try {
+      const { passphrase, saltBase64, iterations } = payload || {};
+      if (!passphrase || !saltBase64) {
+        throw new Error('Passphrase and salt are required');
+      }
+
+      // Ensure auth exists
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      // Ensure sync manager exists
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        const dbSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, dbSettings);
+      }
+
+      // Use DB enabled flag to avoid turning on encryption for uploads
+      const dbEnc = global.databaseManager ? global.databaseManager.getEncryptionSettings() : { enabled: false, iterations: 210000 };
+
+      global.googleDriveSyncManager.updateEncryptionSettings({
+        enabled: dbEnc.enabled === true, // do not change enablement here
+        passphrase: passphrase,
+        saltBase64: saltBase64,
+        iterations: iterations || dbEnc.iterations || 210000
+      });
+
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to set session passphrase for sync:', error);
       return { success: false, error: error.message };
     }
   });
@@ -473,11 +517,18 @@ if (ipcMain) {
           // Notify renderer that remote data is encrypted and passphrase is required
           if (mainWindow && mainWindow.webContents) {
             mainWindow.webContents.send('sync-requires-passphrase', {
-              message: error.message || 'Remote data is encrypted and requires a passphrase to decrypt.'
+              message: 'Cloud data is encrypted. Enter your E2EE passphrase to continue.'
             });
           }
           // Stop sync and do not upload local data
           return { success: false, error: error.message, encryptionRequired: true };
+        }
+        // Improve generic error messaging back to renderer
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-completed', {
+            success: false,
+            error: error.message || 'Sync failed due to an unknown error'
+          });
         }
         throw error;
       }

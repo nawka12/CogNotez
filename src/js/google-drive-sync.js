@@ -86,7 +86,6 @@ class GoogleDriveSyncManager {
         const snapshot = {
             notes: data.notes || {},
             ai_conversations: data.ai_conversations || {},
-            settings: data.settings || {},
             tags: data.tags || {},
             note_tags: data.note_tags || {},
             metadata: {
@@ -175,6 +174,7 @@ class GoogleDriveSyncManager {
         const maxRetries = 3;
         const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
 
+        let progressCallback = () => {};
         try {
             // Ensure the sync manager is fully initialized before proceeding
             await this.ensureInitialized();
@@ -413,6 +413,7 @@ class GoogleDriveSyncManager {
     }
 
     async sync(options = {}) {
+        let progressCallback = () => {};
         try {
             // Ensure the sync manager is fully initialized before proceeding
             await this.ensureInitialized();
@@ -425,7 +426,7 @@ class GoogleDriveSyncManager {
             console.log('[GoogleDriveSync] Starting sync process');
 
             // Progress callback support
-            const progressCallback = options.onProgress || (() => {});
+            progressCallback = typeof options.onProgress === 'function' ? options.onProgress : (() => {});
 
             progressCallback({ status: 'initializing', message: 'Preparing sync...' });
 
@@ -567,12 +568,27 @@ class GoogleDriveSyncManager {
             console.error('[GoogleDriveSync] Sync failed:', error);
             progressCallback({
                 status: 'error',
-                message: `Sync failed: ${error.message}`,
+                message: this._formatSyncErrorMessage(error),
                 error: error
             });
             throw error;
         } finally {
             this.syncInProgress = false;
+        }
+    }
+
+    _formatSyncErrorMessage(error) {
+        try {
+            if (!error) return 'Sync failed due to an unknown error';
+            if (error.encryptionRequired) {
+                return 'Cloud data is encrypted. Enter your E2EE passphrase to continue.';
+            }
+            const code = error.code || error.status || '';
+            if (code === 404) return 'Remote backup not found on Google Drive.';
+            if (code === 401 || code === 403) return 'Google Drive access denied. Please reconnect your account.';
+            return `Sync failed: ${error.message || 'Unexpected error'}`;
+        } catch (_) {
+            return 'Sync failed due to an unknown error';
         }
     }
 
@@ -707,7 +723,6 @@ class GoogleDriveSyncManager {
         const localContent = {
             notes: localData.notes,
             ai_conversations: localData.ai_conversations,
-            settings: localData.settings,
             tags: localData.tags,
             note_tags: localData.note_tags,
             metadata: {
@@ -721,7 +736,6 @@ class GoogleDriveSyncManager {
         const remoteContent = {
             notes: remoteData.notes,
             ai_conversations: remoteData.ai_conversations,
-            settings: remoteData.settings,
             tags: remoteData.tags,
             note_tags: remoteData.note_tags,
             metadata: {

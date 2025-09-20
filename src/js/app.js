@@ -785,6 +785,9 @@ class CogNotezApp {
         ipcRenderer.on('sync-completed', (event, syncResult) => this.handleSyncCompleted(syncResult));
         ipcRenderer.on('sync-requires-passphrase', (event, payload) => this.promptForDecryptionPassphrase(payload));
 
+        // Encryption-related IPC events
+        ipcRenderer.on('encryption-settings-updated', (event, settings) => this.handleEncryptionSettingsUpdated(settings));
+
         // Google Drive authentication IPC handlers
         ipcRenderer.on('google-drive-auth-success', (event, data) => {
             this.showNotification(data.message || 'Google Drive authentication successful', 'success');
@@ -4099,6 +4102,32 @@ Please provide a helpful response based on the note content and conversation his
         }
     }
 
+    handleEncryptionSettingsUpdated(settings) {
+        try {
+            console.log('[Encryption] handleEncryptionSettingsUpdated called with:', {
+                enabled: settings.enabled,
+                hasPassphrase: !!settings.passphrase,
+                hasSalt: !!settings.saltBase64
+            });
+
+            // Update any open modal with the new settings
+            const openModal = document.querySelector('.modal');
+            if (openModal) {
+                console.log('[Encryption] Updating modal with new settings');
+                this.updateModalEncryptionStatus(openModal, settings);
+            } else {
+                console.log('[Encryption] No open modal found to update');
+            }
+
+            // Show notification about the change
+            const statusText = settings.enabled ? 'enabled' : 'disabled';
+            this.showNotification(`End-to-end encryption ${statusText}`, 'success');
+
+        } catch (error) {
+            console.error('[Encryption] Failed to handle settings update:', error);
+        }
+    }
+
     updateSyncUI() {
         const indicator = document.getElementById('sync-status-indicator');
         const icon = document.getElementById('sync-status-icon');
@@ -4665,19 +4694,44 @@ Please provide a helpful response based on the note content and conversation his
             const encryptionCancelBtn = modal.querySelector('#modal-encryption-cancel-btn');
             const encryptionValidation = modal.querySelector('#encryption-validation');
 
-            // Enable/disable checkbox
+            // Enable/disable checkbox - remove existing listeners to prevent duplicates
             encryptionEnabledCheckbox.checked = settings.enabled;
-            encryptionEnabledCheckbox.addEventListener('change', () => {
-                if (encryptionEnabledCheckbox.checked) {
-                    encryptionPassphraseSection.style.display = 'block';
-                    encryptionPassphraseInput.focus();
+
+            // Clone and replace the checkbox to remove all existing event listeners
+            const newCheckbox = encryptionEnabledCheckbox.cloneNode(true);
+            encryptionEnabledCheckbox.parentNode.replaceChild(newCheckbox, encryptionEnabledCheckbox);
+
+            const updateEncryptionControlsUI = (isEnabled) => {
+                // Always keep section visible so Save button is accessible
+                encryptionPassphraseSection.style.display = 'block';
+
+                if (isEnabled) {
+                    // Show inputs when enabling
+                    encryptionPassphraseInput.style.display = '';
+                    encryptionPassphraseConfirmInput.style.display = '';
+                    encryptionValidation.style.display = '';
+                    encryptionSaveBtn.textContent = 'Save Encryption Settings';
                 } else {
-                    encryptionPassphraseSection.style.display = 'none';
+                    // Hide inputs when disabling but keep Save button visible
+                    encryptionPassphraseInput.style.display = 'none';
+                    encryptionPassphraseConfirmInput.style.display = 'none';
+                    encryptionValidation.style.display = 'none';
                     encryptionPassphraseInput.value = '';
                     encryptionPassphraseConfirmInput.value = '';
                     encryptionValidation.textContent = '';
+                    encryptionSaveBtn.textContent = 'Disable Encryption';
+                }
+            };
+
+            newCheckbox.addEventListener('change', () => {
+                updateEncryptionControlsUI(newCheckbox.checked);
+                if (newCheckbox.checked) {
+                    encryptionPassphraseInput.focus();
                 }
             });
+
+            // Initialize controls based on current setting
+            updateEncryptionControlsUI(settings.enabled);
 
             // Passphrase validation
             const validatePassphrases = () => {
@@ -4713,7 +4767,7 @@ Please provide a helpful response based on the note content and conversation his
                 try {
                     const passphrase = encryptionPassphraseInput.value;
                     const confirmPassphrase = encryptionPassphraseConfirmInput.value;
-                    const enabled = encryptionEnabledCheckbox.checked;
+                    const enabled = newCheckbox.checked;
 
                     // Always compute a salt value to send (null if not used)
                     let saltToUse = settings.saltBase64 || null;
@@ -4759,12 +4813,22 @@ Please provide a helpful response based on the note content and conversation his
                     encryptionSaveBtn.disabled = true;
                     encryptionSaveBtn.textContent = 'Saving...';
 
-                    const saveResult = await ipcRenderer.invoke('set-encryption-settings', {
+                    console.log('[Encryption] Sending settings:', {
                         enabled: enabled,
-                        passphrase: enabled ? passphrase : null,
-                        saltBase64: saltToUse,
+                        hasPassphrase: !!passphrase,
+                        hasSalt: !!saltToUse,
                         iterations: settings.iterations
                     });
+
+                    const saveResult = await ipcRenderer.invoke('set-encryption-settings', {
+                        enabled: enabled,
+                        // When disabling, explicitly clear passphrase to null so DB doesn't retain it
+                        passphrase: enabled ? passphrase : null,
+                        saltBase64: enabled ? saltToUse : null,
+                        iterations: settings.iterations
+                    });
+
+                    console.log('[Encryption] Save result:', saveResult);
 
                     if (saveResult.success) {
                         this.showNotification('Encryption settings saved successfully', 'success');
@@ -4775,7 +4839,7 @@ Please provide a helpful response based on the note content and conversation his
                         encryptionPassphraseInput.value = '';
                         encryptionPassphraseConfirmInput.value = '';
                         encryptionValidation.textContent = '';
-                        encryptionPassphraseSection.style.display = 'none';
+                        // Keep section visible; UI will reflect current state via updateModalEncryptionStatus
                     } else {
                         this.showNotification(saveResult.error || 'Failed to save encryption settings', 'error');
                     }
@@ -4793,8 +4857,8 @@ Please provide a helpful response based on the note content and conversation his
                 encryptionPassphraseInput.value = '';
                 encryptionPassphraseConfirmInput.value = '';
                 encryptionValidation.textContent = '';
-                encryptionPassphraseSection.style.display = 'none';
-                encryptionEnabledCheckbox.checked = settings.enabled;
+                newCheckbox.checked = settings.enabled;
+                updateEncryptionControlsUI(settings.enabled);
             });
 
         } catch (error) {
@@ -4809,6 +4873,8 @@ Please provide a helpful response based on the note content and conversation his
             const encryptionDescription = modal.querySelector('#encryption-description');
             const encryptionEnabledCheckbox = modal.querySelector('#modal-encryption-enabled');
             const encryptionPassphraseSection = modal.querySelector('#encryption-passphrase-section');
+
+            if (!encryptionEnabledCheckbox) return;
 
             if (settings.enabled) {
                 encryptionIndicator.style.backgroundColor = 'var(--success-color)';
@@ -4866,19 +4932,18 @@ Please provide a helpful response based on the note content and conversation his
                     return;
                 }
 
-                // Save encryption settings so sync manager can decrypt
-                const saveResult = await ipcRenderer.invoke('set-encryption-settings', {
-                    enabled: true,
+                // Set decryption passphrase for this session ONLY (do not enable E2EE globally)
+                const sessionResult = await ipcRenderer.invoke('set-sync-decryption-passphrase', {
                     passphrase: passphrase,
                     saltBase64: saltResult.saltBase64
                 });
 
-                if (!saveResult.success) {
-                    errorText.textContent = saveResult.error || 'Failed to save encryption settings';
+                if (!sessionResult.success) {
+                    errorText.textContent = sessionResult.error || 'Failed to set passphrase for sync';
                     return;
                 }
 
-                // Retry sync now that passphrase is set
+                // Retry sync now that passphrase is set for this session
                 modal.remove();
                 this.showNotification('Passphrase set. Retrying sync...', 'info');
                 try {
