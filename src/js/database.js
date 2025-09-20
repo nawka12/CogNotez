@@ -8,6 +8,12 @@ class DatabaseManager {
             settings: {},
             tags: {},
             note_tags: {},
+            encryption: {
+                enabled: false,
+                passphrase: null,
+                saltBase64: null,
+                iterations: 210000
+            },
             sync: {
                 enabled: false,
                 provider: null, // 'google-drive', 'dropbox', etc.
@@ -90,6 +96,14 @@ class DatabaseManager {
         if (!this.data.settings) this.data.settings = {};
         if (!this.data.tags) this.data.tags = {};
         if (!this.data.note_tags) this.data.note_tags = {};
+        if (!this.data.encryption) {
+            this.data.encryption = {
+                enabled: false,
+                passphrase: null,
+                saltBase64: null,
+                iterations: 210000
+            };
+        }
         if (!this.data.sync) {
             this.data.sync = {
                 enabled: false,
@@ -403,6 +417,62 @@ class DatabaseManager {
             return setting.value;
         }
         return defaultValue;
+    }
+
+    // Encryption operations
+    setEncryptionSettings(settings) {
+        const encryptionManager = require('./encryption');
+
+        // Generate new salt if enabling encryption and no salt provided
+        if (settings.enabled && !settings.saltBase64 && !this.data.encryption.saltBase64) {
+            if (!settings.passphrase) {
+                throw new Error('Passphrase is required to derive encryption salt');
+            }
+            settings.saltBase64 = encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
+        }
+
+        // Validate settings before applying
+        if (settings.passphrase) {
+            const validation = encryptionManager.validateSettings({
+                passphrase: settings.passphrase,
+                saltBase64: settings.saltBase64
+            });
+
+            if (!validation.isValid) {
+                throw new Error(`Invalid encryption settings: ${validation.errors.join(', ')}`);
+            }
+        }
+
+        this.data.encryption = {
+            enabled: settings.enabled || false,
+            passphrase: settings.passphrase || null,
+            saltBase64: settings.saltBase64 || this.data.encryption.saltBase64,
+            iterations: settings.iterations || this.data.encryption.iterations
+        };
+
+        this.saveToLocalStorage();
+        console.log('[DEBUG] Encryption settings updated:', {
+            enabled: this.data.encryption.enabled,
+            hasPassphrase: !!this.data.encryption.passphrase,
+            hasSalt: !!this.data.encryption.saltBase64
+        });
+    }
+
+    getEncryptionSettings() {
+        return { ...this.data.encryption };
+    }
+
+    isEncryptionEnabled() {
+        return this.data.encryption.enabled === true;
+    }
+
+    getEncryptionStatus() {
+        return {
+            enabled: this.data.encryption.enabled,
+            hasPassphrase: !!this.data.encryption.passphrase,
+            hasSalt: !!this.data.encryption.saltBase64,
+            iterations: this.data.encryption.iterations
+        };
     }
 
     // Tag operations

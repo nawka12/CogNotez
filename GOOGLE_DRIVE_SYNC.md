@@ -123,8 +123,25 @@ The header shows real-time sync status:
 
 - Notes are stored in your Google Drive, not on CogNotez servers
 - Only you can access your data
-- End-to-end encryption using your local encryption keys
+- **Optional end-to-end encryption**: Enable encryption to secure your data before upload
 - No third-party access to your content
+
+#### End-to-End Encryption
+
+CogNotez supports optional AES-256-GCM encryption for your sync data:
+
+- **Encryption**: Data is encrypted locally before being uploaded to Google Drive
+- **Key Management**: Encryption keys and salts are derived from your passphrase using PBKDF2
+- **Security**: Uses industry-standard AES-256-GCM with authenticated encryption
+- **Multi-Device Support**: Same passphrase generates identical keys and salts across all devices
+- **Backward Compatibility**: Existing unencrypted files continue to work seamlessly
+
+To enable encryption:
+1. Open Sync Settings
+2. Enable "End-to-End Encryption"
+3. Set a strong passphrase (minimum 8 characters)
+4. Use the **same passphrase** on all your devices
+5. Your data will be encrypted before the next sync
 
 ### Access Control
 
@@ -272,11 +289,30 @@ CogNotez requests minimal Google Drive permissions:
 - `https://www.googleapis.com/auth/drive.file`: Access to files created by the app
 - `https://www.googleapis.com/auth/drive.metadata.readonly`: Read metadata of files
 
-### Encryption
+### Encryption Implementation
 
-- Data is encrypted using AES-256 before transmission
-- Encryption keys are generated locally and never stored remotely
-- Google cannot decrypt your data without access to your local keys
+#### Optional AES-256-GCM Encryption
+
+When enabled, CogNotez encrypts your data using:
+
+- **Algorithm**: AES-256-GCM (authenticated encryption)
+- **Key Derivation**: PBKDF2 with 210,000 iterations and 16-byte salt
+- **Storage**: Encryption parameters stored in local settings
+- **Passphrase**: User-provided passphrase, never stored in plain text
+
+#### Security Features
+
+- **Client-side encryption**: All encryption/decryption happens locally
+- **Authenticated encryption**: Prevents tampering with encrypted data
+- **Key derivation**: Uses industry-standard PBKDF2 for secure key generation
+- **Salt derivation**: Deterministic 16-byte salt derived from passphrase for multi-device compatibility
+- **Backward compatibility**: Existing unencrypted files continue to work
+
+#### Encryption Workflow
+
+1. **Upload**: Data → Encrypt locally → Upload encrypted envelope to Google Drive
+2. **Download**: Download encrypted envelope → Decrypt locally → Use decrypted data
+3. **Key Management**: Passphrase-derived keys never leave your device
 
 ## Support
 
@@ -304,7 +340,7 @@ For sync-related feature requests:
 - Automatic conflict resolution improvements
 - Selective sync options
 - Multi-account support
-- Enhanced encryption options
+- Enhanced encryption options (e.g., Argon2, hardware security keys)
 
 ---
 

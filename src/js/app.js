@@ -4212,6 +4212,52 @@ Please provide a helpful response based on the note content and conversation his
                             </div>
                         </div>
 
+                        <!-- Encryption Section -->
+                        <div class="sync-section" style="margin-bottom: 24px;">
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;"><i class="fas fa-lock"></i> End-to-End Encryption</h5>
+                            <div class="sync-encryption-section" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
+                                <div class="encryption-status" id="encryption-status" style="margin-bottom: 16px;">
+                                    <div style="display: flex; align-items: center; margin-bottom: 8px;">
+                                        <div id="encryption-indicator" style="width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;"></div>
+                                        <span id="encryption-status-text" style="font-weight: 500;"></span>
+                                    </div>
+                                    <div id="encryption-description" style="font-size: 0.85rem; color: var(--text-secondary);"></div>
+                                </div>
+
+                                <div class="encryption-controls" id="encryption-controls">
+                                    <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 12px;">
+                                        <input type="checkbox" id="modal-encryption-enabled" style="margin-right: 12px;">
+                                        <div>
+                                            <label for="modal-encryption-enabled" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Enable End-to-End Encryption</label>
+                                            <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Encrypt your data before uploading to Google Drive. Your data will only be accessible with your passphrase.</div>
+                                        </div>
+                                    </div>
+
+                                    <div class="encryption-passphrase-section" id="encryption-passphrase-section" style="display: none;">
+                                        <div style="margin-bottom: 12px;">
+                                            <label for="modal-encryption-passphrase" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
+                                            <input type="password" id="modal-encryption-passphrase" placeholder="Enter your passphrase (min. 8 characters)" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                                            <div class="encryption-passphrase-help" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
+                                                Your passphrase is used to encrypt and decrypt your data. Choose a strong passphrase and keep it safe.
+                                            </div>
+                                        </div>
+
+                                        <div style="margin-bottom: 12px;">
+                                            <label for="modal-encryption-passphrase-confirm" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">Confirm Passphrase</label>
+                                            <input type="password" id="modal-encryption-passphrase-confirm" placeholder="Confirm your passphrase" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                                        </div>
+
+                                        <div class="encryption-buttons" style="display: flex; gap: 8px;">
+                                            <button id="modal-encryption-save-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Save Encryption Settings</button>
+                                            <button id="modal-encryption-cancel-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Cancel</button>
+                                        </div>
+
+                                        <div id="encryption-validation" style="margin-top: 8px; font-size: 0.8rem;"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
                         <!-- Conflicts Section (hidden by default) -->
                         <div id="modal-conflicts-section" class="sync-section" style="display: none;">
                             <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Conflicts</h5>
@@ -4271,6 +4317,9 @@ Please provide a helpful response based on the note content and conversation his
             // Initialize sync status in modal
             this.initializeModalSyncHandlers(modal);
 
+            // Initialize encryption status in modal
+            this.initializeModalEncryptionHandlers(modal);
+
         } catch (error) {
             console.error('[Sync] Failed to show sync settings modal:', error);
             this.showNotification('Failed to open sync settings', 'error');
@@ -4290,6 +4339,19 @@ Please provide a helpful response based on the note content and conversation his
             const autoSyncCheckbox = modal.querySelector('#modal-auto-sync');
             const startupSyncCheckbox = modal.querySelector('#modal-sync-on-startup');
             const clearOrphanedAIBtn = modal.querySelector('#modal-clear-orphaned-ai-btn');
+
+            // Encryption controls
+            const encryptionEnabledCheckbox = modal.querySelector('#modal-encryption-enabled');
+            const encryptionPassphraseInput = modal.querySelector('#modal-encryption-passphrase');
+            const encryptionPassphraseConfirmInput = modal.querySelector('#modal-encryption-passphrase-confirm');
+            const encryptionSaveBtn = modal.querySelector('#modal-encryption-save-btn');
+            const encryptionCancelBtn = modal.querySelector('#modal-encryption-cancel-btn');
+            const encryptionPassphraseSection = modal.querySelector('#encryption-passphrase-section');
+            const encryptionStatus = modal.querySelector('#encryption-status');
+            const encryptionIndicator = modal.querySelector('#encryption-indicator');
+            const encryptionStatusText = modal.querySelector('#encryption-status-text');
+            const encryptionDescription = modal.querySelector('#encryption-description');
+            const encryptionValidation = modal.querySelector('#encryption-validation');
 
             // Connect button
             connectBtn.addEventListener('click', async () => {
@@ -4573,6 +4635,191 @@ Please provide a helpful response based on the note content and conversation his
 
         } catch (error) {
             console.error('[Sync] Failed to update modal sync status:', error);
+        }
+    }
+
+    async initializeModalEncryptionHandlers(modal) {
+        try {
+            const { ipcRenderer } = require('electron');
+
+            // Get current encryption settings
+            const encryptionResult = await ipcRenderer.invoke('get-encryption-settings');
+            if (!encryptionResult.success) {
+                console.error('[Encryption] Failed to get encryption settings:', encryptionResult.error);
+                return;
+            }
+
+            const settings = encryptionResult.settings;
+            this.updateModalEncryptionStatus(modal, settings);
+
+            // Encryption enabled checkbox
+            const encryptionEnabledCheckbox = modal.querySelector('#modal-encryption-enabled');
+            const encryptionPassphraseSection = modal.querySelector('#encryption-passphrase-section');
+            const encryptionPassphraseInput = modal.querySelector('#modal-encryption-passphrase');
+            const encryptionPassphraseConfirmInput = modal.querySelector('#modal-encryption-passphrase-confirm');
+            const encryptionSaveBtn = modal.querySelector('#modal-encryption-save-btn');
+            const encryptionCancelBtn = modal.querySelector('#modal-encryption-cancel-btn');
+            const encryptionValidation = modal.querySelector('#encryption-validation');
+
+            // Enable/disable checkbox
+            encryptionEnabledCheckbox.checked = settings.enabled;
+            encryptionEnabledCheckbox.addEventListener('change', () => {
+                if (encryptionEnabledCheckbox.checked) {
+                    encryptionPassphraseSection.style.display = 'block';
+                    encryptionPassphraseInput.focus();
+                } else {
+                    encryptionPassphraseSection.style.display = 'none';
+                    encryptionPassphraseInput.value = '';
+                    encryptionPassphraseConfirmInput.value = '';
+                    encryptionValidation.textContent = '';
+                }
+            });
+
+            // Passphrase validation
+            const validatePassphrases = () => {
+                const passphrase = encryptionPassphraseInput.value;
+                const confirmPassphrase = encryptionPassphraseConfirmInput.value;
+
+                if (!passphrase) {
+                    encryptionValidation.textContent = '';
+                    return;
+                }
+
+                if (passphrase.length < 8) {
+                    encryptionValidation.textContent = 'Passphrase must be at least 8 characters long';
+                    encryptionValidation.style.color = 'var(--error-color)';
+                    return;
+                }
+
+                if (passphrase !== confirmPassphrase) {
+                    encryptionValidation.textContent = 'Passphrases do not match';
+                    encryptionValidation.style.color = 'var(--error-color)';
+                    return;
+                }
+
+                encryptionValidation.textContent = '✓ Passphrases match';
+                encryptionValidation.style.color = 'var(--success-color)';
+            };
+
+            encryptionPassphraseInput.addEventListener('input', validatePassphrases);
+            encryptionPassphraseConfirmInput.addEventListener('input', validatePassphrases);
+
+            // Save button
+            encryptionSaveBtn.addEventListener('click', async () => {
+                try {
+                    const passphrase = encryptionPassphraseInput.value;
+                    const confirmPassphrase = encryptionPassphraseConfirmInput.value;
+                    const enabled = encryptionEnabledCheckbox.checked;
+
+                    // Always compute a salt value to send (null if not used)
+                    let saltToUse = settings.saltBase64 || null;
+
+                    if (enabled) {
+                        if (!passphrase) {
+                            this.showNotification('Please enter a passphrase', 'error');
+                            return;
+                        }
+
+                        if (passphrase.length < 8) {
+                            this.showNotification('Passphrase must be at least 8 characters long', 'error');
+                            return;
+                        }
+
+                        if (passphrase !== confirmPassphrase) {
+                            this.showNotification('Passphrases do not match', 'error');
+                            return;
+                        }
+
+                        // Generate salt if needed for first-time encryption setup
+                        if (!saltToUse) {
+                            const saltResult = await ipcRenderer.invoke('derive-salt-from-passphrase', passphrase);
+                            if (!saltResult.success) {
+                                this.showNotification(`Failed to derive salt: ${saltResult.error}`, 'error');
+                                return;
+                            }
+                            saltToUse = saltResult.saltBase64;
+                        }
+
+                        // Validate with backend
+                        const validationResult = await ipcRenderer.invoke('validate-encryption-settings', {
+                            passphrase: passphrase,
+                            saltBase64: saltToUse
+                        });
+
+                        if (!validationResult.success || !validationResult.isValid) {
+                            this.showNotification(`Invalid encryption settings: ${validationResult.errors?.join(', ') || 'Unknown error'}`, 'error');
+                            return;
+                        }
+                    }
+
+                    encryptionSaveBtn.disabled = true;
+                    encryptionSaveBtn.textContent = 'Saving...';
+
+                    const saveResult = await ipcRenderer.invoke('set-encryption-settings', {
+                        enabled: enabled,
+                        passphrase: enabled ? passphrase : null,
+                        saltBase64: saltToUse,
+                        iterations: settings.iterations
+                    });
+
+                    if (saveResult.success) {
+                        this.showNotification('Encryption settings saved successfully', 'success');
+                        this.updateModalEncryptionStatus(modal, saveResult.settings);
+                        await this.updateModalSyncStatus(modal); // Refresh sync status
+
+                        // Reset form
+                        encryptionPassphraseInput.value = '';
+                        encryptionPassphraseConfirmInput.value = '';
+                        encryptionValidation.textContent = '';
+                        encryptionPassphraseSection.style.display = 'none';
+                    } else {
+                        this.showNotification(saveResult.error || 'Failed to save encryption settings', 'error');
+                    }
+                } catch (error) {
+                    console.error('[Encryption] Failed to save settings:', error);
+                    this.showNotification('Failed to save encryption settings', 'error');
+                } finally {
+                    encryptionSaveBtn.disabled = false;
+                    encryptionSaveBtn.textContent = 'Save Encryption Settings';
+                }
+            });
+
+            // Cancel button
+            encryptionCancelBtn.addEventListener('click', () => {
+                encryptionPassphraseInput.value = '';
+                encryptionPassphraseConfirmInput.value = '';
+                encryptionValidation.textContent = '';
+                encryptionPassphraseSection.style.display = 'none';
+                encryptionEnabledCheckbox.checked = settings.enabled;
+            });
+
+        } catch (error) {
+            console.error('[Encryption] Failed to initialize encryption handlers:', error);
+        }
+    }
+
+    updateModalEncryptionStatus(modal, settings) {
+        try {
+            const encryptionIndicator = modal.querySelector('#encryption-indicator');
+            const encryptionStatusText = modal.querySelector('#encryption-status-text');
+            const encryptionDescription = modal.querySelector('#encryption-description');
+            const encryptionEnabledCheckbox = modal.querySelector('#modal-encryption-enabled');
+            const encryptionPassphraseSection = modal.querySelector('#encryption-passphrase-section');
+
+            if (settings.enabled) {
+                encryptionIndicator.style.backgroundColor = 'var(--success-color)';
+                encryptionStatusText.textContent = 'Encryption Enabled';
+                encryptionDescription.textContent = 'Your data is encrypted before being uploaded to Google Drive.';
+                encryptionEnabledCheckbox.checked = true;
+            } else {
+                encryptionIndicator.style.backgroundColor = 'var(--text-secondary)';
+                encryptionStatusText.textContent = 'Encryption Disabled';
+                encryptionDescription.textContent = 'Your data will be uploaded unencrypted to Google Drive.';
+                encryptionEnabledCheckbox.checked = false;
+            }
+
+        } catch (error) {
+            console.error('[Encryption] Failed to update modal encryption status:', error);
         }
     }
 

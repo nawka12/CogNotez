@@ -190,6 +190,89 @@ if (ipcMain) {
     return await dialog.showOpenDialog(mainWindow, options);
   });
 
+  // Encryption IPC handlers
+  ipcMain.handle('derive-salt-from-passphrase', async (event, passphrase) => {
+    try {
+      const encryptionManager = require('./src/js/encryption');
+
+      if (!passphrase) {
+        throw new Error('Passphrase is required');
+      }
+
+      const saltBase64 = encryptionManager.deriveSaltFromPassphrase(passphrase);
+      return {
+        success: true,
+        saltBase64: saltBase64
+      };
+    } catch (error) {
+      console.error('Failed to derive salt from passphrase:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('get-encryption-settings', async () => {
+    try {
+      if (!global.databaseManager) {
+        throw new Error('Database manager not available');
+      }
+
+      const settings = global.databaseManager.getEncryptionSettings();
+      return {
+        success: true,
+        settings: settings
+      };
+    } catch (error) {
+      console.error('Failed to get encryption settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('set-encryption-settings', async (event, settings) => {
+    try {
+      if (!global.databaseManager) {
+        throw new Error('Database manager not available');
+      }
+
+      global.databaseManager.setEncryptionSettings(settings);
+
+      // Update encryption settings in sync manager if it exists
+      if (global.googleDriveSyncManager) {
+        global.googleDriveSyncManager.updateEncryptionSettings(global.databaseManager.getEncryptionSettings());
+      }
+
+      // Send updated settings to renderer process
+      const updatedSettings = global.databaseManager.getEncryptionSettings();
+      if (mainWindow && mainWindow.webContents) {
+        mainWindow.webContents.send('encryption-settings-updated', updatedSettings);
+      }
+
+      return {
+        success: true,
+        settings: updatedSettings
+      };
+    } catch (error) {
+      console.error('Failed to set encryption settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('validate-encryption-settings', async (event, settings) => {
+    try {
+      const encryptionManager = require('./src/js/encryption');
+
+      const validation = encryptionManager.validateSettings(settings);
+
+      return {
+        success: true,
+        isValid: validation.isValid,
+        errors: validation.errors
+      };
+    } catch (error) {
+      console.error('Failed to validate encryption settings:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   // Auto-updater IPC handlers
   ipcMain.handle('check-for-updates', () => {
     autoUpdater.checkForUpdates();
@@ -355,7 +438,8 @@ if (ipcMain) {
 
       if (!global.googleDriveSyncManager) {
         const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
-        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager);
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
       }
 
       // Get local data - use provided data or fallback to database manager
@@ -438,7 +522,8 @@ if (ipcMain) {
 
       if (!global.googleDriveSyncManager) {
         const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
-        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager);
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
       }
 
       if (!global.databaseManager) {
@@ -486,7 +571,8 @@ if (ipcMain) {
 
       if (!global.googleDriveSyncManager) {
         const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
-        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager);
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
       }
 
       if (!global.databaseManager) {

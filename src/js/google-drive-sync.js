@@ -5,9 +5,10 @@ const { google } = require('googleapis');
 const fs = require('fs').promises;
 const path = require('path');
 const crypto = require('crypto');
+const encryptionManager = require('./encryption');
 
 class GoogleDriveSyncManager {
-    constructor(authManager) {
+    constructor(authManager, encryptionSettings = null) {
         this.authManager = authManager;
         this.drive = null;
         this.appFolderId = null;
@@ -24,7 +25,43 @@ class GoogleDriveSyncManager {
         this.backupFileName = 'cognotez_sync_backup.json';
         this.initialized = false;
 
+        // Encryption settings
+        this.encryptionEnabled = encryptionSettings?.enabled || false;
+        this.encryptionPassphrase = encryptionSettings?.passphrase || null;
+        this.encryptionSalt = encryptionSettings?.saltBase64 || null;
+        this.encryptionIterations = encryptionSettings?.iterations || 210000;
+
         this.initialize();
+    }
+
+    /**
+     * Update encryption settings
+     * @param {Object} settings - Encryption settings
+     */
+    updateEncryptionSettings(settings) {
+        this.encryptionEnabled = settings?.enabled || false;
+        this.encryptionPassphrase = settings?.passphrase || null;
+        this.encryptionSalt = settings?.saltBase64 || this.encryptionSalt;
+        this.encryptionIterations = settings?.iterations || this.encryptionIterations;
+
+        console.log('[GoogleDriveSync] Encryption settings updated:', {
+            enabled: this.encryptionEnabled,
+            hasPassphrase: !!this.encryptionPassphrase,
+            hasSalt: !!this.encryptionSalt
+        });
+    }
+
+    /**
+     * Get current encryption status
+     * @returns {Object} - Encryption status info
+     */
+    getEncryptionStatus() {
+        return {
+            enabled: this.encryptionEnabled,
+            hasPassphrase: !!this.encryptionPassphrase,
+            hasSalt: !!this.encryptionSalt,
+            iterations: this.encryptionIterations
+        };
     }
 
     async initialize() {
@@ -148,8 +185,28 @@ class GoogleDriveSyncManager {
 
             console.log('[GoogleDriveSync] Starting upload process...');
             console.log('[GoogleDriveSync] Upload data contains', Object.keys(data.notes || {}).length, 'notes');
+            console.log('[GoogleDriveSync] Encryption enabled:', this.encryptionEnabled);
 
-            const jsonData = JSON.stringify(data, null, 2);
+            // Encrypt data if encryption is enabled
+            let dataToUpload = data;
+            if (this.encryptionEnabled) {
+                if (!this.encryptionPassphrase) {
+                    throw new Error('Encryption is enabled but no passphrase is set');
+                }
+
+                try {
+                    dataToUpload = encryptionManager.encryptData(data, this.encryptionPassphrase, {
+                        saltBase64: this.encryptionSalt,
+                        iterations: this.encryptionIterations
+                    });
+                    console.log('[GoogleDriveSync] Data encrypted successfully');
+                } catch (error) {
+                    console.error('[GoogleDriveSync] Encryption failed:', error);
+                    throw new Error(`Encryption failed: ${error.message}`);
+                }
+            }
+
+            const jsonData = JSON.stringify(dataToUpload, null, 2);
             // Content-only checksum for robust equality across devices
             const checksum = this.calculateContentChecksum(data);
 
@@ -254,7 +311,28 @@ class GoogleDriveSyncManager {
             });
 
             const jsonData = response.data;
-            const parsed = JSON.parse(jsonData);
+            let parsed = JSON.parse(jsonData);
+
+            // Check if data is encrypted and decrypt if necessary
+            if (encryptionManager.isEncrypted(parsed)) {
+                console.log('[GoogleDriveSync] Downloaded data is encrypted, attempting decryption...');
+
+                if (!this.encryptionPassphrase) {
+                    throw new Error('Downloaded data is encrypted but no passphrase is set. Please configure encryption settings.');
+                }
+
+                try {
+                    const decryptedData = encryptionManager.decryptData(parsed, this.encryptionPassphrase);
+                    parsed = decryptedData;
+                    console.log('[GoogleDriveSync] Data decrypted successfully');
+                } catch (error) {
+                    console.error('[GoogleDriveSync] Decryption failed:', error);
+                    throw new Error(`Decryption failed: ${error.message}. This may indicate an incorrect passphrase or corrupted data.`);
+                }
+            } else {
+                console.log('[GoogleDriveSync] Downloaded data is not encrypted');
+            }
+
             const checksum = this.calculateContentChecksum(parsed);
 
             console.log('[GoogleDriveSync] Download successful, size:', jsonData.length);
@@ -262,7 +340,8 @@ class GoogleDriveSyncManager {
             return {
                 data: parsed,
                 checksum: checksum,
-                size: jsonData.length
+                size: jsonData.length,
+                isEncrypted: encryptionManager.isEncrypted(JSON.parse(jsonData))
             };
 
         } catch (error) {
