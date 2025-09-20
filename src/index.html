@@ -110,6 +110,41 @@
                         <textarea id="note-editor" class="note-editor hidden" placeholder="Start writing your note..."></textarea>
                         <div id="markdown-preview" class="markdown-preview"></div>
                     </div>
+
+                    <!-- AI Edit Approval (Inline) -->
+                    <div id="ai-edit-approval-inline" class="ai-edit-approval-inline hidden">
+                        <div class="ai-edit-approval-header">
+                            <h3>Review AI Edits</h3>
+                            <div class="approval-header-actions">
+                                <button id="ai-edit-help-btn" class="approval-help-btn" title="Help"><i class="fas fa-question-circle"></i></button>
+                                <button id="ai-edit-approval-close" class="approval-close-btn" title="Close"><i class="fas fa-times"></i></button>
+                            </div>
+                        </div>
+                        <div class="ai-edit-approval-body">
+                            <div class="ai-edit-instructions">
+                                <p>Review the proposed changes below. Each changed line has its own Accept/Reject buttons:</p>
+                                <div class="legend">
+                                    <div class="legend-item">
+                                        <span class="block-status original">Red boxes</span> - Your original text that will be changed
+                                    </div>
+                                    <div class="legend-item">
+                                        <span class="block-status edited">Green boxes</span> - AI's suggested replacement text
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="ai-edit-diff-container">
+                                <div class="diff-content" id="ai-edit-diff-content">
+                                    <!-- Diff content will be populated here -->
+                                </div>
+                            </div>
+                            <div class="ai-edit-actions">
+                                <div class="block-actions">
+                                    <button id="accept-changes-btn" class="btn-success">Accept All</button>
+                                    <button id="reject-changes-btn" class="btn-secondary">Reject All</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- No Note Selected Placeholder -->
@@ -176,6 +211,7 @@
             <div class="loading-spinner"></div>
             <div class="loading-text">Processing with AI...</div>
         </div>
+
     </div>
 
     <script src="./js/database.js"></script>
@@ -183,6 +219,7 @@
     <script src="./js/scraper.js"></script>
     <script src="./js/app.js"></script>
     <script src="./js/notes.js"></script>
+    <script src="./js/ai-edit-approval.js"></script>
     <script src="./js/ai.js"></script>
     <script src="./js/ui.js"></script>
 </body>
