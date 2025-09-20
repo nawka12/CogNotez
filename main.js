@@ -461,11 +461,25 @@ if (ipcMain) {
       const dbSyncMeta = global.databaseManager ? global.databaseManager.getSyncMetadata() : {};
       const lastSyncToUse = options.lastSync || (dbSyncMeta && dbSyncMeta.lastSync ? dbSyncMeta.lastSync : null);
       console.log('[Sync] Using lastSync:', lastSyncToUse);
-      const syncResult = await global.googleDriveSyncManager.sync({
-        localData: localData.data,
-        strategy: options.strategy || 'merge',
-        lastSync: lastSyncToUse
-      });
+      let syncResult;
+      try {
+        syncResult = await global.googleDriveSyncManager.sync({
+          localData: localData.data,
+          strategy: options.strategy || 'merge',
+          lastSync: lastSyncToUse
+        });
+      } catch (error) {
+        if (error && error.encryptionRequired) {
+          // Notify renderer that remote data is encrypted and passphrase is required
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-requires-passphrase', {
+              message: error.message || 'Remote data is encrypted and requires a passphrase to decrypt.'
+            });
+          }
+          return { success: false, error: error.message, encryptionRequired: true };
+        }
+        throw error;
+      }
 
       if (syncResult.success) {
         // Update sync metadata in database

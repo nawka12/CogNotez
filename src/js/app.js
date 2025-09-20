@@ -783,6 +783,7 @@ class CogNotezApp {
         // Sync-related IPC events
         ipcRenderer.on('sync-data-updated', (event, syncData) => this.handleSyncDataUpdated(syncData));
         ipcRenderer.on('sync-completed', (event, syncResult) => this.handleSyncCompleted(syncResult));
+        ipcRenderer.on('sync-requires-passphrase', (event, payload) => this.promptForDecryptionPassphrase(payload));
 
         // Google Drive authentication IPC handlers
         ipcRenderer.on('google-drive-auth-success', (event, data) => {
@@ -4820,6 +4821,86 @@ Please provide a helpful response based on the note content and conversation his
 
         } catch (error) {
             console.error('[Encryption] Failed to update modal encryption status:', error);
+        }
+    }
+
+    async promptForDecryptionPassphrase(payload) {
+        try {
+            const { ipcRenderer } = require('electron');
+            const message = (payload && payload.message) || 'Cloud data is encrypted. Enter your passphrase to decrypt.';
+
+            const content = `
+                <div style="max-width: 520px;">
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-lock"></i> Encrypted Cloud Data</h4>
+                    <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 0.95rem;">${message}</p>
+                    <div style="margin-top: 12px;">
+                        <label for="modal-passphrase-input" style="display: block; margin-bottom: 6px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
+                        <input type="password" id="modal-passphrase-input" placeholder="Enter your encryption passphrase" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                        <div id="modal-passphrase-error" style="margin-top: 6px; font-size: 0.85rem; color: var(--error-color);"></div>
+                    </div>
+                </div>
+            `;
+
+            const modal = this.createModal('Encrypted Data Detected', content, [
+                { text: 'Cancel', type: 'secondary', action: 'cancel-passphrase' },
+                { text: 'Decrypt', type: 'primary', action: 'confirm-passphrase' }
+            ]);
+
+            const input = modal.querySelector('#modal-passphrase-input');
+            const errorText = modal.querySelector('#modal-passphrase-error');
+
+            const onConfirm = async () => {
+                const passphrase = input.value;
+                if (!passphrase || passphrase.length < 8) {
+                    errorText.textContent = 'Passphrase must be at least 8 characters';
+                    return;
+                }
+
+                // Derive salt from passphrase
+                const saltResult = await ipcRenderer.invoke('derive-salt-from-passphrase', passphrase);
+                if (!saltResult.success) {
+                    errorText.textContent = saltResult.error || 'Failed to derive salt';
+                    return;
+                }
+
+                // Save encryption settings so sync manager can decrypt
+                const saveResult = await ipcRenderer.invoke('set-encryption-settings', {
+                    enabled: true,
+                    passphrase: passphrase,
+                    saltBase64: saltResult.saltBase64
+                });
+
+                if (!saveResult.success) {
+                    errorText.textContent = saveResult.error || 'Failed to save encryption settings';
+                    return;
+                }
+
+                // Retry sync now that passphrase is set
+                modal.remove();
+                this.showNotification('Passphrase set. Retrying sync...', 'info');
+                try {
+                    await this.manualSync();
+                } catch (e) {
+                    this.showNotification('Sync failed after setting passphrase', 'error');
+                }
+            };
+
+            // Wire buttons
+            const footer = modal.querySelector('.modal-footer');
+            const buttons = footer ? footer.querySelectorAll('button') : [];
+            if (buttons.length === 2) {
+                buttons[0].addEventListener('click', () => modal.remove());
+                buttons[1].addEventListener('click', onConfirm);
+            }
+
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') onConfirm();
+            });
+
+            input.focus();
+        } catch (error) {
+            console.error('[Encryption] Failed to prompt for passphrase:', error);
+            this.showNotification('Encrypted cloud data detected. Open Sync Settings to enter your passphrase.', 'warning');
         }
     }
 

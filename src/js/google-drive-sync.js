@@ -318,7 +318,9 @@ class GoogleDriveSyncManager {
                 console.log('[GoogleDriveSync] Downloaded data is encrypted, attempting decryption...');
 
                 if (!this.encryptionPassphrase) {
-                    throw new Error('Downloaded data is encrypted but no passphrase is set. Please configure encryption settings.');
+                    const err = new Error('Downloaded data is encrypted and requires a passphrase');
+                    err.encryptionRequired = true;
+                    throw err;
                 }
 
                 try {
@@ -327,7 +329,9 @@ class GoogleDriveSyncManager {
                     console.log('[GoogleDriveSync] Data decrypted successfully');
                 } catch (error) {
                     console.error('[GoogleDriveSync] Decryption failed:', error);
-                    throw new Error(`Decryption failed: ${error.message}. This may indicate an incorrect passphrase or corrupted data.`);
+                    const err = new Error(`Decryption failed: ${error.message}. This may indicate an incorrect passphrase or corrupted data.`);
+                    err.encryptionRequired = true;
+                    throw err;
                 }
             } else {
                 console.log('[GoogleDriveSync] Downloaded data is not encrypted');
