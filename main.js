@@ -5,6 +5,9 @@ const { autoUpdater } = require('electron-updater');
 
 // Keep a global reference of the window object
 let mainWindow;
+// App-level quit guards for sync-before-exit
+let isQuittingAfterSync = false;
+let appQuittingRequested = false;
 
 // Log version information for debugging
 console.log('Node.js version:', process.version);
@@ -40,6 +43,42 @@ function createWindow() {
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
   }
+
+  // Handle window close event to sync before closing if auto-sync is enabled
+  let isClosingWithSync = false;
+  mainWindow.on('close', async (event) => {
+    try {
+      // If app quit has already been requested and handled at app-level, allow close
+      if (appQuittingRequested || isQuittingAfterSync) {
+        return;
+      }
+      // Check if auto-sync is enabled and we should sync before closing
+      if (global.databaseManager && global.databaseManager.isAutoSyncEnabled() && !isClosingWithSync) {
+        console.log('[Main] Auto-sync enabled, syncing before closing...');
+
+        // Prevent the window from closing immediately
+        event.preventDefault();
+        isClosingWithSync = true;
+
+        try {
+          // Trigger sync
+          await performSyncBeforeClose();
+
+          // After sync completes, close the window
+          console.log('[Main] Sync completed, closing window...');
+          mainWindow.destroy();
+        } catch (error) {
+          console.error('[Main] Sync failed before close, proceeding with close anyway:', error);
+          // Even if sync fails, allow the window to close
+          mainWindow.destroy();
+        }
+      }
+    } catch (error) {
+      console.error('[Main] Error during close event handling:', error);
+      // Always allow the window to close if there's an error
+      mainWindow.destroy();
+    }
+  });
 
   // Emitted when the window is closed
   mainWindow.on('closed', () => {
@@ -124,6 +163,94 @@ function setupAutoUpdater() {
   }
 }
 
+// Function to perform sync before closing the application
+async function performSyncBeforeClose() {
+  try {
+    // Check if Google Drive is authenticated
+    if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+      console.log('[Main] Google Drive not authenticated, skipping sync before close');
+      return;
+    }
+
+    // Initialize Google Drive sync manager if not already done
+    if (!global.googleDriveSyncManager) {
+      const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+      const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+      global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
+    }
+
+    // Check if sync is already in progress
+    if (global.googleDriveSyncManager.syncInProgress) {
+      console.log('[Main] Sync already in progress, waiting for it to complete...');
+      // Wait for the existing sync to complete (with a timeout)
+      let attempts = 0;
+      while (global.googleDriveSyncManager.syncInProgress && attempts < 60) { // Wait up to 30 seconds
+        await new Promise(resolve => setTimeout(resolve, 500));
+        attempts++;
+      }
+
+      if (global.googleDriveSyncManager.syncInProgress) {
+        console.warn('[Main] Sync still in progress after timeout, proceeding with close');
+        return; // Don't start another sync
+      }
+    }
+
+    // Get local data for sync
+    if (!global.databaseManager) {
+      throw new Error('Database manager not available');
+    }
+
+    const localData = global.databaseManager.exportDataForSync();
+    const dbSyncMeta = global.databaseManager.getSyncMetadata();
+    const lastSyncToUse = dbSyncMeta && dbSyncMeta.lastSync ? dbSyncMeta.lastSync : null;
+
+    console.log('[Main] Performing sync before close...');
+
+    // Show sync progress to user (if mainWindow still exists)
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('sync-status-update', {
+        inProgress: true,
+        message: 'Syncing before closing...'
+      });
+    }
+
+    // Perform sync operation
+    const syncResult = await global.googleDriveSyncManager.sync({
+      localData: localData.data,
+      strategy: 'merge',
+      lastSync: lastSyncToUse
+    });
+
+    // Update sync status
+    if (mainWindow && mainWindow.webContents) {
+      mainWindow.webContents.send('sync-status-update', {
+        inProgress: false,
+        message: syncResult.success ? 'Sync completed' : 'Sync failed'
+      });
+    }
+
+    if (syncResult.success) {
+      // Update sync metadata in database
+      global.databaseManager.updateSyncMetadata({
+        lastSync: new Date().toISOString(),
+        lastSyncVersion: localData.data.metadata.version,
+        localChecksum: localData.checksum
+      });
+
+      // Note: The sync manager already handles downloading and applying data
+      // for 'download' and 'merge' actions, so no additional import is needed here
+
+      console.log('[Main] Sync before close completed successfully');
+    } else {
+      throw new Error(syncResult.error || 'Sync failed');
+    }
+
+  } catch (error) {
+    console.error('[Main] Sync before close failed:', error);
+    throw error;
+  }
+}
+
 // This method will be called when Electron has finished initialization
 async function initApp() {
   createWindow();
@@ -158,6 +285,48 @@ async function initApp() {
 // Initialize app when ready
 if (app) {
   app.on('ready', initApp);
+
+  // Ensure sync runs before the app quits (menu, Ctrl+Q, OS signals)
+  app.on('before-quit', async (event) => {
+    try {
+      // Prevent re-entry
+      if (isQuittingAfterSync) return;
+
+      appQuittingRequested = true;
+
+      // If auto-sync not enabled or preconditions missing, allow quit
+      if (!global.databaseManager || !global.databaseManager.isAutoSyncEnabled()) {
+        return;
+      }
+
+      // If a sync is already running, wait briefly for it to finish
+      if (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress) {
+        let attempts = 0;
+        while (global.googleDriveSyncManager.syncInProgress && attempts < 60) { // up to ~30s
+          event.preventDefault();
+          await new Promise(resolve => setTimeout(resolve, 500));
+          attempts++;
+        }
+        if (!global.googleDriveSyncManager.syncInProgress) {
+          return; // existing sync finished; let quit proceed
+        }
+      }
+
+      // We will perform a quick sync before quitting
+      event.preventDefault();
+      console.log('[Main] Running sync before app quit...');
+      try {
+        await performSyncBeforeClose();
+      } catch (e) {
+        console.warn('[Main] Sync before quit failed, proceeding anyway:', e.message);
+      }
+      isQuittingAfterSync = true;
+      app.quit();
+    } catch (error) {
+      console.error('[Main] Error in before-quit handler:', error);
+      // Fail-open: proceed with quit
+    }
+  });
 
   // On macOS, re-create window when dock icon is clicked
   app.on('activate', () => {
@@ -890,8 +1059,32 @@ const createMenu = () => {
         {
           label: 'Quit',
           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
-          click: () => {
-            app.quit();
+          click: async () => {
+            try {
+              appQuittingRequested = true;
+              // Check if auto-sync is enabled and we should sync before quitting
+              if (global.databaseManager && global.databaseManager.isAutoSyncEnabled()) {
+                console.log('[Main] Auto-sync enabled, syncing before quit...');
+
+                try {
+                  // Trigger sync
+                  await performSyncBeforeClose();
+                  console.log('[Main] Sync completed, quitting...');
+                } catch (error) {
+                  console.error('[Main] Sync failed before quit, proceeding with quit anyway:', error);
+                  // Even if sync fails, allow the app to quit
+                }
+              }
+
+              // Quit the application
+              isQuittingAfterSync = true;
+              app.quit();
+            } catch (error) {
+              console.error('[Main] Error during quit handling:', error);
+              // Always allow the app to quit if there's an error
+              isQuittingAfterSync = true;
+              app.quit();
+            }
           }
         }
       ]

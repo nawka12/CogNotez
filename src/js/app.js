@@ -4046,18 +4046,7 @@ Please provide a helpful response based on the note content and conversation his
                 // Update UI to reflect the changes
                 this.updateSyncStatus();
 
-                // Show notification about the sync
-                let message = 'Data synchronized successfully';
-                if (syncData.stats) {
-                    const stats = syncData.stats;
-                    if (stats.downloaded > 0) {
-                        message += ` - ${stats.downloaded} items downloaded`;
-                    }
-                    if (stats.uploaded > 0) {
-                        message += ` - ${stats.uploaded} items uploaded`;
-                    }
-                }
-                this.showNotification(message, 'success');
+                // Notification is handled centrally in handleSyncCompleted to avoid duplicates
 
             } else {
                 console.error('[Sync] localStorage not available in renderer process');
@@ -4078,6 +4067,13 @@ Please provide a helpful response based on the note content and conversation his
 
             // Update sync status UI
             this.updateSyncStatus();
+
+            // If sync failed, show a single error notification and exit
+            if (syncResult && syncResult.success === false) {
+                const errorMessage = syncResult.error ? `Sync failed: ${syncResult.error}` : 'Sync failed';
+                this.showNotification(errorMessage, 'error');
+                return;
+            }
 
             // Show notification about the sync completion
             let message = 'Sync completed successfully';
@@ -4453,27 +4449,18 @@ Please provide a helpful response based on the note content and conversation his
                     const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync });
 
                     if (result.success) {
-                        let message = 'Sync completed successfully';
-                        if (result.stats) {
-                            const stats = result.stats;
-                            message += ` (${stats.uploaded} uploaded, ${stats.downloaded} downloaded`;
-                            if (stats.conflicts > 0) {
-                                message += `, ${stats.conflicts} conflicts`;
-                            }
-                            message += ')';
-                        }
-                        this.showNotification(message, 'success');
+                        // Success notification handled by sync-completed event
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
                     } else if (result && result.encryptionRequired) {
                         // Prompt for passphrase immediately
                         await this.promptForDecryptionPassphrase({ message: 'Cloud data is encrypted. Enter your passphrase to decrypt.' });
                     } else {
-                        this.showNotification(result.error || 'Sync failed', 'error');
+                        // Error notification handled by sync-completed event
                     }
                 } catch (error) {
                     console.error('[Sync] Manual sync failed:', error);
-                    this.showNotification('Sync failed', 'error');
+                    // Error notification handled by sync-completed event
                 } finally {
                     syncBtn.disabled = false;
                     syncBtn.textContent = 'Sync Now';
@@ -5079,24 +5066,15 @@ Please provide a helpful response based on the note content and conversation his
             const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync });
 
             if (result.success) {
-                let message = 'Sync completed successfully';
-                if (result.stats) {
-                    const stats = result.stats;
-                    message += ` (${stats.uploaded} uploaded, ${stats.downloaded} downloaded`;
-                    if (stats.conflicts > 0) {
-                        message += `, ${stats.conflicts} conflicts`;
-                    }
-                    message += ')';
-                }
-                this.showNotification(message, 'success');
+                // Success notification handled by sync-completed event
                 await this.updateSyncStatus();
             } else {
-                this.showNotification(result.error || 'Sync failed', 'error');
+                // Error notification handled by sync-completed event
             }
 
         } catch (error) {
             console.error('[Sync] Manual sync failed:', error);
-            this.showNotification('Sync failed', 'error');
+            // Error notification handled by sync-completed event
         } finally {
             this.syncStatus.inProgress = false;
             this.updateSyncUI();
