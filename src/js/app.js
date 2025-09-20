@@ -72,7 +72,7 @@ class FindReplaceDialog {
 
         // Style the dialog (positioning handled by CSS)
         Object.assign(dialog.style, {
-            background: 'var(--bg-color)',
+            background: 'var(--bg-primary)',
             border: '1px solid var(--border-color)',
             borderRadius: '8px',
             boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
@@ -93,6 +93,9 @@ class FindReplaceDialog {
         this.element.querySelector('#find-replace-close').addEventListener('click', () => {
             this.hide();
         });
+
+        // Make dialog draggable
+        this.setupDragAndDrop();
 
         // Find input
         const findInput = this.element.querySelector('#find-input');
@@ -146,6 +149,57 @@ class FindReplaceDialog {
         this.element.querySelector('#replace-all').addEventListener('click', () => this.replaceAll());
     }
 
+    setupDragAndDrop() {
+        const header = this.element.querySelector('.find-replace-header');
+        let isDragging = false;
+        let startX, startY, startLeft, startTop;
+
+        header.style.cursor = 'move';
+        header.style.userSelect = 'none';
+
+        header.addEventListener('mousedown', (e) => {
+            isDragging = true;
+            startX = e.clientX;
+            startY = e.clientY;
+            const rect = this.element.getBoundingClientRect();
+            startLeft = rect.left;
+            startTop = rect.top;
+
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+
+            const deltaX = e.clientX - startX;
+            const deltaY = e.clientY - startY;
+
+            let newLeft = startLeft + deltaX;
+            let newTop = startTop + deltaY;
+
+            // Keep dialog within viewport bounds
+            const rect = this.element.getBoundingClientRect();
+            const maxLeft = window.innerWidth - rect.width;
+            const maxTop = window.innerHeight - rect.height;
+
+            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
+            newTop = Math.max(0, Math.min(newTop, maxTop));
+
+            this.element.style.left = `${newLeft}px`;
+            this.element.style.top = `${newTop}px`;
+            this.element.style.right = 'auto'; // Remove auto positioning
+            this.element.style.transform = 'none'; // Remove transform
+        });
+
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.body.style.userSelect = '';
+            }
+        });
+    }
+
     show(findOnly = false) {
         if (!this.element) {
             this.createDialog();
@@ -153,6 +207,18 @@ class FindReplaceDialog {
 
         this.isVisible = true;
         this.element.style.display = 'block';
+
+        // Set initial position for dragging (center the dialog)
+        if (this.element.style.left === '' || this.element.style.top === '') {
+            const rect = this.element.getBoundingClientRect();
+            const centerX = (window.innerWidth - rect.width) / 2;
+            const centerY = (window.innerHeight - rect.height) / 2;
+            this.element.style.left = `${Math.max(0, centerX)}px`;
+            this.element.style.top = `${Math.max(0, centerY)}px`;
+            this.element.style.right = 'auto';
+            this.element.style.transform = 'none';
+        }
+
         this.element.querySelector('#find-input').focus();
 
         if (findOnly) {
@@ -231,11 +297,17 @@ class FindReplaceDialog {
         this.clearHighlights();
         if (this.matches.length === 0) return;
 
-        // For now, we'll skip visual highlighting in preview to avoid markdown conflicts
-        // The selection in the textarea provides sufficient visual feedback
         const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+
+        // Always select the match in the textarea for consistency
         if (editor) {
             this.selectCurrentMatch();
+        }
+
+        // If in preview mode, also highlight in the markdown preview
+        if (preview && !preview.classList.contains('hidden') && this.currentMatchIndex >= 0) {
+            this.highlightInPreview();
         }
     }
 
@@ -244,6 +316,42 @@ class FindReplaceDialog {
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
         if (preview && editor) {
+            preview.innerHTML = marked.parse(editor.value);
+        }
+    }
+
+    highlightInPreview() {
+        if (this.currentMatchIndex < 0 || this.currentMatchIndex >= this.matches.length) return;
+
+        const preview = document.getElementById('markdown-preview');
+        const editor = document.getElementById('note-editor');
+        if (!preview || !editor) return;
+
+        const match = this.matches[this.currentMatchIndex];
+        const editorText = editor.value;
+
+        // Find the corresponding text in the rendered HTML
+        // This is a simplified approach - we'll wrap the matched text in a highlight span
+        try {
+            const beforeMatch = editorText.substring(0, match.start);
+            const matchText = editorText.substring(match.start, match.end);
+            const afterMatch = editorText.substring(match.end);
+
+            // Render the content with the match highlighted
+            const highlightedText = beforeMatch +
+                `<mark class="find-highlight">${matchText}</mark>` +
+                afterMatch;
+
+            preview.innerHTML = marked.parse(highlightedText);
+
+            // Scroll the highlight into view
+            const highlightElement = preview.querySelector('.find-highlight');
+            if (highlightElement) {
+                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        } catch (error) {
+            console.warn('Error highlighting in preview:', error);
+            // Fallback to normal rendering
             preview.innerHTML = marked.parse(editor.value);
         }
     }
@@ -851,6 +959,11 @@ class CogNotezApp {
             this.renderMarkdownPreview();
             toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
             toggleBtn.title = 'Toggle Preview/Edit';
+        }
+
+        // Update find highlighting after mode switch
+        if (this.findReplaceDialog && this.findReplaceDialog.isVisible && this.findReplaceDialog.findText) {
+            this.findReplaceDialog.highlightMatches();
         }
     }
 
@@ -3909,7 +4022,7 @@ Please provide a helpful response based on the note content and conversation his
         // Style the content
         const content = dialog.querySelector('.update-dialog-content');
         Object.assign(content.style, {
-            background: 'var(--bg-color)',
+            background: 'var(--bg-primary)',
             padding: '24px',
             borderRadius: '8px',
             border: '1px solid var(--border-color)',

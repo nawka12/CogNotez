@@ -445,7 +445,7 @@ body {
     padding: 8px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background: var(--bg-color);
+    background: var(--bg-primary);
 }
 
 .tag-item {
@@ -496,7 +496,7 @@ body {
     padding: 8px 12px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background: var(--bg-color);
+    background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 14px;
 }
@@ -515,7 +515,7 @@ body {
     padding: 8px;
     border: 1px solid var(--border-color);
     border-radius: 6px;
-    background: var(--bg-color);
+    background: var(--bg-primary);
 }
 
 .available-tag {
@@ -1431,15 +1431,12 @@ body {
 .find-replace-dialog {
     font-family: var(--font-family);
     color: var(--text-primary);
-    background: var(--bg-color);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 8px;
     box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
     z-index: 1000;
     position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
     width: 350px;
     max-width: 90vw;
     max-height: 90vh;
@@ -1579,6 +1576,15 @@ body {
 /* Hide replace section when in find-only mode */
 .find-replace-dialog .replace-section.hidden {
     display: none;
+}
+
+/* Find highlight styling in markdown preview */
+.find-highlight {
+    background: var(--accent-color-light);
+    padding: 2px 4px;
+    border-radius: 3px;
+    color: var(--accent-color);
+    font-weight: bold;
 }
 
 /* Notification styles - ensure they appear above all modals and overlays */
