@@ -198,35 +198,392 @@ body {
   border-radius: 4px;
 }
 
-/* Responsive design for smaller screens */
-@media (max-width: 768px) {
+/* Responsive design for different screen sizes */
+
+/* Large Desktop (1440px and above) */
+@media (min-width: 1440px) {
+  .ai-panel {
+    width: 400px; /* Slightly wider for larger screens */
+  }
+
+  .sidebar {
+    width: 320px; /* Slightly wider sidebar */
+  }
+
+  .search-input {
+    width: 300px; /* Wider search bar */
+  }
+
+  /* More generous sync status width for large screens */
+  .sync-status-container {
+    max-width: 200px; /* Even more generous for large screens */
+    padding: 6px 10px; /* Slightly more padding on large screens */
+  }
+
+  .sync-status-text {
+    max-width: 140px; /* Allow full text on large screens */
+    font-size: 13px; /* Slightly larger font for better readability */
+  }
+}
+
+/* Desktop (1024px to 1439px) */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .ai-panel {
+    width: 350px;
+  }
+
+  .sidebar {
+    width: 280px;
+  }
+
+  /* Generous sync status width for desktop */
+  .sync-status-container {
+    max-width: 180px; /* Generous width for desktop */
+    padding: 5px 9px; /* Comfortable padding for desktop */
+  }
+
+  .sync-status-text {
+    max-width: 120px; /* Allow longer text on desktop */
+    font-size: 12px; /* Standard readable size */
+  }
+}
+
+/* Optimize for 1366x768 screens and split-screen scenarios */
+@media (min-width: 650px) and (max-width: 768px) {
+  /* Specific optimizations for split 1366x768 screens */
+  .sidebar {
+    width: 220px; /* Narrower sidebar for split screens */
+  }
+
+  .ai-panel {
+    width: 260px; /* Optimized AI panel width for split screens */
+  }
+
+  .main-content-area {
+    flex: 1;
+    min-width: 250px; /* Ensure minimum usable content area */
+  }
+
+  .search-input {
+    width: 180px; /* Smaller search input for space constraints */
+  }
+
+  /* Optimize header for split screens */
+  .app-header {
+    padding: 0 12px;
+    height: 48px; /* Slightly reduced height */
+  }
+
+  .editor-header {
+    padding: 6px 12px;
+    min-height: 48px;
+  }
+
+  /* Better spacing for split screens */
+  .editor-wrapper {
+    padding: 12px;
+  }
+
+  .ai-panel-content {
+    padding: 12px;
+  }
+
+  /* Optimize text sizes for split screens */
+  .note-title-input {
+    font-size: 14px;
+  }
+
+  .sync-status-text {
+    font-size: 11px;
+    max-width: 90px; /* Slightly smaller for split screens */
+  }
+
+  /* Better button sizing for split screens */
+  .action-btn {
+    padding: 6px;
+    min-width: 30px;
+    height: 30px;
+    font-size: 12px;
+  }
+
+  /* Maintain side-by-side layout but optimize proportions */
+  .main-content {
+    flex-direction: row;
+  }
+
+  .ai-panel {
+    border-left: 1px solid var(--border-color);
+    max-height: none; /* Allow full height usage */
+  }
+}
+
+/* Specific optimizations for low-height screens (768px height) */
+@media (max-height: 800px) and (min-width: 1024px) {
+  .app-header {
+    height: 45px; /* Reduce header height for better vertical space */
+    padding: 0 18px;
+  }
+
+  .editor-header {
+    min-height: 45px; /* Reduce editor header height */
+    padding: 6px 18px;
+  }
+
+  .editor-wrapper {
+    padding: 16px; /* Slightly reduce padding to save space */
+  }
+
+  .ai-panel-content {
+    padding: 14px; /* Optimize AI panel padding */
+  }
+
+  .ai-messages {
+    max-height: calc(100vh - 180px); /* Better height utilization for low-height screens */
+    min-height: 150px;
+  }
+
+  .markdown-preview {
+    max-height: calc(100vh - 160px); /* Optimize preview height */
+  }
+
+  .note-editor {
+    height: calc(100vh - 130px); /* Better height calculation for low screens */
+  }
+}
+
+/* Specific optimizations for ~1366px width screens */
+@media (min-width: 1350px) and (max-width: 1380px) {
+  .sidebar {
+    width: 260px; /* Slightly narrower sidebar for better balance */
+  }
+
+  .ai-panel {
+    width: 320px; /* Slightly narrower AI panel */
+  }
+
+  .search-input {
+    width: 240px; /* Optimize search input width */
+  }
+
+  /* Better text sizing for this specific resolution */
+  .sync-status-text {
+    font-size: 12px;
+    max-width: 110px; /* Slightly smaller to fit better */
+  }
+
+  .note-title-input {
+    font-size: 15px; /* Slightly smaller for better fit */
+  }
+
+  /* Optimize spacing for 1366px width */
+  .app-header {
+    padding: 0 16px;
+  }
+
+  .editor-header {
+    padding: 6px 16px;
+  }
+}
+
+/* Tablet (769px to 1023px) */
+@media (min-width: 769px) and (max-width: 1023px) {
+  .ai-panel {
+    width: 320px; /* Moderate width for tablets */
+  }
+
   .sidebar {
     width: 250px;
   }
 
-  .ai-panel {
-    width: 300px;
-  }
-
   .search-input {
-    width: 200px;
+    width: 220px;
   }
 
-  .app-header {
-    padding: 0 15px;
+  /* Improve split screen usability on tablets */
+  .main-content {
+    flex-direction: row; /* Keep side-by-side layout */
   }
 
-  .editor-header {
-    padding: 0 15px;
+  .main-content-area {
+    flex: 1;
+    min-width: 300px; /* Ensure minimum usable width */
+    border-left: 1px solid var(--border-color);
+  }
+
+  .ai-panel {
+    width: 280px; /* Slightly narrower for better usability */
+    border-left: 1px solid var(--border-color);
+    max-height: none; /* Allow full height usage */
   }
 
   .editor-wrapper {
     padding: 15px;
   }
 
+  /* AI panel improvements for tablets */
+  .ai-panel-content {
+    padding: 14px;
+  }
+
+  .ai-messages {
+    max-height: calc(100vh - 200px); /* Better height utilization */
+    min-height: 200px;
+  }
+
+  /* Improve editor layout for tablets */
+  .editor-header {
+    padding: 8px 15px;
+  }
+
+  .note-title-input {
+    font-size: 15px;
+  }
+}
+
+/* Small screens and mobile (up to 768px) */
+@media (max-width: 768px) {
+  .sidebar {
+    width: 100%;
+    max-height: 180px; /* Slightly smaller sidebar height */
+  }
+
+  .ai-panel {
+    width: 100%;
+    max-height: 45vh; /* Slightly smaller AI panel height */
+  }
+
+  .search-input {
+    width: 150px; /* Smaller search input */
+  }
+
+  .app-header {
+    padding: 0 8px;
+  }
+
+  .editor-header {
+    padding: 6px 8px;
+    min-height: 45px;
+  }
+
+  .editor-wrapper {
+    padding: 8px;
+  }
+
+  /* Stack layout on mobile */
+  .main-content {
+    flex-direction: column;
+  }
+
+  .main-content-area {
+    flex: 1;
+    border-left: none;
+  }
+
+  /* Make buttons smaller on mobile */
+  .action-btn {
+    padding: 5px;
+    font-size: 13px;
+    min-width: 32px;
+    height: 32px;
+  }
+
+  .header-right {
+    gap: 4px;
+  }
+
+  /* Improve note title display on mobile */
+  .note-title-input {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .note-date {
+    font-size: 11px;
+  }
+
+  /* Better button layout for mobile */
+  .editor-actions {
+    gap: 4px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  /* Improve sync status for mobile */
+  .sync-status-container {
+    padding: 3px 6px;
+    max-width: 130px; /* Increased for mobile */
+    margin-right: 4px;
+  }
+
+  .sync-status-indicator {
+    font-size: 11px;
+    gap: 3px;
+  }
+
+  .sync-status-text {
+    max-width: 80px; /* Increased for mobile */
+    font-size: 11px;
+  }
+}
+
+/* Very small screens (up to 480px) */
+@media (max-width: 480px) {
+  .app-header {
+    height: 42px;
+    padding: 0 6px;
+  }
+
+  .header-left {
+    gap: 10px;
+  }
+
+  .app-title {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .search-input {
+    width: 120px;
+    font-size: 12px;
+    padding: 4px 8px;
+  }
+
+  .ai-panel {
+    max-height: 40vh;
+  }
+
+  .editor-header {
+    min-height: 38px;
+    max-height: 70px;
+    padding: 4px 6px;
+  }
+
+  .note-title-input {
+    font-size: 13px;
+    font-weight: 500;
+  }
+
+  /* Hide some buttons on very small screens */
+  .editor-actions {
+    gap: 2px;
+  }
+
+  .editor-actions .action-btn {
+    padding: 3px;
+    min-width: 28px;
+    height: 28px;
+    font-size: 12px;
+  }
+
+  /* Adjust modal sizes */
+  .modal-content {
+    max-width: 98vw;
+    max-height: 98vh;
+  }
+
   /* Modal improvements for small screens */
   .modal {
-    padding: 10px;
+    padding: 8px;
   }
 
   .modal-content {
@@ -235,21 +592,64 @@ body {
   }
 
   .modal-header {
-    padding: 15px;
+    padding: 12px;
   }
 
   .modal-body {
-    padding: 15px;
-    max-height: calc(95vh - 120px);
+    padding: 12px;
+    max-height: calc(95vh - 100px);
+  }
+
+  /* Very small screen improvements */
+  .note-editor {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  .markdown-preview {
+    font-size: 13px;
+    line-height: 1.5;
+  }
+
+  /* AI panel improvements for small screens */
+  .ai-panel-content {
+    padding: 10px;
+  }
+
+  .ai-messages {
+    max-height: calc(100vh - 220px);
+    min-height: 120px;
+  }
+
+  .ai-input {
+    font-size: 12px;
+    padding: 5px 8px;
+  }
+
+  .ai-send-btn {
+    padding: 5px 10px;
+    font-size: 11px;
   }
 
   /* AI settings specific improvements */
   .ai-dialog-input {
-    font-size: 14px;
+    font-size: 13px;
   }
 
-  .btn-primary, .btn-secondary {
-    padding: 8px 16px;
-    font-size: 13px;
+  /* Improve sync status for very small screens */
+  .sync-status-container {
+    padding: 2px 4px;
+    max-width: 100px; /* Increased for very small screens */
+    margin-right: 2px;
+  }
+
+  .sync-status-indicator {
+    font-size: 10px;
+    gap: 2px;
+  }
+
+  .sync-status-text {
+    max-width: 60px; /* Increased for very small screens */
+    font-size: 10px;
   }
 }

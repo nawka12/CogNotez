@@ -466,16 +466,182 @@ class UIManager {
         ]);
     }
 
+    // Test responsive design with different screen sizes (for debugging)
+    testResponsiveDesign() {
+        const testSizes = [
+            { width: 1920, height: 1080, name: 'Full HD Desktop' },
+            { width: 1366, height: 768, name: 'Laptop' },
+            { width: 1024, height: 768, name: 'Tablet Landscape' },
+            { width: 768, height: 1024, name: 'Tablet Portrait' },
+            { width: 375, height: 667, name: 'iPhone 6/7/8' },
+            { width: 360, height: 640, name: 'Small Mobile' }
+        ];
+
+        console.log('🧪 Testing responsive design across different screen sizes:');
+        console.table(testSizes.map(size => ({
+            'Screen Size': size.name,
+            'Width': size.width,
+            'Height': size.height,
+            'AI Panel Width': this.getResponsiveAIWidth(size.width),
+            'Layout': size.width <= 768 ? 'Stacked' : 'Side-by-side',
+            'Scenario': this.detectScenario(size.width, size.height)
+        })));
+
+        console.log('💡 Tips for testing:');
+        console.log('- Resize your browser window to test different breakpoints');
+        console.log('- Use browser dev tools to simulate different devices');
+        console.log('- Check that AI panel and editor maintain proper proportions');
+    }
+
+    getResponsiveAIWidth(viewportWidth) {
+        if (viewportWidth >= 1440) return '400px';
+        if (viewportWidth >= 1024) return '350px';
+        if (viewportWidth >= 769) return '320px';
+        if (viewportWidth >= 650 && viewportWidth <= 768) return '260px (split-screen optimized)';
+        return '100% (full width)';
+    }
+
+    // Detect common screen resolutions and split-screen scenarios
+    detectScreenScenario() {
+        const width = window.innerWidth;
+        const height = window.innerHeight;
+
+        // 1366x768 split-screen detection (approximately 683px width)
+        if (width >= 650 && width <= 720 && height >= 700 && height <= 800) {
+            return '1366x768-split';
+        }
+
+        // Standard 1366x768 detection
+        if (width >= 1350 && width <= 1380 && height >= 750 && height <= 780) {
+            return '1366x768-full';
+        }
+
+        // Other common split-screen scenarios
+        if (width >= 600 && width <= 800 && height >= 700) {
+            return 'laptop-split';
+        }
+
+        return 'standard';
+    }
+
+    // Helper method for testing (takes width and height parameters)
+    detectScenario(width, height) {
+        // 1366x768 split-screen detection (approximately 683px width)
+        if (width >= 650 && width <= 720 && height >= 700 && height <= 800) {
+            return '1366x768-split';
+        }
+
+        // Standard 1366x768 detection
+        if (width >= 1350 && width <= 1380 && height >= 750 && height <= 780) {
+            return '1366x768-full';
+        }
+
+        // Other common split-screen scenarios
+        if (width >= 600 && width <= 800 && height >= 700) {
+            return 'laptop-split';
+        }
+
+        return 'standard';
+    }
+
+    // Handle window resize for responsive design
+    handleWindowResize() {
+        const updateResponsiveElements = () => {
+            // Update word count position if it exists
+            if (this.updateWordCountPosition) {
+                this.updateWordCountPosition();
+            }
+
+            // Update AI panel height based on screen size
+            const aiPanel = document.getElementById('ai-panel');
+            const aiMessages = document.getElementById('ai-messages');
+
+            if (aiPanel && aiMessages && !aiPanel.classList.contains('hidden')) {
+                const viewportHeight = window.innerHeight;
+                const isSmallScreen = viewportHeight < 600;
+
+                if (isSmallScreen) {
+                    aiMessages.style.maxHeight = `${viewportHeight - 280}px`;
+                } else {
+                    aiMessages.style.maxHeight = `${viewportHeight - 220}px`;
+                }
+            }
+
+            // Update editor and preview heights
+            const noteEditor = document.getElementById('note-editor');
+            const markdownPreview = document.getElementById('markdown-preview');
+
+            if (noteEditor) {
+                const viewportHeight = window.innerHeight;
+                const editorHeight = Math.max(300, viewportHeight - 150);
+                const maxEditorHeight = viewportHeight - 120;
+                noteEditor.style.height = `${Math.min(editorHeight, maxEditorHeight)}px`;
+            }
+
+            if (markdownPreview) {
+                const viewportHeight = window.innerHeight;
+                const previewHeight = Math.max(200, viewportHeight - 180);
+                markdownPreview.style.maxHeight = `${previewHeight}px`;
+
+                // Handle text overflow for long lines in view mode
+                const viewportWidth = window.innerWidth;
+                const previewViewportHeight = window.innerHeight;
+
+                // Special handling for 1366x768 screens and split-screen scenarios
+                if (viewportWidth < 768) {
+                    // On mobile, ensure long lines can scroll horizontally
+                    markdownPreview.style.overflowX = 'auto';
+                    markdownPreview.style.whiteSpace = 'pre-wrap';
+                    markdownPreview.style.wordBreak = 'break-word';
+                } else if (viewportWidth >= 650 && viewportWidth <= 768) {
+                    // Split-screen optimization for 1366x768 screens
+                    markdownPreview.style.overflowX = 'auto';
+                    markdownPreview.style.whiteSpace = 'pre-wrap';
+                    markdownPreview.style.wordBreak = 'break-word';
+                    markdownPreview.style.fontSize = '14px'; // Slightly smaller font for split screens
+                } else {
+                    // On larger screens, allow normal wrapping
+                    markdownPreview.style.overflowX = 'hidden';
+                    markdownPreview.style.whiteSpace = 'normal';
+                    markdownPreview.style.fontSize = '15px'; // Standard font size
+                }
+
+                // Handle low-height screens (like 1366x768)
+                if (previewViewportHeight <= 800 && viewportWidth >= 1024) {
+                    // Optimize for low-height desktop screens
+                    if (noteEditor) {
+                        noteEditor.style.fontSize = '14px'; // Slightly smaller font
+                        noteEditor.style.lineHeight = '1.5'; // Better line spacing
+                    }
+                }
+            }
+        };
+
+        // Initial call
+        updateResponsiveElements();
+
+        // Debounced resize handler
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(updateResponsiveElements, 100);
+        });
+    }
+
     // Initialize all UI enhancements
     initialize() {
         this.enhanceContextMenu();
         this.enhanceSidebar();
         this.enhanceEditor();
+        this.handleWindowResize();
 
         // Add keyboard shortcuts help to menu
         if (typeof ipcRenderer !== 'undefined') {
             ipcRenderer.on('show-shortcuts', () => this.showKeyboardShortcuts());
         }
+
+        // Expose test function globally for debugging
+        window.testResponsiveDesign = () => this.testResponsiveDesign();
     }
 }
 

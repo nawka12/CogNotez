@@ -145,20 +145,31 @@ body {
 .sync-status-container {
     display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
+    gap: 6px; /* Reduced gap for smaller screens */
+    padding: 4px 8px; /* Reduced padding */
     background: var(--surface-bg);
     border: 1px solid var(--border-color);
     border-radius: 6px;
     margin-right: 8px;
+    max-width: 160px; /* Increased width to accommodate longer text */
+    overflow: hidden;
 }
 
 .sync-status-indicator {
     display: flex;
     align-items: center;
-    gap: 6px;
-    font-size: 13px;
+    gap: 4px; /* Reduced gap */
+    font-size: 12px; /* Smaller font size */
     color: var(--text-secondary);
+    overflow: hidden;
+}
+
+.sync-status-text {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100px; /* Increased width to accommodate longer text */
+    flex-shrink: 1;
 }
 
 .sync-status-indicator.connected {
@@ -214,6 +225,7 @@ body {
     flex: 1;
     display: flex;
     overflow: hidden;
+    min-height: 0; /* Allow flex items to shrink below their minimum content size */
 }
 
 /* Sidebar */
@@ -531,6 +543,8 @@ body {
     background: var(--editor-bg);
     border-left: 1px solid var(--border-color);
     position: relative;
+    min-height: 0; /* Allow flex item to shrink */
+    overflow: hidden; /* Prevent content from overflowing */
 }
 
 /* Editor Container */
@@ -609,7 +623,8 @@ body {
     align-items: flex-start;
     justify-content: space-between;
     background: var(--header-bg);
-    overflow: hidden;
+    overflow: visible; /* Allow content to be visible */
+    gap: 12px; /* Add gap between flex items */
 }
 
 .note-info {
@@ -627,6 +642,11 @@ body {
     font-weight: 600;
     color: var(--text-primary);
     outline: none;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    min-width: 0; /* Allow flex shrinking */
+    flex: 1;
 }
 
 .note-title-input::placeholder {
@@ -642,6 +662,10 @@ body {
     display: flex;
     gap: 8px;
     align-self: flex-start;
+    flex-shrink: 0; /* Prevent shrinking */
+    flex-wrap: wrap; /* Allow wrapping on small screens */
+    justify-content: flex-end;
+    min-width: fit-content;
 }
 
 .action-btn {
@@ -662,11 +686,15 @@ body {
     flex: 1;
     padding: 20px;
     overflow: auto;
+    min-height: calc(100vh - 200px); /* Ensure minimum height for content */
+    max-height: calc(100vh - 120px); /* Prevent excessive height */
 }
 
 .note-editor {
     width: 100%;
-    height: calc(100% - 50px);
+    height: calc(100vh - 150px); /* More adaptive calculation based on viewport */
+    min-height: 300px; /* Minimum height to ensure usability */
+    max-height: calc(100vh - 120px); /* Maximum height to prevent overflow */
     border: none;
     background: transparent;
     font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
@@ -692,8 +720,11 @@ body {
     color: var(--text-primary);
     line-height: 1.6;
     overflow-y: auto;
-    overflow-x: hidden;
-    max-height: calc(100vh - 200px); /* Prevent preview from being too tall */
+    overflow-x: auto; /* Allow horizontal scrolling for long lines */
+    word-wrap: break-word; /* Better word wrapping */
+    overflow-wrap: break-word; /* Modern word wrapping */
+    max-height: calc(100vh - 180px); /* More adaptive max-height */
+    min-height: calc(100vh - 400px); /* Ensure minimum usable height */
 }
 
 .markdown-preview h1,
@@ -859,7 +890,8 @@ body {
     overflow-y: auto;
     margin-bottom: 16px;
     padding: 8px;
-    max-height: calc(100vh - 200px); /* Ensure it doesn't overflow viewport */
+    max-height: calc(100vh - 220px); /* More adaptive height calculation */
+    min-height: 200px; /* Ensure minimum usable height */
     scroll-behavior: smooth;
 }
 
