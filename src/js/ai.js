@@ -17,6 +17,10 @@ class AIManager {
         this.webScraper = null;
         this.lastSearchResults = null; // Store last search results for fallback scraping
         this.initializeWebScraper();
+
+        // Initialize AI edit approval system
+        this.editApproval = null;
+        this.initializationPromise = null; // Track initialization status
     }
 
     /**
@@ -264,8 +268,28 @@ class AIManager {
 
     // Initialize AI connection
     async initialize() {
+        if (this.initializationPromise) {
+            console.log('[DEBUG] AI Manager: Initialization already in progress, returning existing promise');
+            return this.initializationPromise;
+        }
+
         console.log('[DEBUG] AI Manager: Starting initialization...');
+
+        this.initializationPromise = this._doInitialize();
+        return this.initializationPromise;
+    }
+
+    async _doInitialize() {
         try {
+            // Initialize AI edit approval system first
+            if (typeof AIEditApproval !== 'undefined') {
+                this.editApproval = new AIEditApproval(this.app);
+                this.editApproval.initialize();
+                console.log('[DEBUG] AI Manager: Edit approval system initialized');
+            } else {
+                console.warn('[DEBUG] AI Manager: AIEditApproval class not available');
+            }
+
             // Load settings from database or localStorage
             if (this.app.notesManager && this.app.notesManager.db && this.app.notesManager.db.initialized) {
                 console.log('[DEBUG] AI Manager: Loading settings from database...');
@@ -313,9 +337,12 @@ class AIManager {
             console.log('[DEBUG] AI Manager: Loading available models...');
             await this.loadAvailableModels();
             console.log('[DEBUG] AI Manager: AI service initialized successfully');
+
+            return true;
         } catch (error) {
             console.warn('[DEBUG] AI Manager: AI service not available:', error.message);
             this.showOfflineMessage();
+            return false;
         }
     }
 
@@ -1321,6 +1348,38 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
         return this.backend === 'ollama' ? this.ollamaModel : this.openRouterModel;
     }
 
+    // Check if AI manager is fully ready for use
+    get isReady() {
+        return this.editApproval !== null && this.isConnected;
+    }
+
+    // Check if AI manager is initialized (edit approval system ready)
+    get isInitialized() {
+        return this.editApproval !== null;
+    }
+
+    // Check if approval interface is currently visible
+    get isApprovalVisible() {
+        if (!this.editApproval || !this.editApproval.dialog) return false;
+        return !this.editApproval.dialog.classList.contains('hidden');
+    }
+
+    // Reinitialize the AI manager if needed
+    async reinitialize() {
+        console.log('[DEBUG] AI Manager: Reinitializing...');
+        try {
+            // Reset initialization state
+            this.initializationPromise = null;
+            this.editApproval = null;
+
+            // Reinitialize
+            return await this.initialize();
+        } catch (error) {
+            console.error('[DEBUG] AI Manager: Reinitialization failed:', error);
+            throw error;
+        }
+    }
+
     // AI Feature implementations
     async summarize(text, options = {}) {
         const prompt = `Please provide a concise and informative summary of the following text. Keep it brief but capture the key points:
@@ -1849,20 +1908,28 @@ Suggested tags:`;
     }
 
     async handleEditText(text, instruction) {
-        let toolExecutionSuccessful = true;
         let editedResult = null;
 
         try {
+            // Wait for AI manager initialization to complete
+            if (this.initializationPromise) {
+                console.log('[DEBUG] AI handleEditText: Waiting for AI manager initialization...');
+                const initSuccess = await this.initializationPromise;
+                if (!initSuccess) {
+                    throw new Error('AI manager initialization failed');
+                }
+            }
+
             // Ensure AI panel is visible
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
             this.app.updateLoadingText('Editing text with AI...');
             this.app.showLoading();
-            
+
             console.log('[DEBUG] AI handleEditText: Starting with text:', text.substring(0, 50) + '...');
             console.log('[DEBUG] AI handleEditText: Instruction:', instruction);
-            
+
             editedResult = await this.editText(text, instruction);
 
             // Check if the result indicates tool failure
@@ -1872,31 +1939,44 @@ Suggested tags:`;
                 editedResult.includes('Tool execution failed') ||
                 editedResult.includes('All scraping attempts failed')
             )) {
-                toolExecutionSuccessful = false;
-                console.log('[DEBUG] AI handleEditText: Tool execution appears to have failed - will not edit note');
-            } else {
-                console.log('[DEBUG] AI handleEditText: Tool execution appears successful');
+                console.log('[DEBUG] AI handleEditText: Tool execution appears to have failed - showing fallback message');
+                this.app.showAIMessage('❌ Text editing failed due to tool execution issues. Please check your SearXNG connection and try again.', 'assistant');
+                return;
             }
 
-            // Only proceed with text replacement if tools were successful
-            if (toolExecutionSuccessful && editedResult) {
-                console.log('[DEBUG] AI handleEditText: Got edited result:', editedResult.substring(0, 50) + '...');
-            
-            // Call replaceSelection on the app instance
-            if (this.app && typeof this.app.replaceSelection === 'function') {
-                    this.app.replaceSelection(editedResult);
-                console.log('[DEBUG] AI handleEditText: replaceSelection called successfully');
-                this.app.showAIMessage('✅ Text edited successfully!', 'assistant');
+            console.log('[DEBUG] AI handleEditText: Got edited result:', editedResult.substring(0, 50) + '...');
+
+            // Show approval interface instead of directly applying changes
+            if (this.editApproval && editedResult) {
+                console.log('[DEBUG] AI handleEditText: Showing approval interface');
+                this.editApproval.showApprovalDialog(text, editedResult, instruction);
+                this.app.showAIMessage('✅ AI edit generated! Accept to apply or Reject to keep original.', 'assistant');
             } else {
-                console.error('[DEBUG] AI handleEditText: app.replaceSelection is not available');
-                throw new Error('replaceSelection method not available');
+                console.error('[DEBUG] AI handleEditText: Edit approval system not available');
+
+                // Try to reinitialize if edit approval system is missing
+                if (!this.editApproval) {
+                    console.log('[DEBUG] AI handleEditText: Attempting to reinitialize AI manager...');
+                    try {
+                        await this.reinitialize();
+                        if (this.editApproval && editedResult) {
+                            console.log('[DEBUG] AI handleEditText: Reinitialization successful, showing approval dialog');
+                            this.editApproval.showApprovalDialog(text, editedResult, instruction);
+                            this.app.showAIMessage('✅ AI edit generated! Please review the changes in the approval dialog.', 'assistant');
+                            return;
+                        }
+                    } catch (reinitError) {
+                        console.error('[DEBUG] AI handleEditText: Reinitialization failed:', reinitError);
+                    }
                 }
-            } else {
-                console.log('[DEBUG] AI handleEditText: Skipping text replacement due to tool failure');
-                this.app.showAIMessage('❌ Text editing cancelled due to tool execution failure. The note has not been modified. Please check your SearXNG connection and try again.', 'assistant');
+
+                const errorMsg = this.editApproval ?
+                    '❌ Edit approval interface encountered an error. Please refresh the application.' :
+                    '❌ AI edit approval system not initialized. Please wait a moment and try again.';
+                this.app.showAIMessage(errorMsg, 'assistant');
             }
+
         } catch (error) {
-            toolExecutionSuccessful = false;
             console.error('[DEBUG] AI handleEditText error:', error);
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();

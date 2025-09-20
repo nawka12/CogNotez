@@ -2241,6 +2241,13 @@ Please provide a helpful response based on the note content and conversation his
             return;
         }
 
+        // Check if AI manager is properly initialized
+        if (!this.aiManager.isInitialized) {
+            console.error('[DEBUG] handleAIAction: AI manager not fully initialized - edit approval system missing');
+            this.showNotification('AI system is still initializing. Please wait a moment and try again.', 'error');
+            return;
+        }
+
         if (!action) {
             console.error('[DEBUG] handleAIAction: No action specified');
             this.showNotification('No AI action specified', 'error');
