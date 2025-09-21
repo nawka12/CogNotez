@@ -33,6 +33,8 @@ class AIEditApproval {
         this.rejectedBlocks.clear();
         this.processedBlocks.clear();
 
+        console.log('[DEBUG] AI Edit Approval - showing dialog');
+
         // Capture the current selection range from the app or editor so that
         // we can consistently replace within the same region for every apply
         const editor = document.getElementById('note-editor');
@@ -54,6 +56,15 @@ class AIEditApproval {
 
         // Show inline approval interface
         this.dialog.classList.remove('hidden');
+
+        // Debug container dimensions
+        setTimeout(() => {
+            const approvalBody = this.dialog.querySelector('.ai-edit-approval-body');
+            const diffContainer = this.dialog.querySelector('.ai-edit-diff-container');
+            console.log('[DEBUG] Approval body height:', approvalBody?.offsetHeight, 'scroll height:', approvalBody?.scrollHeight);
+            console.log('[DEBUG] Diff container height:', diffContainer?.offsetHeight, 'scroll height:', diffContainer?.scrollHeight);
+            console.log('[DEBUG] Dialog height:', this.dialog.offsetHeight, 'scroll height:', this.dialog.scrollHeight);
+        }, 100);
 
         // Hide the editor and show the approval interface
         const editorContainer = document.getElementById('editor-container');
@@ -296,31 +307,37 @@ class AIEditApproval {
     handleAcceptAll() {
         if (this.isApplying) return;
         this.isApplying = true;
-        // Apply all changes in order to the working text, then close
         const changeableBlocks = this.getChangeableBlocks()
             .slice()
             .sort((a, b) => a.startLine - b.startLine);
 
         if (changeableBlocks.length > 0) {
-            // Build once from currentText
-            let lines = this.currentText.split('\n');
-            changeableBlocks.forEach((block, idx) => {
+            const oldCurrentText = this.currentText;
+            let lines = oldCurrentText.split('\n');
+            changeableBlocks.forEach((block) => {
                 const lineIndex = Math.max(0, (block.startLine || 1) - 1);
                 const editedLine = (block.editedLines && block.editedLines[0] !== undefined) ? block.editedLines[0] : '';
-                // Ensure lines array is large enough
                 while (lines.length <= lineIndex) lines.push('');
                 lines[lineIndex] = editedLine;
-                // Mark processed for consistency
                 this.processedBlocks.add(this.diffBlocks.indexOf(block));
             });
             this.currentText = lines.join('\n');
 
-            if (this.app && typeof this.app.replaceSelection === 'function') {
-                // Force replacement within original selection range
-                this.app.selectionStart = this.selectionStart;
-                this.app.selectionEnd = this.selectionEnd;
-                this.app.preserveSelection = true;
-                this.app.replaceSelection(this.currentText);
+            const editor = document.getElementById('note-editor');
+            if (editor) {
+                const fullContent = editor.value;
+                const beforeSelection = fullContent.substring(0, this.selectionStart);
+                const afterSelection = fullContent.substring(this.selectionStart + oldCurrentText.length);
+                const newContent = beforeSelection + this.currentText + afterSelection;
+                editor.value = newContent;
+                if (this.app && this.app.currentNote) {
+                    this.app.currentNote.content = newContent;
+                }
+                const inputEvent = new Event('input', { bubbles: true });
+                editor.dispatchEvent(inputEvent);
+                this.selectionEnd = this.selectionStart + this.currentText.length;
+                editor.selectionStart = editor.selectionEnd = this.selectionEnd;
+                editor.focus();
             }
         }
 
@@ -340,23 +357,30 @@ class AIEditApproval {
      * Apply a single block change immediately
      */
     applySingleBlockChange(block) {
-        // Replace by line index to avoid interfering with other lines
         const lineIndex = Math.max(0, (block.startLine || 1) - 1);
         const editedLine = (block.editedLines && block.editedLines[0] !== undefined) ? block.editedLines[0] : '';
 
-        let lines = this.currentText.split('\n');
-        // Ensure lines array is large enough
+        const oldCurrentText = this.currentText;
+        let lines = oldCurrentText.split('\n');
         while (lines.length <= lineIndex) lines.push('');
         lines[lineIndex] = editedLine;
         this.currentText = lines.join('\n');
 
-        // Apply the changes using the app's replaceSelection method
-        if (this.app && typeof this.app.replaceSelection === 'function') {
-            // Force replacement within original selection range every time
-            this.app.selectionStart = this.selectionStart;
-            this.app.selectionEnd = this.selectionEnd;
-            this.app.preserveSelection = true;
-            this.app.replaceSelection(this.currentText);
+        const editor = document.getElementById('note-editor');
+        if (editor) {
+            const fullContent = editor.value;
+            const beforeSelection = fullContent.substring(0, this.selectionStart);
+            const afterSelection = fullContent.substring(this.selectionStart + oldCurrentText.length);
+            const newContent = beforeSelection + this.currentText + afterSelection;
+            editor.value = newContent;
+            if (this.app && this.app.currentNote) {
+                this.app.currentNote.content = newContent;
+            }
+            const inputEvent = new Event('input', { bubbles: true });
+            editor.dispatchEvent(inputEvent);
+            this.selectionEnd = this.selectionStart + this.currentText.length;
+            editor.selectionStart = editor.selectionEnd = this.selectionEnd;
+            editor.focus();
         }
     }
 
@@ -565,13 +589,15 @@ class AIEditApproval {
         style.textContent = `
             .ai-edit-approval-inline {
                 width: 100%;
-                height: 100%;
+                height: 100vh; /* Use viewport height instead of 100% */
+                max-height: calc(100vh - 50px); /* Account for header */
                 display: flex;
                 flex-direction: column;
                 background: var(--bg-primary);
                 border: 1px solid var(--border-color);
                 border-radius: 8px;
                 min-height: 0; /* Allow flex children to shrink */
+                overflow: hidden; /* Ensure contained scrolling */
             }
 
             .editor-container.approval-mode .editor-wrapper {
@@ -678,8 +704,9 @@ class AIEditApproval {
                 flex: 1;
                 display: flex;
                 flex-direction: column;
-                overflow: hidden;
                 min-height: 0; /* Allow flex child to shrink below content size */
+                position: relative; /* For sticky positioning context */
+                overflow: hidden; /* Let diff container handle the scroll */
             }
 
             .ai-edit-diff-container {
@@ -687,20 +714,21 @@ class AIEditApproval {
                 flex: 1;
                 flex-direction: column;
                 min-height: 0; /* Allow flex child to shrink */
-                max-height: calc(100vh - 200px); /* Leave room for actions */
-                overflow: hidden;
+                overflow-y: auto; /* Main scroll area */
+                overflow-x: hidden;
+                padding-bottom: 80px; /* Leave space for sticky actions */
             }
 
             @media (max-height: 768px) {
                 .ai-edit-diff-container {
-                    max-height: calc(100vh - 180px); /* Even more room for actions on small screens */
+                    padding-bottom: 70px; /* Adjust space for smaller screens */
                 }
             }
 
             .diff-content {
                 flex: 1;
-                overflow-y: auto;
-                padding: 16px 20px;
+                overflow: visible; /* Avoid nested scrollbars */
+                padding: 16px 20px 20px; /* Regular padding, space handled by container */
             }
 
             .diff-block {
@@ -835,10 +863,11 @@ class AIEditApproval {
             }
 
             .ai-edit-actions {
-                position: sticky;
+                position: absolute;
                 bottom: 0;
-                z-index: 10;
-                margin-top: auto; /* Push to bottom */
+                left: 0;
+                right: 0;
+                z-index: 100; /* Keep above diff content */
                 padding: 10px 12px;
                 border-top: 1px solid var(--border-color);
                 display: flex;
@@ -848,6 +877,8 @@ class AIEditApproval {
                 background: var(--bg-secondary);
                 border-radius: 0 0 8px 8px;
                 flex-shrink: 0; /* Prevent shrinking */
+                backdrop-filter: blur(4px);
+                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
             }
 
             .block-actions, .bulk-actions {
