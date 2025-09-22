@@ -705,7 +705,10 @@ class CogNotezApp {
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
-        document.getElementById('sync-settings-btn').addEventListener('click', () => this.showSyncSettings());
+        const syncSettingsBtn = document.getElementById('sync-settings-btn');
+        if (syncSettingsBtn) {
+            syncSettingsBtn.addEventListener('click', () => this.showSyncSettings());
+        }
         document.getElementById('sync-manual-btn').addEventListener('click', () => this.manualSync());
         document.getElementById('search-button').addEventListener('click', () => this.searchNotes());
 
@@ -876,6 +879,7 @@ class CogNotezApp {
         ipcRenderer.on('menu-generate-tags', () => this.generateTags());
         ipcRenderer.on('menu-ai-settings', () => this.showAISettings());
         ipcRenderer.on('menu-general-settings', () => this.showGeneralSettings());
+        ipcRenderer.on('menu-sync-settings', () => this.showSyncSettings());
 
         // Update-related menu actions
         ipcRenderer.on('menu-check-updates', () => this.checkForUpdates());

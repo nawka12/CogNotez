@@ -1147,13 +1147,7 @@ const createMenu = () => {
             mainWindow.webContents.send('menu-generate-tags');
           }
         },
-        { type: 'separator' },
-        {
-          label: 'AI Settings',
-          click: () => {
-            mainWindow.webContents.send('menu-ai-settings');
-          }
-        }
+        
       ]
     },
     {
@@ -1177,6 +1171,19 @@ const createMenu = () => {
           label: 'General Settings',
           click: () => {
             mainWindow.webContents.send('menu-general-settings');
+          }
+        },
+        {
+          label: 'Cloud Sync Settings',
+          click: () => {
+            mainWindow.webContents.send('menu-sync-settings');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: 'AI Settings',
+          click: () => {
+            mainWindow.webContents.send('menu-ai-settings');
           }
         }
       ]
