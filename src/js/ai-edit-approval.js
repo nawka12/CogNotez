@@ -330,9 +330,6 @@ class AIEditApproval {
                 const afterSelection = fullContent.substring(this.selectionStart + oldCurrentText.length);
                 const newContent = beforeSelection + this.currentText + afterSelection;
                 editor.value = newContent;
-                if (this.app && this.app.currentNote) {
-                    this.app.currentNote.content = newContent;
-                }
                 const inputEvent = new Event('input', { bubbles: true });
                 editor.dispatchEvent(inputEvent);
                 this.selectionEnd = this.selectionStart + this.currentText.length;
@@ -373,9 +370,6 @@ class AIEditApproval {
             const afterSelection = fullContent.substring(this.selectionStart + oldCurrentText.length);
             const newContent = beforeSelection + this.currentText + afterSelection;
             editor.value = newContent;
-            if (this.app && this.app.currentNote) {
-                this.app.currentNote.content = newContent;
-            }
             const inputEvent = new Event('input', { bubbles: true });
             editor.dispatchEvent(inputEvent);
             this.selectionEnd = this.selectionStart + this.currentText.length;
