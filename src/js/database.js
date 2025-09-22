@@ -190,6 +190,7 @@ class DatabaseManager {
             category: noteData.category || null,
             is_favorite: noteData.is_favorite || false,
             is_archived: noteData.is_archived || false,
+            pinned: noteData.pinned || false,
             word_count: wordCount,
             char_count: charCount,
             created_at: now,
@@ -254,11 +255,19 @@ class DatabaseManager {
             notes = notes.filter(note => note.is_favorite === options.isFavorite);
         }
 
-        // Sorting
+        // Sorting - pinned notes always come first
         const sortBy = options.sortBy || 'updated_at';
         const sortOrder = options.sortOrder || 'DESC';
 
         notes.sort((a, b) => {
+            // Pinned notes always come first
+            const aPinned = a.pinned || false;
+            const bPinned = b.pinned || false;
+
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+
+            // Within pinned or unpinned groups, sort by the specified criteria
             let aVal = a[sortBy];
             let bVal = b[sortBy];
 
@@ -326,6 +335,10 @@ class DatabaseManager {
 
         if (noteData.is_archived !== undefined) {
             note.is_archived = noteData.is_archived;
+        }
+
+        if (noteData.pinned !== undefined) {
+            note.pinned = noteData.pinned;
         }
 
         // Update timestamps

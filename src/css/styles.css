@@ -285,11 +285,50 @@ body {
     border-left: 3px solid var(--accent-color);
 }
 
+.note-item.pinned {
+    background: var(--accent-color-light);
+    border-left: 3px solid var(--accent-color);
+    opacity: 0.95;
+}
+
 .note-item-content {
     flex: 1;
     cursor: pointer;
     min-width: 0; /* Allow flex item to shrink below content size */
     max-width: calc(100% - 30px); /* Leave space for delete button */
+}
+
+.note-pin-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    font-size: 14px;
+    opacity: 0;
+    transition: opacity 0.2s, background-color 0.2s, transform 0.2s;
+    color: var(--text-tertiary);
+    flex-shrink: 0; /* Prevent button from shrinking */
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.note-item:hover .note-pin-btn {
+    opacity: 1;
+}
+
+.note-pin-btn:hover {
+    background-color: var(--accent-color-light);
+    color: var(--accent-color);
+}
+
+.note-pin-btn.pinned {
+    opacity: 1;
+    color: var(--accent-color);
+    transform: rotate(-45deg);
 }
 
 .note-delete-btn {

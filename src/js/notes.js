@@ -62,6 +62,10 @@ class NotesManager {
             element.classList.add('active');
         }
 
+        if (note.pinned) {
+            element.classList.add('pinned');
+        }
+
         // Generate tags HTML if tags exist
         let tagsHtml = '';
         if (note.tags && note.tags.length > 0) {
@@ -86,6 +90,7 @@ class NotesManager {
                 ${tagsHtml}
                 <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
             </div>
+            <button class="note-pin-btn ${note.pinned ? 'pinned' : ''}" data-note-id="${note.id}" title="${note.pinned ? 'Unpin note' : 'Pin note'}"><i class="fas fa-thumbtack"></i></button>
             <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note"><i class="fas fa-trash"></i></button>
         `;
 
@@ -97,6 +102,13 @@ class NotesManager {
         deleteBtn.addEventListener('click', (e) => {
             e.stopPropagation(); // Prevent triggering the note selection
             this.deleteNote(note.id);
+        });
+
+        // Pin button functionality
+        const pinBtn = element.querySelector('.note-pin-btn');
+        pinBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the note selection
+            this.togglePinNote(note.id);
         });
 
         return element;
@@ -280,6 +292,47 @@ class NotesManager {
         }
     }
 
+    async togglePinNote(noteId) {
+        try {
+            let note;
+            let allNotes;
+
+            if (this.db && this.db.initialized) {
+                note = await this.db.getNote(noteId);
+                allNotes = await this.db.getAllNotes();
+            } else {
+                note = this.app.notes.find(n => n.id === noteId);
+                allNotes = this.app.notes;
+            }
+
+            if (!note) return;
+
+            const currentlyPinned = note.pinned || false;
+            const pinnedCount = allNotes.filter(n => n.pinned).length;
+
+            if (!currentlyPinned && pinnedCount >= 3) {
+                // Cannot pin more than 3 notes
+                alert('You can only pin up to 3 notes. Please unpin another note first.');
+                return;
+            }
+
+            // Toggle the pinned status
+            const newPinnedStatus = !currentlyPinned;
+
+            if (this.db && this.db.initialized) {
+                await this.db.updateNote(noteId, { pinned: newPinnedStatus });
+            } else {
+                note.pinned = newPinnedStatus;
+                this.app.saveNotes();
+            }
+
+            // Re-render the notes list to reflect the change
+            await this.renderNotesList();
+        } catch (error) {
+            console.error('Error toggling pin status:', error);
+        }
+    }
+
     clearEditor() {
         document.getElementById('note-title').value = '';
         document.getElementById('note-editor').value = '';
@@ -301,17 +354,28 @@ class NotesManager {
     }
 
     sortNotes(criteria = 'modified') {
-        switch (criteria) {
-            case 'modified':
-                this.app.notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
-                break;
-            case 'created':
-                this.app.notes.sort((a, b) => new Date(b.created) - new Date(a.created));
-                break;
-            case 'title':
-                this.app.notes.sort((a, b) => a.title.localeCompare(b.title));
-                break;
-        }
+        const sortFunction = (a, b) => {
+            // Pinned notes always come first
+            const aPinned = a.pinned || false;
+            const bPinned = b.pinned || false;
+
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+
+            // Within pinned or unpinned groups, sort by the specified criteria
+            switch (criteria) {
+                case 'modified':
+                    return new Date(b.modified) - new Date(a.modified);
+                case 'created':
+                    return new Date(b.created) - new Date(a.created);
+                case 'title':
+                    return a.title.localeCompare(b.title);
+                default:
+                    return new Date(b.modified) - new Date(a.modified);
+            }
+        };
+
+        this.app.notes.sort(sortFunction);
         this.renderNotesList();
     }
 
@@ -428,6 +492,17 @@ class NotesManager {
             existingMenu.remove();
         }
 
+        // Get the note to check if it's pinned
+        let note;
+        if (this.db && this.db.initialized) {
+            note = this.db.getNote(noteId);
+        } else {
+            note = this.app.notes.find(n => n.id === noteId);
+        }
+
+        const isPinned = note ? (note.pinned || false) : false;
+        const pinText = isPinned ? 'Unpin' : 'Pin';
+
         const menu = document.createElement('div');
         menu.className = 'note-context-menu context-menu';
         menu.style.left = x + 'px';
@@ -435,6 +510,7 @@ class NotesManager {
 
         menu.innerHTML = `
             <div class="context-menu-item" data-action="open">Open</div>
+            <div class="context-menu-item" data-action="pin">${pinText}</div>
             <div class="context-menu-item" data-action="duplicate">Duplicate</div>
             <div class="context-menu-item" data-action="export">Export</div>
             <div class="context-menu-item" data-action="delete" style="color: #dc3545;">Delete</div>
@@ -464,6 +540,9 @@ class NotesManager {
         switch (action) {
             case 'open':
                 this.app.switchToNoteWithWarning(noteId);
+                break;
+            case 'pin':
+                this.togglePinNote(noteId);
                 break;
             case 'duplicate':
                 this.duplicateNote(noteId);
