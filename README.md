@@ -168,7 +168,7 @@ Comprehensive import and export capabilities for maximum data portability:
 | `Ctrl+Shift+S` | Summarize selected text |
 | `Ctrl+Shift+A` | Ask AI about selected text |
 | `Ctrl+Shift+E` | Edit selected text with AI |
-| `Ctrl+Shift+R` | Rewrite selected text |
+| `Ctrl+Shift+W` | Rewrite selected text |
 | `Ctrl+Shift+K` | Extract key points |
 | `Ctrl+Shift+T` | Generate tags for selection |
 | `F1` | Show keyboard shortcuts help |
@@ -320,7 +320,7 @@ MIT License - see LICENSE file for details.
 - ✅ Basic Electron setup
 - ✅ Core UI and theming
 - ✅ Note creation and editing
-- ✅ SQLite database integration
+- ✅ localStorage database integration
 
 ### Phase 2 ✅ (Completed)
 - ✅ Full Ollama integration
@@ -350,7 +350,7 @@ MIT License - see LICENSE file for details.
 ### Future Enhancements
 - 🔄 Plugin system for custom AI models
 - 🔄 Advanced theming and customization
-- 🔄 Cloud sync (optional, privacy-focused)
+- ✅ Google Drive sync (optional, privacy-focused)
 - 🔄 Mobile version
 - 🔄 Advanced search and filtering
 - 🔄 Note templates and workflows
