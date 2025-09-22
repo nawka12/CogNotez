@@ -717,7 +717,9 @@ if (ipcMain) {
           const importResult = global.databaseManager.importDataFromSync(remoteData.data, {
             mergeStrategy: 'merge',
             force: false,
-            preserveSyncMeta: true
+            preserveSyncMeta: true,
+            mergeTags: true,
+            mergeConversations: true
           });
         } else if (syncResult.action === 'merge' && syncResult.mergedData) {
           // For merge operations, import the merged data directly
@@ -819,7 +821,9 @@ if (ipcMain) {
       if (downloadResult.data) {
         const importResult = global.databaseManager.importDataFromSync(downloadResult.data, {
           mergeStrategy: 'merge',
-          force: false
+          force: false,
+          mergeTags: true,
+          mergeConversations: true
         });
 
         const result = {
