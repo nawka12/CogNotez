@@ -122,25 +122,14 @@
                         </div>
                         <div class="ai-edit-approval-body">
                             <div class="ai-edit-instructions">
-                                <p>Review the proposed changes below. Each changed line has its own Accept/Reject buttons:</p>
-                                <div class="legend">
-                                    <div class="legend-item">
-                                        <span class="block-status original">Red boxes</span> - Your original text that will be changed
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="block-status edited">Green boxes</span> - AI's suggested replacement text
-                                    </div>
+                                <div class="bulk-actions">
+                                    <button id="accept-changes-btn" class="btn-success">Accept All</button>
+                                    <button id="reject-changes-btn" class="btn-secondary">Reject All</button>
                                 </div>
                             </div>
                             <div class="ai-edit-diff-container">
                                 <div class="diff-content" id="ai-edit-diff-content">
                                     <!-- Diff content will be populated here -->
-                                </div>
-                            </div>
-                            <div class="ai-edit-actions">
-                                <div class="block-actions">
-                                    <button id="accept-changes-btn" class="btn-success">Accept All</button>
-                                    <button id="reject-changes-btn" class="btn-secondary">Reject All</button>
                                 </div>
                             </div>
                         </div>

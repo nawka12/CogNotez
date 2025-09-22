@@ -1222,6 +1222,20 @@ body {
     background: var(--button-hover-bg);
 }
 
+.btn-success {
+    background: var(--accent-color, #28a745);
+    color: white;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.btn-success:hover {
+    background: var(--accent-color-dark, #218838);
+}
+
 /* Loading Overlay */
 .loading-overlay {
     position: fixed;
