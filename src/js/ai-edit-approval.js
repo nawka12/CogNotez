@@ -225,9 +225,13 @@ class AIEditApproval {
             }
             // Update UI to show this block is accepted
             this.updateBlockVisualState(index, 'accepted');
+            // Remove processed block from the list to minimize scrolling
+            this.removeProcessedBlock(index);
         } else if (action === 'reject') {
             // Update UI to show this block is rejected
             this.updateBlockVisualState(index, 'rejected');
+            // Remove processed block from the list to minimize scrolling
+            this.removeProcessedBlock(index);
         }
 
         // Check if all changeable blocks have been processed
@@ -242,6 +246,16 @@ class AIEditApproval {
         } else {
             // Update the remaining unprocessed blocks
             this.updateRemainingBlocks();
+        }
+    }
+
+    /**
+     * Remove a processed block element from the UI
+     */
+    removeProcessedBlock(blockIndex) {
+        const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+        if (blockElement && blockElement.parentElement) {
+            blockElement.parentElement.removeChild(blockElement);
         }
     }
 

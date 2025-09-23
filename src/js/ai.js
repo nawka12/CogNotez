@@ -1947,6 +1947,13 @@ Suggested tags:`;
             console.log('[DEBUG] AI handleEditText: Got edited result:', editedResult.substring(0, 50) + '...');
 
             // Show approval interface instead of directly applying changes
+            // Ensure edit approval system is available (lazy-init if needed)
+            if (!this.editApproval && typeof AIEditApproval !== 'undefined') {
+                console.log('[DEBUG] AI handleEditText: Lazily initializing edit approval system');
+                this.editApproval = new AIEditApproval(this.app);
+                this.editApproval.initialize();
+            }
+
             if (this.editApproval && editedResult) {
                 console.log('[DEBUG] AI handleEditText: Showing approval interface');
                 this.editApproval.showApprovalDialog(text, editedResult, instruction);
