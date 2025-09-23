@@ -337,6 +337,13 @@ MIT License - see LICENSE file for details.
 - ✅ Multi-model support
 - ✅ Streaming AI responses
 
+### Phase 4 🚧 (In Progress)
+- ✅ Authenticated Google Drive sync workflow
+- ✅ End-to-end encrypted cloud backups
+- 🔄 Offline-aware sync UX (clear status + retry/backoff)
+- 🔄 Unified offline state detection across AI, sync, and scraping
+- 🔄 Guided troubleshooting for connectivity issues across features
+
 ### Recently Added Features ✅
 - ✅ Web scraping integration (Reddit, Fandom, generic sites)
 - ✅ SearXNG web search integration
@@ -350,7 +357,8 @@ MIT License - see LICENSE file for details.
 ### Future Enhancements
 - 🔄 Plugin system for custom AI models
 - 🔄 Advanced theming and customization
-- ✅ Google Drive sync (optional, privacy-focused)
+- 🔄 Offline sync retry/backoff improvements
+- 🔄 Offline-aware messaging across AI and scraping workflows
 - 🔄 Mobile version
 - 🔄 Advanced search and filtering
 - 🔄 Note templates and workflows
