@@ -766,6 +766,7 @@ class CogNotezApp {
         document.getElementById('manage-tags-btn').addEventListener('click', () => this.showTagManager());
         document.getElementById('export-btn').addEventListener('click', () => this.exportNote());
         document.getElementById('share-btn').addEventListener('click', () => this.showShareOptions());
+        document.getElementById('password-lock-btn').addEventListener('click', () => this.showPasswordProtectionDialog());
 
         // Placeholder actions
         document.getElementById('create-first-note-btn').addEventListener('click', () => this.createNewNote());
@@ -1089,10 +1090,170 @@ class CogNotezApp {
             }
 
             if (note) {
-                this.displayNote(note);
+                // Check if note is password protected
+                if (note.password_protected) {
+                    await this.promptForNotePassword(note);
+                } else {
+                    this.displayNote(note);
+                }
             }
         } catch (error) {
             console.error('Error loading note:', error);
+        }
+    }
+
+    async promptForNotePassword(note) {
+        return new Promise((resolve) => {
+            this.uiManager.showPasswordDialog({
+                title: 'Enter Password',
+                message: `Enter the password to unlock "${note.title}"`,
+                onSubmit: async (password) => {
+                    try {
+                        const isValid = await this.verifyNotePassword(note, password);
+                        if (isValid) {
+                            this.displayNote(note);
+                            this.showNotification('Note unlocked successfully', 'success');
+                            resolve(true);
+                        } else {
+                            this.showNotification('Incorrect password', 'error');
+                            // Re-prompt for password
+                            setTimeout(() => this.promptForNotePassword(note), 500);
+                        }
+                    } catch (error) {
+                        console.error('Error verifying password:', error);
+                        this.showNotification('Error unlocking note', 'error');
+                        resolve(false);
+                    }
+                },
+                onCancel: () => {
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+    async verifyNotePassword(note, password) {
+        if (!note.password_protected || !note.password_hash) {
+            return true; // Not password protected
+        }
+
+        try {
+            if (!window.encryptionManager) {
+                throw new Error('Encryption manager not available');
+            }
+            const hashParts = JSON.parse(note.password_hash);
+
+            return window.encryptionManager.verifyPassword(
+                password,
+                hashParts.hashBase64,
+                hashParts.saltBase64,
+                hashParts.iterations
+            );
+        } catch (error) {
+            console.error('Error verifying note password:', error);
+            return false;
+        }
+    }
+
+    async showPasswordProtectionDialog() {
+        if (!this.currentNote) {
+            this.showNotification('No note selected', 'error');
+            return;
+        }
+
+        const isCurrentlyProtected = this.currentNote.password_protected;
+        const title = isCurrentlyProtected ? 'Remove Password Protection' : 'Add Password Protection';
+        const message = isCurrentlyProtected
+            ? 'Enter the current password to remove protection from this note.'
+            : 'Enter a password to protect this note.';
+
+        this.uiManager.showPasswordDialog({
+            title: title,
+            message: message,
+            requireConfirmation: !isCurrentlyProtected,
+            showStrength: !isCurrentlyProtected,
+            onSubmit: async (password) => {
+                try {
+                    if (isCurrentlyProtected) {
+                        // Remove protection - verify current password
+                        const isValid = await this.verifyNotePassword(this.currentNote, password);
+                        if (isValid) {
+                            await this.removePasswordProtection(this.currentNote);
+                            this.showNotification('Password protection removed', 'success');
+                        } else {
+                            this.showNotification('Incorrect password', 'error');
+                            return;
+                        }
+                    } else {
+                        // Add protection - set new password
+                        await this.setPasswordProtection(this.currentNote, password);
+                        this.showNotification('Password protection added', 'success');
+                    }
+
+                    // Update the lock icon in the UI
+                    this.updatePasswordLockIcon();
+                    // Refresh notes list to show lock icon
+                    if (this.notesManager) {
+                        await this.notesManager.renderNotesList();
+                    }
+                } catch (error) {
+                    console.error('Error managing password protection:', error);
+                    this.showNotification('Error managing password protection', 'error');
+                }
+            }
+        });
+    }
+
+    async setPasswordProtection(note, password) {
+        if (!window.encryptionManager) {
+            throw new Error('Encryption manager not available');
+        }
+        const hashResult = window.encryptionManager.hashPassword(password);
+
+        const updateData = {
+            password_protected: true,
+            password_hash: JSON.stringify(hashResult)
+        };
+
+        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+            await this.notesManager.db.updateNote(note.id, updateData);
+            // Update the current note object
+            Object.assign(note, updateData);
+        } else {
+            // Fallback to localStorage
+            Object.assign(note, updateData);
+            this.saveNotes();
+        }
+    }
+
+    async removePasswordProtection(note) {
+        const updateData = {
+            password_protected: false,
+            password_hash: null
+        };
+
+        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+            await this.notesManager.db.updateNote(note.id, updateData);
+            // Update the current note object
+            Object.assign(note, updateData);
+        } else {
+            // Fallback to localStorage
+            Object.assign(note, updateData);
+            this.saveNotes();
+        }
+    }
+
+    updatePasswordLockIcon() {
+        const lockBtn = document.getElementById('password-lock-btn');
+        if (!lockBtn || !this.currentNote) return;
+
+        const icon = lockBtn.querySelector('i');
+        if (this.currentNote.password_protected) {
+            icon.className = 'fas fa-lock-open';
+            lockBtn.title = 'Remove Password Protection';
+        } else {
+            icon.className = 'fas fa-lock';
+            lockBtn.title = 'Add Password Protection';
         }
     }
 
@@ -1146,6 +1307,9 @@ class CogNotezApp {
 
         // Display tags in the editor header
         this.displayNoteTags(note);
+
+        // Update password lock icon
+        this.updatePasswordLockIcon();
 
         // Update active note in sidebar
         document.querySelectorAll('.note-item').forEach(item => {

@@ -85,7 +85,10 @@ class NotesManager {
 
         element.innerHTML = `
             <div class="note-item-content">
-                <div class="note-item-title">${this.escapeHtml(note.title)}</div>
+                <div class="note-item-title">
+                    ${note.password_protected ? '<i class="fas fa-lock note-lock-icon" title="Password protected"></i>' : ''}
+                    ${this.escapeHtml(note.title)}
+                </div>
                 <div class="note-item-preview">${this.escapeHtml(note.preview)}</div>
                 ${tagsHtml}
                 <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
@@ -503,6 +506,9 @@ class NotesManager {
         const isPinned = note ? (note.pinned || false) : false;
         const pinText = isPinned ? 'Unpin' : 'Pin';
 
+        const isPasswordProtected = note ? (note.password_protected || false) : false;
+        const passwordText = isPasswordProtected ? 'Remove Password' : 'Add Password';
+
         const menu = document.createElement('div');
         menu.className = 'note-context-menu context-menu';
         menu.style.left = x + 'px';
@@ -510,6 +516,7 @@ class NotesManager {
 
         menu.innerHTML = `
             <div class="context-menu-item" data-action="open">Open</div>
+            <div class="context-menu-item" data-action="password">${passwordText}</div>
             <div class="context-menu-item" data-action="pin">${pinText}</div>
             <div class="context-menu-item" data-action="duplicate">Duplicate</div>
             <div class="context-menu-item" data-action="export">Export</div>
@@ -541,6 +548,9 @@ class NotesManager {
             case 'open':
                 this.app.switchToNoteWithWarning(noteId);
                 break;
+            case 'password':
+                this.handlePasswordProtection(noteId);
+                break;
             case 'pin':
                 this.togglePinNote(noteId);
                 break;
@@ -558,6 +568,29 @@ class NotesManager {
                 this.deleteNote(noteId);
                 break;
         }
+    }
+
+    async handlePasswordProtection(noteId) {
+        let note;
+        if (this.db && this.db.initialized) {
+            note = await this.db.getNote(noteId);
+        } else {
+            note = this.app.notes.find(n => n.id === noteId);
+        }
+
+        if (!note) return;
+
+        // Store the current note temporarily
+        const currentNote = this.app.currentNote;
+
+        // Switch to the note to enable password management
+        this.app.currentNote = note;
+        this.app.displayNote(note);
+
+        // Show password protection dialog
+        this.app.showPasswordProtectionDialog();
+
+        // Note: The dialog will handle updating the UI and refreshing the notes list
     }
 }
 

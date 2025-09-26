@@ -450,6 +450,52 @@ body {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+}
+
+.note-lock-icon {
+    color: var(--accent-color);
+    font-size: 12px;
+    margin-top: 2px;
+    flex-shrink: 0;
+}
+
+/* Password-protected note styling */
+.note-item:has(.note-lock-icon) {
+    border-left: 3px solid var(--accent-color);
+    background: linear-gradient(90deg, rgba(62, 207, 142, 0.05) 0%, transparent 100%);
+}
+
+.note-item:has(.note-lock-icon):hover {
+    background: linear-gradient(90deg, rgba(62, 207, 142, 0.1) 0%, transparent 100%);
+}
+
+/* Password lock button styling */
+#password-lock-btn {
+    transition: all 0.2s ease;
+}
+
+#password-lock-btn:hover {
+    background: var(--bg-hover);
+    transform: scale(1.05);
+}
+
+#password-lock-btn.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+/* Context menu password item styling */
+.context-menu-item[data-action="password"] {
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.context-menu-item[data-action="password"]:before {
+    content: "🔒";
+    margin-right: 8px;
 }
 
 .note-item-preview {

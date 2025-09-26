@@ -39,6 +39,10 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - **Sharing**: Share notes via clipboard or exported files
 - **Statistics**: Note statistics and analytics dashboard
 
+### Security & Privacy
+- **Password-Locked Notes (current state)**: Password prompts gate access to protected notes. Note content is not yet encrypted at rest; the password is stored as a salted PBKDF2 hash for verification only.
+- **Encrypted Cloud Backups**: When Google Drive sync is enabled, backups are end-to-end encrypted before upload.
+
 ## Technology Stack
 
 - **Frontend**: Vanilla JavaScript (HTML/CSS/JS)
@@ -355,6 +359,7 @@ MIT License - see LICENSE file for details.
 - ✅ OpenRouter API integration as Ollama fallback
 
 ### Future Enhancements
+- 🔄 Password-locked note encryption (encrypt note bodies at rest)
 - 🔄 Plugin system for custom AI models
 - 🔄 Advanced theming and customization
 - 🔄 Offline sync retry/backoff improvements

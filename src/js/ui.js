@@ -642,12 +642,14 @@ class UIManager {
 
         // Expose test function globally for debugging
         window.testResponsiveDesign = () => this.testResponsiveDesign();
-    }
-}
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
+        // Add CSS animations
+        this.injectStyles();
+    }
+
+    injectStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
     @keyframes slideInRight {
         from { transform: translateX(100%); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
@@ -671,8 +673,333 @@ style.textContent = `
         background: var(--context-menu-hover-bg);
         font-weight: bold;
     }
+
+    /* Password Dialog Styles */
+    .password-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .password-dialog-content {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        animation: slideIn 0.3s ease;
+    }
+
+    .password-dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .password-dialog-header h3 {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 18px;
+    }
+
+    .password-dialog-close {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+    }
+
+    .password-dialog-close:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .password-dialog-body {
+        margin-bottom: 20px;
+    }
+
+    .password-field {
+        margin-bottom: 16px;
+    }
+
+    .password-field label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .password-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .password-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.2);
+    }
+
+    .password-strength {
+        margin-top: 4px;
+        font-size: 12px;
+        display: none;
+    }
+
+    .password-strength.weak { color: #dc3545; }
+    .password-strength.medium { color: #ffc107; }
+    .password-strength.strong { color: #28a745; }
+
+    .password-dialog-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .btn-secondary, .btn-primary {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+        background: var(--bg-hover);
+    }
+
+    .btn-primary {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: var(--accent-color-dark);
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
 `;
-document.head.appendChild(style);
+        document.head.appendChild(style);
+    }
+
+    // Password Dialog Methods
+    showPasswordDialog(options = {}) {
+        const {
+            title = 'Enter Password',
+            message = '',
+            requireConfirmation = false,
+            showStrength = false,
+            onSubmit,
+            onCancel
+        } = options;
+
+        // Remove existing dialog
+        this.closePasswordDialog();
+
+        const dialog = document.createElement('div');
+        dialog.className = 'password-dialog';
+        dialog.innerHTML = `
+            <div class="password-dialog-content">
+                <div class="password-dialog-header">
+                    <h3>${title}</h3>
+                    <button class="password-dialog-close">×</button>
+                </div>
+                <div class="password-dialog-body">
+                    ${message ? `<p style="margin-bottom: 16px; color: var(--text-secondary);">${message}</p>` : ''}
+                    <div class="password-field">
+                        <label for="password-input">Password:</label>
+                        <input type="password" id="password-input" class="password-input" placeholder="Enter password">
+                        <div class="password-strength" id="password-strength"></div>
+                    </div>
+                    ${requireConfirmation ? `
+                    <div class="password-field">
+                        <label for="confirm-password-input">Confirm Password:</label>
+                        <input type="password" id="confirm-password-input" class="password-input" placeholder="Confirm password">
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="password-dialog-actions">
+                    <button class="btn-secondary" id="password-cancel">Cancel</button>
+                    <button class="btn-primary" id="password-submit">Submit</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+        this.currentPasswordDialog = dialog;
+
+        const passwordInput = dialog.querySelector('#password-input');
+        const confirmInput = dialog.querySelector('#confirm-password-input');
+        const strengthIndicator = dialog.querySelector('#password-strength');
+        const submitBtn = dialog.querySelector('#password-submit');
+        const cancelBtn = dialog.querySelector('#password-cancel');
+        const closeBtn = dialog.querySelector('.password-dialog-close');
+
+        // Focus password input
+        setTimeout(() => passwordInput.focus(), 100);
+
+        // Show strength indicator if requested
+        if (showStrength) {
+            strengthIndicator.style.display = 'block';
+            passwordInput.addEventListener('input', () => {
+                const strength = this.calculatePasswordStrength(passwordInput.value);
+                strengthIndicator.textContent = `Password strength: ${strength.level}`;
+                strengthIndicator.className = `password-strength ${strength.level.toLowerCase()}`;
+            });
+        }
+
+        // Handle submit
+        const handleSubmit = () => {
+            const password = passwordInput.value;
+            const confirmPassword = confirmInput ? confirmInput.value : password;
+
+            if (requireConfirmation && password !== confirmPassword) {
+                this.showNotification('Passwords do not match', 'error');
+                return;
+            }
+
+            if (!password.trim()) {
+                this.showNotification('Password cannot be empty', 'error');
+                return;
+            }
+
+            if (onSubmit) {
+                onSubmit(password);
+            }
+            this.closePasswordDialog();
+        };
+
+        // Handle cancel
+        const handleCancel = () => {
+            if (onCancel) {
+                onCancel();
+            }
+            this.closePasswordDialog();
+        };
+
+        // Event listeners
+        submitBtn.addEventListener('click', handleSubmit);
+        cancelBtn.addEventListener('click', handleCancel);
+        closeBtn.addEventListener('click', handleCancel);
+
+        // Keyboard events
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (requireConfirmation && confirmInput && document.activeElement !== confirmInput) {
+                    confirmInput.focus();
+                } else {
+                    handleSubmit();
+                }
+            } else if (e.key === 'Escape') {
+                handleCancel();
+            }
+        });
+
+        if (confirmInput) {
+            confirmInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSubmit();
+                } else if (e.key === 'Escape') {
+                    handleCancel();
+                }
+            });
+        }
+
+        // Click outside to close
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                handleCancel();
+            }
+        });
+
+        return dialog;
+    }
+
+    closePasswordDialog() {
+        if (this.currentPasswordDialog) {
+            this.currentPasswordDialog.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => {
+                if (this.currentPasswordDialog && this.currentPasswordDialog.parentNode) {
+                    this.currentPasswordDialog.parentNode.removeChild(this.currentPasswordDialog);
+                }
+                this.currentPasswordDialog = null;
+            }, 300);
+        }
+    }
+
+    calculatePasswordStrength(password) {
+        let score = 0;
+        let feedback = [];
+
+        if (password.length >= 8) score++;
+        else feedback.push('At least 8 characters');
+
+        if (/[a-z]/.test(password)) score++;
+        else feedback.push('Lowercase letter');
+
+        if (/[A-Z]/.test(password)) score++;
+        else feedback.push('Uppercase letter');
+
+        if (/\d/.test(password)) score++;
+        else feedback.push('Number');
+
+        if (/[^a-zA-Z\d]/.test(password)) score++;
+        else feedback.push('Special character');
+
+        let level = 'Weak';
+        if (score >= 4) level = 'Strong';
+        else if (score >= 3) level = 'Medium';
+
+        return { level, score, feedback };
+    }
+}
 
 // Export for use in main app
 window.UIManager = UIManager;

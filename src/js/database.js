@@ -191,6 +191,8 @@ class DatabaseManager {
             is_favorite: noteData.is_favorite || false,
             is_archived: noteData.is_archived || false,
             pinned: noteData.pinned || false,
+            password_protected: noteData.password_protected || false,
+            password_hash: noteData.password_hash || null,
             word_count: wordCount,
             char_count: charCount,
             created_at: now,
@@ -341,6 +343,14 @@ class DatabaseManager {
             note.pinned = noteData.pinned;
         }
 
+        if (noteData.password_protected !== undefined) {
+            note.password_protected = noteData.password_protected;
+        }
+
+        if (noteData.password_hash !== undefined) {
+            note.password_hash = noteData.password_hash;
+        }
+
         // Update timestamps
         note.updated_at = now;
         note.modified = new Date(now);
@@ -487,25 +497,32 @@ class DatabaseManager {
             iterations: settings.iterations
         });
 
-        const encryptionManager = require('./encryption');
-
         // Generate new salt if enabling encryption and no salt provided
         if (settings.enabled && !settings.saltBase64 && !this.data.encryption.saltBase64) {
             if (!settings.passphrase) {
                 throw new Error('Passphrase is required to derive encryption salt');
             }
-            settings.saltBase64 = encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
+            // Use global encryptionManager (available after encryption.js loads)
+            if (typeof window !== 'undefined' && window.encryptionManager) {
+                settings.saltBase64 = window.encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
+            } else {
+                throw new Error('Encryption manager not available');
+            }
         }
 
         // Validate settings before applying
         if (settings.passphrase) {
-            const validation = encryptionManager.validateSettings({
-                passphrase: settings.passphrase,
-                saltBase64: settings.saltBase64
-            });
+            if (typeof window !== 'undefined' && window.encryptionManager) {
+                const validation = window.encryptionManager.validateSettings({
+                    passphrase: settings.passphrase,
+                    saltBase64: settings.saltBase64
+                });
 
-            if (!validation.isValid) {
-                throw new Error(`Invalid encryption settings: ${validation.errors.join(', ')}`);
+                if (!validation.isValid) {
+                    throw new Error(`Invalid encryption settings: ${validation.errors.join(', ')}`);
+                }
+            } else {
+                throw new Error('Encryption manager not available for validation');
             }
         }
 
