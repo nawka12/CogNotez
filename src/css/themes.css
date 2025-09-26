@@ -1,74 +1,171 @@
-/* CSS Custom Properties for Theming */
+/* Modern Design System - CSS Custom Properties for Theming */
 :root {
-  /* Light Theme Variables */
+  /* Modern Color Palette with #bdabe3 as primary accent */
   --bg-primary: #ffffff;
-  --bg-secondary: #f8f9fa;
-  --text-primary: #2c3e50;
-  --text-secondary: #6c757d;
-  --text-tertiary: #adb5bd;
-  --border-color: #e9ecef;
-  --border-color-light: #f1f3f4;
-  --accent-color: #BDABE3;
-  --accent-color-light: rgba(189, 171, 227, 0.1);
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #64748b;
+  --text-tertiary: #94a3b8;
+  --text-muted: #cbd5e1;
+
+  /* Modern Border System */
+  --border-color: #e2e8f0;
+  --border-color-light: #f1f5f9;
+  --border-color-subtle: #f8fafc;
+
+  /* Enhanced Accent Color System - Keeping #bdabe3 as primary */
+  --accent-color: #bdabe3;
+  --accent-color-light: rgba(189, 171, 227, 0.12);
+  --accent-color-lighter: rgba(189, 171, 227, 0.06);
   --accent-color-dark: #a890d1;
-  --header-bg: #ffffff;
-  --sidebar-bg: #f8f9fa;
+  --accent-color-darker: #9678c1;
+
+  /* Modern Gradient System */
+  --gradient-primary: linear-gradient(135deg, #bdabe3 0%, #a890d1 100%);
+  --gradient-subtle: linear-gradient(135deg, rgba(189, 171, 227, 0.1) 0%, rgba(168, 144, 209, 0.05) 100%);
+  --gradient-surface: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+
+  /* Modern Surface Colors */
+  --header-bg: rgba(255, 255, 255, 0.8);
+  --sidebar-bg: rgba(248, 250, 252, 0.6);
   --editor-bg: #ffffff;
-  --input-bg: #ffffff;
-  --button-bg: #ffffff;
-  --button-hover-bg: #f8f9fa;
-  --note-hover-bg: #f1f3f4;
-  --context-menu-bg: #ffffff;
-  --context-menu-hover-bg: #f8f9fa;
-  --modal-bg: #ffffff;
-  --message-bg: #f8f9fa;
-  --context-highlight-bg: #fff3cd;
-  --scrollbar-track: #f1f3f4;
-  --scrollbar-thumb: #c1c1c1;
-  --scrollbar-thumb-hover: #a8a8a8;
-  --code-bg: rgba(0, 0, 0, 0.1);
-  --code-color: #2c3e50;
-  --link-color: #BDABE3;
+  --input-bg: rgba(255, 255, 255, 0.7);
+  --button-bg: rgba(255, 255, 255, 0.8);
+  --button-hover-bg: rgba(189, 171, 227, 0.08);
+  --note-hover-bg: rgba(189, 171, 227, 0.06);
+  --context-menu-bg: rgba(255, 255, 255, 0.95);
+  --context-menu-hover-bg: rgba(189, 171, 227, 0.1);
+  --modal-bg: rgba(255, 255, 255, 0.95);
+  --message-bg: rgba(248, 250, 252, 0.8);
+  --context-highlight-bg: rgba(189, 171, 227, 0.15);
+
+  /* Modern Shadow System */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  --shadow-accent: 0 4px 14px 0 rgba(189, 171, 227, 0.2);
+
+  /* Modern Scrollbar */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(189, 171, 227, 0.3);
+  --scrollbar-thumb-hover: rgba(189, 171, 227, 0.5);
+
+  /* Modern Code Styling */
+  --code-bg: rgba(189, 171, 227, 0.1);
+  --code-color: #7c3aed;
+  --code-border: rgba(189, 171, 227, 0.2);
+
+  /* Modern Link Colors */
+  --link-color: #bdabe3;
+  --link-hover: #a890d1;
+
+  /* Modern Status Colors */
   --success-color: #10b981;
+  --success-light: rgba(16, 185, 129, 0.1);
   --warning-color: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.1);
   --error-color: #ef4444;
-  --surface-bg: #ffffff;
+  --error-light: rgba(239, 68, 68, 0.1);
+
+  /* Modern Surface Colors */
+  --surface-bg: rgba(255, 255, 255, 0.6);
+  --surface-elevated: rgba(255, 255, 255, 0.8);
+
+  /* Modern Border Radius */
+  --radius-xs: 4px;
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --radius-full: 9999px;
+
+  /* Modern Spacing */
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 16px;
+  --spacing-lg: 24px;
+  --spacing-xl: 32px;
+  --spacing-2xl: 48px;
 }
 
-/* Dark Theme */
+/* Dark Theme - Modern Dark Design */
 [data-theme="dark"] {
-  --bg-primary: #1a1a1a;
-  --bg-secondary: #2d2d2d;
-  --text-primary: #e4e4e4;
-  --text-secondary: #b0b0b0;
-  --text-tertiary: #808080;
-  --border-color: #404040;
-  --border-color-light: #333333;
-  --accent-color: #BDABE3;
+  /* Dark Color Palette */
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --text-primary: #f1f5f9;
+  --text-secondary: #cbd5e1;
+  --text-tertiary: #94a3b8;
+  --text-muted: #64748b;
+
+  /* Dark Border System */
+  --border-color: #334155;
+  --border-color-light: #475569;
+  --border-color-subtle: #1e293b;
+
+  /* Enhanced Accent for Dark Mode */
+  --accent-color: #bdabe3;
   --accent-color-light: rgba(189, 171, 227, 0.2);
+  --accent-color-lighter: rgba(189, 171, 227, 0.1);
   --accent-color-dark: #c8b8e8;
-  --header-bg: #2d2d2d;
-  --sidebar-bg: #1a1a1a;
-  --editor-bg: #1a1a1a;
-  --input-bg: #2d2d2d;
-  --button-bg: #2d2d2d;
-  --button-hover-bg: #404040;
-  --note-hover-bg: #333333;
-  --context-menu-bg: #2d2d2d;
-  --context-menu-hover-bg: #404040;
-  --modal-bg: #2d2d2d;
-  --message-bg: #404040;
-  --context-highlight-bg: #4a3c28;
-  --scrollbar-track: #333333;
-  --scrollbar-thumb: #555555;
-  --scrollbar-thumb-hover: #666666;
-  --code-bg: rgba(255, 255, 255, 0.1);
-  --code-color: #e4e4e4;
-  --link-color: #BDABE3;
+  --accent-color-darker: #d4c4f0;
+
+  /* Dark Gradient System */
+  --gradient-primary: linear-gradient(135deg, #bdabe3 0%, #c8b8e8 100%);
+  --gradient-subtle: linear-gradient(135deg, rgba(189, 171, 227, 0.15) 0%, rgba(200, 184, 232, 0.08) 100%);
+  --gradient-surface: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+
+  /* Dark Surface Colors */
+  --header-bg: rgba(15, 23, 42, 0.9);
+  --sidebar-bg: rgba(30, 41, 59, 0.8);
+  --editor-bg: #0f172a;
+  --input-bg: rgba(30, 41, 59, 0.8);
+  --button-bg: rgba(30, 41, 59, 0.9);
+  --button-hover-bg: rgba(189, 171, 227, 0.15);
+  --note-hover-bg: rgba(189, 171, 227, 0.12);
+  --context-menu-bg: rgba(15, 23, 42, 0.95);
+  --context-menu-hover-bg: rgba(189, 171, 227, 0.2);
+  --modal-bg: rgba(15, 23, 42, 0.95);
+  --message-bg: rgba(30, 41, 59, 0.9);
+  --context-highlight-bg: rgba(189, 171, 227, 0.2);
+
+  /* Dark Shadow System */
+  --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.4), 0 1px 2px -1px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -2px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.4), 0 4px 6px -4px rgba(0, 0, 0, 0.4);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.4);
+  --shadow-accent: 0 4px 14px 0 rgba(189, 171, 227, 0.3);
+
+  /* Dark Scrollbar */
+  --scrollbar-track: transparent;
+  --scrollbar-thumb: rgba(189, 171, 227, 0.4);
+  --scrollbar-thumb-hover: rgba(189, 171, 227, 0.6);
+
+  /* Dark Code Styling */
+  --code-bg: rgba(189, 171, 227, 0.15);
+  --code-color: #c8b8e8;
+  --code-border: rgba(189, 171, 227, 0.3);
+
+  /* Dark Link Colors */
+  --link-color: #bdabe3;
+  --link-hover: #c8b8e8;
+
+  /* Dark Status Colors */
   --success-color: #10b981;
+  --success-light: rgba(16, 185, 129, 0.2);
   --warning-color: #f59e0b;
+  --warning-light: rgba(245, 158, 11, 0.2);
   --error-color: #ef4444;
-  --surface-bg: #2d2d2d;
+  --error-light: rgba(239, 68, 68, 0.2);
+
+  /* Dark Surface Colors */
+  --surface-bg: rgba(15, 23, 42, 0.8);
+  --surface-elevated: rgba(30, 41, 59, 0.9);
 }
 
 /* Base body styling that uses theme variables */
@@ -77,37 +174,60 @@ body {
   color: var(--text-primary);
 }
 
-/* Theme transition for smooth switching */
+/* Modern Theme Transitions */
 * {
-  transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* Theme toggle button animation */
-.theme-toggle {
-  transition: transform 0.2s ease;
+/* Modern Button System */
+.theme-toggle, .action-btn, .search-button, .new-note-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
 }
 
-.theme-toggle:hover {
-  transform: scale(1.1);
+.theme-toggle:hover, .action-btn:hover, .search-button:hover, .new-note-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
 }
 
-/* Focus states for accessibility */
+.theme-toggle:active, .action-btn:active, .search-button:active, .new-note-btn:active {
+  transform: translateY(0);
+  transition-duration: 0.1s;
+}
+
+/* Modern Focus States */
 .search-input:focus,
 .note-title-input:focus,
 .ai-input:focus,
-.ai-dialog-input:focus {
-  box-shadow: 0 0 0 2px var(--accent-color-light);
+.ai-dialog-input:focus,
+.find-input:focus,
+.replace-input:focus,
+.tag-input:focus {
+  outline: none;
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-color-light);
+  background: var(--input-bg);
 }
 
-/* Selection styling */
+/* Modern Selection Styling */
 ::selection {
   background: var(--accent-color-light);
   color: var(--text-primary);
 }
 
-/* Custom scrollbar for webkit browsers */
+::-moz-selection {
+  background: var(--accent-color-light);
+  color: var(--text-primary);
+}
+
+/* Modern Scrollbar System */
 ::-webkit-scrollbar {
-  width: 8px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -116,61 +236,129 @@ body {
 
 ::-webkit-scrollbar-thumb {
   background: var(--scrollbar-thumb);
-  border-radius: 4px;
+  border-radius: var(--radius-full);
+  transition: background 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--scrollbar-thumb-hover);
 }
 
-/* Loading spinner animation */
+::-webkit-scrollbar-corner {
+  background: var(--scrollbar-track);
+}
+
+/* Modern Loading Animation */
 @keyframes spin {
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes bounce {
+  0%, 20%, 53%, 80%, 100% {
+    transform: translate3d(0,0,0);
+  }
+  40%, 43% {
+    transform: translate3d(0, -8px, 0);
+  }
+  70% {
+    transform: translate3d(0, -4px, 0);
+  }
+  90% {
+    transform: translate3d(0, -2px, 0);
+  }
 }
 
 .loading-spinner {
   animation: spin 1s linear infinite;
 }
 
-/* Button hover effects */
-.action-btn:hover,
-.search-button:hover,
-.new-note-btn:hover,
-.theme-toggle:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+/* Modern Glassmorphism Effects */
+.glass {
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
-/* Modal backdrop blur for modern browsers */
+[data-theme="dark"] .glass {
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Modern Modal Enhancements */
 .modal {
-  backdrop-filter: blur(2px);
+  backdrop-filter: blur(8px) saturate(150%);
+  -webkit-backdrop-filter: blur(8px) saturate(150%);
 }
 
-/* Context menu animations */
+/* Modern Hover Effects */
+.note-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  cursor: pointer;
+}
+
+.note-item:hover {
+  transform: translateX(4px);
+}
+
+.available-tag, .tag-item {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.available-tag:hover, .tag-item:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Modern Context Menu Animations */
 .context-menu {
-  animation: fadeIn 0.2s ease;
+  animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-lg);
+  border: 1px solid var(--border-color);
 }
 
-@keyframes fadeIn {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
 }
 
-/* AI panel slide animation */
+/* Modern AI Panel Animation */
 .ai-panel {
-  animation: slideInRight 0.3s ease;
+  animation: slideInFromRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: var(--shadow-lg);
 }
 
-@keyframes slideInRight {
-  from { transform: translateX(100%); }
-  to { transform: translateX(0); }
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(100%);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
-/* Note item hover effects */
+/* Modern Note Item Styling */
 .note-item {
   position: relative;
   overflow: hidden;
+  border-radius: var(--radius-md);
+  margin: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid transparent;
+  background: var(--surface-bg);
 }
 
 .note-item::before {
@@ -180,22 +368,102 @@ body {
   top: 0;
   bottom: 0;
   width: 0;
-  background: var(--accent-color);
-  transition: width 0.2s ease;
+  background: var(--gradient-primary);
+  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
 
 .note-item:hover::before {
-  width: 3px;
+  width: 4px;
+}
+
+.note-item:hover {
+  background: var(--button-hover-bg);
+  border-color: var(--accent-color-light);
+  box-shadow: var(--shadow-sm);
+}
+
+.note-item.active {
+  background: var(--accent-color-lighter);
+  border-color: var(--accent-color);
+  box-shadow: var(--shadow-accent);
 }
 
 .note-item.active::before {
-  width: 3px;
+  width: 4px;
 }
 
-/* Editor focus enhancement */
+/* Modern Editor Enhancement */
 .note-editor:focus {
-  outline: 1px solid var(--accent-color-light);
-  border-radius: 4px;
+  outline: none;
+  background: var(--surface-elevated);
+  box-shadow: inset 0 0 0 2px var(--accent-color-light);
+  border-radius: var(--radius-md);
+}
+
+/* Modern Tag Styling */
+.note-tag, .editor-note-tag, .tag-item {
+  border-radius: var(--radius-full);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  border: 1px solid var(--accent-color);
+  background: var(--accent-color-lighter);
+  color: var(--accent-color-darker);
+}
+
+.note-tag:hover, .editor-note-tag:hover, .tag-item:hover {
+  background: var(--accent-color-light);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Modern Button Styling */
+.action-btn, .search-button, .new-note-btn, .theme-toggle {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--button-bg);
+  color: var(--text-secondary);
+  font-weight: 500;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.action-btn:hover, .search-button:hover, .new-note-btn:hover, .theme-toggle:hover {
+  background: var(--button-hover-bg);
+  border-color: var(--accent-color);
+  color: var(--accent-color);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+
+.action-btn.active, .search-button.active, .new-note-btn.active, .theme-toggle.active {
+  background: var(--accent-color);
+  color: white;
+  box-shadow: var(--shadow-accent);
+}
+
+/* Modern Input Styling */
+.search-input, .ai-input, .ai-dialog-input, .find-input, .replace-input, .tag-input {
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background: var(--input-bg);
+  color: var(--text-primary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  font-weight: 400;
+}
+
+.search-input:hover, .ai-input:hover, .ai-dialog-input:hover, .find-input:hover, .replace-input:hover, .tag-input:hover {
+  border-color: var(--accent-color-light);
+  background: var(--surface-elevated);
+}
+
+.search-input:focus, .ai-input:focus, .ai-dialog-input:focus, .find-input:focus, .replace-input:focus, .tag-input:focus {
+  border-color: var(--accent-color);
+  box-shadow: 0 0 0 3px var(--accent-color-light);
+  background: var(--input-bg);
 }
 
 /* Responsive design for different screen sizes */
@@ -467,6 +735,19 @@ body {
 
   .editor-wrapper {
     padding: 8px;
+  }
+
+  /* Ensure AI input stays visible and send button doesn't clip */
+  .ai-input-container {
+    padding: 10px;
+  }
+  .ai-input {
+    min-width: 0;
+  }
+  .ai-send-btn {
+    min-width: 44px;
+    min-height: 44px;
+    flex: 0 0 auto;
   }
 
   /* Stack layout on mobile */
