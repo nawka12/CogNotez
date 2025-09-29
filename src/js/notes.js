@@ -89,7 +89,7 @@ class NotesManager {
                     ${note.password_protected ? '<i class="fas fa-lock note-lock-icon" title="Password protected"></i>' : ''}
                     ${this.escapeHtml(note.title)}
                 </div>
-                <div class="note-item-preview">${this.escapeHtml(note.preview)}</div>
+                <div class="note-item-preview">${this.escapeHtml(note.password_protected ? '' : (note.preview || ''))}</div>
                 ${tagsHtml}
                 <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
             </div>
@@ -271,10 +271,13 @@ class NotesManager {
             const duplicate = {
                 id: Date.now().toString(),
                 title: `${originalNote.title} (Copy)`,
-                content: originalNote.content,
-                preview: originalNote.preview || '',
+                content: originalNote.password_protected ? '' : originalNote.content,
+                preview: originalNote.password_protected ? '' : (originalNote.preview || ''),
                 tags: originalNote.tags || [],
-                category: originalNote.category
+                category: originalNote.category,
+                password_protected: originalNote.password_protected || false,
+                password_hash: originalNote.password_hash || null,
+                encrypted_content: originalNote.encrypted_content || null
             };
 
             if (this.db && this.db.initialized) {

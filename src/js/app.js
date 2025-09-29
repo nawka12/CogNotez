@@ -583,6 +583,9 @@ class CogNotezApp {
             inProgress: false
         };
 
+		// Cache of passwords for unlocked notes (noteId -> password)
+		this.notePasswordCache = {};
+
         this.init();
     }
 
@@ -1109,9 +1112,23 @@ class CogNotezApp {
                 message: `Enter the password to unlock "${note.title}"`,
                 onSubmit: async (password) => {
                     try {
-                        const isValid = await this.verifyNotePassword(note, password);
+						const isValid = await this.verifyNotePassword(note, password);
                         if (isValid) {
-                            this.displayNote(note);
+							// Decrypt content for this session and cache password
+							if (note.encrypted_content && window.encryptionManager) {
+								try {
+									const envelope = JSON.parse(note.encrypted_content);
+									const decrypted = window.encryptionManager.decryptData(envelope, password);
+									note.content = decrypted.content || '';
+									this.cacheNotePassword(note.id, password);
+								} catch (e) {
+									console.error('Failed to decrypt note content:', e);
+									this.showNotification('Error decrypting note', 'error');
+									resolve(false);
+									return;
+								}
+							}
+							this.displayNote(note);
                             this.showNotification('Note unlocked successfully', 'success');
                             resolve(true);
                         } else {
@@ -1131,6 +1148,21 @@ class CogNotezApp {
             });
         });
     }
+
+	// Password cache helpers
+	cacheNotePassword(noteId, password) {
+		this.notePasswordCache[noteId] = password;
+	}
+
+	getCachedNotePassword(noteId) {
+		return this.notePasswordCache[noteId] || null;
+	}
+
+	clearCachedNotePassword(noteId) {
+		if (this.notePasswordCache[noteId]) {
+			delete this.notePasswordCache[noteId];
+		}
+	}
 
     async verifyNotePassword(note, password) {
         if (!note.password_protected || !note.password_hash) {
@@ -1155,7 +1187,7 @@ class CogNotezApp {
         }
     }
 
-    async showPasswordProtectionDialog() {
+	async showPasswordProtectionDialog() {
         if (!this.currentNote) {
             this.showNotification('No note selected', 'error');
             return;
@@ -1178,7 +1210,7 @@ class CogNotezApp {
                         // Remove protection - verify current password
                         const isValid = await this.verifyNotePassword(this.currentNote, password);
                         if (isValid) {
-                            await this.removePasswordProtection(this.currentNote);
+							await this.removePasswordProtection(this.currentNote, password);
                             this.showNotification('Password protection removed', 'success');
                         } else {
                             this.showNotification('Incorrect password', 'error');
@@ -1204,44 +1236,92 @@ class CogNotezApp {
         });
     }
 
-    async setPasswordProtection(note, password) {
+	async setPasswordProtection(note, password) {
         if (!window.encryptionManager) {
             throw new Error('Encryption manager not available');
         }
         const hashResult = window.encryptionManager.hashPassword(password);
 
-        const updateData = {
+		// Encrypt current content and clear plaintext
+		let envelopeString = null;
+		try {
+			const envelope = window.encryptionManager.encryptData({ content: note.content || '' }, password);
+			envelopeString = JSON.stringify(envelope);
+		} catch (e) {
+			console.error('Failed to encrypt note during protection enable:', e);
+			this.showNotification('Failed to enable protection', 'error');
+			throw e;
+		}
+
+		const updateData = {
             password_protected: true,
-            password_hash: JSON.stringify(hashResult)
+			password_hash: JSON.stringify(hashResult),
+			encrypted_content: envelopeString,
+			content: '',
+			preview: ''
         };
 
         if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
             await this.notesManager.db.updateNote(note.id, updateData);
             // Update the current note object
-            Object.assign(note, updateData);
+			Object.assign(note, updateData);
+			// Keep decrypted content in memory for current session
+			note.content = note.content || '';
         } else {
             // Fallback to localStorage
             Object.assign(note, updateData);
             this.saveNotes();
         }
+
+		// Cache the password for future saves in this session
+		this.cacheNotePassword(note.id, password);
     }
 
-    async removePasswordProtection(note) {
-        const updateData = {
-            password_protected: false,
-            password_hash: null
-        };
+	async removePasswordProtection(note, password = null) {
+		// If a password isn't provided, try cached
+		let passToUse = password || this.getCachedNotePassword(note.id);
+		if (!passToUse) {
+			// Ask user for password
+			const unlocked = await this.promptForNotePassword(note);
+			if (!unlocked) return;
+			passToUse = this.getCachedNotePassword(note.id);
+		}
 
-        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
-            await this.notesManager.db.updateNote(note.id, updateData);
-            // Update the current note object
-            Object.assign(note, updateData);
-        } else {
-            // Fallback to localStorage
-            Object.assign(note, updateData);
-            this.saveNotes();
-        }
-    }
+		// Decrypt existing content
+		let plaintext = note.content || '';
+		if (!plaintext && note.encrypted_content && window.encryptionManager) {
+			try {
+				const envelope = JSON.parse(note.encrypted_content);
+				const decrypted = window.encryptionManager.decryptData(envelope, passToUse);
+				plaintext = decrypted.content || '';
+			} catch (e) {
+				console.error('Failed to decrypt while removing protection:', e);
+				this.showNotification('Failed to remove protection', 'error');
+				return;
+			}
+		}
+
+		const updateData = {
+			password_protected: false,
+			password_hash: null,
+			encrypted_content: null,
+			content: plaintext,
+			preview: this.generatePreview(plaintext)
+		};
+
+		if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+			await this.notesManager.db.updateNote(note.id, updateData);
+			// Update the current note object
+			Object.assign(note, updateData);
+		} else {
+			// Fallback to localStorage
+			Object.assign(note, updateData);
+			this.saveNotes();
+		}
+
+		// Clear cached password
+		this.clearCachedNotePassword(note.id);
+	}
 
     updatePasswordLockIcon() {
         const lockBtn = document.getElementById('password-lock-btn');
@@ -1621,23 +1701,54 @@ class CogNotezApp {
         ).join('');
     }
 
-    async saveCurrentNote(isAutoSave = false) {
+	async saveCurrentNote(isAutoSave = false) {
         if (!this.currentNote || !this.notesManager) return;
 
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('note-editor').value;
 
         try {
-            const updateData = {
-                title: title || 'Untitled Note',
-                content: content,
-                preview: this.generatePreview(content)
-            };
+			let updateData = {
+				title: title || 'Untitled Note',
+				content: content,
+				preview: this.generatePreview(content)
+			};
+
+			// If note is protected, encrypt content and avoid persisting plaintext
+			if (this.currentNote.password_protected) {
+				if (!window.encryptionManager) {
+					throw new Error('Encryption manager not available');
+				}
+				const cached = this.getCachedNotePassword(this.currentNote.id);
+				if (!cached) {
+					// For auto-save without password, skip encrypting to avoid prompts
+					if (isAutoSave) {
+						return; // silently skip auto-save to prevent plaintext leak
+					}
+					const ok = await this.promptForNotePassword(this.currentNote);
+					if (!ok) return;
+				}
+				const pass = this.getCachedNotePassword(this.currentNote.id);
+				const envelope = window.encryptionManager.encryptData({ content }, pass);
+				updateData = {
+					title: title || 'Untitled Note',
+					content: '',
+					preview: '',
+					encrypted_content: JSON.stringify(envelope)
+				};
+			}
 
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 await this.notesManager.db.updateNote(this.currentNote.id, updateData);
-                // Refresh the current note data
-                this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
+				// Refresh the current note data
+				const updatedFromDb = await this.notesManager.db.getNote(this.currentNote.id);
+				// Preserve decrypted content in memory for protected notes
+				if (updatedFromDb && this.currentNote.password_protected) {
+					const plaintext = content;
+					this.currentNote = { ...updatedFromDb, content: plaintext };
+				} else {
+					this.currentNote = updatedFromDb;
+				}
             } else {
                 // Fallback to localStorage
                 this.currentNote.title = updateData.title;

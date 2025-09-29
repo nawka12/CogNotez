@@ -181,7 +181,7 @@ class DatabaseManager {
         const wordCount = this.calculateWordCount(noteData.content || '');
         const charCount = (noteData.content || '').length;
 
-        const note = {
+		const note = {
             id: id,
             title: noteData.title || 'Untitled Note',
             content: noteData.content || '',
@@ -193,6 +193,7 @@ class DatabaseManager {
             pinned: noteData.pinned || false,
             password_protected: noteData.password_protected || false,
             password_hash: noteData.password_hash || null,
+			encrypted_content: noteData.encrypted_content || null,
             word_count: wordCount,
             char_count: charCount,
             created_at: now,
@@ -232,10 +233,12 @@ class DatabaseManager {
         if (options.search) {
             const searchTerm = options.search.toLowerCase();
             notes = notes.filter(note => {
-                // Search in title, content, and preview
+                // Search in title, and only in content/preview if not password protected
+                const safeContent = note.password_protected ? '' : (note.content || '');
+                const safePreview = note.password_protected ? '' : (note.preview || '');
                 const textMatch = note.title.toLowerCase().includes(searchTerm) ||
-                                note.content.toLowerCase().includes(searchTerm) ||
-                                (note.preview && note.preview.toLowerCase().includes(searchTerm));
+                                safeContent.toLowerCase().includes(searchTerm) ||
+                                safePreview.toLowerCase().includes(searchTerm);
 
                 // Search in tags
                 let tagMatch = false;
@@ -350,6 +353,10 @@ class DatabaseManager {
         if (noteData.password_hash !== undefined) {
             note.password_hash = noteData.password_hash;
         }
+
+		if (noteData.encrypted_content !== undefined) {
+			note.encrypted_content = noteData.encrypted_content;
+		}
 
         // Update timestamps
         note.updated_at = now;
