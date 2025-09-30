@@ -1853,6 +1853,19 @@ Provide only the modified text without any additional explanations, comments, or
         });
     }
 
+    async generateContent(prompt, options = {}) {
+        const fullPrompt = `You are a helpful AI assistant for a note-taking application. Generate content based on the user's request.
+
+Request: ${prompt}
+
+Provide the generated content directly without any additional explanations, comments, or questions. Make it useful and well-formatted for a note-taking context.`;
+        return await this.processWithAI(fullPrompt, '', {
+            temperature: 0.7,
+            max_tokens: 4096,
+            ...options
+        });
+    }
+
 
     // Advanced AI features
     async rewriteText(text, style = 'professional', options = {}) {
@@ -2041,6 +2054,92 @@ Suggested tags:`;
                 this.app.toggleAIPanel();
             }
             this.app.showAIMessage(`❌ Failed to edit text: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
+        } finally {
+            this.app.hideLoading();
+        }
+    }
+
+    async handleGenerateContent(prompt) {
+        let generatedResult = null;
+
+        try {
+            // Wait for AI manager initialization to complete
+            if (this.initializationPromise) {
+                console.log('[DEBUG] AI handleGenerateContent: Waiting for AI manager initialization...');
+                const initSuccess = await this.initializationPromise;
+                if (!initSuccess) {
+                    throw new Error('AI manager initialization failed');
+                }
+            }
+
+            // Ensure AI panel is visible
+            if (!this.app.aiPanelVisible) {
+                this.app.toggleAIPanel();
+            }
+            this.app.updateLoadingText('Generating content with AI...');
+            this.app.showLoading();
+
+            console.log('[DEBUG] AI handleGenerateContent: Starting with prompt:', prompt);
+
+            generatedResult = await this.generateContent(prompt);
+
+            // Check if the result indicates tool failure
+            if (generatedResult && (
+                generatedResult.includes('Failed to scrape') ||
+                generatedResult.includes('Web scraper not available') ||
+                generatedResult.includes('Tool execution failed') ||
+                generatedResult.includes('All scraping attempts failed')
+            )) {
+                console.log('[DEBUG] AI handleGenerateContent: Tool execution appears to have failed - showing fallback message');
+                this.app.showAIMessage('❌ Content generation failed due to tool execution issues. Please check your SearXNG connection and try again.', 'assistant');
+                return;
+            }
+
+            console.log('[DEBUG] AI handleGenerateContent: Got generated result:', generatedResult.substring(0, 50) + '...');
+
+            // Show approval interface for generated content (insertion instead of replacement)
+            // For now, we'll use the same approval system but with insertion logic
+            if (!this.generateApproval && typeof AIGenerateApproval !== 'undefined') {
+                console.log('[DEBUG] AI handleGenerateContent: Lazily initializing generate approval system');
+                this.generateApproval = new AIGenerateApproval(this.app);
+                this.generateApproval.initialize();
+            }
+
+            if (this.generateApproval && generatedResult) {
+                console.log('[DEBUG] AI handleGenerateContent: Showing approval interface');
+                this.generateApproval.showApprovalDialog(generatedResult, prompt);
+                this.app.showAIMessage('✅ AI content generated! Accept to insert or Reject to discard.', 'assistant');
+            } else {
+                console.error('[DEBUG] AI handleGenerateContent: Generate approval system not available');
+
+                // Try to reinitialize if generate approval system is missing
+                if (!this.generateApproval) {
+                    console.log('[DEBUG] AI handleGenerateContent: Attempting to reinitialize AI manager...');
+                    try {
+                        await this.reinitialize();
+                        if (this.generateApproval && generatedResult) {
+                            console.log('[DEBUG] AI handleGenerateContent: Reinitialization successful, showing approval dialog');
+                            this.generateApproval.showApprovalDialog(generatedResult, prompt);
+                            this.app.showAIMessage('✅ AI content generated! Please review in the approval dialog.', 'assistant');
+                            return;
+                        }
+                    } catch (reinitError) {
+                        console.error('[DEBUG] AI handleGenerateContent: Reinitialization failed:', reinitError);
+                    }
+                }
+
+                // Fallback: directly insert the generated content
+                console.log('[DEBUG] AI handleGenerateContent: Using fallback - directly inserting content');
+                this.app.insertTextAtCursor(generatedResult);
+                this.app.showAIMessage('✅ Content generated and inserted!', 'assistant');
+            }
+
+        } catch (error) {
+            console.error('[DEBUG] AI handleGenerateContent error:', error);
+            if (!this.app.aiPanelVisible) {
+                this.app.toggleAIPanel();
+            }
+            this.app.showAIMessage(`❌ Failed to generate content: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
         } finally {
             this.app.hideLoading();
         }

@@ -106,3 +106,26 @@ Status information:
 - Status: [Fixed]
 - Fix: Created NetworkUtils module with fast connectivity checks, real-time online/offline event listeners, and caching to avoid redundant checks. App now shows immediate visual feedback when going online/offline.
 
+## Template Management Bugs
+
+**[Fixed] Create custom template button doesn't work due to Electron prompt() restriction**
+- Location: `src/js/templates.js` lines 424-439 (old code)
+- Description: The "Create Custom Template" button failed with error "prompt() is and will not be supported" because Electron's renderer process doesn't support browser's prompt(), confirm(), and alert() functions for security reasons.
+- Impact: Users couldn't create custom templates at all - button appeared to do nothing or threw errors in console.
+- Status: [Fixed]
+- Fix: Replaced all prompt() and confirm() calls with custom modal dialogs. Created `showTemplateCreatorDialog()` method with proper form inputs for template name, description, and icon. Also created confirmation dialog for template deletion. Added field validation and better UX with warning when creating template from empty note.
+
+**[Fixed] AI template generation fails with "sendMessage is not a function" error**
+- Location: `src/js/templates.js` line 580
+- Description: The AI template generation feature called `this.app.aiManager.sendMessage(prompt)` but the correct method name is `processWithAI(prompt)`.
+- Impact: "Generate Template with AI" button failed with TypeError and couldn't generate templates.
+- Status: [Fixed]
+- Fix: Changed the method call from `sendMessage` to `processWithAI`. Also improved error handling with more specific error messages and better AI connection validation.
+
+**[Fixed] Poor text contrast in AI template dialog for dark mode**
+- Location: `src/js/templates.js` lines 537-564, 464-498, 692-699, 825-831
+- Description: Template suggestion buttons, modal headers, and text elements had poor contrast in dark mode, making text hard to read against dark backgrounds.
+- Impact: Users couldn't properly see template suggestion buttons and dialog text in dark mode.
+- Status: [Fixed]
+- Fix: Added explicit `color: var(--text-primary)` and `color: var(--text-secondary)` styling to all text elements, buttons, and modal headers. Improved modal backgrounds using theme variables. Enhanced hover states for better visual feedback.
+

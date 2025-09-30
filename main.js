@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const { autoUpdater } = require('electron-updater');
@@ -251,8 +251,38 @@ async function performSyncBeforeClose() {
   }
 }
 
+// Register custom protocol for media files
+function registerMediaProtocol() {
+  protocol.registerFileProtocol('cognotez-media', async (request, callback) => {
+    try {
+      const fileId = request.url.replace('cognotez-media://', '');
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Find file with this ID (could have any extension)
+      const files = await fs.readdir(mediaDir);
+      const matchingFile = files.find(file => file.startsWith(fileId));
+      
+      if (matchingFile) {
+        const filePath = path.join(mediaDir, matchingFile);
+        callback({ path: filePath });
+      } else {
+        console.error('[Media Protocol] File not found:', fileId);
+        callback({ error: -6 }); // FILE_NOT_FOUND
+      }
+    } catch (error) {
+      console.error('[Media Protocol] Error:', error);
+      callback({ error: -2 }); // FAILED
+    }
+  });
+  
+  console.log('[Media Protocol] Registered cognotez-media:// protocol');
+}
+
 // This method will be called when Electron has finished initialization
 async function initApp() {
+  // Register custom protocol for media files
+  registerMediaProtocol();
+  
   createWindow();
   setupAutoUpdater();
   createMenu();
@@ -974,6 +1004,224 @@ if (ipcMain) {
     }
   });
 
+  // ============================================================
+  // PHASE 5: MEDIA FILE HANDLERS
+  // ============================================================
+
+  // Get media directory path
+  ipcMain.handle('get-media-directory', async () => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      // Ensure media directory exists
+      await fs.mkdir(mediaDir, { recursive: true });
+      return mediaDir;
+    } catch (error) {
+      console.error('[Media] Failed to get media directory:', error);
+      throw error;
+    }
+  });
+
+  // Save media file to filesystem
+  ipcMain.handle('save-media-file', async (event, { fileName, buffer, type }) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      await fs.mkdir(mediaDir, { recursive: true });
+
+      const filePath = path.join(mediaDir, fileName);
+      const bufferData = Buffer.from(buffer);
+      
+      await fs.writeFile(filePath, bufferData);
+      
+      console.log(`[Media] Saved ${type} file: ${fileName} (${bufferData.length} bytes)`);
+      return filePath;
+    } catch (error) {
+      console.error('[Media] Failed to save media file:', error);
+      throw error;
+    }
+  });
+
+  // Get media file from filesystem
+  ipcMain.handle('get-media-file', async (event, filePath) => {
+    try {
+      const buffer = await fs.readFile(filePath);
+      return {
+        data: buffer,
+        path: filePath,
+        size: buffer.length
+      };
+    } catch (error) {
+      console.error('[Media] Failed to get media file:', error);
+      throw error;
+    }
+  });
+
+  // Delete media file
+  ipcMain.handle('delete-media-file', async (event, filePath) => {
+    try {
+      await fs.unlink(filePath);
+      console.log('[Media] Deleted media file:', filePath);
+      return { success: true };
+    } catch (error) {
+      console.error('[Media] Failed to delete media file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Sync media files to Google Drive (smart sync with orphan cleanup)
+  ipcMain.handle('sync-media-to-drive', async () => {
+    try {
+      if (!global.googleDriveSyncManager) {
+        throw new Error('Google Drive sync not initialized');
+      }
+
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Check if media directory exists
+      let localFiles = [];
+      try {
+        await fs.access(mediaDir);
+        const files = await fs.readdir(mediaDir);
+        for (const file of files) {
+          const filePath = path.join(mediaDir, file);
+          const stats = await fs.stat(filePath);
+          if (stats.isFile()) {
+            localFiles.push({
+              name: file,
+              path: filePath,
+              mtime: stats.mtimeMs,
+              size: stats.size
+            });
+          }
+        }
+      } catch {
+        // No media directory yet, nothing to sync locally
+        console.log('[Media] No local media directory found');
+      }
+
+      // Get list of media files from Google Drive
+      const driveFiles = await global.googleDriveSyncManager.listMediaFiles();
+      const driveFileMap = new Map(driveFiles.map(f => [f.name, f]));
+      
+      // Get referenced media IDs from all notes
+      const referencedMediaIds = new Set();
+      if (global.databaseManager && global.databaseManager.data.notes) {
+        const notes = Object.values(global.databaseManager.data.notes);
+        const mediaPattern = /cognotez-media:\/\/([a-z0-9]+)/gi;
+        
+        for (const note of notes) {
+          if (note.content) {
+            let match;
+            while ((match = mediaPattern.exec(note.content)) !== null) {
+              referencedMediaIds.add(match[1]);
+            }
+          }
+        }
+      }
+      
+      console.log(`[Media] Found ${referencedMediaIds.size} referenced media IDs in notes`);
+      
+      // Upload new or modified files
+      let uploaded = 0;
+      let skipped = 0;
+      
+      for (const localFile of localFiles) {
+        // Extract media ID from filename (before the extension)
+        const mediaId = localFile.name.split('.')[0];
+        
+        // Skip if not referenced in any note
+        if (!referencedMediaIds.has(mediaId)) {
+          console.log(`[Media] Skipping unreferenced file: ${localFile.name}`);
+          skipped++;
+          continue;
+        }
+        
+        const driveFile = driveFileMap.get(localFile.name);
+        
+        // Upload if file doesn't exist on Drive or has different size
+        if (!driveFile || driveFile.size !== String(localFile.size)) {
+          const fileData = await fs.readFile(localFile.path);
+          await global.googleDriveSyncManager.uploadMediaFile(localFile.name, fileData, localFile.mtime);
+          uploaded++;
+          console.log(`[Media] Uploaded: ${localFile.name}`);
+        } else {
+          skipped++;
+        }
+      }
+      
+      // Delete orphaned files from Google Drive (files not referenced in any note)
+      let deletedFromDrive = 0;
+      for (const driveFile of driveFiles) {
+        const mediaId = driveFile.name.split('.')[0];
+        
+        if (!referencedMediaIds.has(mediaId)) {
+          console.log(`[Media] Deleting orphaned file from Drive: ${driveFile.name}`);
+          await global.googleDriveSyncManager.deleteMediaFile(driveFile.id);
+          deletedFromDrive++;
+        }
+      }
+      
+      // Delete orphaned files from local filesystem (files not referenced in any note)
+      let deletedFromLocal = 0;
+      for (const localFile of localFiles) {
+        const mediaId = localFile.name.split('.')[0];
+        
+        if (!referencedMediaIds.has(mediaId)) {
+          console.log(`[Media] Deleting orphaned file from local: ${localFile.name}`);
+          try {
+            await fs.unlink(localFile.path);
+            deletedFromLocal++;
+          } catch (error) {
+            console.warn(`[Media] Failed to delete local file ${localFile.name}:`, error.message);
+          }
+        }
+      }
+
+      console.log(`[Media] Sync complete: ${uploaded} uploaded, ${skipped} skipped, ${deletedFromDrive} deleted from Drive, ${deletedFromLocal} deleted from local`);
+      return { 
+        success: true, 
+        uploaded,
+        skipped,
+        deletedFromDrive,
+        deletedFromLocal,
+        total: localFiles.length
+      };
+      
+    } catch (error) {
+      console.error('[Media] Failed to sync media to Drive:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Download media files from Google Drive
+  ipcMain.handle('download-media-from-drive', async () => {
+    try {
+      if (!global.googleDriveSyncManager) {
+        throw new Error('Google Drive sync not initialized');
+      }
+
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      await fs.mkdir(mediaDir, { recursive: true });
+
+      // Download all media files from Google Drive
+      const mediaFiles = await global.googleDriveSyncManager.listMediaFiles();
+      let filesDownloaded = 0;
+
+      for (const fileInfo of mediaFiles) {
+        const fileData = await global.googleDriveSyncManager.downloadMediaFile(fileInfo.id);
+        const filePath = path.join(mediaDir, fileInfo.name);
+        await fs.writeFile(filePath, fileData);
+        filesDownloaded++;
+      }
+
+      console.log(`[Media] Downloaded ${filesDownloaded} media files from Google Drive`);
+      return { success: true, filesDownloaded };
+      
+    } catch (error) {
+      console.error('[Media] Failed to download media from Drive:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
 } else {
   console.error('ipcMain not available - Electron may not be properly initialized');
 }
@@ -1127,6 +1375,13 @@ const createMenu = () => {
           accelerator: 'CmdOrCtrl+Shift+E',
           click: () => {
             mainWindow.webContents.send('menu-edit-ai');
+          }
+        },
+        {
+          label: 'Generate Content with AI',
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => {
+            mainWindow.webContents.send('menu-generate-ai');
           }
         },
         { type: 'separator' },

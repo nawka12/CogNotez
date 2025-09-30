@@ -311,12 +311,21 @@ class FindReplaceDialog {
         }
     }
 
-    clearHighlights() {
+    async clearHighlights() {
         // Reset preview to normal content
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
         if (preview && editor) {
-            preview.innerHTML = marked.parse(editor.value);
+            // Process media URLs before rendering
+            let content = editor.value;
+            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
+                try {
+                    content = await this.app.richMediaManager.processContentForPreview(content);
+                } catch (error) {
+                    console.warn('[Preview] Failed to process media URLs in clearHighlights:', error);
+                }
+            }
+            preview.innerHTML = marked.parse(content);
         }
     }
 
@@ -586,6 +595,11 @@ class CogNotezApp {
 		// Cache of passwords for unlocked notes (noteId -> password)
 		this.notePasswordCache = {};
 
+        // Phase 5 managers
+        this.advancedSearchManager = null;
+        this.templatesManager = null;
+        this.richMediaManager = null;
+
         this.init();
     }
 
@@ -622,6 +636,11 @@ class CogNotezApp {
             this.updateSplashProgress('Preparing user interface...', 70);
             this.uiManager = new UIManager(this);
             this.uiManager.initialize();
+
+            // Initialize Phase 5 features
+            console.log('[DEBUG] Initializing Phase 5 features...');
+            this.updateSplashProgress('Loading advanced features...', 75);
+            await this.initializePhase5Features();
 
             // Register IPC listeners before any sync to ensure we catch startup sync events
             this.setupIPC();
@@ -715,6 +734,7 @@ class CogNotezApp {
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
+        document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
         const syncSettingsBtn = document.getElementById('sync-settings-btn');
         if (syncSettingsBtn) {
             syncSettingsBtn.addEventListener('click', () => this.showSyncSettings());
@@ -820,35 +840,42 @@ class CogNotezApp {
             if (e.key === 'Enter') this.sendAIMessage();
         });
 
-        // Context menu
-        document.addEventListener('contextmenu', (e) => {
-            console.log('[DEBUG] Context menu event triggered');
-            this.showContextMenu(e);
+        // Global context menu closer
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('context-menu');
+            if (menu && !menu.contains(e.target)) {
+                this.hideContextMenu();
+            }
         });
-        document.addEventListener('click', () => this.hideContextMenu());
 
-        // Note editor
+        // Note editor context menu
         const editor = document.getElementById('note-editor');
         editor.addEventListener('contextmenu', (e) => {
-            console.log('[DEBUG] Editor context menu event triggered');
-            // Use textarea selection properties instead of window.getSelection()
+            e.preventDefault();
             const start = editor.selectionStart;
             const end = editor.selectionEnd;
-            const selectedText = editor.value.substring(start, end).trim();
-            console.log('[DEBUG] Selected text:', selectedText ? `"${selectedText.substring(0, 50)}..."` : 'none');
-            console.log('[DEBUG] Selection range: start =', start, 'end =', end);
-            if (selectedText) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('[DEBUG] Preventing default context menu and showing AI menu');
-                // Store selection range for later use in replaceSelection
-                this.selectionStart = start;
-                this.selectionEnd = end;
-                this.selectedText = selectedText; // Also store the selected text
-                console.log('[DEBUG] Stored selection: start =', this.selectionStart, 'end =', this.selectionEnd);
-                console.log('[DEBUG] Stored selected text:', this.selectedText.substring(0, 50) + '...');
-                this.showAIContextMenu(e, selectedText);
-            }
+            const selectedText = editor.value.substring(start, end);
+            
+            // Store selection range for operations
+            this.selectionStart = start;
+            this.selectionEnd = end;
+            this.selectedText = selectedText;
+            this.contextElement = editor;
+            
+            this.showContextMenu(e, selectedText);
+        });
+
+        // Preview mode context menu
+        const preview = document.getElementById('markdown-preview');
+        preview.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const selection = window.getSelection();
+            const selectedText = selection.toString();
+            
+            this.selectedText = selectedText;
+            this.contextElement = preview;
+            
+            this.showContextMenu(e, selectedText);
         });
         editor.addEventListener('input', () => {
             this.updateNotePreview();
@@ -890,6 +917,7 @@ class CogNotezApp {
         ipcRenderer.on('menu-summarize', () => this.summarizeSelection());
         ipcRenderer.on('menu-ask-ai', () => this.askAIAboutSelection());
         ipcRenderer.on('menu-edit-ai', () => this.editSelectionWithAI());
+        ipcRenderer.on('menu-generate-ai', () => this.generateContentWithAI());
         ipcRenderer.on('menu-export-markdown', () => this.exportNote('markdown'));
         ipcRenderer.on('menu-export-text', () => this.exportNote('text'));
         ipcRenderer.on('menu-export-json', () => this.exportAllNotesJSON());
@@ -999,7 +1027,7 @@ class CogNotezApp {
         }
     }
 
-    renderMarkdownPreview() {
+    async renderMarkdownPreview() {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
 
@@ -1008,8 +1036,19 @@ class CogNotezApp {
             return;
         }
 
+        // Process content to resolve media URLs if needed
+        let content = editor.value;
+        if (this.richMediaManager && this.richMediaManager.processContentForPreview) {
+            try {
+                content = await this.richMediaManager.processContentForPreview(content);
+            } catch (error) {
+                console.warn('[Preview] Failed to process media URLs:', error);
+                // Continue with original content if processing fails
+            }
+        }
+
         // Render markdown and sanitize for security
-        const renderedHTML = renderMarkdown(editor.value);
+        const renderedHTML = renderMarkdown(content);
         preview.innerHTML = renderedHTML;
     }
 
@@ -1987,6 +2026,15 @@ class CogNotezApp {
         }
     }
 
+    showTemplateChooser() {
+        if (this.templatesManager) {
+            this.templatesManager.show();
+        } else {
+            console.error('[Templates] Templates manager not initialized');
+            this.showNotification('Templates are not available', 'error');
+        }
+    }
+
     async sendAIMessage() {
         const input = document.getElementById('ai-input');
         const message = input.value.trim();
@@ -2214,45 +2262,118 @@ Please provide a helpful response based on the note content and conversation his
         }
     }
 
-    // Context menu
-    showContextMenu(e) {
-        // Hide any existing context menus
-        this.hideAIContextMenu();
+    // Unified Context Menu
+    showContextMenu(e, selectedText = '') {
         this.hideContextMenu();
-
-        // Show regular context menu with basic options
+        
         const menu = document.getElementById('context-menu');
-        const x = e.pageX || (e.clientX + window.scrollX);
-        const y = e.pageY || (e.clientY + window.scrollY);
+        const hasSelection = selectedText.length > 0;
+        
+        // Show/hide menu items based on context
+        const aiItems = menu.querySelectorAll('.context-menu-ai');
+        const generateItem = menu.querySelector('[data-action="generate-ai"]');
+        const editItem = menu.querySelector('[data-action="edit-ai"]');
+        const summarizeItem = menu.querySelector('[data-action="summarize"]');
+        const askItem = menu.querySelector('[data-action="ask-ai"]');
+        const cutItem = menu.querySelector('[data-action="cut"]');
+        const copyItem = menu.querySelector('[data-action="copy"]');
+        const pasteItem = menu.querySelector('[data-action="paste"]');
+        const separator = menu.querySelector('.context-menu-separator');
 
+        // Check if in preview mode
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        // AI items that modify content (edit, generate) are disabled in preview mode
+        // AI items that don't modify content (summarize, ask) work in both modes
+
+        // Edit AI: only when text selected AND not in preview mode
+        if (editItem) {
+            const shouldShow = hasSelection && !isPreviewMode;
+            editItem.style.display = shouldShow ? 'flex' : 'none';
+            if (isPreviewMode) {
+                editItem.classList.add('disabled');
+            } else {
+                editItem.classList.remove('disabled');
+            }
+        }
+
+        // Generate AI: only when NO text selected AND not in preview mode
+        if (generateItem) {
+            const shouldShow = !hasSelection && !isPreviewMode;
+            generateItem.style.display = shouldShow ? 'flex' : 'none';
+            if (isPreviewMode) {
+                generateItem.classList.add('disabled');
+            } else {
+                generateItem.classList.remove('disabled');
+            }
+        }
+
+        // Summarize and Ask AI work in both edit and preview modes when text is selected
+        if (summarizeItem) {
+            const shouldShow = hasSelection;
+            summarizeItem.style.display = shouldShow ? 'flex' : 'none';
+            // These don't modify content, so they work in preview mode
+        }
+
+        if (askItem) {
+            const shouldShow = hasSelection;
+            askItem.style.display = shouldShow ? 'flex' : 'none';
+            // These don't modify content, so they work in preview mode
+        }
+
+        separator.style.display = hasSelection ? 'block' : 'none';
+        
+        // Cut/Copy enabled only when text is selected
+        if (cutItem) {
+            if (hasSelection && this.contextElement && this.contextElement.tagName === 'TEXTAREA') {
+                cutItem.classList.remove('disabled');
+            } else {
+                cutItem.classList.add('disabled');
+            }
+        }
+        
+        if (copyItem) {
+            copyItem.classList.toggle('disabled', !hasSelection);
+        }
+        
+        // Paste only works in editor mode (textarea)
+        if (pasteItem) {
+            if (this.contextElement && this.contextElement.tagName === 'TEXTAREA') {
+                pasteItem.classList.remove('disabled');
+            } else {
+                pasteItem.classList.add('disabled');
+            }
+        }
+        
         // Position the menu
-        const menuWidth = 200;
-        const menuHeight = 120;
-
+        const x = e.clientX;
+        const y = e.clientY;
+        const menuWidth = 250;
+        const menuHeight = hasSelection ? 300 : 150;
+        
         let finalX = x;
         let finalY = y;
-
+        
         if (x + menuWidth > window.innerWidth) {
             finalX = x - menuWidth;
         }
-
+        
         if (y + menuHeight > window.innerHeight) {
             finalY = y - menuHeight;
         }
-
+        
         finalX = Math.max(10, finalX);
         finalY = Math.max(10, finalY);
-
-        menu.style.position = 'fixed';
+        
         menu.style.left = finalX + 'px';
         menu.style.top = finalY + 'px';
-        menu.style.zIndex = '9999';
         menu.classList.remove('hidden');
-
+        
         // Handle menu item clicks
         const handleClick = (e) => {
             const target = e.target.closest('.context-menu-item');
-            if (target) {
+            if (target && !target.classList.contains('disabled')) {
                 const action = target.dataset.action;
                 if (action) {
                     this.handleContextAction(action);
@@ -2260,14 +2381,8 @@ Please provide a helpful response based on the note content and conversation his
                 }
             }
         };
-
+        
         menu.addEventListener('click', handleClick, { once: true });
-
-        // Close menu when clicking elsewhere
-        setTimeout(() => {
-            document.addEventListener('click', () => this.hideContextMenu(), { once: true });
-            document.addEventListener('contextmenu', () => this.hideContextMenu(), { once: true });
-        }, 10);
     }
 
     hideContextMenu() {
@@ -2275,211 +2390,108 @@ Please provide a helpful response based on the note content and conversation his
         if (menu) menu.classList.add('hidden');
     }
 
-    handleContextAction(action) {
-        switch (action) {
-            case 'summarize':
-                this.summarizeNote();
-                break;
-            case 'ask-ai':
-                // Show AI dialog for asking questions about the current note
-                this.showAIDialog('Ask AI About Current Note',
-                    `Ask a question about the current note: "${this.currentNote ? this.currentNote.title : 'Untitled'}"`,
-                    'ask-ai');
-                break;
-            case 'edit-ai':
-                // This would need the full note content, maybe show a dialog
-                this.showNotification('Please select text to edit with AI', 'info');
-                break;
-        }
-    }
-
-    // AI Context Menu
-    showAIContextMenu(e, selectedText) {
-        console.log('[DEBUG] Showing AI context menu for selected text:', selectedText);
-        this.hideAIContextMenu(); // Hide any existing AI context menu
-        this.selectedText = selectedText;
-        // Preserve selection during AI context menu operations
-        this.preserveSelection = true;
-        console.log('[DEBUG] Set this.selectedText to:', this.selectedText);
-        console.log('[DEBUG] Set preserveSelection to true');
-
-        const menu = document.createElement('div');
-        menu.id = 'ai-context-menu';
-        menu.className = 'context-menu ai-context-menu';
-
-        menu.innerHTML = `
-            <div class="context-menu-item" data-action="summarize">
-                <i class="fas fa-file-alt"></i> Summarize Selection
-            </div>
-            <div class="context-menu-item" data-action="ask-ai">
-                <i class="fas fa-robot"></i> Ask AI About Selection
-            </div>
-            <div class="context-menu-item" data-action="edit-ai">
-                <i class="fas fa-edit"></i> Edit Selection with AI
-            </div>
-            <div class="context-menu-item" data-action="rewrite">
-                <i class="fas fa-palette"></i> Rewrite Selection
-            </div>
-            <div class="context-menu-item" data-action="key-points">
-                <i class="fas fa-clipboard-list"></i> Extract Key Points
-            </div>
-            <div class="context-menu-item" data-action="generate-tags">
-                <i class="fas fa-tags"></i> Generate Tags
-            </div>
-        `;
-
-        // Position the menu at the mouse cursor with viewport bounds checking
-        const x = e.pageX || (e.clientX + window.scrollX);
-        const y = e.pageY || (e.clientY + window.scrollY);
-
-        // Get menu dimensions (approximate)
-        const menuWidth = 220;
-        const menuHeight = 280;
-
-        // Adjust position if menu would go off-screen
-        let finalX = x;
-        let finalY = y;
-
-        if (x + menuWidth > window.innerWidth) {
-            finalX = x - menuWidth;
-        }
-
-        if (y + menuHeight > window.innerHeight) {
-            finalY = y - menuHeight;
-        }
-
-        // Ensure minimum positions
-        finalX = Math.max(10, finalX);
-        finalY = Math.max(10, finalY);
-
-        menu.style.position = 'fixed'; // Use fixed positioning for better control
-        menu.style.left = finalX + 'px';
-        menu.style.top = finalY + 'px';
-        menu.style.zIndex = '9999';
-
-        console.log('[DEBUG] AI context menu positioned at:', x, y);
-
-        // Handle menu item clicks
-        menu.addEventListener('click', (e) => {
-            const target = e.target.closest('.context-menu-item');
-            if (target) {
-                const action = target.dataset.action;
-                console.log('[DEBUG] AI context menu action clicked:', action);
-                if (action) {
-                    this.handleAIContextAction(action);
-                    this.hideAIContextMenu();
-                }
-            }
-        });
-
-        document.body.appendChild(menu);
-
-        // Force layout and ensure menu is visible
-        menu.offsetHeight; // Force reflow
-
-        // Debug: Check if element was added and is visible
-        console.log('[DEBUG] Context menu element added to DOM:', menu);
-        console.log('[DEBUG] Context menu visibility:', getComputedStyle(menu).visibility);
-        console.log('[DEBUG] Context menu display:', getComputedStyle(menu).display);
-        console.log('[DEBUG] Context menu position:', menu.style.left, menu.style.top);
-
-        // Ensure menu is visible with forced styles
-        menu.style.display = 'block';
-        menu.style.visibility = 'visible';
-        menu.style.opacity = '1';
-
-        // Additional debug after a short delay
-        setTimeout(() => {
-            console.log('[DEBUG] Context menu after delay - visibility:', getComputedStyle(menu).visibility);
-            console.log('[DEBUG] Context menu after delay - display:', getComputedStyle(menu).display);
-            console.log('[DEBUG] Context menu still in DOM:', document.body.contains(menu));
-        }, 100);
-
-        // Close menu when clicking elsewhere
-        const closeMenu = () => {
-            console.log('[DEBUG] Closing context menu');
-            this.hideAIContextMenu();
-        };
-
-        // Use setTimeout to avoid immediate closing
-        setTimeout(() => {
-            document.addEventListener('click', closeMenu, { once: true });
-            document.addEventListener('contextmenu', closeMenu, { once: true });
-        }, 10);
-    }
-
-    hideAIContextMenu() {
-        const menu = document.getElementById('ai-context-menu');
-        if (menu) {
-            menu.remove();
-        }
-        // Reset preserve selection flag when context menu is hidden
-        // But only if we're not in an AI dialog
-        if (!document.getElementById('ai-dialog').classList.contains('hidden')) {
-            console.log('[DEBUG] AI dialog is open, keeping preserveSelection = true');
-        } else {
-            console.log('[DEBUG] Resetting preserveSelection to false');
-            this.preserveSelection = false;
-        }
-    }
-
-    handleOutsideClick(e) {
-        const menu = document.getElementById('ai-context-menu');
-        if (menu && !menu.contains(e.target)) {
-            this.hideAIContextMenu();
-        }
-    }
-
-    handleAIContextAction(action) {
-        console.log('[DEBUG] handleAIContextAction called with action:', action);
-        console.log('[DEBUG] handleAIContextAction: selectedText =', this.selectedText ? this.selectedText.substring(0, 50) + '...' : 'none');
-        console.log('[DEBUG] handleAIContextAction: selectionStart =', this.selectionStart, 'selectionEnd =', this.selectionEnd);
+    async handleContextAction(action) {
+        const editor = document.getElementById('note-editor');
         
-        if (!this.aiManager) {
-            console.error('[DEBUG] handleAIContextAction: AI manager not available');
-            this.showNotification('AI manager not available', 'error');
-            return;
-        }
+        switch (action) {
+            case 'cut':
+                if (this.selectedText && this.contextElement === editor) {
+                    await navigator.clipboard.writeText(this.selectedText);
+                    // Replace selection with empty string
+                    const before = editor.value.substring(0, this.selectionStart);
+                    const after = editor.value.substring(this.selectionEnd);
+                    editor.value = before + after;
+                    editor.setSelectionRange(this.selectionStart, this.selectionStart);
+                    this.updateNotePreview();
+                    this.showNotification('Text cut to clipboard', 'success');
+                }
+                break;
+                
+            case 'copy':
+                if (this.selectedText) {
+                    await navigator.clipboard.writeText(this.selectedText);
+                    this.showNotification('Text copied to clipboard', 'success');
+                }
+                break;
+                
+            case 'paste':
+                if (this.contextElement === editor) {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        const before = editor.value.substring(0, this.selectionStart);
+                        const after = editor.value.substring(this.selectionEnd);
+                        editor.value = before + text + after;
+                        const newPos = this.selectionStart + text.length;
+                        editor.setSelectionRange(newPos, newPos);
+                        this.updateNotePreview();
+                        this.showNotification('Text pasted', 'success');
+                    } catch (err) {
+                        this.showNotification('Failed to paste from clipboard', 'error');
+                    }
+                }
+                break;
+                
+            case 'summarize':
+                if (this.selectedText) {
+                    this.preserveSelection = true;
+                    await this.summarizeSelection();
+                } else {
+                    await this.summarizeNote();
+                }
+                break;
+                
+            case 'ask-ai':
+                this.preserveSelection = true;
+                if (this.selectedText) {
+                    this.showAIDialog('Ask AI About Selection',
+                        `Ask a question about the selected text: "${this.selectedText.substring(0, 50)}${this.selectedText.length > 50 ? '...' : ''}"`,
+                        'ask-ai');
+                } else {
+                    this.showAIDialog('Ask AI About Note',
+                        `Ask a question about: "${this.currentNote ? this.currentNote.title : 'Untitled'}"`,
+                        'ask-ai');
+                }
+                break;
+                
+            case 'edit-ai':
+                if (this.selectedText) {
+                    this.preserveSelection = true;
+                    this.showAIDialog('Edit Selection with AI',
+                        'How would you like to edit this text?',
+                        'edit-ai');
+                } else {
+                    this.showNotification('Please select text to edit with AI', 'info');
+                }
+                break;
 
+            case 'generate-ai':
+                this.generateContentWithAI();
+                break;
+        }
+    }
+
+    // Legacy methods kept for backward compatibility with keyboard shortcuts
+    // These now redirect to the main methods
+    rewriteSelection() {
         if (!this.selectedText) {
-            console.error('[DEBUG] handleAIContextAction: No selected text available');
-            this.showNotification('No text selected', 'error');
+            this.showNotification('No text selected', 'info');
             return;
         }
+        this.preserveSelection = true;
+        this.showAIDialog('Rewrite Selection',
+            'How would you like to rewrite this text?',
+            'rewrite');
+    }
 
-        try {
-            switch (action) {
-                case 'summarize':
-                    console.log('[DEBUG] handleAIContextAction: calling summarizeSelection');
-                    this.summarizeSelection();
-                    break;
-                case 'ask-ai':
-                    console.log('[DEBUG] handleAIContextAction: calling askAIAboutSelection');
-                    this.askAIAboutSelection();
-                    break;
-                case 'edit-ai':
-                    console.log('[DEBUG] handleAIContextAction: calling editSelectionWithAI');
-                    this.editSelectionWithAI();
-                    break;
-                case 'rewrite':
-                    console.log('[DEBUG] handleAIContextAction: calling rewriteSelection');
-                    this.rewriteSelection();
-                    break;
-                case 'key-points':
-                    console.log('[DEBUG] handleAIContextAction: calling extractKeyPoints');
-                    this.extractKeyPoints();
-                    break;
-                case 'generate-tags':
-                    console.log('[DEBUG] handleAIContextAction: calling generateTags');
-                    this.generateTags();
-                    break;
-                default:
-                    console.error('[DEBUG] handleAIContextAction: Unknown action:', action);
-            }
-        } catch (error) {
-            console.error('[DEBUG] handleAIContextAction error:', error);
-            this.showNotification(`Failed to execute AI action: ${error.message}`, 'error');
+    extractKeyPoints() {
+        if (!this.selectedText) {
+            this.showNotification('No text selected', 'info');
+            return;
         }
+        this.preserveSelection = true;
+        this.showAIDialog('Extract Key Points',
+            'Extracting key points from selected text...',
+            'key-points');
     }
 
     // AI Dialog
@@ -2599,6 +2611,11 @@ Please provide a helpful response based on the note content and conversation his
                 case 'edit-ai':
                     console.log('[DEBUG] handleAIAction: Processing edit-ai action');
                     await this.aiManager.handleEditText(this.selectedText, input);
+                    break;
+
+                case 'generate-ai':
+                    console.log('[DEBUG] handleAIAction: Processing generate-ai action');
+                    await this.aiManager.handleGenerateContent(input);
                     break;
 
                 case 'rewrite':
@@ -2800,6 +2817,47 @@ Please provide a helpful response based on the note content and conversation his
         editor.selectionStart = editor.selectionEnd = start + replacement.length;
         editor.focus();
         console.log('[DEBUG] replaceSelection: completed successfully, preserveSelection reset to false');
+    }
+
+    insertTextAtCursor(text) {
+        console.log('[DEBUG] insertTextAtCursor called with:', text.substring(0, 100) + '...');
+
+        const editor = document.getElementById('note-editor');
+        if (!editor) {
+            console.error('[DEBUG] insertTextAtCursor: note-editor element not found');
+            return;
+        }
+
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+
+        console.log('[DEBUG] insertTextAtCursor: start =', start, 'end =', end);
+        console.log('[DEBUG] insertTextAtCursor: current editor content length =', editor.value.length);
+
+        // Insert the text at the cursor position
+        const before = editor.value.substring(0, start);
+        const after = editor.value.substring(end);
+        editor.value = before + text + after;
+
+        // Update the cursor position to after the inserted text
+        const newCursorPosition = start + text.length;
+        editor.setSelectionRange(newCursorPosition, newCursorPosition);
+
+        console.log('[DEBUG] insertTextAtCursor: updated editor content length =', editor.value.length);
+
+        // Dispatch input event for word count update
+        const inputEvent = new Event('input', { bubbles: true });
+        editor.dispatchEvent(inputEvent);
+
+        // Update currentNote content if available
+        if (this.currentNote) {
+            this.currentNote.content = editor.value;
+            console.log('[DEBUG] insertTextAtCursor: updated currentNote content');
+        } else {
+            console.warn('[DEBUG] insertTextAtCursor: no currentNote to update');
+        }
+
+        console.log('[DEBUG] insertTextAtCursor: completed successfully');
     }
 
     // Export functionality
@@ -3470,6 +3528,12 @@ Please provide a helpful response based on the note content and conversation his
                         this.editSelectionWithAI();
                     }
                     break;
+                case 'G': // Ctrl+Shift+G
+                    if (e.shiftKey) {
+                        e.preventDefault();
+                        this.generateContentWithAI();
+                    }
+                    break;
                 case 'W': // Ctrl+Shift+W
                     if (e.shiftKey) {
                         e.preventDefault();
@@ -3523,6 +3587,7 @@ Please provide a helpful response based on the note content and conversation his
             { key: 'Ctrl+Shift+S', description: 'Summarize selected text' },
             { key: 'Ctrl+Shift+A', description: 'Ask AI about selected text' },
             { key: 'Ctrl+Shift+E', description: 'Edit selected text with AI' },
+            { key: 'Ctrl+Shift+G', description: 'Generate content with AI' },
             { key: 'Ctrl+Shift+W', description: 'Rewrite selected text' },
             { key: 'Ctrl+Shift+K', description: 'Extract key points' },
             { key: 'Ctrl+Shift+T', description: 'Generate tags for selection' },
@@ -3645,25 +3710,66 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     summarizeSelection() {
-        const editor = document.getElementById('note-editor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+        let selectedText = '';
 
-        if (!selectedText) {
-            this.showNotification('Please select some text to summarize', 'info');
-            return;
+        // Check if in preview mode
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            // In preview mode, try to get selected text from preview element
+            const selection = window.getSelection();
+            selectedText = selection.toString().trim();
+
+            if (!selectedText) {
+                this.showNotification('Please select some text in the preview to summarize', 'info');
+                return;
+            }
+        } else {
+            // In edit mode, get selected text from editor
+            const editor = document.getElementById('note-editor');
+            selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+
+            if (!selectedText) {
+                this.showNotification('Please select some text to summarize', 'info');
+                return;
+            }
         }
 
         this.selectedText = selectedText;
-        this.showAIDialog('Summarize Selection', `Selected text: ${selectedText.substring(0, 100)}...`, 'summarize');
+        // Directly summarize without requiring user interaction
+        if (this.aiManager) {
+            this.aiManager.handleSummarize(selectedText);
+        } else {
+            this.showNotification('AI manager not available', 'error');
+        }
     }
 
     askAIAboutSelection() {
-        const editor = document.getElementById('note-editor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+        let selectedText = '';
 
-        if (!selectedText) {
-            this.showNotification('Please select some text to ask about', 'info');
-            return;
+        // Check if in preview mode
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            // In preview mode, try to get selected text from preview element
+            const selection = window.getSelection();
+            selectedText = selection.toString().trim();
+
+            if (!selectedText) {
+                this.showNotification('Please select some text in the preview to ask about', 'info');
+                return;
+            }
+        } else {
+            // In edit mode, get selected text from editor
+            const editor = document.getElementById('note-editor');
+            selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+
+            if (!selectedText) {
+                this.showNotification('Please select some text to ask about', 'info');
+                return;
+            }
         }
 
         this.selectedText = selectedText;
@@ -3674,7 +3780,16 @@ Please provide a helpful response based on the note content and conversation his
 
     editSelectionWithAI() {
         console.log('[DEBUG] editSelectionWithAI called');
-        
+
+        // Check if in preview mode - Edit AI modifies content so it shouldn't work in preview
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            this.showNotification('Edit with AI is not available in preview mode. Switch to edit mode first.', 'info');
+            return;
+        }
+
         // Use stored selection if available, otherwise get current selection
         let selectedText = this.selectedText;
         let start = this.selectionStart;
@@ -3704,6 +3819,24 @@ Please provide a helpful response based on the note content and conversation his
         this.showAIDialog('Edit Selection with AI',
             `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
             'edit-ai');
+    }
+
+    generateContentWithAI() {
+        console.log('[DEBUG] generateContentWithAI called');
+
+        // Check if in preview mode
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            this.showNotification('Generate with AI is not available in preview mode. Switch to edit mode first.', 'info');
+            return;
+        }
+
+        // For generate with AI, we don't need selected text - we're generating new content
+        this.showAIDialog('Generate Content with AI',
+            'What would you like me to generate? (e.g., "a summary of quantum physics", "a todo list for project planning", etc.)',
+            'generate-ai');
     }
 
     rewriteSelection() {
@@ -4424,6 +4557,39 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     // Sync-related methods
+    async initializePhase5Features() {
+        try {
+            console.log('[Phase5] Initializing advanced features...');
+
+            // Initialize Advanced Search Manager
+            if (window.AdvancedSearchManager) {
+                this.advancedSearchManager = new window.AdvancedSearchManager(this);
+                await this.advancedSearchManager.initialize();
+                console.log('[Phase5] Advanced Search initialized');
+            }
+
+            // Initialize Templates Manager
+            if (window.TemplatesManager) {
+                this.templatesManager = new window.TemplatesManager(this);
+                await this.templatesManager.initialize();
+                console.log('[Phase5] Templates initialized');
+            }
+
+            // Initialize Rich Media Manager
+            if (window.RichMediaManager) {
+                this.richMediaManager = new window.RichMediaManager(this);
+                await this.richMediaManager.initialize();
+                console.log('[Phase5] Rich Media initialized');
+            }
+
+            console.log('[Phase5] All Phase 5 features initialized successfully');
+
+        } catch (error) {
+            console.error('[Phase5] Failed to initialize Phase 5 features:', error);
+            // Continue even if Phase 5 features fail
+        }
+    }
+
     async initializeSync() {
         try {
             // Quick offline check to avoid slow sync initialization when offline
@@ -5553,6 +5719,28 @@ Please provide a helpful response based on the note content and conversation his
             if (result.success) {
                 // Success notification handled by sync-completed event
                 await this.updateSyncStatus();
+
+                // Also sync media files if available
+                try {
+                    const electron = require('electron');
+                    if (electron && electron.ipcRenderer) {
+                        console.log('[Sync] Syncing media files to Google Drive...');
+                        const mediaResult = await electron.ipcRenderer.invoke('sync-media-to-drive');
+                        if (mediaResult.success) {
+                            const { uploaded, skipped, deletedFromDrive, deletedFromLocal } = mediaResult;
+                            console.log(`[Sync] Media sync: ${uploaded} uploaded, ${skipped} skipped, ${deletedFromDrive} deleted from Drive, ${deletedFromLocal} deleted from local`);
+                            
+                            // Show notification if files were deleted
+                            const totalDeleted = (deletedFromDrive || 0) + (deletedFromLocal || 0);
+                            if (totalDeleted > 0) {
+                                this.showNotification(`Cleaned up ${totalDeleted} unused media file${totalDeleted > 1 ? 's' : ''} (${deletedFromDrive} from Drive, ${deletedFromLocal} from local)`, 'info');
+                            }
+                        }
+                    }
+                } catch (mediaError) {
+                    console.warn('[Sync] Media sync failed (non-critical):', mediaError);
+                    // Don't fail the whole sync if media sync fails
+                }
             } else {
                 // Error notification handled by sync-completed event
             }

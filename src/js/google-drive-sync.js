@@ -870,6 +870,182 @@ class GoogleDriveSyncManager {
             return false;
         }
     }
+
+    // ============================================================
+    // PHASE 5: MEDIA FILE SYNC
+    // ============================================================
+
+    /**
+     * Get or create media folder in Google Drive
+     */
+    async getMediaFolderId() {
+        try {
+            if (this.mediaFolderId) {
+                return this.mediaFolderId;
+            }
+
+            // Search for existing media folder in app folder
+            const response = await this.drive.files.list({
+                q: `name='media' and '${this.appFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                fields: 'files(id, name)',
+                spaces: 'drive'
+            });
+
+            if (response.data.files && response.data.files.length > 0) {
+                this.mediaFolderId = response.data.files[0].id;
+                console.log('[GoogleDriveSync] Found existing media folder:', this.mediaFolderId);
+            } else {
+                // Create media folder
+                const folderMetadata = {
+                    name: 'media',
+                    mimeType: 'application/vnd.google-apps.folder',
+                    parents: [this.appFolderId]
+                };
+
+                const folder = await this.drive.files.create({
+                    resource: folderMetadata,
+                    fields: 'id'
+                });
+
+                this.mediaFolderId = folder.data.id;
+                console.log('[GoogleDriveSync] Created media folder:', this.mediaFolderId);
+            }
+
+            return this.mediaFolderId;
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to get/create media folder:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Upload media file to Google Drive
+     * @param {string} fileName - Name of the file
+     * @param {Buffer} fileData - File data as Buffer
+     * @param {number} mtime - Optional modification time in milliseconds
+     */
+    async uploadMediaFile(fileName, fileData, mtime = null) {
+        try {
+            const mediaFolderId = await this.getMediaFolderId();
+            
+            // Convert Buffer to Stream (Google Drive API expects a stream)
+            const { Readable } = require('stream');
+            const bufferStream = Readable.from(fileData);
+
+            // Check if file already exists
+            const existing = await this.drive.files.list({
+                q: `name='${fileName}' and '${mediaFolderId}' in parents and trashed=false`,
+                fields: 'files(id, size, modifiedTime)',
+                spaces: 'drive'
+            });
+
+            if (existing.data.files && existing.data.files.length > 0) {
+                // File exists - update it
+                const fileId = existing.data.files[0].id;
+                const updateStream = Readable.from(fileData);
+                
+                const updateMetadata = {
+                    name: fileName
+                };
+                
+                // Set modification time if provided
+                if (mtime) {
+                    updateMetadata.modifiedTime = new Date(mtime).toISOString();
+                }
+                
+                await this.drive.files.update({
+                    fileId: fileId,
+                    resource: updateMetadata,
+                    media: {
+                        mimeType: 'application/octet-stream',
+                        body: updateStream
+                    }
+                });
+                console.log('[GoogleDriveSync] Updated media file:', fileName);
+            } else {
+                // Create new file
+                const fileMetadata = {
+                    name: fileName,
+                    parents: [mediaFolderId]
+                };
+                
+                // Set modification time if provided
+                if (mtime) {
+                    fileMetadata.modifiedTime = new Date(mtime).toISOString();
+                }
+
+                await this.drive.files.create({
+                    resource: fileMetadata,
+                    media: {
+                        mimeType: 'application/octet-stream',
+                        body: bufferStream
+                    },
+                    fields: 'id'
+                });
+                console.log('[GoogleDriveSync] Uploaded media file:', fileName);
+            }
+
+            return true;
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to upload media file:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Download media file from Google Drive
+     */
+    async downloadMediaFile(fileId) {
+        try {
+            const response = await this.drive.files.get({
+                fileId: fileId,
+                alt: 'media'
+            }, {
+                responseType: 'arraybuffer'
+            });
+
+            return Buffer.from(response.data);
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to download media file:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * List all media files in Google Drive
+     */
+    async listMediaFiles() {
+        try {
+            const mediaFolderId = await this.getMediaFolderId();
+
+            const response = await this.drive.files.list({
+                q: `'${mediaFolderId}' in parents and trashed=false`,
+                fields: 'files(id, name, size, modifiedTime)',
+                spaces: 'drive'
+            });
+
+            return response.data.files || [];
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to list media files:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Delete media file from Google Drive
+     */
+    async deleteMediaFile(fileId) {
+        try {
+            await this.drive.files.delete({
+                fileId: fileId
+            });
+            console.log('[GoogleDriveSync] Deleted media file:', fileId);
+            return true;
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to delete media file:', error);
+            throw error;
+        }
+    }
 }
 
 // Export for use in main app

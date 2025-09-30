@@ -17,6 +17,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - **Smart Summarization**: AI-generated summaries of notes or selected text
 - **Contextual Q&A**: Ask AI questions about your notes
 - **Text Editing**: AI-powered text transformations and improvements
+- **Content Generation**: AI-powered content creation and brainstorming
 - **Text Rewriting**: Rewrite content in different styles (professional, casual, academic, simple, creative)
 - **Key Points Extraction**: Automatically extract main points from text
 - **Tag Generation**: AI-suggested tags for better organization
@@ -43,15 +44,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - **Password-Locked Notes**: Full end-to-end encryption for protected notes. Note content is encrypted at rest using AES-256-GCM encryption; passwords are stored as salted PBKDF2 hashes (210,000 iterations) for verification.
 - **Encrypted Cloud Backups**: When Google Drive sync is enabled, backups are end-to-end encrypted before upload using AES-256-GCM with PBKDF2 key derivation.
 
-## Technology Stack
 
-- **Frontend**: Vanilla JavaScript (HTML/CSS/JS)
-- **Desktop Framework**: Electron
-- **AI Integration**: Ollama (local LLM) with optional OpenRouter API fallback
-- **Database**: localStorage (JSON-based) for portable offline storage
-- **Web Scraping**: Axios and Cheerio for content extraction
-- **Markdown Processing**: Marked library for rendering
-- **Styling**: CSS Custom Properties with theme support
 
 ## Installation & Setup
 
@@ -93,6 +86,17 @@ An offline-first, privacy-focused note-taking application that leverages local L
    ```bash
    npm start
    ```
+
+### Google Drive Sync (Basic Setup)
+
+1. Open the app and click the cloud icon (☁️) in the header.
+2. Click "Import Credentials File" and select the OAuth JSON you created in Google Cloud Console.
+   - In Google Cloud Console, add your email as a Test user on the OAuth consent screen.
+3. Click "Connect Google Drive" and complete the Google sign‑in.
+4. (Optional) Enable "End‑to‑End Encryption" and set a passphrase to encrypt your cloud backups.
+5. Choose whether to enable Auto Sync and Sync on Startup.
+
+For step‑by‑step advanced options, see the detailed guide: [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 
 ### Database Setup
 
@@ -145,6 +149,91 @@ Comprehensive import and export capabilities for maximum data portability:
 - **Format Options**: Markdown and plain text export formats
 - **Shareable Links**: Generate shareable note references
 
+### Advanced Search & Filtering
+
+CogNotez includes powerful search capabilities to find exactly what you're looking for:
+
+#### Opening Advanced Search
+- Click the filter icon (🔍) next to the search bar in the header
+- Or use keyboard shortcut (coming soon)
+
+#### Search Features
+- **Full-Text Search**: Search across titles, content, and tags
+- **Tag Filtering**: Filter by one or multiple tags
+- **Date Range**: Find notes created or modified within specific date ranges
+- **Special Filters**: 
+  - Favorites only
+  - Pinned notes only
+  - Password-protected notes
+- **Sorting Options**:
+  - Last Modified (newest/oldest)
+  - Created Date (newest/oldest)
+  - Title (A-Z or Z-A)
+  - Word Count (high to low or low to high)
+
+#### Using Advanced Search
+1. Click the filter button in the header
+2. Enter your search criteria
+3. Select tags (hold Ctrl/Cmd for multiple)
+4. Set date range if needed
+5. Enable any special filters
+6. Choose sort order
+7. Click "Apply Filters" to see results
+
+### Note Templates
+
+Speed up your workflow with ready-to-use templates:
+
+#### Built-in Templates
+1. **Blank Note** - Clean slate for free-form writing
+2. **Meeting Notes** - Agenda, discussion points, action items
+3. **Daily Journal** - Mood tracker, goals, gratitude
+4. **Project Plan** - Objectives, milestones, timeline
+5. **Book Notes** - Summary, takeaways, quotes
+6. **Research Notes** - Findings, analysis, references
+7. **To-Do List** - Priority-based task management
+8. **Brainstorm** - Idea generation and organization
+9. **Recipe** - Ingredients, instructions, notes
+10. **Code Snippet** - Code documentation template
+
+#### Using Templates
+- Create a new note and select from template chooser
+- Or use menu: **File → New from Template**
+
+#### Custom Templates
+
+**Create from Current Note:**
+1. Create a note with your desired structure
+2. Open template chooser
+3. Click "Create Custom Template"
+4. Enter template name and description
+5. Choose an emoji icon
+6. Template is saved for future use
+
+**Generate with AI:**
+1. Open template chooser
+2. Click "Generate Template with AI"
+3. Describe the template you want (e.g., "A bug report template with steps to reproduce")
+4. Or choose from quick suggestions (Meeting Notes, Bug Report, Weekly Review, etc.)
+5. Click "Generate" to create template with AI
+6. Review the generated template in the preview
+7. Click "Save as Template" to customize and save
+8. AI automatically suggests name, description, and icon based on content
+
+### Rich Media Support
+
+Enhance your notes with images, videos, and attachments:
+
+#### Adding Images
+- **Drag & Drop**: Drag image files directly into the editor
+- **Paste**: Copy and paste images from clipboard
+- **URL**: Insert image from URL via context menu
+- **Supported formats**: JPEG, PNG, GIF, WebP, SVG
+
+#### Embedding Videos
+- Drag & drop video files (MP4, WebM, OGG)
+- Videos play directly in notes
+
 ### AI Features
 
 #### Text Selection Actions (Right-click or keyboard shortcuts)
@@ -161,6 +250,11 @@ Comprehensive import and export capabilities for maximum data portability:
    - Select text and describe desired changes
    - AI transforms the text accordingly
 
+4. **Generate Content with AI**: `Ctrl+Shift+G` or Right-click → "Generate with AI"
+   - Generate new content without selecting text
+   - Enter a prompt and AI creates content at cursor position
+   - Perfect for brainstorming, writing assistance, or starting new notes
+
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -172,6 +266,7 @@ Comprehensive import and export capabilities for maximum data portability:
 | `Ctrl+Shift+S` | Summarize selected text |
 | `Ctrl+Shift+A` | Ask AI about selected text |
 | `Ctrl+Shift+E` | Edit selected text with AI |
+| `Ctrl+Shift+G` | Generate content with AI |
 | `Ctrl+Shift+W` | Rewrite selected text |
 | `Ctrl+Shift+K` | Extract key points |
 | `Ctrl+Shift+T` | Generate tags for selection |
@@ -189,6 +284,9 @@ Select any text in your notes and right-click to access powerful AI features:
 - **🎨 Rewrite Selection**: Change writing style (professional, casual, etc.)
 - **📋 Extract Key Points**: Pull out main points from text
 - **🏷️ Generate Tags**: Get AI-suggested tags for organization
+
+**General Context Menu** (right-click anywhere, no text selection needed):
+- **✨ Generate with AI**: Create new content based on prompts
 
 ### Themes
 
@@ -217,157 +315,26 @@ ollama pull gemma3:latest
 ollama serve
 ```
 
-## Project Structure
-
-```
-cognotez/
-├── main.js                    # Electron main process and menu system
-├── package.json              # Dependencies and build scripts
-├── package-lock.json         # Dependency lock file
-├── src/                      # Application source code
-│   ├── index.html           # Main HTML interface
-│   ├── css/
-│   │   ├── styles.css       # Main application styles
-│   │   └── themes.css       # Light/dark theme definitions
-│   └── js/
-│       ├── app.js           # Main application coordinator
-│       ├── ai.js            # AI integration and chat
-│       ├── backend.js       # File operations and data management
-│       ├── database.js      # Database abstraction layer
-│       ├── notes.js         # Note CRUD operations
-│       ├── scraper.js       # Web scraping functionality
-│       └── ui.js            # UI utilities and enhancements
-├── dist/                     # Build output directory
-│   └── linux-unpacked/      # Linux executable and resources
-├── test-*.js                # Test scripts for various features
-├── scraper-aichan.js        # Additional scraping utilities
-├── specs.md                 # Project specifications
-└── README.md                # This documentation
-```
-
-## Development
-
-### Building for Distribution
-
-```bash
-# Create distributable packages
-npm run dist
-
-# Build only
-npm run build
-```
-
-### Development Mode
-
-```bash
-# Run with dev tools open
-npm run dev
-```
-
-### Code Structure
-
-- **Main Process** (`main.js`): Electron window management, menu system, and IPC handlers
-- **Renderer Process** (`src/`): Web-based UI and application logic
-- **Core Modules**:
-  - `app.js`: Main application coordinator and initialization
-  - `notes.js`: Note CRUD operations and management
-  - `ai.js`: AI integration, chat, and tool calling
-  - `database.js`: localStorage abstraction and data persistence
-  - `backend.js`: File operations, import/export, and data management
-  - `scraper.js`: Web scraping functionality for external content
-  - `ui.js`: UI utilities, themes, and user interactions
-
-## Configuration
-
-### AI Settings
-
-The application automatically detects Ollama running on `localhost:11434`. Advanced configuration options include:
-
-#### Ollama Configuration
-1. **Local Models**: Automatic detection of installed Ollama models
-2. **Custom Endpoints**: Configure alternative Ollama server addresses
-3. **Model Selection**: Choose from available models for different tasks
-
-#### OpenRouter Integration (Optional)
-1. **API Key Setup**: Configure OpenRouter API key for cloud AI fallback
-2. **Model Selection**: Access to various AI models through OpenRouter
-3. **Tool Calling**: Enhanced AI capabilities with web search integration
-
-#### SearXNG Web Search (Optional)
-1. **Server Configuration**: Set custom SearXNG instance URL
-2. **Search Integration**: Enable web search for AI queries
-3. **Privacy-Focused**: Use self-hosted SearXNG for maximum privacy
-
-### Theme Customization
-
-Edit `src/css/themes.css` to customize:
-- Color palette
-- Accent colors (currently `#BDABE3`)
-- Font families
-- Spacing and sizing
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+ 
 
 ## License
 
 MIT License - see LICENSE file for details.
 
-## Roadmap
+## v1.0 Highlights (Completed)
 
-### Phase 1 ✅ (Completed)
-- ✅ Basic Electron setup
-- ✅ Core UI and theming
-- ✅ Note creation and editing
-- ✅ localStorage database integration
-
-### Phase 2 ✅ (Completed)
-- ✅ Full Ollama integration
-- ✅ Advanced AI features (summarization, Q&A, text editing, rewriting)
-- ✅ Context menus and keyboard shortcuts
-- ✅ AI settings and configuration
-- ✅ Data export/import functionality
-
-### Phase 3 ✅ (Completed)
-- ✅ Complete AI feature set (7+ AI actions)
-- ✅ Right-click context menu system
-- ✅ Comprehensive keyboard shortcuts
-- ✅ AI conversation history
-- ✅ Multi-model support
-- ✅ Streaming AI responses
-
-### Phase 4 ✅ (Completed)
-- ✅ Authenticated Google Drive sync workflow
-- ✅ End-to-end encrypted cloud backups
-- ✅ Offline-aware sync UX (clear status + retry/backoff)
-- ✅ Unified offline state detection across AI, sync, and scraping
-- ✅ Guided troubleshooting for connectivity issues across features
-
-### Phase 5 🎯 (Planned)
-- 🎯 Advanced search and filtering (full-text, tags, date ranges)
-- 🎯 Note templates and workflows
-- 🎯 Rich media support (images, attachments, embeds)
-- 🎯 Note versioning and history
-- 🎯 Plugin system for custom AI models
-
-### Recently Added Features ✅
-- ✅ Web scraping integration (Reddit, Fandom, generic sites)
-- ✅ SearXNG web search integration
-- ✅ Advanced import/export (JSON, bulk operations)
-- ✅ Backup and restore functionality
-- ✅ Migration wizard
-- ✅ Enhanced sharing capabilities
-- ✅ Statistics and analytics dashboard
-- ✅ OpenRouter API integration as Ollama fallback
-- ✅ Password-locked note encryption (AES-256-GCM at rest)
-- ✅ Network connectivity detection and monitoring (NetworkUtils)
-- ✅ Fast offline startup (<2 seconds with intelligent network detection)
-- ✅ Offline-aware error messaging across all features
+- Offline‑first note taking (create, edit, delete, search)
+- Local AI via Ollama: summarization, Q&A, edit, generate, rewrite, key points, tags
+- Streaming AI responses and multi‑model support
+- Right‑click AI actions and comprehensive keyboard shortcuts
+- Advanced search & filtering (full‑text, tags, date ranges, sort)
+- Note templates (built‑in and custom)
+- Rich media in notes (images, videos)
+- Google Drive sync with optional end‑to‑end encryption
+- Import/export, backup/restore, and migration tools
+- Web scraping (Reddit, Fandom, generic) and optional SearXNG integration
+- Statistics dashboard
+- Offline‑aware UX, fast startup (<2s), clear network/error status
 
 ### Future Enhancements (Long-term Vision)
 - 🔄 Advanced theming and customization

@@ -48,6 +48,7 @@
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
                     <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
+                    <button id="advanced-search-btn" class="advanced-search-btn" title="Advanced Search"><i class="fas fa-filter"></i></button>
                 </div>
             </div>
             <div class="header-right">
@@ -64,6 +65,7 @@
 
                 <button id="theme-toggle" class="theme-toggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
                 <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
+                <button id="templates-btn" class="templates-btn" title="Templates"><i class="fas fa-file-alt"></i></button>
                 <button id="new-note-btn" class="new-note-btn" title="New note"><i class="fas fa-plus"></i></button>
             </div>
         </header>
@@ -173,8 +175,16 @@
 
         <!-- Context Menu (hidden) -->
         <div id="context-menu" class="context-menu hidden">
-            <div class="context-menu-item" data-action="summarize"><i class="fas fa-file-alt"></i> Summarize Note</div>
-            <div class="context-menu-item" data-action="ask-ai"><i class="fas fa-robot"></i> Ask AI About Note</div>
+            <!-- Standard operations -->
+            <div class="context-menu-item" data-action="cut"><i class="fas fa-cut"></i> Cut</div>
+            <div class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> Copy</div>
+            <div class="context-menu-item" data-action="paste"><i class="fas fa-paste"></i> Paste</div>
+            <div class="context-menu-item" data-action="generate-ai"><i class="fas fa-magic"></i> Generate with AI</div>
+            <div class="context-menu-separator"></div>
+            <!-- AI operations (shown only when text is selected) -->
+            <div class="context-menu-item context-menu-ai" data-action="summarize"><i class="fas fa-file-alt"></i> Summarize</div>
+            <div class="context-menu-item context-menu-ai" data-action="ask-ai"><i class="fas fa-robot"></i> Ask AI</div>
+            <div class="context-menu-item context-menu-ai" data-action="edit-ai"><i class="fas fa-edit"></i> Edit with AI</div>
         </div>
 
         <!-- Modals/Dialogs -->
@@ -201,6 +211,81 @@
             <div class="loading-text">Processing with AI...</div>
         </div>
 
+        <!-- Advanced Search Panel -->
+        <div id="advanced-search-panel" class="advanced-search-panel hidden">
+            <div class="advanced-search-header">
+                <h3>Advanced Search</h3>
+                <button id="advanced-search-close" class="advanced-search-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="advanced-search-body">
+                <div class="search-filter-group">
+                    <label>Search Text</label>
+                    <input type="text" id="filter-text" placeholder="Search in title, content, tags..." class="filter-input">
+                </div>
+                <div class="search-filter-group">
+                    <label>Filter by Tags</label>
+                    <select id="filter-tags" multiple class="filter-select">
+                        <!-- Tags will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="search-filter-group">
+                    <label>Date Range</label>
+                    <div class="date-range-inputs">
+                        <input type="date" id="filter-date-from" class="filter-input-date" placeholder="From">
+                        <span>to</span>
+                        <input type="date" id="filter-date-to" class="filter-input-date" placeholder="To">
+                    </div>
+                </div>
+                <div class="search-filter-group">
+                    <label>Filter Options</label>
+                    <div class="filter-checkboxes">
+                        <label><input type="checkbox" id="filter-favorites"> Favorites only</label>
+                        <label><input type="checkbox" id="filter-pinned"> Pinned only</label>
+                        <label><input type="checkbox" id="filter-protected"> Password protected</label>
+                    </div>
+                </div>
+                <div class="search-filter-group">
+                    <label>Sort By</label>
+                    <select id="filter-sort" class="filter-select">
+                        <option value="updated_at_desc">Last Modified (Newest)</option>
+                        <option value="updated_at_asc">Last Modified (Oldest)</option>
+                        <option value="created_at_desc">Created (Newest)</option>
+                        <option value="created_at_asc">Created (Oldest)</option>
+                        <option value="title_asc">Title (A-Z)</option>
+                        <option value="title_desc">Title (Z-A)</option>
+                        <option value="word_count_desc">Word Count (High to Low)</option>
+                        <option value="word_count_asc">Word Count (Low to High)</option>
+                    </select>
+                </div>
+                <div class="advanced-search-actions">
+                    <button id="apply-filters-btn" class="btn-primary">Apply Filters</button>
+                    <button id="clear-filters-btn" class="btn-secondary">Clear All</button>
+                </div>
+                <div class="search-results-summary">
+                    <span id="search-results-count">0 notes found</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template Chooser Dialog -->
+        <div id="template-chooser" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Choose a Template</h3>
+                    <button id="template-chooser-close" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="template-grid" id="template-grid">
+                        <!-- Templates will be populated here -->
+                    </div>
+                    <div class="template-actions">
+                        <button id="create-custom-template-btn" class="btn-secondary"><i class="fas fa-plus"></i> Create Custom Template</button>
+                        <button id="generate-ai-template-btn" class="btn-primary"><i class="fas fa-robot"></i> Generate Template with AI</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
 
     <script src="./js/database.js"></script>
@@ -208,6 +293,11 @@
     <script src="./js/network-utils.js"></script>
     <script src="./js/backend.js"></script>
     <script src="./js/scraper.js"></script>
+    <!-- Phase 5 Modules -->
+    <script src="./js/advanced-search.js"></script>
+    <script src="./js/templates.js"></script>
+    <script src="./js/rich-media.js"></script>
+    <!-- End Phase 5 -->
     <script src="./js/app.js"></script>
     <script src="./js/notes.js"></script>
     <script src="./js/ai-edit-approval.js"></script>
