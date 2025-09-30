@@ -332,16 +332,28 @@ class AIManager {
                 if (savedSearxngMaxResults) this.searxngMaxResults = parseInt(savedSearxngMaxResults);
             }
 
-            console.log('[DEBUG] AI Manager: Checking connection...');
-            await this.checkConnection();
-            console.log('[DEBUG] AI Manager: Loading available models...');
-            await this.loadAvailableModels();
-            console.log('[DEBUG] AI Manager: AI service initialized successfully');
+            // Quick offline check to avoid slow timeouts during startup
+            if (!navigator.onLine) {
+                console.log('[DEBUG] AI Manager: Device is offline, skipping connection check');
+                this.isConnected = false;
+                return false;
+            }
 
-            return true;
+            console.log('[DEBUG] AI Manager: Checking connection...');
+            try {
+                await this.checkConnection();
+                console.log('[DEBUG] AI Manager: Loading available models...');
+                await this.loadAvailableModels();
+                console.log('[DEBUG] AI Manager: AI service initialized successfully');
+                return true;
+            } catch (error) {
+                console.warn('[DEBUG] AI Manager: AI connection failed:', error.message);
+                this.isConnected = false;
+                return false;
+            }
         } catch (error) {
             console.warn('[DEBUG] AI Manager: AI service not available:', error.message);
-            this.showOfflineMessage();
+            this.isConnected = false;
             return false;
         }
     }
@@ -363,7 +375,7 @@ class AIManager {
     async checkOllamaConnection() {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout for faster startup
 
             const response = await fetch(`${this.ollamaEndpoint}/api/tags`, {
                 signal: controller.signal,
@@ -383,7 +395,10 @@ class AIManager {
         } catch (error) {
             this.isConnected = false;
             if (error.name === 'AbortError') {
-                throw new Error('Connection timeout - Ollama may not be running');
+                throw new Error('Connection timeout - Ollama is not responding. Please start Ollama using "ollama serve" or check if it\'s running on a different port.');
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error(`Cannot reach Ollama at ${this.ollamaEndpoint}. Please ensure:\n1. Ollama is installed and running ("ollama serve")\n2. The endpoint URL is correct\n3. No firewall is blocking the connection`);
             }
             throw new Error(`Cannot connect to Ollama service: ${error.message}`);
         }
@@ -391,12 +406,12 @@ class AIManager {
 
     async checkOpenRouterConnection() {
         if (!this.openRouterApiKey || this.openRouterApiKey.trim() === '') {
-            throw new Error('OpenRouter API key is required');
+            throw new Error('OpenRouter API key is required. Please add your API key in AI Settings.');
         }
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for API
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout for faster startup
 
             const response = await fetch('https://openrouter.ai/api/v1/models', {
                 signal: controller.signal,
@@ -412,14 +427,17 @@ class AIManager {
                 this.isConnected = true;
                 return true;
             } else if (response.status === 401) {
-                throw new Error('Invalid OpenRouter API key');
+                throw new Error('Invalid OpenRouter API key. Please check your API key in AI Settings.');
             } else {
                 throw new Error(`OpenRouter API responded with status: ${response.status}`);
             }
         } catch (error) {
             this.isConnected = false;
             if (error.name === 'AbortError') {
-                throw new Error('Connection timeout - OpenRouter API may be unavailable');
+                throw new Error('Connection timeout - Check your internet connection or OpenRouter service may be temporarily unavailable.');
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error('No internet connection. OpenRouter requires an active internet connection to function.');
             }
             throw new Error(`Cannot connect to OpenRouter API: ${error.message}`);
         }
@@ -498,9 +516,25 @@ class AIManager {
     showOfflineMessage() {
         let message = '';
         if (this.backend === 'ollama') {
-            message = '🤖 AI features are currently offline. Please ensure Ollama is running locally.';
+            message = `🤖 AI features are currently offline.
+
+**To use Ollama:**
+1. Install Ollama from https://ollama.com
+2. Start Ollama by running "ollama serve" in terminal
+3. Pull a model: "ollama pull llama2"
+4. Verify it's running at ${this.ollamaEndpoint}
+
+**Alternative:** Switch to OpenRouter in AI Settings for cloud-based AI (requires internet).`;
         } else if (this.backend === 'openrouter') {
-            message = '🤖 AI features are currently offline. Please check your OpenRouter API key and internet connection.';
+            message = `🤖 AI features are currently offline.
+
+**To use OpenRouter:**
+1. Ensure you have an active internet connection
+2. Get an API key from https://openrouter.ai
+3. Add your API key in AI Settings
+4. Test the connection
+
+**Alternative:** Switch to Ollama in AI Settings for local AI (works offline).`;
         }
         this.app.showAIMessage(message, 'assistant');
     }
@@ -724,7 +758,7 @@ class AIManager {
     // SearXNG web search functionality
     async searchWithSearxng(query, options = {}) {
         if (!this.searxngEnabled) {
-            throw new Error('SearXNG is not enabled');
+            throw new Error('SearXNG is not enabled. Enable it in AI Settings to use web search.');
         }
 
         try {
@@ -736,13 +770,19 @@ class AIManager {
             searchUrl.searchParams.set('language', 'en');
             searchUrl.searchParams.set('safesearch', '1');
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
             const response = await fetch(searchUrl.toString(), {
                 method: 'GET',
+                signal: controller.signal,
                 headers: {
                     'Accept': 'application/json',
                     'User-Agent': 'CogNotez/1.0'
                 }
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`SearXNG search failed: ${response.status}`);
@@ -772,7 +812,13 @@ class AIManager {
 
         } catch (error) {
             console.error('SearXNG search error:', error);
-            throw new Error(`Failed to search with SearXNG: ${error.message}`);
+            if (error.name === 'AbortError') {
+                throw new Error(`Web search timed out. SearXNG at ${this.searxngUrl} is not responding. Please check if it's running.`);
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error(`Cannot reach SearXNG for web search. Ensure SearXNG is running at ${this.searxngUrl} and accessible.`);
+            }
+            throw new Error(`Web search failed: ${error.message}. Check SearXNG configuration in AI Settings.`);
         }
     }
 
@@ -802,6 +848,12 @@ class AIManager {
             }
         } catch (error) {
             console.error('SearXNG connection check failed:', error);
+            if (error.name === 'AbortError') {
+                throw new Error(`SearXNG connection timeout. Please ensure:\n1. SearXNG is running at ${this.searxngUrl}\n2. The URL is correct\n3. No firewall is blocking access`);
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error(`Cannot reach SearXNG at ${this.searxngUrl}. Please check if SearXNG is running and accessible.`);
+            }
             throw new Error(`Cannot connect to SearXNG: ${error.message}`);
         }
     }

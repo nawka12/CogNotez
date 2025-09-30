@@ -47,9 +47,10 @@ class WebScraper {
             if (!url || !url.startsWith('http')) {
                 return {
                     url,
-                    content: 'Invalid URL format',
+                    content: 'Invalid URL format - URL must start with http:// or https://',
                     title: 'Invalid URL',
-                    success: false
+                    success: false,
+                    errorType: 'invalid_url'
                 };
             }
 
@@ -67,11 +68,31 @@ class WebScraper {
             return await this.scrapeGeneric(url, options);
         } catch (error) {
             console.error(`[WebScraper] Error scraping ${url}:`, error.message);
+            
+            // Determine error type for better messaging
+            let errorType = 'unknown';
+            let errorMessage = error.message;
+            
+            if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN') {
+                errorType = 'network';
+                errorMessage = 'No internet connection or DNS resolution failed. Check your network connection.';
+            } else if (error.code === 'ECONNREFUSED') {
+                errorType = 'connection';
+                errorMessage = 'Connection refused - the website may be down or blocking requests.';
+            } else if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
+                errorType = 'timeout';
+                errorMessage = 'Request timed out - the website is not responding or connection is too slow.';
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorType = 'network';
+                errorMessage = 'Network error - please check your internet connection.';
+            }
+            
             return {
                 url,
-                content: `Failed to scrape content: ${error.message}`,
+                content: `Failed to scrape content: ${errorMessage}`,
                 title: 'Scraping Error',
-                success: false
+                success: false,
+                errorType: errorType
             };
         }
     }
@@ -385,19 +406,38 @@ class WebScraper {
             console.error(`[WebScraper] Error in generic scraping for ${url}:`, error.message);
 
             let errorMessage = 'Failed to scrape content';
-            if (error.code === 'ECONNABORTED') {
-                errorMessage = 'Request timed out';
-            } else if (error.code === 'ENOTFOUND') {
-                errorMessage = 'Domain not found';
+            let errorType = 'unknown';
+            
+            if (error.code === 'ECONNABORTED' || error.code === 'ETIMEDOUT') {
+                errorMessage = 'Request timed out - website not responding';
+                errorType = 'timeout';
+            } else if (error.code === 'ENOTFOUND' || error.code === 'EAI_AGAIN') {
+                errorMessage = 'Domain not found - check your internet connection or the URL';
+                errorType = 'network';
+            } else if (error.code === 'ECONNREFUSED') {
+                errorMessage = 'Connection refused - website may be down or blocking requests';
+                errorType = 'connection';
             } else if (error.response) {
                 errorMessage = `Server responded with status ${error.response.status}`;
+                errorType = 'http_error';
+                if (error.response.status === 403) {
+                    errorMessage += ' - Access forbidden (website may be blocking scrapers)';
+                } else if (error.response.status === 404) {
+                    errorMessage += ' - Page not found';
+                } else if (error.response.status >= 500) {
+                    errorMessage += ' - Server error';
+                }
+            } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                errorMessage = 'Network error - check your internet connection';
+                errorType = 'network';
             }
 
             return {
                 url,
                 content: `${errorMessage}: ${error.message}`,
                 title: 'Scraping Error',
-                success: false
+                success: false,
+                errorType: errorType
             };
         }
     }

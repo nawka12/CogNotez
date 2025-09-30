@@ -454,16 +454,12 @@ class DatabaseManager {
         return deletedCount;
     }
 
-    // Clear orphaned AI conversations (conversations for notes that no longer exist)
+    // Clear all AI conversations
     clearOrphanedAIConversations() {
-        const existingNoteIds = new Set(Object.keys(this.data.notes));
         let deletedCount = 0;
 
-        const conversationsToDelete = Object.keys(this.data.ai_conversations).filter(id => {
-            const conversation = this.data.ai_conversations[id];
-            // Check if the conversation has a note_id and if that note still exists
-            return conversation.note_id && !existingNoteIds.has(conversation.note_id);
-        });
+        // Get all conversation IDs
+        const conversationsToDelete = Object.keys(this.data.ai_conversations);
 
         conversationsToDelete.forEach(id => {
             delete this.data.ai_conversations[id];
@@ -472,7 +468,7 @@ class DatabaseManager {
 
         if (deletedCount > 0) {
             this.saveToLocalStorage();
-            console.log(`[Database] Cleared ${deletedCount} orphaned AI conversations`);
+            console.log(`[Database] Cleared ${deletedCount} AI conversations`);
         }
 
         return deletedCount;

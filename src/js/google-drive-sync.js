@@ -180,7 +180,9 @@ class GoogleDriveSyncManager {
             await this.ensureInitialized();
 
             if (!this.drive || !this.appFolderId) {
-                throw new Error('Drive API not initialized or app folder not found');
+                const error = new Error('Drive API not initialized or app folder not found. Please reconnect Google Drive in Sync Settings.');
+                error.notRetryable = true;
+                throw error;
             }
 
             console.log('[GoogleDriveSync] Starting upload process...');
@@ -269,14 +271,37 @@ class GoogleDriveSyncManager {
         } catch (error) {
             console.error('[GoogleDriveSync] Upload failed:', error);
 
+            // Don't retry if explicitly marked as non-retryable
+            if (error.notRetryable) {
+                throw error;
+            }
+
+            // Check for network errors (offline state)
+            const isNetworkError = error.message && (
+                error.message.includes('Failed to fetch') ||
+                error.message.includes('NetworkError') ||
+                error.message.includes('ENOTFOUND') ||
+                error.message.includes('ETIMEDOUT') ||
+                error.code === 'ENOTFOUND' ||
+                error.code === 'ETIMEDOUT'
+            );
+
+            // Network errors are retryable but should be handled differently
+            if (isNetworkError) {
+                console.log('[GoogleDriveSync] Network error detected - device may be offline');
+                const networkError = new Error('No internet connection. Please check your network and try again.');
+                networkError.isOffline = true;
+                networkError.retryableWhenOnline = true;
+                throw networkError;
+            }
+
             // Categorize error types for better handling
             const isRetryableError = error.code === 429 || // Rate limit
                                    error.code === 500 || // Server error
                                    error.code === 502 || // Bad gateway
                                    error.code === 503 || // Service unavailable
                                    error.code === 504 || // Gateway timeout
-                                   (error.code >= 520 && error.code <= 527) || // Cloudflare errors
-                                   error.code === 403; // Quota exceeded (sometimes retryable)
+                                   (error.code >= 520 && error.code <= 527); // Cloudflare errors
 
             // Retry for transient errors
             if (isRetryableError && retryCount < maxRetries) {
@@ -351,6 +376,31 @@ class GoogleDriveSyncManager {
         } catch (error) {
             console.error('[GoogleDriveSync] Download failed:', error);
 
+            // If file not found, reset remote file ID (not retryable)
+            if (error.code === 404) {
+                this.syncMetadata.remoteFileId = null;
+                throw error;
+            }
+
+            // Check for network errors (offline state)
+            const isNetworkError = error.message && (
+                error.message.includes('Failed to fetch') ||
+                error.message.includes('NetworkError') ||
+                error.message.includes('ENOTFOUND') ||
+                error.message.includes('ETIMEDOUT') ||
+                error.code === 'ENOTFOUND' ||
+                error.code === 'ETIMEDOUT'
+            );
+
+            // Network errors are retryable but should be handled differently
+            if (isNetworkError) {
+                console.log('[GoogleDriveSync] Network error detected during download - device may be offline');
+                const networkError = new Error('No internet connection. Please check your network and try again.');
+                networkError.isOffline = true;
+                networkError.retryableWhenOnline = true;
+                throw networkError;
+            }
+
             // Categorize error types for better handling
             const isRetryableError = error.code === 429 || // Rate limit
                                    error.code === 500 || // Server error
@@ -358,12 +408,6 @@ class GoogleDriveSyncManager {
                                    error.code === 503 || // Service unavailable
                                    error.code === 504 || // Gateway timeout
                                    (error.code >= 520 && error.code <= 527); // Cloudflare errors
-
-            // If file not found, reset remote file ID (not retryable)
-            if (error.code === 404) {
-                this.syncMetadata.remoteFileId = null;
-                throw error;
-            }
 
             // Retry for transient errors
             if (isRetryableError && retryCount < maxRetries) {
@@ -583,9 +627,26 @@ class GoogleDriveSyncManager {
             if (error.encryptionRequired) {
                 return 'Cloud data is encrypted. Enter your E2EE passphrase to continue.';
             }
+            
+            // Network-related errors
+            if (error.message && (
+                error.message.includes('Failed to fetch') || 
+                error.message.includes('NetworkError') ||
+                error.message.includes('ENOTFOUND') ||
+                error.message.includes('ETIMEDOUT') ||
+                error.message.includes('network')
+            )) {
+                return 'No internet connection. Sync requires an active internet connection. Will retry when online.';
+            }
+            
             const code = error.code || error.status || '';
             if (code === 404) return 'Remote backup not found on Google Drive.';
-            if (code === 401 || code === 403) return 'Google Drive access denied. Please reconnect your account.';
+            if (code === 401 || code === 403) return 'Google Drive access denied. Please reconnect your account in Sync Settings.';
+            if (code === 429) return 'Google Drive rate limit reached. Auto-sync paused temporarily.';
+            if (code === 500 || code === 502 || code === 503 || code === 504) {
+                return 'Google Drive service temporarily unavailable. Will retry automatically.';
+            }
+            
             return `Sync failed: ${error.message || 'Unexpected error'}`;
         } catch (_) {
             return 'Sync failed due to an unknown error';

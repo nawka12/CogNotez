@@ -640,8 +640,15 @@ class CogNotezApp {
             try {
                 const syncMeta = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
                 if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
-                    console.log('[Sync] Running startup sync after initial note load...');
-                    await this.manualSync();
+                    // Check if we're online before attempting startup sync
+                    const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
+                    if (isOnline) {
+                        console.log('[Sync] Running startup sync after initial note load...');
+                        await this.manualSync();
+                    } else {
+                        console.log('[Sync] Skipping startup sync - device is offline');
+                        this.showNotification('Startup sync skipped - no internet connection', 'info');
+                    }
                 }
             } catch (e) {
                 console.warn('[Sync] Post-load startup sync failed:', e.message);
@@ -714,6 +721,23 @@ class CogNotezApp {
         }
         document.getElementById('sync-manual-btn').addEventListener('click', () => this.manualSync());
         document.getElementById('search-button').addEventListener('click', () => this.searchNotes());
+
+        // Network online/offline event listeners
+        window.addEventListener('online', () => {
+            console.log('[Network] Device is now ONLINE');
+            this.showNotification('Connection restored', 'success');
+            this.updateSyncUI();
+            // Clear network cache when coming back online
+            if (window.networkUtils) {
+                window.networkUtils.clearCache();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('[Network] Device is now OFFLINE');
+            this.showNotification('No internet connection', 'warning');
+            this.updateSyncUI();
+        });
 
         // Search input
         document.getElementById('search-input').addEventListener('input', (e) => this.searchNotes(e.target.value));
@@ -2044,7 +2068,22 @@ Please provide a helpful response based on the note content and conversation his
                 console.log('[DEBUG] AI response received:', response.substring(0, 200) + '...');
             } else {
                 console.log('[DEBUG] AI Manager not connected, showing offline message');
-                response = '<i class="fas fa-robot"></i> AI features are currently offline. Please ensure Ollama is running locally.';
+                const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+                if (backend === 'ollama') {
+                    response = `<i class="fas fa-robot"></i> AI features are currently offline.
+
+**To enable Ollama:**
+• Start Ollama: Run "ollama serve" in terminal
+• Pull a model: "ollama pull llama2"
+• Or switch to OpenRouter in AI Settings`;
+                } else {
+                    response = `<i class="fas fa-robot"></i> AI features are currently offline.
+
+**To enable OpenRouter:**
+• Check your internet connection
+• Verify your API key in AI Settings
+• Or switch to Ollama for offline AI`;
+                }
             }
 
             // Remove typing indicator and show actual response
@@ -2066,7 +2105,14 @@ Please provide a helpful response based on the note content and conversation his
             console.error('[DEBUG] Error sending AI message:', error);
             // Remove typing indicator and show error
             this.removeLastAIMessage();
-            this.showAIMessage('❌ Sorry, I encountered an error. Please check your AI connection.', 'assistant');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            let errorMsg = '❌ Sorry, I encountered an error. ';
+            if (backend === 'ollama') {
+                errorMsg += 'Please check that Ollama is running and accessible.';
+            } else {
+                errorMsg += 'Please check your internet connection and OpenRouter settings.';
+            }
+            this.showAIMessage(errorMsg, 'assistant');
         }
     }
 
@@ -2503,7 +2549,9 @@ Please provide a helpful response based on the note content and conversation his
             console.log('[DEBUG] processAIDialog: handleAIAction completed');
         } catch (error) {
             console.error('[DEBUG] processAIDialog: AI action failed:', error);
-            this.showNotification('AI action failed. Please check your connection.', 'error');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            const connectionType = backend === 'ollama' ? 'Ollama service' : 'internet connection and API key';
+            this.showNotification(`AI action failed. Please check your ${connectionType}.`, 'error');
         } finally {
             this.hideLoading();
         }
@@ -2616,7 +2664,14 @@ Please provide a helpful response based on the note content and conversation his
             if (!this.aiPanelVisible) {
                 this.toggleAIPanel();
             }
-            this.showAIMessage('❌ AI action failed. Please check your Ollama connection.', 'assistant');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            let errorMsg = '❌ AI action failed. ';
+            if (backend === 'ollama') {
+                errorMsg += 'Please ensure Ollama is running ("ollama serve") and a model is loaded.';
+            } else {
+                errorMsg += 'Please check your internet connection and OpenRouter API key in AI Settings.';
+            }
+            this.showAIMessage(errorMsg, 'assistant');
             this.hideLoading();
         }
     }
@@ -3577,7 +3632,14 @@ Please provide a helpful response based on the note content and conversation his
             if (!this.aiPanelVisible) {
                 this.toggleAIPanel();
             }
-            this.showAIMessage('❌ AI action failed. Please check your Ollama connection.', 'assistant');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            let errorMsg = '❌ AI action failed. ';
+            if (backend === 'ollama') {
+                errorMsg += 'Please ensure Ollama is running ("ollama serve") and a model is loaded.';
+            } else {
+                errorMsg += 'Please check your internet connection and OpenRouter API key in AI Settings.';
+            }
+            this.showAIMessage(errorMsg, 'assistant');
             this.hideLoading();
         }
     }
@@ -4364,12 +4426,19 @@ Please provide a helpful response based on the note content and conversation his
     // Sync-related methods
     async initializeSync() {
         try {
+            // Quick offline check to avoid slow sync initialization when offline
+            if (!navigator.onLine) {
+                console.log('[Sync] Device is offline, skipping sync initialization');
+                return;
+            }
+
             // Check if sync is enabled
             if (this.notesManager && this.notesManager.db) {
                 const syncEnabled = this.notesManager.db.isSyncEnabled();
                 if (syncEnabled) {
-                    // Initialize sync status
-                    await this.updateSyncStatus();
+                    // Initialize sync status with timeout to prevent blocking startup
+                    const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
+                    await Promise.race([this.updateSyncStatus(), timeoutPromise]);
 
                     // Show sync status container
                     const syncContainer = document.getElementById('sync-status-container');
@@ -4537,6 +4606,9 @@ Please provide a helpful response based on the note content and conversation his
             inProgress: this.syncStatus.inProgress
         });
 
+        // Check if we're offline (quick sync check)
+        const isOnline = navigator.onLine;
+
         // Determine if content is in sync using checksums when available
         const contentInSync = !!(this.syncStatus.localChecksum && this.syncStatus.remoteChecksum && this.syncStatus.localChecksum === this.syncStatus.remoteChecksum);
 
@@ -4545,6 +4617,12 @@ Please provide a helpful response based on the note content and conversation his
             indicator.className = 'sync-status-indicator syncing';
             icon.className = 'fas fa-spinner fa-spin';
             text.textContent = 'Syncing...';
+            manualBtn.disabled = true;
+        } else if (!isOnline) {
+            // Show offline state
+            indicator.className = 'sync-status-indicator disconnected';
+            icon.className = 'fas fa-wifi-slash';
+            text.textContent = 'Offline';
             manualBtn.disabled = true;
         } else if (this.syncStatus.isAuthenticated) {
             if (contentInSync) {
@@ -4724,10 +4802,10 @@ Please provide a helpful response based on the note content and conversation his
                             <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Advanced Options</h5>
                             <div class="sync-advanced-options" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
                                 <div class="sync-buttons" style="display: flex; gap: 12px; flex-wrap: wrap;">
-                                    <button id="modal-clear-orphaned-ai-btn" class="sync-button" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear Orphaned AI Conversations</button>
+                                    <button id="modal-clear-orphaned-ai-btn" class="sync-button" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear All AI Conversations</button>
                                 </div>
                                 <div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary);">
-                                    <strong>Clear Orphaned AI Conversations:</strong> Deletes AI conversations for notes that no longer exist. Useful for cleaning up conversations from deleted notes.
+                                    <strong>Clear All AI Conversations:</strong> Deletes all AI conversations for all notes. This action cannot be undone.
                                 </div>
                             </div>
                         </div>
@@ -4949,10 +5027,10 @@ Please provide a helpful response based on the note content and conversation his
                 }
             });
 
-            // Clear orphaned AI conversations button
+            // Clear all AI conversations button
             clearOrphanedAIBtn.addEventListener('click', async () => {
                 try {
-                    const confirmed = confirm('Are you sure you want to clear orphaned AI conversations? This will delete AI conversations for notes that no longer exist.');
+                    const confirmed = confirm('Are you sure you want to clear all AI conversations? This will delete ALL AI conversations for ALL notes and cannot be undone.');
 
                     if (!confirmed) return;
 
@@ -4964,14 +5042,14 @@ Please provide a helpful response based on the note content and conversation his
                     if (result.success) {
                         this.showNotification(result.message, 'success');
                     } else {
-                        this.showNotification(result.error || 'Failed to clear orphaned AI conversations', 'error');
+                        this.showNotification(result.error || 'Failed to clear AI conversations', 'error');
                     }
                 } catch (error) {
-                    console.error('[Sync] Failed to clear orphaned AI conversations:', error);
-                    this.showNotification('Failed to clear orphaned AI conversations', 'error');
+                    console.error('[Sync] Failed to clear AI conversations:', error);
+                    this.showNotification('Failed to clear AI conversations', 'error');
                 } finally {
                     clearOrphanedAIBtn.disabled = false;
-                    clearOrphanedAIBtn.textContent = 'Clear Orphaned AI Conversations';
+                    clearOrphanedAIBtn.textContent = 'Clear All AI Conversations';
                 }
             });
 
@@ -5444,6 +5522,14 @@ Please provide a helpful response based on the note content and conversation his
                 return;
             }
 
+            // Check if we're online before attempting sync
+            const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(3000);
+            if (!isOnline) {
+                this.showNotification('Cannot sync - no internet connection', 'error');
+                console.log('[Sync] Manual sync cancelled - device is offline');
+                return;
+            }
+
             this.syncStatus.inProgress = true;
             this.updateSyncUI();
 
@@ -5491,8 +5577,15 @@ Please provide a helpful response based on the note content and conversation his
         this.autoSyncInterval = setInterval(async () => {
             try {
                 if (!this.syncStatus.inProgress && this.syncStatus.isAuthenticated && this.syncStatus.syncEnabled) {
-                    console.log('[Sync] Running auto-sync...');
-                    await this.manualSync();
+                    // Check if we're online before attempting auto-sync
+                    const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
+                    if (isOnline) {
+                        console.log('[Sync] Running auto-sync...');
+                        await this.manualSync();
+                    } else {
+                        console.log('[Sync] Skipping auto-sync - device is offline');
+                        // Don't show notification for auto-sync failures to avoid spam
+                    }
                 }
             } catch (error) {
                 console.error('[Sync] Auto-sync failed:', error);

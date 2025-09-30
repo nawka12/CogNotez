@@ -239,7 +239,7 @@ class BackendAPI {
         }
     }
 
-    // Clear orphaned AI conversations (conversations for deleted notes)
+    // Clear all AI conversations
     async clearOrphanedAIConversations() {
         try {
             if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
@@ -249,15 +249,15 @@ class BackendAPI {
             const db = this.app.notesManager.db;
             const deletedCount = db.clearOrphanedAIConversations();
 
-            console.log(`[Backend] Cleared ${deletedCount} orphaned AI conversations`);
+            console.log(`[Backend] Cleared ${deletedCount} AI conversations`);
             return {
                 success: true,
                 deletedCount: deletedCount,
-                message: `Successfully cleared ${deletedCount} orphaned AI conversations`
+                message: `Successfully cleared ${deletedCount} AI conversations`
             };
 
         } catch (error) {
-            console.error('[Backend] Failed to clear orphaned AI conversations:', error);
+            console.error('[Backend] Failed to clear AI conversations:', error);
             return {
                 success: false,
                 error: error.message
