@@ -627,7 +627,7 @@ class RichMediaManager {
         try {
             // Get file data
             const fileData = await this.getMediaFile(attachment.id);
-            
+
             if (!fileData) {
                 this.app.showNotification?.('File not found', 'error');
                 return;
@@ -646,6 +646,74 @@ class RichMediaManager {
         } catch (error) {
             console.error('[RichMedia] Failed to download attachment:', error);
             this.app.showNotification?.('Failed to download file', 'error');
+        }
+    }
+
+    /**
+     * Save downloaded media file (used during sync)
+     * @param {string} fileId - Media file ID
+     * @param {Buffer|ArrayBuffer} fileData - File data
+     */
+    async saveDownloadedMediaFile(fileId, fileData) {
+        try {
+            if (this.useFileSystem) {
+                // Use Electron IPC to save file
+                const electron = require('electron');
+                await electron.ipcRenderer.invoke('save-downloaded-media-file', {
+                    fileId: fileId,
+                    fileData: Array.from(fileData)
+                });
+            } else {
+                // Save to IndexedDB
+                const fileDataObj = {
+                    id: fileId,
+                    name: `${fileId}`, // Use ID as filename for now
+                    type: 'application/octet-stream', // Generic type for downloaded files
+                    size: fileData.byteLength || fileData.length,
+                    data: fileData,
+                    storageType: 'indexeddb',
+                    createdAt: new Date().toISOString()
+                };
+
+                await this.saveToIndexedDB(fileDataObj);
+            }
+
+            console.log('[RichMedia] Saved downloaded media file:', fileId);
+        } catch (error) {
+            console.error('[RichMedia] Failed to save downloaded media file:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Track downloaded media file for cognotez-media:// access
+     * @param {string} fileId - Media file ID
+     * @param {Object} mediaRef - Media reference object
+     */
+    async trackDownloadedMedia(fileId, mediaRef) {
+        try {
+            // Create a temporary attachment entry for this downloaded file
+            // This allows the file to be accessed via cognotez-media:// URLs
+            const tempNoteId = 'downloaded_media';
+
+            if (!this.attachments.has(tempNoteId)) {
+                this.attachments.set(tempNoteId, []);
+            }
+
+            // Check if already tracked
+            const existingIndex = this.attachments.get(tempNoteId).findIndex(a => a.id === fileId);
+            if (existingIndex >= 0) {
+                // Update existing entry
+                this.attachments.get(tempNoteId)[existingIndex] = mediaRef;
+            } else {
+                // Add new entry
+                this.attachments.get(tempNoteId).push(mediaRef);
+            }
+
+            console.log('[RichMedia] Tracked downloaded media file:', fileId);
+        } catch (error) {
+            console.error('[RichMedia] Failed to track downloaded media file:', error);
+            throw error;
         }
     }
 

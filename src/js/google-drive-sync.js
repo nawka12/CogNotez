@@ -7,6 +7,9 @@ const path = require('path');
 const crypto = require('crypto');
 const encryptionManager = require('./encryption');
 
+// Check if we're in Electron main process or renderer process
+const isMainProcess = typeof window === 'undefined';
+
 class GoogleDriveSyncManager {
     constructor(authManager, encryptionSettings = null) {
         this.authManager = authManager;
@@ -481,7 +484,9 @@ class GoogleDriveSyncManager {
                 stats: {
                     uploaded: 0,
                     downloaded: 0,
-                    conflicts: 0
+                    conflicts: 0,
+                    mediaFilesUploaded: 0,
+                    mediaFilesDownloaded: 0
                 }
             };
 
@@ -530,6 +535,12 @@ class GoogleDriveSyncManager {
                     progressCallback({ status: 'error', message: 'Failed to download remote data' });
                 }
             }
+
+            // Handle media file synchronization
+            progressCallback({ status: 'syncing_media', message: 'Synchronizing media files...' });
+            const mediaSyncResult = await this.syncMediaFiles(localData, remoteData, progressCallback);
+            result.stats.mediaFilesUploaded = mediaSyncResult.uploaded;
+            result.stats.mediaFilesDownloaded = mediaSyncResult.downloaded;
 
             // Determine sync strategy
             progressCallback({ status: 'analyzing_changes', message: 'Analyzing data changes...' });
@@ -1044,6 +1055,219 @@ class GoogleDriveSyncManager {
         } catch (error) {
             console.error('[GoogleDriveSync] Failed to delete media file:', error);
             throw error;
+        }
+    }
+
+    /**
+     * Extract media file IDs from note content
+     * @param {Object} data - Notes data object
+     * @returns {Set} Set of media file IDs found in notes
+     */
+    extractMediaFileIds(data) {
+        const mediaFileIds = new Set();
+
+        if (!data || !data.notes) {
+            return mediaFileIds;
+        }
+
+        // Pattern to match cognotez-media:// URLs
+        const mediaUrlPattern = /cognotez-media:\/\/([a-z0-9]+)/gi;
+
+        for (const note of Object.values(data.notes)) {
+            if (note.content) {
+                const matches = note.content.match(mediaUrlPattern);
+                if (matches) {
+                    for (const match of matches) {
+                        const fileId = match.replace('cognotez-media://', '');
+                        mediaFileIds.add(fileId);
+                    }
+                }
+            }
+        }
+
+        return mediaFileIds;
+    }
+
+    /**
+     * Synchronize media files between local and remote storage
+     * @param {Object} localData - Local notes data
+     * @param {Object} remoteData - Remote notes data (null if no remote data)
+     * @param {Function} progressCallback - Progress callback function
+     * @returns {Object} Sync results with uploaded and downloaded counts
+     */
+    async syncMediaFiles(localData, remoteData, progressCallback) {
+        const result = {
+            uploaded: 0,
+            downloaded: 0,
+            errors: []
+        };
+
+        try {
+            // Extract media file IDs from both local and remote data
+            const localMediaIds = this.extractMediaFileIds(localData);
+            const remoteMediaIds = remoteData ? this.extractMediaFileIds(remoteData) : new Set();
+
+            console.log('[GoogleDriveSync] Media sync - Local files:', localMediaIds.size, 'Remote files:', remoteMediaIds.size);
+
+            // Get list of remote media files
+            let remoteMediaFiles = [];
+            try {
+                remoteMediaFiles = await this.listMediaFiles();
+                console.log('[GoogleDriveSync] Found', remoteMediaFiles.length, 'remote media files');
+            } catch (error) {
+                console.warn('[GoogleDriveSync] Could not list remote media files:', error.message);
+                // Continue with empty list - we'll handle missing files during download
+            }
+
+            // Create a map of remote file names to IDs for quick lookup
+            const remoteFileMap = new Map();
+            remoteMediaFiles.forEach(file => {
+                remoteFileMap.set(file.name, file.id);
+            });
+
+            // This is a simplified sync approach:
+            // 1. For files that exist locally but not remotely: upload them
+            // 2. For files that exist remotely but not locally: download them
+            // Note: In a full implementation, we'd also check modification times and handle conflicts
+
+            // Upload new local media files
+            for (const fileId of localMediaIds) {
+                const fileName = `${fileId}`; // Files are stored by ID without extension in our current system
+
+                if (!remoteFileMap.has(fileName)) {
+                    try {
+                        // Get file data from local storage
+                        let fileData = null;
+                        if (typeof window !== 'undefined' && window.RichMediaManager) {
+                            // We're in renderer process - use RichMediaManager
+                            fileData = await window.RichMediaManager.getMediaFile(fileId);
+                        } else {
+                            // We're in main process - use direct file access
+                            const fs = require('fs').promises;
+                            const mediaDir = await this.getMediaDirectory();
+                            const filePath = `${mediaDir}/${fileName}`;
+
+                            try {
+                                fileData = await fs.readFile(filePath);
+                            } catch (error) {
+                                console.warn(`[GoogleDriveSync] Could not read local media file ${fileName}:`, error.message);
+                                continue;
+                            }
+                        }
+
+                        if (fileData) {
+                            await this.uploadMediaFile(fileName, fileData);
+                            result.uploaded++;
+                            console.log('[GoogleDriveSync] Uploaded media file:', fileName);
+                        }
+                    } catch (error) {
+                        console.error('[GoogleDriveSync] Failed to upload media file:', fileName, error);
+                        result.errors.push(`Upload failed for ${fileName}: ${error.message}`);
+                    }
+                }
+            }
+
+            // Download missing remote media files
+            for (const file of remoteMediaFiles) {
+                const fileName = file.name;
+                const fileId = fileName; // File name is the ID in our system
+
+                // Check if this file is referenced in either local or remote notes
+                if (localMediaIds.has(fileId) || remoteMediaIds.has(fileId)) {
+                    // Check if file exists locally
+                    let fileExistsLocally = false;
+
+                    if (typeof window !== 'undefined' && window.RichMediaManager) {
+                        // Renderer process - check if RichMediaManager can access the file
+                        try {
+                            await window.RichMediaManager.getMediaFile(fileId);
+                            fileExistsLocally = true;
+                        } catch (error) {
+                            fileExistsLocally = false;
+                        }
+                    } else {
+                        // Main process - check file system
+                        try {
+                            const fs = require('fs').promises;
+                            const mediaDir = await this.getMediaDirectory();
+                            const filePath = `${mediaDir}/${fileName}`;
+                            await fs.access(filePath);
+                            fileExistsLocally = true;
+                        } catch (error) {
+                            fileExistsLocally = false;
+                        }
+                    }
+
+                    if (!fileExistsLocally) {
+                        try {
+                            // Download the file
+                            const fileData = await this.downloadMediaFile(file.id);
+
+                            // Save to local storage
+                            if (typeof window !== 'undefined' && window.RichMediaManager) {
+                                // Renderer process - use RichMediaManager to save and register
+                                await window.RichMediaManager.saveDownloadedMediaFile(fileId, fileData);
+
+                                // Also register the file in the media database for cognotez-media:// access
+                                const mediaDir = await this.getMediaDirectory();
+                                const mediaRef = {
+                                    id: fileId,
+                                    name: fileName,
+                                    type: 'application/octet-stream', // Will be updated when file is actually accessed
+                                    size: fileData.byteLength || fileData.length,
+                                    storageType: 'filesystem',
+                                    path: `${mediaDir}/${fileName}`,
+                                    createdAt: new Date().toISOString()
+                                };
+
+                                // Track this as a downloaded media file
+                                await window.RichMediaManager.trackDownloadedMedia(fileId, mediaRef);
+                            } else {
+                                // Main process - save directly to file system
+                                const fs = require('fs').promises;
+                                const mediaDir = await this.getMediaDirectory();
+                                const filePath = `${mediaDir}/${fileName}`;
+
+                                // Ensure media directory exists
+                                await fs.mkdir(mediaDir, { recursive: true });
+                                await fs.writeFile(filePath, fileData);
+                            }
+
+                            result.downloaded++;
+                            console.log('[GoogleDriveSync] Downloaded media file:', fileName);
+                        } catch (error) {
+                            console.error('[GoogleDriveSync] Failed to download media file:', fileName, error);
+                            result.errors.push(`Download failed for ${fileName}: ${error.message}`);
+                        }
+                    }
+                }
+            }
+
+            console.log('[GoogleDriveSync] Media sync completed:', result);
+            return result;
+
+        } catch (error) {
+            console.error('[GoogleDriveSync] Media sync failed:', error);
+            result.errors.push(`Media sync failed: ${error.message}`);
+            return result;
+        }
+    }
+
+    /**
+     * Get media directory path (main process only)
+     */
+    async getMediaDirectory() {
+        // Use the existing IPC handler to get media directory
+        if (typeof window !== 'undefined') {
+            // We're in renderer process - use IPC
+            const electron = require('electron');
+            return await electron.ipcRenderer.invoke('get-media-directory');
+        } else {
+            // We're in main process - return the path directly
+            const path = require('path');
+            const app = require('electron').app;
+            const mediaDir = path.join(app.getPath('userData'), 'media');
+            return mediaDir;
         }
     }
 }

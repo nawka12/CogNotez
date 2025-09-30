@@ -1067,6 +1067,26 @@ if (ipcMain) {
     }
   });
 
+  // Save downloaded media file (used during sync)
+  ipcMain.handle('save-downloaded-media-file', async (event, { fileId, fileData }) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      await fs.mkdir(mediaDir, { recursive: true });
+
+      const fileName = `${fileId}`;
+      const filePath = path.join(mediaDir, fileName);
+      const bufferData = Buffer.from(fileData);
+
+      await fs.writeFile(filePath, bufferData);
+
+      console.log(`[Media] Saved downloaded media file: ${fileName} (${bufferData.length} bytes)`);
+      return filePath;
+    } catch (error) {
+      console.error('[Media] Failed to save downloaded media file:', error);
+      throw error;
+    }
+  });
+
   // Sync media files to Google Drive (smart sync with orphan cleanup)
   ipcMain.handle('sync-media-to-drive', async () => {
     try {
