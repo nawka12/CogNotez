@@ -871,10 +871,18 @@ class CogNotezApp {
             e.preventDefault();
             const selection = window.getSelection();
             const selectedText = selection.toString();
-            
+
             this.selectedText = selectedText;
             this.contextElement = preview;
-            
+
+            // Check if right-clicked on media element
+            const target = e.target.closest('img, video, audio');
+            if (target) {
+                this.contextMediaElement = target;
+            } else {
+                this.contextMediaElement = null;
+            }
+
             this.showContextMenu(e, selectedText);
         });
         editor.addEventListener('input', () => {
@@ -2326,6 +2334,7 @@ Please provide a helpful response based on the note content and conversation his
         const cutItem = menu.querySelector('[data-action="cut"]');
         const copyItem = menu.querySelector('[data-action="copy"]');
         const pasteItem = menu.querySelector('[data-action="paste"]');
+        const downloadItem = menu.querySelector('[data-action="download-media"]');
         const separator = menu.querySelector('.context-menu-separator');
 
         // Check if in preview mode
@@ -2391,6 +2400,17 @@ Please provide a helpful response based on the note content and conversation his
                 pasteItem.classList.remove('disabled');
             } else {
                 pasteItem.classList.add('disabled');
+            }
+        }
+
+        // Show download option when right-clicking on media elements in preview mode
+        if (downloadItem) {
+            const hasMediaElement = this.contextMediaElement && isPreviewMode;
+            downloadItem.style.display = hasMediaElement ? 'flex' : 'none';
+
+            if (hasMediaElement) {
+                // Enable download item if we have a media element
+                downloadItem.classList.remove('disabled');
             }
         }
         
@@ -2515,6 +2535,135 @@ Please provide a helpful response based on the note content and conversation his
             case 'generate-ai':
                 this.generateContentWithAI();
                 break;
+
+            case 'download-media':
+                if (this.contextMediaElement) {
+                    await this.downloadMediaFromElement(this.contextMediaElement);
+                }
+                break;
+        }
+    }
+
+    /**
+     * Download media file from a media element (img, video, audio)
+     * @param {HTMLElement} mediaElement - The media element to download from
+     */
+    async downloadMediaFromElement(mediaElement) {
+        try {
+            const src = mediaElement.src || mediaElement.querySelector('source')?.src;
+
+            if (!src) {
+                this.showNotification('Media source not found', 'error');
+                return;
+            }
+
+            // Extract file ID from cognotez-media:// URL
+            if (src.startsWith('cognotez-media://')) {
+                const fileId = src.replace('cognotez-media://', '');
+
+                if (this.richMediaManager) {
+                    // First try to get media reference from RichMediaManager (for local files)
+                    let mediaRef = await this.richMediaManager.getMediaReference(fileId);
+
+                    if (mediaRef) {
+                        // Use the existing downloadAttachment method for tracked files
+                        await this.richMediaManager.downloadAttachment(mediaRef);
+                        return;
+                    }
+
+                    // If not found in RichMediaManager, try direct filesystem access for synced files
+                    try {
+                        const fileResult = await this.downloadMediaFromFilesystem(fileId);
+                        if (fileResult) {
+                            // Get filename from the result (includes extension)
+                            const filename = fileResult.filename || fileId;
+
+                            // Create a blob and trigger download
+                            const blob = new Blob([fileResult.buffer]);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            this.showNotification('Media downloaded successfully', 'success');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn('[App] Filesystem download failed, trying alternative methods:', error);
+                    }
+
+                    // Fallback: try to get original filename from attachments or use fileId
+                    const attachments = this.richMediaManager.getAttachmentsForNote ? this.richMediaManager.getAttachmentsForNote('downloaded_media') : [];
+                    const attachment = attachments.find(att => att.id === fileId);
+                    const originalName = attachment?.name || fileId;
+
+                    this.showNotification(`Media file "${originalName}" not found locally`, 'error');
+                } else {
+                    this.showNotification('Media manager not available', 'error');
+                }
+            } else {
+                // For external URLs, use browser download
+                const link = document.createElement('a');
+                link.href = src;
+                link.download = mediaElement.alt || mediaElement.title || 'media';
+                link.click();
+                this.showNotification('Downloading media...', 'success');
+            }
+        } catch (error) {
+            console.error('[App] Failed to download media:', error);
+            this.showNotification('Failed to download media', 'error');
+        }
+    }
+
+    /**
+     * Download media file directly from filesystem for synced files
+     * @param {string} fileId - The media file ID
+     * @returns {Promise<Object|null>} - Object with buffer and filename, or null if not found
+     */
+    async downloadMediaFromFilesystem(fileId) {
+        try {
+            // First try to get the original filename from RichMediaManager
+            if (this.richMediaManager) {
+                try {
+                    const mediaRef = await this.richMediaManager.getMediaReference(fileId);
+                    if (mediaRef && mediaRef.name) {
+                        // Use the original filename from the media reference
+                        const electron = require('electron');
+                        const mediaDir = await electron.ipcRenderer.invoke('get-media-directory');
+                        const filePath = `${mediaDir}/${mediaRef.name}`;
+
+                        try {
+                            const fileData = await electron.ipcRenderer.invoke('read-media-file', filePath);
+                            if (fileData) {
+                                console.log(`[App] Successfully read media file using original filename: ${mediaRef.name}`);
+                                return {
+                                    buffer: fileData,
+                                    filename: mediaRef.name
+                                };
+                            }
+                        } catch (error) {
+                            console.warn(`[App] Failed to read file with original filename: ${mediaRef.name}`, error);
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[App] Failed to get media reference for: ${fileId}`, error);
+                }
+            }
+
+            // Fallback: Use intelligent file discovery
+            const electron = require('electron');
+            const result = await electron.ipcRenderer.invoke('find-and-read-media-file', fileId);
+
+            if (result && result.buffer) {
+                console.log(`[App] Successfully read media file from filesystem: ${result.filename}`);
+                return result;
+            }
+
+            return null;
+        } catch (error) {
+            console.warn(`[App] Failed to read media file from filesystem: ${fileId}`, error);
+            return null;
         }
     }
 

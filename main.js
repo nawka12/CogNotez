@@ -1062,6 +1062,77 @@ if (ipcMain) {
     }
   });
 
+  // Read media file directly from filesystem (for synced files)
+  ipcMain.handle('read-media-file', async (event, filePath) => {
+    try {
+      // Ensure the file exists before reading
+      await fs.access(filePath);
+
+      const buffer = await fs.readFile(filePath);
+      console.log(`[Media] Successfully read media file: ${filePath} (${buffer.length} bytes)`);
+      return buffer;
+    } catch (error) {
+      console.error(`[Media] Failed to read media file: ${filePath}`, error);
+      throw error;
+    }
+  });
+
+  // Find and read media file by ID (intelligent file discovery)
+  ipcMain.handle('find-and-read-media-file', async (event, fileId) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+
+      // 1. Try the fileId as-is (for backwards compatibility)
+      let filePath = path.join(mediaDir, fileId);
+      try {
+        await fs.access(filePath);
+        const buffer = await fs.readFile(filePath);
+        console.log(`[Media] Successfully read media file: ${fileId} (${buffer.length} bytes)`);
+        return { buffer, filename: fileId };
+      } catch (error) {
+        // File not found, continue to intelligent discovery
+      }
+
+      // 2. Use intelligent file discovery - find files that start with the fileId
+      try {
+        const files = await fs.readdir(mediaDir);
+
+        // Find files that start with the fileId followed by a dot (extension)
+        const matchingFiles = files.filter(file => {
+          // Check if file starts with fileId + '.' (e.g., "fileId.png", "fileId.jpg")
+          return file.startsWith(fileId + '.');
+        });
+
+        if (matchingFiles.length > 0) {
+          // Use the first matching file (there should typically be only one)
+          const filename = matchingFiles[0];
+          filePath = path.join(mediaDir, filename);
+          const buffer = await fs.readFile(filePath);
+          console.log(`[Media] Successfully read media file: ${filename} (${buffer.length} bytes)`);
+          return { buffer, filename };
+        }
+
+        // 3. As a last resort, try to find files that start with the fileId (without requiring extension)
+        const looseMatches = files.filter(file => file.startsWith(fileId));
+        if (looseMatches.length > 0) {
+          const filename = looseMatches[0];
+          filePath = path.join(mediaDir, filename);
+          const buffer = await fs.readFile(filePath);
+          console.log(`[Media] Successfully read media file (loose match): ${filename} (${buffer.length} bytes)`);
+          return { buffer, filename };
+        }
+
+      } catch (error) {
+        console.warn(`[Media] Failed to list media directory: ${mediaDir}`, error);
+      }
+
+      throw new Error(`Media file not found: ${fileId}`);
+    } catch (error) {
+      console.error(`[Media] Failed to find and read media file: ${fileId}`, error);
+      throw error;
+    }
+  });
+
   // Delete media file
   ipcMain.handle('delete-media-file', async (event, filePath) => {
     try {
