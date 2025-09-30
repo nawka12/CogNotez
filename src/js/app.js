@@ -1657,7 +1657,23 @@ class CogNotezApp {
                 if (this.notesManager.db && this.notesManager.db.initialized) {
                     tagId = this.notesManager.db.createTag({ name: tagName });
                 } else {
+                    // Fallback: create tag ID and save tag definition
                     tagId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+                    // Initialize fallback tag data structure if needed
+                    if (this.notesManager.db) {
+                        this.notesManager.db.data = this.notesManager.db.data || {};
+                        this.notesManager.db.data.tags = this.notesManager.db.data.tags || {};
+                        this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
+
+                        // Save tag definition
+                        this.notesManager.db.data.tags[tagId] = {
+                            id: tagId,
+                            name: tagName,
+                            color: '#BDABE3',
+                            created_at: new Date().toISOString()
+                        };
+                    }
                 }
             }
 
@@ -1688,6 +1704,19 @@ class CogNotezApp {
                 this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
             } else {
                 this.currentNote.tags = updatedTags;
+
+                // Also update note_tags relationship in fallback mode
+                if (this.notesManager.db) {
+                    this.notesManager.db.data = this.notesManager.db.data || {};
+                    this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
+
+                    const noteTagKey = `${this.currentNote.id}_${tagId}`;
+                    this.notesManager.db.data.note_tags[noteTagKey] = {
+                        note_id: this.currentNote.id,
+                        tag_id: tagId
+                    };
+                }
+
                 this.saveNotes();
             }
 
@@ -1717,6 +1746,13 @@ class CogNotezApp {
                 this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
             } else {
                 this.currentNote.tags = updatedTags;
+
+                // Also remove note_tags relationship in fallback mode
+                if (this.notesManager.db && this.notesManager.db.data && this.notesManager.db.data.note_tags) {
+                    const noteTagKey = `${this.currentNote.id}_${tagId}`;
+                    delete this.notesManager.db.data.note_tags[noteTagKey];
+                }
+
                 this.saveNotes();
             }
 
@@ -1888,8 +1924,20 @@ class CogNotezApp {
                 console.warn('Notes array is not valid, resetting to empty array');
                 this.notes = [];
             }
+
+            // Save notes to localStorage
             localStorage.setItem('notes', JSON.stringify(this.notes));
             console.log(`[DEBUG] Saved ${this.notes.length} notes to localStorage`);
+
+            // Also save tag data if available (for fallback compatibility)
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.data) {
+                const tagData = {
+                    tags: this.notesManager.db.data.tags || {},
+                    note_tags: this.notesManager.db.data.note_tags || {}
+                };
+                localStorage.setItem('cognotez_fallback_tags', JSON.stringify(tagData));
+                console.log(`[DEBUG] Saved tag data to localStorage fallback`);
+            }
         } catch (error) {
             console.error('Error saving notes to localStorage:', error);
             // Try to save with error handling
@@ -3980,8 +4028,23 @@ Please provide a helpful response based on the note content and conversation his
                     if (this.notesManager.db && this.notesManager.db.initialized) {
                         tagId = await this.notesManager.db.createTag({ name: tagName });
                     } else {
-                        // Fallback: create simple tag ID
+                        // Fallback: create tag ID and save tag definition
                         tagId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+                        // Initialize fallback tag data structure if needed
+                        if (this.notesManager.db) {
+                            this.notesManager.db.data = this.notesManager.db.data || {};
+                            this.notesManager.db.data.tags = this.notesManager.db.data.tags || {};
+                            this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
+
+                            // Save tag definition
+                            this.notesManager.db.data.tags[tagId] = {
+                                id: tagId,
+                                name: tagName,
+                                color: '#BDABE3',
+                                created_at: new Date().toISOString()
+                            };
+                        }
                     }
                 }
                 tagIds.push(tagId);

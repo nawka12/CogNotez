@@ -143,10 +143,16 @@ class NotesManager {
                 const tag = this.db.data.tags[tagId];
                 return tag ? tag.name : tagId;
             } else {
-                // Fallback: try to find in app's notes data
+                // Fallback: check if we have tag data from fallback loading
+                if (this.db && this.db.data && this.db.data.tags) {
+                    const tag = this.db.data.tags[tagId];
+                    return tag ? tag.name : tagId;
+                }
+
+                // Final fallback: try to find in app's notes data
                 for (const note of this.app.notes || []) {
                     if (note.tags && note.tags.includes(tagId)) {
-                        // For now, return the tagId itself as we don't have tag names in localStorage
+                        // Return the tagId itself as we don't have tag names in old localStorage format
                         return tagId;
                     }
                 }
@@ -176,6 +182,22 @@ class NotesManager {
         try {
             const savedNotes = localStorage.getItem('notes');
             const notes = savedNotes ? JSON.parse(savedNotes) : [];
+
+            // Load tag data for fallback compatibility
+            const tagDataString = localStorage.getItem('cognotez_fallback_tags');
+            if (tagDataString) {
+                try {
+                    const tagData = JSON.parse(tagDataString);
+                    if (this.db && !this.db.initialized) {
+                        // Initialize minimal tag data structure for fallback
+                        this.db.data = this.db.data || {};
+                        this.db.data.tags = tagData.tags || {};
+                        this.db.data.note_tags = tagData.note_tags || {};
+                    }
+                } catch (tagError) {
+                    console.warn('Error loading tag data from localStorage:', tagError);
+                }
+            }
 
             // Synchronize with main app's notes array
             this.app.notes = notes;
