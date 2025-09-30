@@ -257,16 +257,23 @@ function registerMediaProtocol() {
     try {
       const fileId = request.url.replace('cognotez-media://', '');
       const mediaDir = path.join(app.getPath('userData'), 'media');
-      
+
+      // Ensure media directory exists
+      try {
+        await fs.mkdir(mediaDir, { recursive: true });
+      } catch (error) {
+        // Directory might already exist, that's fine
+      }
+
       // Find file with this ID (could have any extension)
       const files = await fs.readdir(mediaDir);
       const matchingFile = files.find(file => file.startsWith(fileId));
-      
+
       if (matchingFile) {
         const filePath = path.join(mediaDir, matchingFile);
         callback({ path: filePath });
       } else {
-        console.error('[Media Protocol] File not found:', fileId);
+        console.error('[Media Protocol] File not found:', fileId, 'in directory:', mediaDir);
         callback({ error: -6 }); // FILE_NOT_FOUND
       }
     } catch (error) {
@@ -274,7 +281,7 @@ function registerMediaProtocol() {
       callback({ error: -2 }); // FAILED
     }
   });
-  
+
   console.log('[Media Protocol] Registered cognotez-media:// protocol');
 }
 
