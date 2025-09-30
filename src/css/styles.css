@@ -2545,10 +2545,27 @@ body {
 /* Embedded images in notes */
 .note-editor img,
 .markdown-preview img {
+    /* Only apply max-width if no explicit width is set */
     max-width: 100%;
+    /* Only apply height auto if no explicit height is set */
     height: auto;
     border-radius: var(--radius-md);
     margin: var(--spacing-md) 0;
+}
+
+/* Respect explicit width/height attributes in markdown */
+.note-editor img[style*="width"],
+.note-editor img[width],
+.markdown-preview img[style*="width"],
+.markdown-preview img[width] {
+    max-width: none; /* Remove max-width constraint when explicit width is set */
+}
+
+.note-editor img[style*="height"],
+.note-editor img[height],
+.markdown-preview img[style*="height"],
+.markdown-preview img[height] {
+    height: auto; /* Keep auto height even with explicit height to maintain aspect ratio */
 }
 
 /* Embedded videos */

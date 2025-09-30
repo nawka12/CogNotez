@@ -5,7 +5,7 @@ class AIManager {
         // Backend configurations
         this.backend = 'ollama'; // 'ollama' or 'openrouter'
         this.ollamaEndpoint = 'http://localhost:11434'; // Default Ollama endpoint
-        this.ollamaModel = 'llama2'; // Default Ollama model
+        this.ollamaModel = 'llama3.2:latest'; // Default Ollama model (supports tool calling)
         this.openRouterApiKey = ''; // OpenRouter API key
         this.openRouterModel = 'openai/gpt-4o-mini'; // Default OpenRouter model (better at tool calling)
         this.searxngUrl = 'http://localhost:8080'; // Default SearXNG instance URL
@@ -1450,7 +1450,12 @@ Summary:`;
         // For Ollama backend, use tool calling if SearXNG is enabled, otherwise manual search
         if (this.backend === 'ollama') {
             if (this.searxngEnabled) {
-                return this.askQuestionWithOllamaToolCalling(question, context, options);
+                try {
+                    return await this.askQuestionWithOllamaToolCalling(question, context, options);
+                } catch (error) {
+                    console.warn('[DEBUG] Ollama tool calling failed, falling back to manual search:', error.message);
+                    return this.askQuestionWithManualSearch(question, context, options);
+                }
             } else {
                 return this.askQuestionWithManualSearch(question, context, options);
             }

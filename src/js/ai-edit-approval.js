@@ -439,6 +439,16 @@ class AIEditApproval {
         if (aiPanel && this.aiPanelWasVisible) {
             aiPanel.classList.remove('hidden');
         }
+
+        // Restore focus to the editor if it was visible before
+        if (noteEditor && this.editorWasVisible) {
+            noteEditor.focus();
+        }
+
+        // Reset selection preservation flag since dialog is closed
+        if (this.app && this.app.preserveSelection !== undefined) {
+            this.app.preserveSelection = false;
+        }
     }
 
     /**

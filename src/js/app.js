@@ -2843,6 +2843,9 @@ Please provide a helpful response based on the note content and conversation his
         const newCursorPosition = start + text.length;
         editor.setSelectionRange(newCursorPosition, newCursorPosition);
 
+        // Ensure editor maintains focus after insertion
+        editor.focus();
+
         console.log('[DEBUG] insertTextAtCursor: updated editor content length =', editor.value.length);
 
         // Dispatch input event for word count update
@@ -4117,6 +4120,7 @@ Please provide a helpful response based on the note content and conversation his
                             <div id="searxng-tip" style="display: ${this.aiManager.searxngEnabled ? 'block' : 'none'}">
                                 • SearXNG provides privacy-focused web search<br>
                                 • Install SearXNG: <code>pip install searxng</code><br>
+                                ${this.aiManager.backend === 'ollama' ? '• <strong>Note:</strong> Ollama tool calling may not work with all models. If you experience issues, try a different model or use OpenRouter.' : ''}
                             </div>
                         </div>
                         • Right-click selected text for quick AI actions

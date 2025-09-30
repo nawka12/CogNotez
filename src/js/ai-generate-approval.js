@@ -252,6 +252,11 @@ class AIGenerateApproval {
         if (noteEditor) {
             noteEditor.focus();
         }
+
+        // Reset selection preservation flag since dialog is closed
+        if (this.app && this.app.preserveSelection !== undefined) {
+            this.app.preserveSelection = false;
+        }
     }
 
     showHelp() {

@@ -191,25 +191,40 @@ class RichMediaManager {
         }
 
         try {
+            // Prompt for optional dimensions
+            const dimensions = await this.promptImageDimensions(file.name);
+
             // Save file and get reference
             const fileRef = await this.saveMediaFile(file, 'image');
-            
+
             // Insert markdown image syntax with file reference
             const editor = document.getElementById('note-editor');
             if (editor) {
                 const cursorPos = editor.selectionStart;
-                const imageMarkdown = `\n![${file.name}](cognotez-media://${fileRef.id})\n`;
-                
+
+                // Build image HTML with optional dimensions
+                let imageHtml;
+                if (dimensions.width || dimensions.height) {
+                    // Use HTML img tag for dimensional control
+                    const width = dimensions.width ? ` width="${dimensions.width}"` : '';
+                    const height = dimensions.height ? ` height="${dimensions.height}"` : '';
+                    const style = dimensions.width || dimensions.height ? ` style="max-width: 100%; height: auto;"` : '';
+                    imageHtml = `\n<img src="cognotez-media://${fileRef.id}" alt="${file.name}"${width}${height}${style}>\n`;
+                } else {
+                    // Use standard markdown for automatic sizing
+                    imageHtml = `\n![${file.name}](cognotez-media://${fileRef.id})\n`;
+                }
+
                 const before = editor.value.substring(0, cursorPos);
                 const after = editor.value.substring(cursorPos);
-                editor.value = before + imageMarkdown + after;
-                
+                editor.value = before + imageHtml + after;
+
                 // Update cursor position
-                editor.selectionStart = editor.selectionEnd = cursorPos + imageMarkdown.length;
-                
+                editor.selectionStart = editor.selectionEnd = cursorPos + imageHtml.length;
+
                 // Track this media in the note
                 await this.trackMediaInNote(this.app.currentNote.id, fileRef);
-                
+
                 // Trigger save
                 this.app.saveCurrentNote?.();
                 this.app.updatePreview?.();
@@ -672,23 +687,99 @@ class RichMediaManager {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
+    async promptImageDimensions(fileName) {
+        // For now, we'll use a simple approach - users can manually edit dimensions later
+        // In the future, this could show a modal with input fields for width/height
+        return { width: null, height: null };
+
+        // Alternative implementation with modal dialog:
+        /*
+        return new Promise((resolve) => {
+            // Create modal for dimension input
+            const modal = document.createElement('div');
+            modal.className = 'modal-overlay';
+            modal.innerHTML = `
+                <div class="modal-content" style="max-width: 400px;">
+                    <h3>Set Image Dimensions</h3>
+                    <p>Leave blank for automatic sizing</p>
+                    <div style="margin: 16px 0;">
+                        <label>Width (px): <input type="number" id="img-width" placeholder="Auto" min="1" style="width: 100px; margin-left: 8px;"></label>
+                    </div>
+                    <div style="margin: 16px 0;">
+                        <label>Height (px): <input type="number" id="img-height" placeholder="Auto" min="1" style="width: 100px; margin-left: 8px;"></label>
+                    </div>
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button id="cancel-dimensions" style="margin-right: 8px;">Cancel</button>
+                        <button id="confirm-dimensions">Insert</button>
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Handle buttons
+            const cancelBtn = modal.querySelector('#cancel-dimensions');
+            const confirmBtn = modal.querySelector('#confirm-dimensions');
+
+            cancelBtn.addEventListener('click', () => {
+                document.body.removeChild(modal);
+                resolve({ width: null, height: null });
+            });
+
+            confirmBtn.addEventListener('click', () => {
+                const width = modal.querySelector('#img-width').value;
+                const height = modal.querySelector('#img-height').value;
+
+                document.body.removeChild(modal);
+                resolve({
+                    width: width ? parseInt(width) : null,
+                    height: height ? parseInt(height) : null
+                });
+            });
+
+            // Focus first input
+            modal.querySelector('#img-width').focus();
+        });
+        */
+    }
+
     async insertImageFromUrl() {
         const url = prompt('Enter image URL:');
         if (!url) return;
 
-        const editor = document.getElementById('note-editor');
-        if (editor) {
-            const cursorPos = editor.selectionStart;
-            const imageMarkdown = `\n![Image](${url})\n`;
-            
-            const before = editor.value.substring(0, cursorPos);
-            const after = editor.value.substring(cursorPos);
-            editor.value = before + imageMarkdown + after;
-            
-            editor.selectionStart = editor.selectionEnd = cursorPos + imageMarkdown.length;
-            
-            this.app.saveCurrentNote?.();
-            this.app.updatePreview?.();
+        try {
+            // Prompt for optional dimensions
+            const dimensions = await this.promptImageDimensions('Image');
+
+            const editor = document.getElementById('note-editor');
+            if (editor) {
+                const cursorPos = editor.selectionStart;
+
+                // Build image HTML with optional dimensions
+                let imageHtml;
+                if (dimensions.width || dimensions.height) {
+                    // Use HTML img tag for dimensional control
+                    const width = dimensions.width ? ` width="${dimensions.width}"` : '';
+                    const height = dimensions.height ? ` height="${dimensions.height}"` : '';
+                    const style = dimensions.width || dimensions.height ? ` style="max-width: 100%; height: auto;"` : '';
+                    imageHtml = `\n<img src="${url}" alt="Image"${width}${height}${style}>\n`;
+                } else {
+                    // Use standard markdown for automatic sizing
+                    imageHtml = `\n![Image](${url})\n`;
+                }
+
+                const before = editor.value.substring(0, cursorPos);
+                const after = editor.value.substring(cursorPos);
+                editor.value = before + imageHtml + after;
+
+                editor.selectionStart = editor.selectionEnd = cursorPos + imageHtml.length;
+
+                this.app.saveCurrentNote?.();
+                this.app.updatePreview?.();
+            }
+        } catch (error) {
+            console.error('[RichMedia] Failed to insert image from URL:', error);
+            this.app.showNotification?.('Failed to insert image', 'error');
         }
     }
 

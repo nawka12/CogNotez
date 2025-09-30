@@ -230,9 +230,59 @@ Enhance your notes with images, videos, and attachments:
 - **URL**: Insert image from URL via context menu
 - **Supported formats**: JPEG, PNG, GIF, WebP, SVG
 
+#### Image Sizing Control
+CogNotez provides flexible image sizing options:
+
+**Automatic Sizing (Default):**
+- Images automatically scale to fit the editor/preview width
+- Maintains aspect ratio with `height: auto`
+- Perfect for most use cases
+
+**Manual Sizing:**
+You can manually control image dimensions by using HTML img tags:
+
+```markdown
+<!-- Width only (height scales proportionally) -->
+<img src="cognotez-media://fileId" alt="Alt text" width="300">
+
+<!-- Height only (width scales proportionally) -->
+<img src="cognotez-media://fileId" alt="Alt text" height="200">
+
+<!-- Both dimensions (exact size) -->
+<img src="cognotez-media://fileId" alt="Alt text" width="400" height="300">
+```
+
+**Syntax:**
+- `width="N"`: Sets explicit width in pixels
+- `height="N"`: Sets explicit height in pixels
+- When both are specified, the image uses those exact dimensions
+- When only one is specified, the other dimension scales proportionally
+- Explicit dimensions override automatic sizing
+- Still responsive: images won't exceed container width even with explicit dimensions
+
 #### Embedding Videos
-- Drag & drop video files (MP4, WebM, OGG)
-- Videos play directly in notes
+- **Drag & drop video files** (MP4, WebM, OGG)
+- **Videos play directly in notes** with full controls
+- **Size control**: Videos are inserted at 100% width by default, but you can manually adjust by editing the `width` attribute:
+
+```html
+<!-- Default (full width) -->
+<video controls width="100%">
+  <source src="cognotez-media://fileId" type="video/mp4">
+</video>
+
+<!-- Custom width (50% of container) -->
+<video controls width="50%">
+  <source src="cognotez-media://fileId" type="video/mp4">
+</video>
+
+<!-- Pixel width -->
+<video controls width="400">
+  <source src="cognotez-media://fileId" type="video/mp4">
+</video>
+```
+
+**Tip:** After inserting a video, you can edit the `width` attribute directly in the note to resize it as needed.
 
 ### AI Features
 
@@ -308,12 +358,14 @@ Configure your AI integration through the **AI → AI Settings** menu:
 # Install Ollama
 curl -fsSL https://ollama.com/install.sh | sh
 
-# Pull a model (recommended: gemma3:latest)
-ollama pull gemma3:latest
+# Pull a model that supports tool calling (recommended: llama3.2:latest)
+ollama pull llama3.2:latest
 
 # Start the service
 ollama serve
 ```
+
+**Note:** Not all Ollama models support tool calling for SearXNG integration. If you experience issues with web search, try a different model or use OpenRouter instead.
 
  
 
@@ -429,6 +481,11 @@ The app displays real-time network status:
    - Verify SEARXNG_URL environment variable
    - Check if SearXNG is running on the correct port
    - Ensure proper CORS configuration in SearXNG
+
+3. **Ollama Compatibility**:
+   - Not all Ollama models support tool calling required for SearXNG integration
+   - If web search doesn't work with Ollama, try switching to OpenRouter or use a different Ollama model
+   - The app will automatically fall back to manual search if tool calling fails
 
 ### Web Scraping Issues
 
