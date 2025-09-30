@@ -1103,11 +1103,10 @@ class GoogleDriveSyncManager {
         };
 
         try {
-            // Extract media file IDs from both local and remote data
+            // Extract media file IDs from local data to determine what to upload
             const localMediaIds = this.extractMediaFileIds(localData);
-            const remoteMediaIds = remoteData ? this.extractMediaFileIds(remoteData) : new Set();
 
-            console.log('[GoogleDriveSync] Media sync - Local files:', localMediaIds.size, 'Remote files:', remoteMediaIds.size);
+            console.log('[GoogleDriveSync] Media sync - Local files:', localMediaIds.size);
 
             // Get list of remote media files
             let remoteMediaFiles = [];
@@ -1184,105 +1183,109 @@ class GoogleDriveSyncManager {
                 }
             }
 
-            // Download missing remote media files
+            // Download all remote media files that don't exist locally
             for (const file of remoteMediaFiles) {
                 const fileName = file.name;
                 const fileId = fileName; // File name is the ID in our system
 
-                // Check if this file is referenced in either local or remote notes
-                if (localMediaIds.has(fileId) || remoteMediaIds.has(fileId)) {
-                    console.log(`[GoogleDriveSync] Processing remote media file: ${fileName} (referenced in notes)`);
+                console.log(`[GoogleDriveSync] Processing remote media file: ${fileName} (${file.size} bytes)`);
 
-                    // Check if file exists locally
-                    let fileExistsLocally = false;
+                // Check if file exists locally
+                let fileExistsLocally = false;
 
-                    if (typeof window !== 'undefined' && window.RichMediaManager) {
-                        // Renderer process - check if RichMediaManager can access the file
+                if (typeof window !== 'undefined' && window.RichMediaManager) {
+                    // Renderer process - check if RichMediaManager can access the file
+                    try {
+                        await window.RichMediaManager.getMediaFile(fileId);
+                        fileExistsLocally = true;
+                        console.log(`[GoogleDriveSync] File ${fileName} found in RichMediaManager`);
+                    } catch (error) {
+                        fileExistsLocally = false;
+                        console.log(`[GoogleDriveSync] File ${fileName} not found in RichMediaManager`);
+                    }
+                } else {
+                    // Main process - check file system
+                    try {
+                        const fs = require('fs').promises;
+                        const mediaDir = await this.getMediaDirectory();
+                        const filePath = `${mediaDir}/${fileName}`;
+
+                        // Check if media directory exists first
                         try {
-                            await window.RichMediaManager.getMediaFile(fileId);
-                            fileExistsLocally = true;
-                        } catch (error) {
+                            await fs.access(mediaDir);
+                        } catch (dirError) {
+                            // Media directory doesn't exist yet
+                            console.log(`[GoogleDriveSync] Media directory doesn't exist: ${mediaDir}`);
                             fileExistsLocally = false;
                         }
-                    } else {
-                        // Main process - check file system
-                        try {
+
+                        if (!fileExistsLocally) {
+                            await fs.access(filePath);
+                            fileExistsLocally = true;
+                            console.log(`[GoogleDriveSync] File ${fileName} found locally at: ${filePath}`);
+                        }
+                    } catch (error) {
+                        // File doesn't exist or other error
+                        console.log(`[GoogleDriveSync] Media file ${fileName} not found locally`);
+                        fileExistsLocally = false;
+                    }
+                }
+
+                if (!fileExistsLocally) {
+                    try {
+                        console.log(`[GoogleDriveSync] File ${fileName} not found locally, downloading...`);
+                        // Download the file
+                        const fileData = await this.downloadMediaFile(file.id);
+
+                        // Save to local storage
+                        if (isMainProcess) {
+                            // Main process - save directly to file system
                             const fs = require('fs').promises;
                             const mediaDir = await this.getMediaDirectory();
                             const filePath = `${mediaDir}/${fileName}`;
 
-                            // Check if media directory exists first
+                            // Ensure media directory exists
                             try {
-                                await fs.access(mediaDir);
-                            } catch (dirError) {
-                                // Media directory doesn't exist yet
-                                console.log(`[GoogleDriveSync] Media directory doesn't exist: ${mediaDir}`);
-                                fileExistsLocally = false;
-                                continue; // Skip to next file since directory doesn't exist
+                                await fs.mkdir(mediaDir, { recursive: true });
+                                console.log(`[GoogleDriveSync] Created media directory: ${mediaDir}`);
+                            } catch (error) {
+                                // Directory might already exist, that's fine
+                                console.log(`[GoogleDriveSync] Media directory already exists or created: ${mediaDir}`);
                             }
 
-                            await fs.access(filePath);
-                            fileExistsLocally = true;
-                        } catch (error) {
-                            // File doesn't exist or other error
-                            console.log(`[GoogleDriveSync] Media file ${fileName} not found locally`);
-                            fileExistsLocally = false;
+                            await fs.writeFile(filePath, fileData);
+                            console.log(`[GoogleDriveSync] Saved downloaded media file to: ${filePath}`);
+
+                            // Register the file for cognotez-media:// access
+                            this.registerDownloadedMediaFile(fileId, fileName, fileData.byteLength || fileData.length);
+                        } else {
+                            // Renderer process - use RichMediaManager to save and register
+                            await window.RichMediaManager.saveDownloadedMediaFile(fileId, fileData);
+
+                            // Also register the file in the media database for cognotez-media:// access
+                            const mediaDir = await this.getMediaDirectory();
+                            const mediaRef = {
+                                id: fileId,
+                                name: fileName,
+                                type: 'application/octet-stream', // Will be updated when file is actually accessed
+                                size: fileData.byteLength || fileData.length,
+                                storageType: 'filesystem',
+                                path: `${mediaDir}/${fileName}`,
+                                createdAt: new Date().toISOString()
+                            };
+
+                            // Track this as a downloaded media file
+                            await window.RichMediaManager.trackDownloadedMedia(fileId, mediaRef);
                         }
+
+                        result.downloaded++;
+                        console.log(`[GoogleDriveSync] Downloaded media file: ${fileName} (${fileData.byteLength || fileData.length} bytes)`);
+                    } catch (error) {
+                        console.error('[GoogleDriveSync] Failed to download media file:', fileName, error);
+                        result.errors.push(`Download failed for ${fileName}: ${error.message}`);
                     }
-
-                    if (!fileExistsLocally) {
-                        try {
-                            console.log(`[GoogleDriveSync] File ${fileName} not found locally, downloading...`);
-                            // Download the file
-                            const fileData = await this.downloadMediaFile(file.id);
-
-                            // Save to local storage
-                            if (isMainProcess) {
-                                // Main process - save directly to file system
-                                const fs = require('fs').promises;
-                                const mediaDir = await this.getMediaDirectory();
-                                const filePath = `${mediaDir}/${fileName}`;
-
-                                // Ensure media directory exists
-                                try {
-                                    await fs.mkdir(mediaDir, { recursive: true });
-                                } catch (error) {
-                                    // Directory might already exist, that's fine
-                                    console.log(`[GoogleDriveSync] Media directory already exists or created: ${mediaDir}`);
-                                }
-
-                                await fs.writeFile(filePath, fileData);
-                                console.log(`[GoogleDriveSync] Saved downloaded media file to: ${filePath}`);
-
-                                // Register the file for cognotez-media:// access
-                                this.registerDownloadedMediaFile(fileId, fileName, fileData.byteLength || fileData.length);
-                            } else {
-                                // Renderer process - use RichMediaManager to save and register
-                                await window.RichMediaManager.saveDownloadedMediaFile(fileId, fileData);
-
-                                // Also register the file in the media database for cognotez-media:// access
-                                const mediaDir = await this.getMediaDirectory();
-                                const mediaRef = {
-                                    id: fileId,
-                                    name: fileName,
-                                    type: 'application/octet-stream', // Will be updated when file is actually accessed
-                                    size: fileData.byteLength || fileData.length,
-                                    storageType: 'filesystem',
-                                    path: `${mediaDir}/${fileName}`,
-                                    createdAt: new Date().toISOString()
-                                };
-
-                                // Track this as a downloaded media file
-                                await window.RichMediaManager.trackDownloadedMedia(fileId, mediaRef);
-                            }
-
-                            result.downloaded++;
-                            console.log('[GoogleDriveSync] Downloaded media file:', fileName);
-                        } catch (error) {
-                            console.error('[GoogleDriveSync] Failed to download media file:', fileName, error);
-                            result.errors.push(`Download failed for ${fileName}: ${error.message}`);
-                        }
-                    }
+                } else {
+                    console.log(`[GoogleDriveSync] File ${fileName} already exists locally, skipping download`);
                 }
             }
 
