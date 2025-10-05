@@ -14,6 +14,36 @@ console.log('Node.js version:', process.version);
 console.log('Electron version:', process.versions.electron);
 console.log('Chrome version:', process.versions.chrome);
 
+// Helper function to get MIME type from file extension
+function getMimeTypeFromExtension(ext) {
+  const mimeTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp',
+    '.tiff': 'image/tiff',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogg': 'video/ogg',
+    '.avi': 'video/x-msvideo',
+    '.mov': 'video/quicktime',
+    '.wmv': 'video/x-ms-wmv',
+    '.flv': 'video/x-flv',
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json'
+  };
+  
+  return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
+}
+
 function createWindow() {
   // Create the browser window
   mainWindow = new BrowserWindow({
@@ -390,6 +420,263 @@ if (ipcMain) {
 
   ipcMain.handle('show-save-dialog', async (event, options) => {
     return await dialog.showSaveDialog(mainWindow, options);
+  });
+
+  // PDF generation handlers
+  ipcMain.handle('generate-pdf-from-html', async (event, { html, filename }) => {
+    let tempHtmlPath = null;
+    let tempWindow = null;
+    let timeoutId = null;
+    
+    try {
+      console.log('[PDF] Starting PDF generation...');
+      
+      // Show save dialog for PDF
+      const result = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: filename,
+        filters: [
+          { name: 'PDF', extensions: ['pdf'] }
+        ]
+      });
+
+      if (result.canceled) {
+        console.log('[PDF] User canceled PDF generation');
+        return { success: false, canceled: true };
+      }
+
+      console.log('[PDF] Creating temporary HTML file...');
+      
+      // Create temporary HTML file instead of using data URL
+      const tempDir = path.join(app.getPath('temp'), 'cognotez-pdf');
+      try {
+        await fs.mkdir(tempDir, { recursive: true });
+      } catch (mkdirError) {
+        console.error('[PDF] Failed to create temp directory:', mkdirError);
+        throw new Error('Failed to create temporary directory');
+      }
+      
+      tempHtmlPath = path.join(tempDir, `temp-${Date.now()}.html`);
+      await fs.writeFile(tempHtmlPath, html, 'utf8');
+      console.log('[PDF] HTML file created:', tempHtmlPath);
+      console.log('[PDF] HTML content preview:', html.substring(0, 500) + '...');
+      
+      // Verify the file was written correctly
+      try {
+        const fileStats = await fs.stat(tempHtmlPath);
+        console.log('[PDF] HTML file size:', fileStats.size, 'bytes');
+        const readBack = await fs.readFile(tempHtmlPath, 'utf8');
+        console.log('[PDF] HTML file verification: file can be read back, length:', readBack.length);
+      } catch (verifyError) {
+        console.error('[PDF] HTML file verification failed:', verifyError);
+      }
+
+      // Create a temporary window to render the HTML
+      console.log('[PDF] Creating temporary window...');
+      tempWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          webSecurity: false // Allow loading local files
+        }
+      });
+
+      // Set up timeout for the entire process
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('PDF generation timed out after 30 seconds'));
+        }, 30000);
+      });
+
+      // Load the HTML file with timeout
+      console.log('[PDF] Loading HTML content...');
+      
+      // Set up content loading promise BEFORE loading the file
+      const contentLoadPromise = new Promise((resolve, reject) => {
+        let loadFinished = false;
+        
+        tempWindow.webContents.once('did-finish-load', () => {
+          if (loadFinished) return;
+          loadFinished = true;
+          console.log('[PDF] Content loaded successfully');
+          
+          // Simple approach: just wait a bit for images and proceed
+          setTimeout(() => {
+            console.log('[PDF] Proceeding with PDF generation after content load');
+            resolve();
+          }, 3000); // Wait 3 seconds for images to load
+        });
+        
+        tempWindow.webContents.once('did-fail-load', (event, errorCode, errorDescription) => {
+          if (loadFinished) return;
+          loadFinished = true;
+          reject(new Error(`Failed to load content: ${errorDescription}`));
+        });
+      });
+      
+      // Add debugging for the load process
+      tempWindow.webContents.on('did-start-loading', () => {
+        console.log('[PDF] Started loading HTML content');
+      });
+      
+      tempWindow.webContents.on('did-stop-loading', () => {
+        console.log('[PDF] Stopped loading HTML content');
+      });
+      
+      tempWindow.webContents.on('did-finish-load', () => {
+        console.log('[PDF] HTML content finished loading');
+      });
+      
+      tempWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+        console.error('[PDF] HTML content failed to load:', errorCode, errorDescription, validatedURL);
+      });
+      
+      const loadPromise = tempWindow.loadFile(tempHtmlPath);
+      
+      // Race between loading and timeout
+      await Promise.race([loadPromise, timeoutPromise]);
+      console.log('[PDF] HTML file load completed');
+
+      // Wait for content to load and images to be ready
+      console.log('[PDF] Waiting for content to load...');
+      await Promise.race([contentLoadPromise, timeoutPromise]);
+
+      // Generate PDF
+      console.log('[PDF] Generating PDF...');
+      const pdfData = await Promise.race([
+        tempWindow.webContents.printToPDF({
+          printBackground: true,
+          pageSize: 'A4',
+          margins: {
+            marginType: 'printableArea'
+          }
+        }),
+        timeoutPromise
+      ]);
+
+      // Write PDF to file
+      console.log('[PDF] Writing PDF file...');
+      await fs.writeFile(result.filePath, pdfData);
+
+      console.log(`[PDF] Generated PDF: ${result.filePath}`);
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      console.error('[PDF] Failed to generate PDF:', error);
+      return { success: false, error: error.message };
+    } finally {
+      // Clear timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      // Clean up
+      if (tempWindow) {
+        try {
+          tempWindow.close();
+        } catch (closeError) {
+          console.warn('[PDF] Failed to close temp window:', closeError);
+        }
+      }
+      
+      if (tempHtmlPath) {
+        try {
+          await fs.unlink(tempHtmlPath);
+        } catch (cleanupError) {
+          console.warn('[PDF] Failed to cleanup temp HTML file:', cleanupError);
+        }
+      }
+      
+      // Clean up temporary media files
+      try {
+        const tempMediaDir = path.join(app.getPath('temp'), 'cognotez-pdf-media');
+        if (await fs.access(tempMediaDir).then(() => true).catch(() => false)) {
+          const files = await fs.readdir(tempMediaDir);
+          for (const file of files) {
+            try {
+              await fs.unlink(path.join(tempMediaDir, file));
+            } catch (fileError) {
+              console.warn(`[PDF] Failed to cleanup temp media file ${file}:`, fileError);
+            }
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('[PDF] Failed to cleanup temp media files:', cleanupError);
+      }
+    }
+  });
+
+  ipcMain.handle('get-media-file-as-base64', async (event, fileId) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Find file with this ID (could have any extension)
+      const files = await fs.readdir(mediaDir);
+      const matchingFile = files.find(file => file.startsWith(fileId));
+
+      if (!matchingFile) {
+        throw new Error(`Media file not found: ${fileId}`);
+      }
+
+      const filePath = path.join(mediaDir, matchingFile);
+      const fileBuffer = await fs.readFile(filePath);
+      const mimeType = getMimeTypeFromExtension(path.extname(matchingFile));
+      const base64 = fileBuffer.toString('base64');
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+
+      return { dataUrl, mimeType, size: fileBuffer.length, filename: matchingFile };
+    } catch (error) {
+      console.error('[PDF] Failed to get media file as base64:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('copy-media-file-for-pdf', async (event, fileId) => {
+    try {
+      console.log(`[PDF] Copying media file for PDF: ${fileId}`);
+      
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Check if media directory exists
+      try {
+        await fs.access(mediaDir);
+      } catch (accessError) {
+        throw new Error(`Media directory not found: ${mediaDir}`);
+      }
+      
+      // Find file with this ID (could have any extension)
+      const files = await fs.readdir(mediaDir);
+      const matchingFile = files.find(file => file.startsWith(fileId));
+
+      if (!matchingFile) {
+        console.error(`[PDF] Media file not found: ${fileId} in directory: ${mediaDir}`);
+        throw new Error(`Media file not found: ${fileId}`);
+      }
+
+      const sourcePath = path.join(mediaDir, matchingFile);
+      const mimeType = getMimeTypeFromExtension(path.extname(matchingFile));
+      
+      console.log(`[PDF] Found media file: ${matchingFile}, MIME type: ${mimeType}`);
+      
+      // Create temporary directory for PDF media files
+      const tempDir = path.join(app.getPath('temp'), 'cognotez-pdf-media');
+      try {
+        await fs.mkdir(tempDir, { recursive: true });
+      } catch (mkdirError) {
+        throw new Error(`Failed to create temp media directory: ${mkdirError.message}`);
+      }
+      
+      // Copy file to temporary location
+      const tempPath = path.join(tempDir, matchingFile);
+      await fs.copyFile(sourcePath, tempPath);
+      
+      console.log(`[PDF] Successfully copied media file to: ${tempPath}`);
+      return { tempPath, mimeType, filename: matchingFile };
+    } catch (error) {
+      console.error('[PDF] Failed to copy media file for PDF:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('show-open-dialog', async (event, options) => {
@@ -1358,6 +1645,12 @@ const createMenu = () => {
               label: 'Export as Text',
               click: () => {
                 mainWindow.webContents.send('menu-export-text');
+              }
+            },
+            {
+              label: 'Share as PDF',
+              click: () => {
+                mainWindow.webContents.send('menu-export-pdf');
               }
             },
             { type: 'separator' },

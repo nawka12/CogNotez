@@ -928,6 +928,7 @@ class CogNotezApp {
         ipcRenderer.on('menu-generate-ai', () => this.generateContentWithAI());
         ipcRenderer.on('menu-export-markdown', () => this.exportNote('markdown'));
         ipcRenderer.on('menu-export-text', () => this.exportNote('text'));
+        ipcRenderer.on('menu-export-pdf', () => this.exportNote('pdf'));
         ipcRenderer.on('menu-export-json', () => this.exportAllNotesJSON());
         ipcRenderer.on('menu-create-backup', () => this.createFullBackup());
 
@@ -4576,6 +4577,14 @@ Please provide a helpful response based on the note content and conversation his
                             <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
                         </div>
                     </button>
+
+                    <button class="share-option-btn" data-action="export-pdf" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
+                        <span>📋</span>
+                        <div>
+                            <div style="font-weight: 500;">Share as PDF</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Preserves media and formatting</div>
+                        </div>
+                    </button>
                 </div>
 
                 <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
@@ -4630,6 +4639,14 @@ Please provide a helpful response based on the note content and conversation his
                     const txtPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'text');
                     if (txtPath) {
                         message = `Note exported as Text: ${txtPath}`;
+                        success = true;
+                    }
+                    break;
+
+                case 'export-pdf':
+                    const pdfPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'pdf');
+                    if (pdfPath) {
+                        message = `Note exported as PDF: ${pdfPath}`;
                         success = true;
                     }
                     break;

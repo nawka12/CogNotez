@@ -107,6 +107,266 @@ class BackendAPI {
         return await this.saveFile(content, filename, format === 'markdown' ? 'md' : 'txt');
     }
 
+    async exportNoteAsPDF(note) {
+        const { ipcRenderer } = require('electron');
+        
+        try {
+            console.log('[PDF] Starting PDF export for note:', note.title);
+            
+            // Process note content to resolve media URLs
+            let processedContent;
+            try {
+                // Add timeout to media processing
+                processedContent = await Promise.race([
+                    this.processContentForPDF(note),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Media processing timeout')), 10000)
+                    )
+                ]);
+            } catch (mediaError) {
+                console.warn('[PDF] Media processing failed, using simplified content:', mediaError);
+                // Fallback: create simplified content without media
+                processedContent = this.simplifyContentForPDF(note.content);
+            }
+            
+            // Create HTML content for PDF generation
+            console.log('[PDF] Creating HTML content...');
+            const htmlContent = this.createHTMLForPDF(note, processedContent);
+            
+            // Generate PDF using Electron's printToPDF
+            console.log('[PDF] Calling PDF generation handler...');
+            const result = await ipcRenderer.invoke('generate-pdf-from-html', {
+                html: htmlContent,
+                filename: `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`
+            });
+            
+            if (result.success) {
+                console.log('[PDF] PDF generation successful:', result.filePath);
+                return result.filePath;
+            } else if (result.canceled) {
+                console.log('[PDF] PDF generation canceled by user');
+                return null; // User canceled
+            } else {
+                console.error('[PDF] PDF generation failed:', result.error);
+                throw new Error(result.error || 'PDF generation failed');
+            }
+        } catch (error) {
+            console.error('[PDF] Error exporting note as PDF:', error);
+            throw error;
+        }
+    }
+
+    async processContentForPDF(note) {
+        console.log('[PDF] Processing content for PDF...');
+        
+        if (!note.content) {
+            console.log('[PDF] No content to process');
+            return note.content;
+        }
+
+        // Find all cognotez-media:// URLs
+        const mediaUrlPattern = /cognotez-media:\/\/[a-z0-9]+/gi;
+        const matches = note.content.match(mediaUrlPattern);
+        
+        if (!matches || matches.length === 0) {
+            console.log('[PDF] No media files found in content');
+            return note.content;
+        }
+
+        console.log(`[PDF] Found ${matches.length} media files to process`);
+        
+        let processedContent = note.content;
+        const { ipcRenderer } = require('electron');
+        
+        // Convert media URLs to temporary file paths for PDF embedding
+        for (const cognotezUrl of matches) {
+            try {
+                console.log(`[PDF] Processing media file: ${cognotezUrl}`);
+                const fileId = cognotezUrl.replace('cognotez-media://', '');
+                
+                // Add timeout for media file processing
+                const mediaData = await Promise.race([
+                    ipcRenderer.invoke('copy-media-file-for-pdf', fileId),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Media processing timeout')), 5000)
+                    )
+                ]);
+                
+                if (mediaData && mediaData.tempPath) {
+                    // Check if it's a video file
+                    if (mediaData.mimeType && mediaData.mimeType.startsWith('video/')) {
+                        console.log(`[PDF] Replacing video with placeholder: ${mediaData.filename}`);
+                        // For videos, create a placeholder with video icon and filename
+                        const fileName = mediaData.filename || `video_${fileId}`;
+                        const videoPlaceholder = `<div style="background-color: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 20px; text-align: center; margin: 15px 0;">
+                            <div style="font-size: 24px; margin-bottom: 10px;">🎥</div>
+                            <div style="font-weight: bold; color: #495057;">Video File</div>
+                            <div style="color: #6c757d; font-size: 14px; margin-top: 5px;">${fileName}</div>
+                            <div style="color: #6c757d; font-size: 12px; margin-top: 5px;">(Video files are not playable in PDF format)</div>
+                        </div>`;
+                        processedContent = processedContent.replace(cognotezUrl, videoPlaceholder);
+                    } else {
+                        console.log(`[PDF] Replacing image with temp path: ${mediaData.tempPath}`);
+                        // For images, use the temporary file path with file:// protocol
+                        const fileUrl = `file://${mediaData.tempPath}`;
+                        processedContent = processedContent.replace(cognotezUrl, fileUrl);
+                    }
+                } else {
+                    console.warn(`[PDF] No media data returned for: ${cognotezUrl}`);
+                    const placeholder = `<div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; margin: 10px 0; color: #6c757d; font-style: italic;">
+                        Media file data unavailable
+                    </div>`;
+                    processedContent = processedContent.replace(cognotezUrl, placeholder);
+                }
+            } catch (error) {
+                console.warn(`[PDF] Failed to process media file ${cognotezUrl}:`, error);
+                // Replace with placeholder if processing fails
+                const placeholder = `<div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; margin: 10px 0; color: #6c757d; font-style: italic;">
+                    Media file unavailable (${error.message})
+                </div>`;
+                processedContent = processedContent.replace(cognotezUrl, placeholder);
+            }
+        }
+
+        console.log('[PDF] Content processing completed');
+        return processedContent;
+    }
+
+    simplifyContentForPDF(content) {
+        console.log('[PDF] Simplifying content for PDF (removing media)...');
+        
+        if (!content) return content;
+        
+        // Replace all cognotez-media:// URLs with placeholders
+        const mediaUrlPattern = /cognotez-media:\/\/[a-z0-9]+/gi;
+        const simplifiedContent = content.replace(mediaUrlPattern, (match) => {
+            const fileId = match.replace('cognotez-media://', '');
+            return `[Media File: ${fileId}]`;
+        });
+        
+        console.log('[PDF] Content simplified');
+        return simplifiedContent;
+    }
+
+    createHTMLForPDF(note, content) {
+        console.log('[PDF] Creating HTML content...');
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 15px 0;
+            display: block;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border-radius: 0 4px 4px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        ul, ol {
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .metadata {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>${this.escapeHtml(note.title)}</h1>
+    
+    <div class="metadata">
+        <strong>Created:</strong> ${note.created ? new Date(note.created).toLocaleDateString() : 'Unknown'}<br>
+        <strong>Modified:</strong> ${note.modified ? new Date(note.modified).toLocaleDateString() : 'Unknown'}<br>
+        <strong>Exported:</strong> ${new Date().toLocaleDateString()}
+    </div>
+    
+    <div class="content">
+        ${this.markdownToHtml(content)}
+    </div>
+</body>
+</html>`;
+        
+        console.log('[PDF] HTML content created, length:', html.length);
+        return html;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    markdownToHtml(markdown) {
+        // Use the marked library for proper markdown parsing
+        const { marked } = require('marked');
+        
+        // Configure marked for better HTML output
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            sanitize: false, // We trust our content
+            smartLists: true,
+            smartypants: true
+        });
+
+        return marked.parse(markdown);
+    }
+
     async exportAllNotes(notes, format = 'markdown') {
         let content = '# All Notes Export\n\n';
         const timestamp = new Date().toISOString().split('T')[0];
@@ -608,6 +868,9 @@ ${notes.map(note => `- **${note.title}** (${note.word_count || 0} words) - ${new
     }
 
     async shareNoteAsFile(note, format = 'markdown') {
+        if (format === 'pdf') {
+            return await this.exportNoteAsPDF(note);
+        }
         return await this.exportNote(note, format);
     }
 
