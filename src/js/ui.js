@@ -676,6 +676,18 @@ class UIManager {
             // This is handled by the main app, but we can enhance it here if needed
         }
 
+        // Close mobile search when clicking outside
+        document.addEventListener('click', (e) => {
+            const searchContainer = document.getElementById('search-container');
+            const mobileSearchBtn = document.getElementById('mobile-search-btn');
+            if (searchContainer && searchContainer.classList.contains('mobile-active')) {
+                // Don't close if clicking inside search container or on the mobile search button
+                if (!searchContainer.contains(e.target) && e.target !== mobileSearchBtn) {
+                    searchContainer.classList.remove('mobile-active');
+                }
+            }
+        });
+
         // Handle orientation changes
         window.addEventListener('orientationchange', () => {
             setTimeout(() => {
@@ -689,6 +701,11 @@ class UIManager {
             if (e.key === 'Escape') {
                 if (sidebar && sidebar.classList.contains('mobile-open')) {
                     this.closeMobileSidebar();
+                }
+                // Close mobile search
+                const searchContainer = document.getElementById('search-container');
+                if (searchContainer && searchContainer.classList.contains('mobile-active')) {
+                    searchContainer.classList.remove('mobile-active');
                 }
             }
         });

@@ -754,6 +754,7 @@ class CogNotezApp {
         
         // Menu items that were moved to overflow
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
+        document.getElementById('mobile-search-btn').addEventListener('click', () => this.toggleMobileSearch());
         document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
         const syncSettingsBtn = document.getElementById('sync-settings-btn');
         if (syncSettingsBtn) {
@@ -1125,10 +1126,30 @@ class CogNotezApp {
     closeHeaderOverflowMenu(e) {
         const menu = document.getElementById('header-overflow-menu');
         const overflowBtn = document.getElementById('header-overflow-btn');
-        
+
         // Don't close if clicking inside the menu or on the overflow button
         if (menu && !menu.contains(e?.target) && e?.target !== overflowBtn) {
             menu.classList.add('hidden');
+        }
+    }
+
+    // Toggle mobile search
+    toggleMobileSearch() {
+        const searchContainer = document.getElementById('search-container');
+        const isActive = searchContainer.classList.contains('mobile-active');
+
+        if (isActive) {
+            // Hide search
+            searchContainer.classList.remove('mobile-active');
+        } else {
+            // Show search and focus input
+            searchContainer.classList.add('mobile-active');
+            setTimeout(() => {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.focus();
+                }
+            }, 300); // Wait for animation to complete
         }
     }
 
