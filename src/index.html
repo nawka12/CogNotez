@@ -48,25 +48,28 @@
                 <div class="search-container">
                     <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
                     <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
-                    <button id="advanced-search-btn" class="advanced-search-btn" title="Advanced Search"><i class="fas fa-filter"></i></button>
                 </div>
             </div>
             <div class="header-right">
-                <!-- Sync Status -->
-                <div id="sync-status-container" class="sync-status-container" style="display: none;">
-                    <div class="sync-status-indicator" id="sync-status-indicator">
-                        <i class="fas fa-cloud" id="sync-status-icon"></i>
-                        <span class="sync-status-text" id="sync-status-text">Sync</span>
-                    </div>
-                    <button id="sync-manual-btn" class="sync-manual-btn" title="Manual Sync">
-                        <i class="fas fa-sync-alt"></i>
-                    </button>
-                </div>
-
-                <button id="theme-toggle" class="theme-toggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
+                <!-- Simplified Sync Button (hidden until sync is enabled) -->
+                <button id="sync-btn" class="sync-btn hidden" title="Sync status - Click to sync">
+                    <i class="fas fa-cloud" id="sync-btn-icon"></i>
+                    <span class="sync-btn-text" id="sync-btn-text">Sync</span>
+                </button>
+                
+                <button id="theme-toggle" class="theme-toggle-btn" title="Toggle theme">
+                    <span class="theme-icon-light"><i class="fas fa-sun"></i></span>
+                    <span class="theme-icon-dark"><i class="fas fa-moon"></i></span>
+                </button>
                 <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
-                <button id="templates-btn" class="templates-btn" title="Templates"><i class="fas fa-file-alt"></i></button>
                 <button id="new-note-btn" class="new-note-btn" title="New note"><i class="fas fa-plus"></i></button>
+                <button id="header-overflow-btn" class="header-overflow-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
+                
+                <!-- Header Overflow Menu -->
+                <div id="header-overflow-menu" class="header-overflow-menu hidden">
+                    <button id="advanced-search-btn" class="header-overflow-item" title="Advanced Search"><i class="fas fa-filter"></i> Advanced Search</button>
+                    <button id="templates-btn" class="header-overflow-item" title="Templates"><i class="fas fa-file-alt"></i> Templates</button>
+                </div>
             </div>
         </header>
 
@@ -96,16 +99,23 @@
                         <div class="editor-actions">
                             <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
                             <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
-                            <button id="find-btn" class="action-btn" title="Find (Ctrl+F)"><i class="fas fa-search"></i></button>
-                            <button id="replace-btn" class="action-btn" title="Replace (Ctrl+H)"><i class="fas fa-exchange-alt"></i></button>
                             <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit"><i class="fas fa-edit"></i></button>
                             <button id="save-btn" class="action-btn" title="Save"><i class="fas fa-save"></i></button>
-                            <button id="ai-summary-btn" class="action-btn" title="AI Summary"><i class="fas fa-file-alt"></i></button>
-                            <button id="generate-tags-btn" class="action-btn" title="Generate Tags"><i class="fas fa-tags"></i></button>
-                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags"><i class="fas fa-clipboard-list"></i></button>
-                            <button id="export-btn" class="action-btn" title="Export"><i class="fas fa-download"></i></button>
-                            <button id="share-btn" class="action-btn" title="Share"><i class="fas fa-share"></i></button>
-                            <button id="password-lock-btn" class="action-btn" title="Password Protection"><i class="fas fa-lock"></i></button>
+                            <button id="editor-overflow-btn" class="action-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
+                            
+                            <!-- Overflow menu -->
+                            <div id="editor-overflow-menu" class="editor-overflow-menu hidden">
+                                <button id="find-btn" class="overflow-menu-item" title="Find (Ctrl+F)"><i class="fas fa-search"></i> Find</button>
+                                <button id="replace-btn" class="overflow-menu-item" title="Replace (Ctrl+H)"><i class="fas fa-exchange-alt"></i> Replace</button>
+                                <div class="overflow-menu-separator"></div>
+                                <button id="ai-summary-btn" class="overflow-menu-item" title="AI Summary"><i class="fas fa-file-alt"></i> AI Summary</button>
+                                <button id="generate-tags-btn" class="overflow-menu-item" title="Generate Tags"><i class="fas fa-tags"></i> Generate Tags</button>
+                                <button id="manage-tags-btn" class="overflow-menu-item" title="Manage Tags"><i class="fas fa-clipboard-list"></i> Manage Tags</button>
+                                <div class="overflow-menu-separator"></div>
+                                <button id="export-btn" class="overflow-menu-item" title="Export"><i class="fas fa-download"></i> Export</button>
+                                <button id="share-btn" class="overflow-menu-item" title="Share"><i class="fas fa-share"></i> Share</button>
+                                <button id="password-lock-btn" class="overflow-menu-item" title="Password Protection"><i class="fas fa-lock"></i> Password Lock</button>
+                            </div>
                         </div>
                     </div>
                     <div class="editor-wrapper">

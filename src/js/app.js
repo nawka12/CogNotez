@@ -600,6 +600,10 @@ class CogNotezApp {
         this.templatesManager = null;
         this.richMediaManager = null;
 
+        // Debounced history tracking
+        this.historyDebounceTimer = null;
+        this.historyDebounceDelay = 500; // 500ms delay for batching history updates
+
         this.init();
     }
 
@@ -732,14 +736,36 @@ class CogNotezApp {
     setupEventListeners() {
         // Header buttons
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
-        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
+        
+        // Header overflow menu toggle
+        document.getElementById('header-overflow-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleHeaderOverflowMenu();
+        });
+        
+        // Close overflow menu when clicking any menu item
+        document.querySelectorAll('.header-overflow-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const menu = document.getElementById('header-overflow-menu');
+                menu.classList.add('hidden');
+            });
+        });
+        
+        // Menu items that were moved to overflow
+        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
         const syncSettingsBtn = document.getElementById('sync-settings-btn');
         if (syncSettingsBtn) {
             syncSettingsBtn.addEventListener('click', () => this.showSyncSettings());
         }
-        document.getElementById('sync-manual-btn').addEventListener('click', () => this.manualSync());
+        
+        // Simplified sync button
+        const syncBtn = document.getElementById('sync-btn');
+        if (syncBtn) {
+            syncBtn.addEventListener('click', () => this.manualSync());
+        }
+        
         document.getElementById('search-button').addEventListener('click', () => this.searchNotes());
 
         // Network online/offline event listeners
@@ -808,6 +834,20 @@ class CogNotezApp {
         document.getElementById('replace-btn').addEventListener('click', () => this.showReplaceDialog());
         document.getElementById('preview-toggle-btn').addEventListener('click', () => this.togglePreview());
         document.getElementById('save-btn').addEventListener('click', () => this.saveCurrentNote());
+        
+        // Editor overflow menu toggle
+        document.getElementById('editor-overflow-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleEditorOverflowMenu();
+        });
+        
+        // Close overflow menu when clicking any menu item
+        document.querySelectorAll('.overflow-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const menu = document.getElementById('editor-overflow-menu');
+                menu.classList.add('hidden');
+            });
+        });
         document.getElementById('ai-summary-btn').addEventListener('click', () => this.summarizeNote());
         document.getElementById('generate-tags-btn').addEventListener('click', () => this.generateTags());
         document.getElementById('manage-tags-btn').addEventListener('click', () => this.showTagManager());
@@ -887,10 +927,9 @@ class CogNotezApp {
         });
         editor.addEventListener('input', () => {
             this.updateNotePreview();
-            // Track history for undo/redo functionality
+            // Track history for undo/redo functionality with debouncing
             if (!this.ignoreHistoryUpdate) {
-                const cursorPos = editor.selectionStart;
-                this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+                this.debouncedPushHistory(editor);
             }
             // Clear stored selection when user types
             this.selectionStart = -1;
@@ -993,18 +1032,13 @@ class CogNotezApp {
     // Theme management
     loadTheme() {
         document.documentElement.setAttribute('data-theme', this.theme);
-        this.updateThemeToggleButton();
+        // CSS automatically handles button appearance through data-theme attribute
     }
 
     toggleTheme() {
         this.theme = this.theme === 'light' ? 'dark' : 'light';
         localStorage.setItem('theme', this.theme);
         this.loadTheme();
-    }
-
-    updateThemeToggleButton() {
-        const button = document.getElementById('theme-toggle');
-        button.innerHTML = this.theme === 'light' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
     }
 
     // Preview/Edit mode toggle
@@ -1021,6 +1055,7 @@ class CogNotezApp {
             editor.classList.remove('hidden');
             toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
             toggleBtn.title = 'Toggle Preview/Edit';
+            toggleBtn.classList.remove('active');
         } else {
             // Switch to preview mode
             editor.classList.add('hidden');
@@ -1028,11 +1063,72 @@ class CogNotezApp {
             this.renderMarkdownPreview();
             toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
             toggleBtn.title = 'Toggle Preview/Edit';
+            toggleBtn.classList.add('active');
         }
 
         // Update find highlighting after mode switch
         if (this.findReplaceDialog && this.findReplaceDialog.isVisible && this.findReplaceDialog.findText) {
             this.findReplaceDialog.highlightMatches();
+        }
+    }
+
+    // Toggle editor overflow menu
+    toggleEditorOverflowMenu() {
+        const menu = document.getElementById('editor-overflow-menu');
+        const isHidden = menu.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show menu
+            menu.classList.remove('hidden');
+            
+            // Add click listener to close menu when clicking outside
+            setTimeout(() => {
+                document.addEventListener('click', this.closeEditorOverflowMenu.bind(this), { once: true });
+            }, 0);
+        } else {
+            // Hide menu
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Close editor overflow menu
+    closeEditorOverflowMenu(e) {
+        const menu = document.getElementById('editor-overflow-menu');
+        const overflowBtn = document.getElementById('editor-overflow-btn');
+        
+        // Don't close if clicking inside the menu or on the overflow button
+        if (menu && !menu.contains(e?.target) && e?.target !== overflowBtn) {
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Toggle header overflow menu
+    toggleHeaderOverflowMenu() {
+        const menu = document.getElementById('header-overflow-menu');
+        const isHidden = menu.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show menu
+            menu.classList.remove('hidden');
+            
+            // Add click listener to close menu when clicking outside
+            setTimeout(() => {
+                document.addEventListener('click', this.closeHeaderOverflowMenu.bind(this), { once: true });
+            }, 0);
+        } else {
+            // Hide menu
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Close header overflow menu
+    closeHeaderOverflowMenu(e) {
+        const menu = document.getElementById('header-overflow-menu');
+        const overflowBtn = document.getElementById('header-overflow-btn');
+        
+        // Don't close if clicking inside the menu or on the overflow button
+        if (menu && !menu.contains(e?.target) && e?.target !== overflowBtn) {
+            menu.classList.add('hidden');
         }
     }
 
@@ -1811,6 +1907,17 @@ class CogNotezApp {
 
 	async saveCurrentNote(isAutoSave = false) {
         if (!this.currentNote || !this.notesManager) return;
+
+        // Flush any pending debounced history before saving
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+            const editor = document.getElementById('note-editor');
+            if (editor && !this.ignoreHistoryUpdate) {
+                const cursorPos = editor.selectionStart;
+                this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+            }
+        }
 
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('note-editor').value;
@@ -2891,10 +2998,31 @@ Please provide a helpful response based on the note content and conversation his
         }
     }
 
+    // Debounced history push to prevent bloat from rapid typing
+    debouncedPushHistory(editor) {
+        // Clear any existing timer
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+        }
+
+        // Set a new timer
+        this.historyDebounceTimer = setTimeout(() => {
+            const cursorPos = editor.selectionStart;
+            this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+            console.log('[DEBUG] History state saved (debounced)');
+        }, this.historyDebounceDelay);
+    }
+
     // Undo/Redo functionality
     undo() {
         const editor = document.getElementById('note-editor');
         if (!editor) return;
+
+        // Clear any pending debounced history push
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+        }
 
         const previousState = this.historyManager.undo();
         if (previousState) {
@@ -2920,6 +3048,12 @@ Please provide a helpful response based on the note content and conversation his
     redo() {
         const editor = document.getElementById('note-editor');
         if (!editor) return;
+
+        // Clear any pending debounced history push
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+        }
 
         const nextState = this.historyManager.redo();
         if (nextState) {
@@ -4839,10 +4973,10 @@ Please provide a helpful response based on the note content and conversation his
                     const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
                     await Promise.race([this.updateSyncStatus(), timeoutPromise]);
 
-                    // Show sync status container
-                    const syncContainer = document.getElementById('sync-status-container');
-                    if (syncContainer) {
-                        syncContainer.style.display = 'flex';
+                    // Show sync button
+                    const syncBtn = document.getElementById('sync-btn');
+                    if (syncBtn) {
+                        syncBtn.classList.remove('hidden');
                     }
 
                     // Set up auto-sync if enabled
@@ -4992,12 +5126,11 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     updateSyncUI() {
-        const indicator = document.getElementById('sync-status-indicator');
-        const icon = document.getElementById('sync-status-icon');
-        const text = document.getElementById('sync-status-text');
-        const manualBtn = document.getElementById('sync-manual-btn');
+        const syncBtn = document.getElementById('sync-btn');
+        const icon = document.getElementById('sync-btn-icon');
+        const text = document.getElementById('sync-btn-text');
 
-        if (!indicator || !icon || !text) return;
+        if (!syncBtn || !icon || !text) return;
 
         console.log('[UI] Updating sync UI with status:', {
             isAuthenticated: this.syncStatus.isAuthenticated,
@@ -5005,44 +5138,52 @@ Please provide a helpful response based on the note content and conversation his
             inProgress: this.syncStatus.inProgress
         });
 
-        // Check if we're offline (quick sync check)
+        // Check if we're offline
         const isOnline = navigator.onLine;
 
         // Determine if content is in sync using checksums when available
         const contentInSync = !!(this.syncStatus.localChecksum && this.syncStatus.remoteChecksum && this.syncStatus.localChecksum === this.syncStatus.remoteChecksum);
 
-        // Update sync status indicator
+        // Reset all status classes
+        syncBtn.classList.remove('connected', 'disconnected', 'syncing', 'error');
+
+        // Update sync button based on status
         if (this.syncStatus.inProgress) {
-            indicator.className = 'sync-status-indicator syncing';
-            icon.className = 'fas fa-spinner fa-spin';
+            syncBtn.classList.add('syncing');
+            icon.className = 'fas fa-sync-alt';
             text.textContent = 'Syncing...';
-            manualBtn.disabled = true;
+            syncBtn.disabled = true;
+            syncBtn.title = 'Sync in progress...';
         } else if (!isOnline) {
             // Show offline state
-            indicator.className = 'sync-status-indicator disconnected';
+            syncBtn.classList.add('disconnected');
             icon.className = 'fas fa-wifi-slash';
             text.textContent = 'Offline';
-            manualBtn.disabled = true;
+            syncBtn.disabled = true;
+            syncBtn.title = 'No internet connection';
         } else if (this.syncStatus.isAuthenticated) {
             if (contentInSync) {
-                indicator.className = 'sync-status-indicator connected';
-                icon.className = 'fas fa-cloud';
-                text.textContent = 'Content in sync';
-                manualBtn.disabled = false;
+                syncBtn.classList.add('connected');
+                icon.className = 'fas fa-cloud-check';
+                text.textContent = 'Synced';
+                syncBtn.disabled = false;
+                syncBtn.title = 'In sync - Click to sync manually';
             } else {
-                indicator.className = 'sync-status-indicator disconnected';
-                icon.className = 'fas fa-cloud-upload';
-                text.textContent = 'Ready to sync';
-                manualBtn.disabled = false;
+                syncBtn.classList.add('disconnected');
+                icon.className = 'fas fa-cloud-upload-alt';
+                text.textContent = 'Sync';
+                syncBtn.disabled = false;
+                syncBtn.title = 'Click to sync with Google Drive';
             }
         } else {
-            indicator.className = 'sync-status-indicator disconnected';
-            icon.className = 'fas fa-cloud-off';
+            syncBtn.classList.add('disconnected');
+            icon.className = 'fas fa-cloud-slash';
             text.textContent = 'Not connected';
-            manualBtn.disabled = true;
+            syncBtn.disabled = true;
+            syncBtn.title = 'Not connected to Google Drive';
         }
 
-        // Update last sync time
+        // Update last sync time in settings modal if open
         const lastSyncElement = document.getElementById('google-drive-last-sync');
         if (lastSyncElement && this.syncStatus.lastSync) {
             const lastSyncDate = new Date(this.syncStatus.lastSync);
