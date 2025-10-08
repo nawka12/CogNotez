@@ -628,12 +628,229 @@ class UIManager {
         });
     }
 
+    // Mobile UI Handlers
+    initializeMobileUI() {
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        const searchButton = document.getElementById('search-button');
+        const searchContainer = document.getElementById('search-container');
+
+        // Set CSS viewport variable for mobile height accuracy
+        const setViewportHeightVar = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        setViewportHeightVar();
+
+        // Update on resize and orientation changes
+        window.addEventListener('resize', setViewportHeightVar, { passive: true });
+        window.addEventListener('orientationchange', setViewportHeightVar, { passive: true });
+
+        // Mobile menu toggle
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', () => {
+                this.toggleMobileSidebar();
+            });
+        }
+
+        // Sidebar backdrop click
+        if (sidebarBackdrop) {
+            sidebarBackdrop.addEventListener('click', () => {
+                this.closeMobileSidebar();
+            });
+        }
+
+        // Close sidebar when clicking a note on mobile
+        if (sidebar) {
+            sidebar.addEventListener('click', (e) => {
+                if (e.target.closest('.note-item') && window.innerWidth <= 768) {
+                    this.closeMobileSidebar();
+                }
+            });
+        }
+
+        // Mobile search toggle (if needed)
+        if (searchButton && window.innerWidth <= 768) {
+            // On mobile, search might need special handling
+            // This is handled by the main app, but we can enhance it here if needed
+        }
+
+        // Handle orientation changes
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                this.handleOrientationChange();
+                setViewportHeightVar();
+            }, 100);
+        });
+
+        // Close mobile overlays on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    this.closeMobileSidebar();
+                }
+            }
+        });
+
+        // Prevent body scroll when sidebar is open on mobile
+        const preventScroll = (e) => {
+            if (sidebar && sidebar.classList.contains('mobile-open') && window.innerWidth <= 768) {
+                if (!e.target.closest('.sidebar')) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        document.addEventListener('touchmove', preventScroll, { passive: false });
+
+        // Swipe gestures for mobile
+        this.initializeSwipeGestures();
+    }
+
+    toggleMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (sidebar && backdrop) {
+            const isOpen = sidebar.classList.toggle('mobile-open');
+            backdrop.classList.toggle('active', isOpen);
+            
+            // Prevent body scroll when sidebar is open
+            if (isOpen) {
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+    }
+
+    closeMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (sidebar && backdrop) {
+            sidebar.classList.remove('mobile-open');
+            backdrop.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+
+    openMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (sidebar && backdrop) {
+            sidebar.classList.add('mobile-open');
+            backdrop.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    handleOrientationChange() {
+        // Close any open mobile overlays on orientation change
+        this.closeMobileSidebar();
+        
+        // Update responsive elements
+        if (this.updateWordCountPosition) {
+            this.updateWordCountPosition();
+        }
+
+        // Adjust AI panel if needed
+        const aiPanel = document.getElementById('ai-panel');
+        if (aiPanel && !aiPanel.classList.contains('hidden')) {
+            // Force a reflow to ensure proper positioning
+            aiPanel.style.display = 'none';
+            setTimeout(() => {
+                aiPanel.style.display = '';
+            }, 100);
+        }
+    }
+
+    initializeSwipeGestures() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        const mainContent = document.querySelector('.main-content-area');
+        if (!mainContent) return;
+
+        mainContent.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        mainContent.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            this.handleSwipeGesture(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, { passive: true });
+    }
+
+    handleSwipeGesture(startX, startY, endX, endY) {
+        // Only on mobile
+        if (window.innerWidth > 768) return;
+
+        const diffX = endX - startX;
+        const diffY = endY - startY;
+        const minSwipeDistance = 50;
+
+        // Horizontal swipe is dominant
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+            // Swipe right from left edge - open sidebar
+            if (diffX > minSwipeDistance && startX < 50) {
+                this.openMobileSidebar();
+            }
+            // Swipe left - close sidebar
+            else if (diffX < -minSwipeDistance) {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    this.closeMobileSidebar();
+                }
+            }
+        }
+    }
+
+    // Optimize touch interactions
+    optimizeTouchInteractions() {
+        // Add touch-friendly ripple effect to buttons
+        const buttons = document.querySelectorAll('button, .action-btn, .note-item');
+        
+        buttons.forEach(button => {
+            button.addEventListener('touchstart', function(e) {
+                // Add visual feedback for touch
+                this.style.opacity = '0.7';
+            }, { passive: true });
+
+            button.addEventListener('touchend', function(e) {
+                // Remove visual feedback
+                setTimeout(() => {
+                    this.style.opacity = '';
+                }, 100);
+            }, { passive: true });
+        });
+    }
+
+    // Check if device is mobile
+    isMobile() {
+        return window.innerWidth <= 768 || 
+               /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // Check if device is tablet
+    isTablet() {
+        return window.innerWidth > 768 && window.innerWidth <= 1024;
+    }
+
     // Initialize all UI enhancements
     initialize() {
         this.enhanceContextMenu();
         this.enhanceSidebar();
         this.enhanceEditor();
         this.handleWindowResize();
+        this.initializeMobileUI();
+        this.optimizeTouchInteractions();
 
         // Add keyboard shortcuts help to menu
         if (typeof ipcRenderer !== 'undefined') {
@@ -645,6 +862,10 @@ class UIManager {
 
         // Add CSS animations
         this.injectStyles();
+
+        // Expose mobile helpers
+        window.isMobileDevice = () => this.isMobile();
+        window.isTabletDevice = () => this.isTablet();
     }
 
     injectStyles() {

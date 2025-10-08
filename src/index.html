@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="CogNotez">
+    <meta name="theme-color" content="#3ECF8E">
     <title>CogNotez - AI-Powered Notes</title>
     <script>
         // Apply theme immediately to prevent flashbang
@@ -41,11 +46,14 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
+                <button id="mobile-menu-toggle" class="mobile-menu-toggle" title="Toggle menu">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="app-title-container">
                     <img src="../assets/icon.svg" alt="CogNotez Logo" class="app-logo" width="32" height="32">
                     <h1 class="app-title">CogNotez</h1>
                 </div>
-                <div class="search-container">
+                <div class="search-container" id="search-container">
                     <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
                     <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
                 </div>
@@ -75,8 +83,11 @@
 
         <!-- Main Content -->
         <main class="main-content">
+            <!-- Sidebar Backdrop (for mobile) -->
+            <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+            
             <!-- Sidebar -->
-            <aside class="sidebar">
+            <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
                     <h2>Notes</h2>
                     <button id="sidebar-toggle" class="sidebar-toggle"><i class="fas fa-bars"></i></button>
