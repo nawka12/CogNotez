@@ -985,6 +985,7 @@ class CogNotezApp {
         ipcRenderer.on('menu-ai-settings', () => this.showAISettings());
         ipcRenderer.on('menu-general-settings', () => this.showGeneralSettings());
         ipcRenderer.on('menu-sync-settings', () => this.showSyncSettings());
+        ipcRenderer.on('menu-advanced-settings', () => this.showAdvancedSettings());
 
         // Update-related menu actions
         ipcRenderer.on('menu-check-updates', () => this.checkForUpdates());
@@ -4694,6 +4695,162 @@ Please provide a helpful response based on the note content and conversation his
         });
     }
 
+    showAdvancedSettings() {
+        // Get current tag statistics
+        const allTags = this.notesManager.db ? this.notesManager.db.getAllTags() : [];
+        const totalTags = allTags.length;
+
+        const content = `
+            <div style="max-width: 500px;">
+                <div class="settings-section">
+                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fas fa-cog"></i> Advanced Options
+                    </h4>
+
+                    <!-- Tag Management -->
+                    <div class="setting-item" style="margin-bottom: 24px;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 4px;">
+                                <i class="fas fa-tags"></i> Tag Management
+                            </label>
+                            <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                                Total tags: <strong>${totalTags}</strong>
+                            </div>
+                        </div>
+                        
+                        <button id="clear-unused-tags-btn" class="advanced-action-btn" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; transition: all 0.2s;">
+                            <i class="fas fa-broom"></i>
+                            <span>Clear Unused Tags</span>
+                        </button>
+                        <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
+                            Remove tags that are not associated with any notes. This helps keep your tag list clean and organized.
+                        </div>
+                    </div>
+
+                    <!-- AI Data Management -->
+                    <div class="setting-item" style="margin-bottom: 24px;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 4px;">
+                                <i class="fas fa-robot"></i> AI Data Management
+                            </label>
+                            <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                                Manage AI conversation history and data
+                            </div>
+                        </div>
+                        
+                        <button id="clear-all-ai-conversations-btn" class="advanced-action-btn" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; transition: all 0.2s;">
+                            <i class="fas fa-trash"></i>
+                            <span>Clear All AI Conversations</span>
+                        </button>
+                        <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
+                            Delete all AI conversations for all notes. This action cannot be undone. Note content will not be affected.
+                        </div>
+                    </div>
+
+                    <!-- Database Management (placeholder for future options) -->
+                    <div class="setting-item" style="margin-bottom: 24px;">
+                        <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 8px;">
+                            <i class="fas fa-database"></i> Database
+                        </label>
+                        <div style="color: var(--text-secondary); font-size: 12px; padding: 8px; background: var(--note-preview-bg, #f5f5f5); border-radius: 4px;">
+                            ℹ️ Additional database management options will be available here in future updates.
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = this.createModal('Advanced Settings', content, [
+            { text: 'Close', type: 'secondary', action: 'cancel' }
+        ]);
+
+        // Handle Clear Unused Tags button
+        const clearTagsBtn = modal.querySelector('#clear-unused-tags-btn');
+        clearTagsBtn.addEventListener('click', async () => {
+            if (!this.notesManager.db || !this.notesManager.db.initialized) {
+                this.showNotification('❌ Database not initialized', 'error');
+                return;
+            }
+
+            // Confirm action
+            const confirmClear = confirm('Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.');
+            if (!confirmClear) return;
+
+            try {
+                clearTagsBtn.disabled = true;
+                clearTagsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Clearing...</span>';
+
+                const result = this.notesManager.db.clearUnusedTags();
+
+                if (result.deletedCount > 0) {
+                    this.showNotification(`✅ Cleared ${result.deletedCount} unused tag${result.deletedCount > 1 ? 's' : ''}. ${result.remainingCount} tag${result.remainingCount !== 1 ? 's' : ''} remaining.`, 'success');
+                    console.log('[Advanced Settings] Cleared unused tags:', result);
+                    
+                    // Close modal and refresh if needed
+                    this.closeModal(modal);
+                } else {
+                    this.showNotification('ℹ️ No unused tags found. All tags are currently in use!', 'info');
+                    clearTagsBtn.disabled = false;
+                    clearTagsBtn.innerHTML = '<i class="fas fa-broom"></i> <span>Clear Unused Tags</span>';
+                }
+            } catch (error) {
+                console.error('[Advanced Settings] Error clearing unused tags:', error);
+                this.showNotification('❌ Failed to clear unused tags: ' + error.message, 'error');
+                clearTagsBtn.disabled = false;
+                clearTagsBtn.innerHTML = '<i class="fas fa-broom"></i> <span>Clear Unused Tags</span>';
+            }
+        });
+
+        // Handle Clear All AI Conversations button
+        const clearAIConversationsBtn = modal.querySelector('#clear-all-ai-conversations-btn');
+        clearAIConversationsBtn.addEventListener('click', async () => {
+            // Confirm action
+            const confirmed = confirm('Are you sure you want to clear all AI conversations?\n\nThis will delete ALL AI conversations for ALL notes and cannot be undone.\n\nNote: Your note content will not be affected.');
+            if (!confirmed) return;
+
+            try {
+                clearAIConversationsBtn.disabled = true;
+                clearAIConversationsBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> <span>Clearing...</span>';
+
+                const result = await this.backendAPI.clearOrphanedAIConversations();
+
+                if (result.success) {
+                    this.showNotification(result.message || '✅ All AI conversations cleared successfully', 'success');
+                    console.log('[Advanced Settings] Cleared AI conversations:', result);
+                    
+                    // Close modal
+                    this.closeModal(modal);
+                } else {
+                    this.showNotification(result.error || '❌ Failed to clear AI conversations', 'error');
+                    clearAIConversationsBtn.disabled = false;
+                    clearAIConversationsBtn.innerHTML = '<i class="fas fa-trash"></i> <span>Clear All AI Conversations</span>';
+                }
+            } catch (error) {
+                console.error('[Advanced Settings] Error clearing AI conversations:', error);
+                this.showNotification('❌ Failed to clear AI conversations: ' + error.message, 'error');
+                clearAIConversationsBtn.disabled = false;
+                clearAIConversationsBtn.innerHTML = '<i class="fas fa-trash"></i> <span>Clear All AI Conversations</span>';
+            }
+        });
+
+        // Add hover effect for the button
+        const style = document.createElement('style');
+        style.textContent = `
+            .advanced-action-btn:hover:not(:disabled) {
+                background: var(--accent-color, #3ECF8E) !important;
+                color: white !important;
+                border-color: var(--accent-color, #3ECF8E) !important;
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .advanced-action-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
     showShareOptions() {
         if (!this.currentNote || !this.backendAPI) return;
 
@@ -5363,19 +5520,6 @@ Please provide a helpful response based on the note content and conversation his
                                 </div>
                             </div>
                         </div>
-
-                        <!-- Advanced Options Section -->
-                        <div class="sync-section">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Advanced Options</h5>
-                            <div class="sync-advanced-options" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
-                                <div class="sync-buttons" style="display: flex; gap: 12px; flex-wrap: wrap;">
-                                    <button id="modal-clear-orphaned-ai-btn" class="sync-button" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear All AI Conversations</button>
-                                </div>
-                                <div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary);">
-                                    <strong>Clear All AI Conversations:</strong> Deletes all AI conversations for all notes. This action cannot be undone.
-                                </div>
-                            </div>
-                        </div>
                     </div>
                 </div>
             `;
@@ -5408,7 +5552,6 @@ Please provide a helpful response based on the note content and conversation his
             const importBtn = modal.querySelector('#modal-import-credentials-btn');
             const autoSyncCheckbox = modal.querySelector('#modal-auto-sync');
             const startupSyncCheckbox = modal.querySelector('#modal-sync-on-startup');
-            const clearOrphanedAIBtn = modal.querySelector('#modal-clear-orphaned-ai-btn');
 
             // Encryption controls
             const encryptionEnabledCheckbox = modal.querySelector('#modal-encryption-enabled');
@@ -5591,32 +5734,6 @@ Please provide a helpful response based on the note content and conversation his
                 } catch (error) {
                     console.error('[Sync] Failed to toggle sync on startup:', error);
                     this.showNotification('Failed to update sync on startup setting', 'error');
-                }
-            });
-
-            // Clear all AI conversations button
-            clearOrphanedAIBtn.addEventListener('click', async () => {
-                try {
-                    const confirmed = confirm('Are you sure you want to clear all AI conversations? This will delete ALL AI conversations for ALL notes and cannot be undone.');
-
-                    if (!confirmed) return;
-
-                    clearOrphanedAIBtn.disabled = true;
-                    clearOrphanedAIBtn.textContent = 'Clearing...';
-
-                    const result = await this.backendAPI.clearOrphanedAIConversations();
-
-                    if (result.success) {
-                        this.showNotification(result.message, 'success');
-                    } else {
-                        this.showNotification(result.error || 'Failed to clear AI conversations', 'error');
-                    }
-                } catch (error) {
-                    console.error('[Sync] Failed to clear AI conversations:', error);
-                    this.showNotification('Failed to clear AI conversations', 'error');
-                } finally {
-                    clearOrphanedAIBtn.disabled = false;
-                    clearOrphanedAIBtn.textContent = 'Clear All AI Conversations';
                 }
             });
 

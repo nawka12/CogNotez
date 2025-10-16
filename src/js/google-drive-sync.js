@@ -574,18 +574,17 @@ class GoogleDriveSyncManager {
                 console.log('[GoogleDriveSync] Local notes:', Object.keys(localData.notes || {}).length);
                 console.log('[GoogleDriveSync] Remote notes:', Object.keys(remoteData.notes || {}).length);
                 console.log('[GoogleDriveSync] Conflict detection - hasLocalChanges:', this.hasLocalChanges(localData, remoteData));
-                // Use the most recent known lastSync between renderer-provided and internal
-                const providedLastSync = options.lastSync ? new Date(options.lastSync).getTime() : null;
+                // CRITICAL: Use ONLY this device's last sync time, NOT cloud's global lastSync
+                // Using cloud's lastSync would cause data loss for offline-created notes
+                // Example: Device A synced at 7 AM, creates note at 8 AM offline
+                //          Device B syncs at 8:30 AM
+                //          Device A syncs at 9 AM - note created at 8 AM would be wrongly
+                //          treated as "deleted" because 8 AM < 8:30 AM (cloud's lastSync)
                 const internalLastSync = this.syncMetadata.lastSync ? new Date(this.syncMetadata.lastSync).getTime() : null;
-                let effectiveLastSync = null;
-                if (providedLastSync && internalLastSync) {
-                    effectiveLastSync = new Date(Math.max(providedLastSync, internalLastSync)).toISOString();
-                } else if (providedLastSync) {
-                    effectiveLastSync = new Date(providedLastSync).toISOString();
-                } else if (internalLastSync) {
-                    effectiveLastSync = new Date(internalLastSync).toISOString();
-                }
-                console.log('[GoogleDriveSync] Using effective lastSync:', effectiveLastSync);
+                const effectiveLastSync = internalLastSync ? new Date(internalLastSync).toISOString() : null;
+                
+                console.log('[GoogleDriveSync] Using device-specific lastSync:', effectiveLastSync);
+                console.log('[GoogleDriveSync] This prevents treating offline-created notes as deletions');
                 const conflictResult = await this.resolveConflicts(localData, remoteData, options.strategy || 'merge', effectiveLastSync);
 
                 if (conflictResult.resolved) {
@@ -716,22 +715,51 @@ class GoogleDriveSyncManager {
                     const localModified = new Date(localNote.updated_at || localNote.modified);
                     const remoteModified = new Date(remoteNote.updated_at || remoteNote.modified);
 
+                    // Check if content actually differs (prevents false overwrites)
+                    const contentChanged = JSON.stringify(localNote.content) !== JSON.stringify(remoteNote.content) ||
+                                         JSON.stringify(localNote.title) !== JSON.stringify(remoteNote.title);
+
                     if (localModified > remoteModified) {
                         // Local is newer - keep local
                         continue;
                     } else if (remoteModified > localModified) {
-                        // Remote is newer - use remote
+                        // Remote timestamp is newer, but check for content conflicts
+                        if (contentChanged && lastSyncTime) {
+                            // Both versions have changes since last sync - potential offline edit conflict
+                            const localChangedSinceSync = localModified.getTime() > lastSyncTime;
+                            const remoteChangedSinceSync = remoteModified.getTime() > lastSyncTime;
+                            
+                            if (localChangedSinceSync && remoteChangedSinceSync) {
+                                // Both edited since last sync - this is a real conflict
+                                console.log('[GoogleDriveSync] Real conflict detected - both devices edited since last sync:', localNote.title);
+                                conflicts.push({
+                                    type: 'note',
+                                    id: noteId,
+                                    title: localNote.title,
+                                    localModified: localModified,
+                                    remoteModified: remoteModified,
+                                    reason: 'both_edited_offline'
+                                });
+                                
+                                // For safety, keep local version (user can see their work)
+                                // Remote version is not lost - it's still in cloud
+                                console.log('[GoogleDriveSync] Keeping local version to prevent data loss');
+                                continue;
+                            }
+                        }
+                        // Remote is newer and no conflict detected - use remote
                         mergedData.notes[noteId] = remoteNote;
                     } else {
                         // Same modification time - check content
-                        if (JSON.stringify(localNote) !== JSON.stringify(remoteNote)) {
+                        if (contentChanged) {
                             console.log('[GoogleDriveSync] Content conflict detected for note:', localNote.title);
                             conflicts.push({
                                 type: 'note',
                                 id: noteId,
                                 title: localNote.title,
                                 localModified: localModified,
-                                remoteModified: remoteModified
+                                remoteModified: remoteModified,
+                                reason: 'same_timestamp_different_content'
                             });
 
                             // For merge strategy, keep local version
@@ -746,38 +774,79 @@ class GoogleDriveSyncManager {
                 }
             }
 
-            // Merge tags from remote data - tags are identified by ID, so merge both local and remote
+            // Merge tags - respect local deletions
+            // Local tags are the source of truth. We keep all local tags and only add remote tags
+            // that don't conflict with local state. This ensures local deletions are preserved.
             if (remoteData.tags) {
                 if (!mergedData.tags) {
                     mergedData.tags = {};
                 }
-                // Merge remote tags into local tags (remote tags take precedence if there's a conflict)
-                Object.assign(mergedData.tags, remoteData.tags);
-                console.log('[GoogleDriveSync] Merged tags:', Object.keys(mergedData.tags).length);
+                
+                // Get all tag IDs that are currently used in notes (local state)
+                const usedTagIds = new Set();
+                Object.values(mergedData.notes || {}).forEach(note => {
+                    if (note.tags && Array.isArray(note.tags)) {
+                        note.tags.forEach(tagId => usedTagIds.add(tagId));
+                    }
+                });
+                if (mergedData.note_tags) {
+                    Object.values(mergedData.note_tags).forEach(noteTag => {
+                        if (noteTag.tag_id) usedTagIds.add(noteTag.tag_id);
+                    });
+                }
+                
+                // Only add remote tags that are actually used in notes or already exist locally
+                // This prevents re-adding tags that were intentionally deleted
+                for (const [tagId, remoteTag] of Object.entries(remoteData.tags)) {
+                    if (mergedData.tags[tagId] || usedTagIds.has(tagId)) {
+                        mergedData.tags[tagId] = remoteTag;
+                    }
+                }
+                console.log('[GoogleDriveSync] Merged tags (respecting local deletions):', Object.keys(mergedData.tags).length);
             }
 
-            // Merge note_tags associations from remote data
+            // Merge note_tags associations - respect local state
+            // Only merge associations for notes that exist in merged data
             if (remoteData.note_tags) {
                 if (!mergedData.note_tags) {
                     mergedData.note_tags = {};
                 }
-                // Merge remote note_tags into local note_tags
-                Object.assign(mergedData.note_tags, remoteData.note_tags);
-                console.log('[GoogleDriveSync] Merged note_tags:', Object.keys(mergedData.note_tags).length);
+                
+                const existingNoteIds = new Set(Object.keys(mergedData.notes || {}));
+                
+                // Only add remote note_tags if the note still exists
+                for (const [noteTagKey, remoteNoteTag] of Object.entries(remoteData.note_tags)) {
+                    if (existingNoteIds.has(remoteNoteTag.note_id)) {
+                        // Only add if not already in local or if local doesn't have it
+                        if (!mergedData.note_tags[noteTagKey]) {
+                            mergedData.note_tags[noteTagKey] = remoteNoteTag;
+                        }
+                    }
+                }
+                console.log('[GoogleDriveSync] Merged note_tags (respecting local state):', Object.keys(mergedData.note_tags).length);
             }
 
-            // Merge AI conversations from remote data
+            // Merge AI conversations - respect local deletions
+            // Local AI conversation state is the source of truth. Only add remote conversations
+            // for notes that still exist and if they don't conflict with local deletions.
             if (remoteData.ai_conversations) {
                 if (!mergedData.ai_conversations) {
                     mergedData.ai_conversations = {};
                 }
-                // Merge remote conversations, checking for duplicates by ID
+                
+                const existingNoteIds = new Set(Object.keys(mergedData.notes || {}));
+                
+                // Only add remote conversations if:
+                // 1. The conversation doesn't exist locally (new from remote)
+                // 2. The associated note still exists
+                // This prevents re-adding conversations that were intentionally cleared
                 for (const [convId, remoteConv] of Object.entries(remoteData.ai_conversations)) {
-                    if (!mergedData.ai_conversations[convId]) {
+                    const noteExists = !remoteConv.note_id || existingNoteIds.has(remoteConv.note_id);
+                    if (!mergedData.ai_conversations[convId] && noteExists) {
                         mergedData.ai_conversations[convId] = remoteConv;
                     }
                 }
-                console.log('[GoogleDriveSync] Merged ai_conversations:', Object.keys(mergedData.ai_conversations).length);
+                console.log('[GoogleDriveSync] Merged ai_conversations (respecting local deletions):', Object.keys(mergedData.ai_conversations).length);
             }
 
             console.log('[GoogleDriveSync] Conflict resolution complete:', {

@@ -1837,6 +1837,12 @@ const createMenu = () => {
           click: () => {
             mainWindow.webContents.send('menu-ai-settings');
           }
+        },
+        {
+          label: 'Advanced Settings',
+          click: () => {
+            mainWindow.webContents.send('menu-advanced-settings');
+          }
         }
       ]
     },

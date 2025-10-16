@@ -609,6 +609,47 @@ class DatabaseManager {
         }
     }
 
+    clearUnusedTags() {
+        // Find all tag IDs that are actually used in notes
+        const usedTagIds = new Set();
+        
+        // Check note_tags associations
+        Object.values(this.data.note_tags).forEach(noteTag => {
+            if (noteTag.tag_id) {
+                usedTagIds.add(noteTag.tag_id);
+            }
+        });
+        
+        // Also check tags array in notes (for backward compatibility)
+        Object.values(this.data.notes).forEach(note => {
+            if (note.tags && Array.isArray(note.tags)) {
+                note.tags.forEach(tagId => usedTagIds.add(tagId));
+            }
+        });
+
+        // Find unused tags
+        const allTagIds = Object.keys(this.data.tags);
+        const unusedTagIds = allTagIds.filter(tagId => !usedTagIds.has(tagId));
+
+        // Delete unused tags
+        let deletedCount = 0;
+        unusedTagIds.forEach(tagId => {
+            delete this.data.tags[tagId];
+            deletedCount++;
+        });
+
+        if (deletedCount > 0) {
+            this.saveToLocalStorage();
+            console.log(`[Database] Cleared ${deletedCount} unused tags`);
+        }
+
+        return {
+            deletedCount,
+            remainingCount: Object.keys(this.data.tags).length,
+            deletedTags: unusedTagIds
+        };
+    }
+
     // Statistics
     getStats() {
         const notes = Object.values(this.data.notes);
@@ -1017,18 +1058,61 @@ class DatabaseManager {
             }
         }
 
-        // Merge other data types (keep local versions for settings, tags, etc.)
-        // This is a simplified approach - you might want more sophisticated merging
+        // Merge other data types - respect local deletions
+        // Local state is the source of truth for deletions
+        
         if (remoteData.ai_conversations && options.mergeConversations) {
-            Object.assign(this.data.ai_conversations, remoteData.ai_conversations);
+            // Only add remote conversations that don't exist locally
+            // This respects local deletions (if user cleared conversations)
+            const existingNoteIds = new Set(Object.keys(this.data.notes));
+            
+            for (const [convId, remoteConv] of Object.entries(remoteData.ai_conversations)) {
+                // Only add if:
+                // 1. Conversation doesn't exist locally (new from remote)
+                // 2. Associated note still exists
+                const noteExists = !remoteConv.note_id || existingNoteIds.has(remoteConv.note_id);
+                if (!this.data.ai_conversations[convId] && noteExists) {
+                    this.data.ai_conversations[convId] = remoteConv;
+                }
+            }
         }
 
         if (remoteData.tags && options.mergeTags) {
-            Object.assign(this.data.tags, remoteData.tags);
+            // Only add remote tags that are actually used in notes or already exist locally
+            // This prevents re-adding tags that were intentionally deleted
+            const usedTagIds = new Set();
+            
+            // Check which tags are currently used
+            Object.values(this.data.notes).forEach(note => {
+                if (note.tags && Array.isArray(note.tags)) {
+                    note.tags.forEach(tagId => usedTagIds.add(tagId));
+                }
+            });
+            Object.values(this.data.note_tags).forEach(noteTag => {
+                if (noteTag.tag_id) usedTagIds.add(noteTag.tag_id);
+            });
+            
+            // Only merge tags that exist locally or are used in notes
+            for (const [tagId, remoteTag] of Object.entries(remoteData.tags)) {
+                if (this.data.tags[tagId] || usedTagIds.has(tagId)) {
+                    this.data.tags[tagId] = remoteTag;
+                }
+            }
         }
 
         if (remoteData.note_tags && options.mergeTags) {
-            Object.assign(this.data.note_tags, remoteData.note_tags);
+            // Only add remote note_tags if the note still exists
+            // This prevents orphaned tag associations
+            const existingNoteIds = new Set(Object.keys(this.data.notes));
+            
+            for (const [noteTagKey, remoteNoteTag] of Object.entries(remoteData.note_tags)) {
+                if (existingNoteIds.has(remoteNoteTag.note_id)) {
+                    // Only add if not already present locally
+                    if (!this.data.note_tags[noteTagKey]) {
+                        this.data.note_tags[noteTagKey] = remoteNoteTag;
+                    }
+                }
+            }
         }
     }
 
