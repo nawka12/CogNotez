@@ -1908,11 +1908,15 @@ Key Points:`;
     }
 
     async generateTags(text, options = {}) {
-        const prompt = `Analyze the following text and suggest the 3 most relevant and important tags that would help categorize and find this content. Focus on the most essential tags only.
+        // Include note title in the prompt if provided for better context
+        const titleContext = options.noteTitle ? `Note Title: "${options.noteTitle}"\n\n` : '';
+        
+        const prompt = `Analyze the following content and suggest the 3 most relevant and important tags that would help categorize and find this note. Focus on the most essential tags only.
 
-Provide exactly 3 tags (or fewer if the content doesn't warrant that many) as a comma-separated list:
-
+${titleContext}Content:
 ${text}
+
+Provide exactly 3 tags (or fewer if the content doesn't warrant that many) as a comma-separated list.
 
 Suggested tags:`;
         return await this.processWithAI(prompt, '', {

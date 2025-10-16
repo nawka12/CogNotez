@@ -2992,7 +2992,9 @@ Please provide a helpful response based on the note content and conversation his
                     this.updateLoadingText('Generating tags...');
                     this.showLoading();
                     try {
-                        const tagsResponse = await this.aiManager.generateTags(this.selectedText);
+                        // Include note title for better tag generation context
+                        const noteTitle = this.currentNote ? this.currentNote.title : document.getElementById('note-title').value;
+                        const tagsResponse = await this.aiManager.generateTags(this.selectedText, { noteTitle });
                         await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, tagsResponse, this.selectedText, 'tags');
                         this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${tagsResponse}`, 'assistant');
                     } finally {
@@ -4032,7 +4034,8 @@ Please provide a helpful response based on the note content and conversation his
                     }
                     this.updateLoadingText('Generating tags...');
                     this.showLoading();
-                    response = await this.aiManager.generateTags(this.selectedText);
+                    // Include note title for better tag generation context
+                    response = await this.aiManager.generateTags(this.selectedText, { noteTitle: this.noteTitle });
                     await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'tags');
 
                     // Parse and save tags to the current note
@@ -4271,6 +4274,9 @@ Please provide a helpful response based on the note content and conversation his
         } else {
             this.selectedText = selectedText;
         }
+
+        // Store the note title for tag generation context
+        this.noteTitle = this.currentNote ? this.currentNote.title : document.getElementById('note-title').value;
 
         // Process immediately without dialog
         this.processAIActionWithoutDialog('generate-tags');
