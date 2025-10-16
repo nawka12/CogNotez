@@ -1051,7 +1051,9 @@ if (ipcMain) {
           const importResult = global.databaseManager.importDataFromSync(syncResult.mergedData, {
             mergeStrategy: 'replace', // Replace with merged data
             force: true,
-            preserveSyncMeta: true
+            preserveSyncMeta: true,
+            mergeTags: true,
+            mergeConversations: true
           });
         }
 

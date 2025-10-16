@@ -746,8 +746,39 @@ class GoogleDriveSyncManager {
                 }
             }
 
-            // Handle other data types (settings, tags, etc.) with similar logic
-            // For simplicity, we'll prioritize local changes for non-note data
+            // Merge tags from remote data - tags are identified by ID, so merge both local and remote
+            if (remoteData.tags) {
+                if (!mergedData.tags) {
+                    mergedData.tags = {};
+                }
+                // Merge remote tags into local tags (remote tags take precedence if there's a conflict)
+                Object.assign(mergedData.tags, remoteData.tags);
+                console.log('[GoogleDriveSync] Merged tags:', Object.keys(mergedData.tags).length);
+            }
+
+            // Merge note_tags associations from remote data
+            if (remoteData.note_tags) {
+                if (!mergedData.note_tags) {
+                    mergedData.note_tags = {};
+                }
+                // Merge remote note_tags into local note_tags
+                Object.assign(mergedData.note_tags, remoteData.note_tags);
+                console.log('[GoogleDriveSync] Merged note_tags:', Object.keys(mergedData.note_tags).length);
+            }
+
+            // Merge AI conversations from remote data
+            if (remoteData.ai_conversations) {
+                if (!mergedData.ai_conversations) {
+                    mergedData.ai_conversations = {};
+                }
+                // Merge remote conversations, checking for duplicates by ID
+                for (const [convId, remoteConv] of Object.entries(remoteData.ai_conversations)) {
+                    if (!mergedData.ai_conversations[convId]) {
+                        mergedData.ai_conversations[convId] = remoteConv;
+                    }
+                }
+                console.log('[GoogleDriveSync] Merged ai_conversations:', Object.keys(mergedData.ai_conversations).length);
+            }
 
             console.log('[GoogleDriveSync] Conflict resolution complete:', {
                 conflictsFound: conflicts.length,
