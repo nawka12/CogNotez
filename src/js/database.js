@@ -1,6 +1,7 @@
 // localStorage-based Database Manager for CogNotez
 const fs = require('fs');
 const path = require('path');
+const encryptionManager = require('./encryption');
 let electronApp = null;
 try {
     const electron = require('electron');
@@ -505,27 +506,19 @@ class DatabaseManager {
             if (!settings.passphrase) {
                 throw new Error('Passphrase is required to derive encryption salt');
             }
-            // Use global encryptionManager (available after encryption.js loads)
-            if (typeof window !== 'undefined' && window.encryptionManager) {
-                settings.saltBase64 = window.encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
-            } else {
-                throw new Error('Encryption manager not available');
-            }
+            // Use encryptionManager to derive salt from passphrase
+            settings.saltBase64 = encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
         }
 
         // Validate settings before applying
         if (settings.passphrase) {
-            if (typeof window !== 'undefined' && window.encryptionManager) {
-                const validation = window.encryptionManager.validateSettings({
-                    passphrase: settings.passphrase,
-                    saltBase64: settings.saltBase64
-                });
+            const validation = encryptionManager.validateSettings({
+                passphrase: settings.passphrase,
+                saltBase64: settings.saltBase64
+            });
 
-                if (!validation.isValid) {
-                    throw new Error(`Invalid encryption settings: ${validation.errors.join(', ')}`);
-                }
-            } else {
-                throw new Error('Encryption manager not available for validation');
+            if (!validation.isValid) {
+                throw new Error(`Invalid encryption settings: ${validation.errors.join(', ')}`);
             }
         }
 
