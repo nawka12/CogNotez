@@ -1,7 +1,17 @@
 // localStorage-based Database Manager for CogNotez
 const fs = require('fs');
 const path = require('path');
-const encryptionManager = require('./encryption');
+
+// Helper function to get encryption manager (works in both main and renderer process)
+function getEncryptionManager() {
+    // In main process, require the module
+    if (typeof window === 'undefined') {
+        return require('./encryption');
+    }
+    // In renderer process, use the global window.encryptionManager
+    return window.encryptionManager;
+}
+
 let electronApp = null;
 try {
     const electron = require('electron');
@@ -54,6 +64,9 @@ class DatabaseManager {
             // Ensure data structure exists
             this.ensureDataStructure();
 
+            // CRITICAL SECURITY: Clean up any existing plaintext leaks in password-protected notes
+            this.sanitizePasswordProtectedNotes();
+
             this.initialized = true;
             console.log('[DEBUG] localStorage database initialized successfully');
             console.log('[DEBUG] Database loaded with', Object.keys(this.data.notes).length, 'notes');
@@ -102,9 +115,27 @@ class DatabaseManager {
 
     saveToLocalStorage() {
         try {
+            // CRITICAL SECURITY: Sanitize password-protected notes before saving
+            // This prevents plaintext content from being persisted to disk
+            const dataToSave = { ...this.data };
+            dataToSave.notes = {};
+            
+            for (const [noteId, note] of Object.entries(this.data.notes)) {
+                if (note.password_protected) {
+                    // For password-protected notes, ensure content and preview are NEVER saved as plaintext
+                    dataToSave.notes[noteId] = {
+                        ...note,
+                        content: '',
+                        preview: ''
+                    };
+                } else {
+                    dataToSave.notes[noteId] = note;
+                }
+            }
+
             // Check if localStorage is available (only in renderer process)
             if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('cognotez_data', JSON.stringify(this.data));
+                localStorage.setItem('cognotez_data', JSON.stringify(dataToSave));
                 console.log('[DEBUG] Data saved to localStorage');
             } else {
                 // In main process: persist to file under userData
@@ -114,7 +145,7 @@ class DatabaseManager {
                     if (!fs.existsSync(dir)) {
                         fs.mkdirSync(dir, { recursive: true });
                     }
-                    fs.writeFileSync(filePath, JSON.stringify(this.data, null, 2), 'utf8');
+                    fs.writeFileSync(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
                     console.log('[DEBUG] Data saved to file:', filePath);
                 } catch (fileError) {
                     console.error('[DEBUG] Failed to save data file:', fileError);
@@ -123,6 +154,24 @@ class DatabaseManager {
         } catch (error) {
             console.error('[DEBUG] Failed to save data to localStorage:', error);
             throw error;
+        }
+    }
+
+    // CRITICAL SECURITY: Sanitize any password-protected notes that have plaintext content
+    sanitizePasswordProtectedNotes() {
+        let sanitizedCount = 0;
+        for (const [noteId, note] of Object.entries(this.data.notes)) {
+            if (note.password_protected && (note.content || note.preview)) {
+                // Found a password-protected note with plaintext - clean it immediately
+                note.content = '';
+                note.preview = '';
+                sanitizedCount++;
+            }
+        }
+        if (sanitizedCount > 0) {
+            console.log(`[Database] SECURITY: Sanitized ${sanitizedCount} password-protected notes with leaked plaintext`);
+            // Save immediately to persist the fix
+            this.saveToLocalStorage();
         }
     }
 
@@ -212,12 +261,15 @@ class DatabaseManager {
     getNote(id) {
         const note = this.data.notes[id];
         if (note && !note.is_archived) {
+            // Create a deep copy to prevent accidental mutation of database objects
+            const noteCopy = JSON.parse(JSON.stringify(note));
+            
             // Ensure proper date objects
-            if (typeof note.created === 'string') {
-                note.created = new Date(note.created_at || note.created);
-                note.modified = new Date(note.updated_at || note.modified);
+            if (typeof noteCopy.created === 'string') {
+                noteCopy.created = new Date(noteCopy.created_at || noteCopy.created);
+                noteCopy.modified = new Date(noteCopy.updated_at || noteCopy.modified);
             }
-            return note;
+            return noteCopy;
         }
         return null;
     }
@@ -501,18 +553,24 @@ class DatabaseManager {
             iterations: settings.iterations
         });
 
+        // Get encryption manager
+        const encMgr = getEncryptionManager();
+        if (!encMgr) {
+            throw new Error('Encryption manager not available');
+        }
+
         // Generate new salt if enabling encryption and no salt provided
         if (settings.enabled && !settings.saltBase64 && !this.data.encryption.saltBase64) {
             if (!settings.passphrase) {
                 throw new Error('Passphrase is required to derive encryption salt');
             }
             // Use encryptionManager to derive salt from passphrase
-            settings.saltBase64 = encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
+            settings.saltBase64 = encMgr.deriveSaltFromPassphrase(settings.passphrase);
         }
 
         // Validate settings before applying
         if (settings.passphrase) {
-            const validation = encryptionManager.validateSettings({
+            const validation = encMgr.validateSettings({
                 passphrase: settings.passphrase,
                 saltBase64: settings.saltBase64
             });
@@ -725,8 +783,24 @@ class DatabaseManager {
 
     // Export data as JSON string (for localStorage-based backup)
     exportDataAsJSON() {
+        // Sanitize notes to prevent plaintext leakage for password-protected notes
+        const sanitizedNotes = {};
+        for (const [noteId, note] of Object.entries(this.data.notes)) {
+            if (note.password_protected) {
+                // For password-protected notes, ensure content and preview are cleared
+                sanitizedNotes[noteId] = {
+                    ...note,
+                    content: '',
+                    preview: ''
+                };
+            } else {
+                sanitizedNotes[noteId] = note;
+            }
+        }
+
         const exportData = {
             ...this.data,
+            notes: sanitizedNotes,
             metadata: {
                 ...this.data.metadata,
                 exportedAt: new Date().toISOString(),
@@ -864,8 +938,23 @@ class DatabaseManager {
 
     // Enhanced export for sync (excludes local-only settings and secrets)
     exportDataForSync() {
+        // Sanitize notes to prevent plaintext leakage for password-protected notes
+        const sanitizedNotes = {};
+        for (const [noteId, note] of Object.entries(this.data.notes)) {
+            if (note.password_protected) {
+                // For password-protected notes, ensure content and preview are cleared
+                sanitizedNotes[noteId] = {
+                    ...note,
+                    content: '',
+                    preview: ''
+                };
+            } else {
+                sanitizedNotes[noteId] = note;
+            }
+        }
+
         const exportData = {
-            notes: this.data.notes,
+            notes: sanitizedNotes,
             ai_conversations: this.data.ai_conversations,
             tags: this.data.tags,
             note_tags: this.data.note_tags,
@@ -880,7 +969,7 @@ class DatabaseManager {
         // Calculate checksum based on content only (exclude sync state and timestamp metadata)
         // This ensures checksum consistency across devices when content hasn't changed
         const contentOnlyData = {
-            notes: this.data.notes,
+            notes: sanitizedNotes,
             ai_conversations: this.data.ai_conversations,
             tags: this.data.tags,
             note_tags: this.data.note_tags,
