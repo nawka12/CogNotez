@@ -244,7 +244,10 @@ class NotesManager {
                 const note = await this.db.getNote(noteId);
                 if (!note) return;
 
-                if (confirm(`Delete "${note.title}"? This action cannot be undone.`)) {
+                // Use custom modal instead of native confirm() to avoid focus/rendering issues
+                const shouldDelete = await this.showDeleteConfirmation(note.title);
+                
+                if (shouldDelete) {
                     await this.db.deleteNote(noteId);
 
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
@@ -254,6 +257,9 @@ class NotesManager {
                     }
 
                     await this.renderNotesList();
+                    
+                    // Force a reflow/repaint to ensure UI is responsive
+                    this.forceReflow();
                 }
             } else {
                 // Fallback to localStorage
@@ -261,7 +267,11 @@ class NotesManager {
                 if (index === -1) return;
 
                 const note = this.app.notes[index];
-                if (confirm(`Delete "${note.title}"? This action cannot be undone.`)) {
+                
+                // Use custom modal instead of native confirm() to avoid focus/rendering issues
+                const shouldDelete = await this.showDeleteConfirmation(note.title);
+                
+                if (shouldDelete) {
                     this.app.notes.splice(index, 1);
 
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
@@ -272,11 +282,74 @@ class NotesManager {
 
                     this.app.saveNotes();
                     this.renderNotesList();
+                    
+                    // Force a reflow/repaint to ensure UI is responsive
+                    this.forceReflow();
                 }
             }
         } catch (error) {
             console.error('Error deleting note:', error);
         }
+    }
+
+    // Show delete confirmation using custom modal (avoids native confirm() focus issues)
+    showDeleteConfirmation(noteTitle) {
+        return new Promise((resolve) => {
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0 0 20px 0; color: var(--text-primary);">
+                        Delete "<strong>${this.app.escapeHtml(noteTitle)}</strong>"?
+                    </p>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                        This action cannot be undone.
+                    </p>
+                </div>
+            `;
+
+            const modal = this.app.createModal('Delete Note', content, [
+                { text: 'Delete', type: 'primary', action: 'delete', callback: () => resolve(true) },
+                { text: 'Cancel', type: 'secondary', action: 'cancel', callback: () => resolve(false) }
+            ]);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve(false);
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    // Force browser reflow to fix rendering/focus issues (fixes bug where DevTools reopen was needed)
+    forceReflow() {
+        // Trigger a forced reflow by reading offsetHeight
+        const body = document.body;
+        void body.offsetHeight;
+        
+        // Also ensure focus is properly managed
+        setTimeout(() => {
+            // Clear any stuck focus
+            if (document.activeElement && document.activeElement.tagName !== 'BODY') {
+                const activeEl = document.activeElement;
+                // Only blur if it's not a text input we want to keep focused
+                if (!activeEl.matches('input[type="text"], textarea')) {
+                    activeEl.blur();
+                }
+            }
+            
+            // Re-enable event propagation by forcing a focus cycle
+            document.body.focus();
+            document.body.blur();
+        }, 50);
     }
 
     async duplicateNote(noteId) {

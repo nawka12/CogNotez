@@ -851,6 +851,13 @@ if (ipcMain) {
     return app.getVersion();
   });
 
+  // App restart handler
+  ipcMain.on('restart-app', () => {
+    console.log('[Main] Restarting application...');
+    app.relaunch();
+    app.exit(0);
+  });
+
   // Google Drive sync IPC handlers
   ipcMain.handle('google-drive-authenticate', async () => {
     try {

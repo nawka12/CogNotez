@@ -3201,17 +3201,11 @@ Please provide a helpful response based on the note content and conversation his
 
         console.log('[DEBUG] insertTextAtCursor: updated editor content length =', editor.value.length);
 
-        // Dispatch input event for word count update
+        // Dispatch input event to trigger autosave and word count update
+        // Note: We intentionally do NOT update this.currentNote.content here
+        // to allow the autosave mechanism to detect the change properly
         const inputEvent = new Event('input', { bubbles: true });
         editor.dispatchEvent(inputEvent);
-
-        // Update currentNote content if available
-        if (this.currentNote) {
-            this.currentNote.content = editor.value;
-            console.log('[DEBUG] insertTextAtCursor: updated currentNote content');
-        } else {
-            console.warn('[DEBUG] insertTextAtCursor: no currentNote to update');
-        }
 
         console.log('[DEBUG] insertTextAtCursor: completed successfully');
     }
@@ -4442,6 +4436,10 @@ Please provide a helpful response based on the note content and conversation his
             const wordCountEnabled = modal.querySelector('#word-count-toggle').checked;
             const theme = modal.querySelector('#theme-select').value;
 
+            // Track if auto-save setting changed
+            const previousAutoSave = localStorage.getItem('autoSave') === 'true';
+            const autoSaveChanged = previousAutoSave !== autoSaveEnabled;
+
             // Save settings
             localStorage.setItem('autoSave', autoSaveEnabled.toString());
             localStorage.setItem('showWordCount', wordCountEnabled.toString());
@@ -4475,6 +4473,13 @@ Please provide a helpful response based on the note content and conversation his
 
             this.showNotification('✅ General settings saved successfully!', 'success');
             this.closeModal(modal);
+
+            // Show restart dialog if auto-save setting changed
+            if (autoSaveChanged) {
+                setTimeout(() => {
+                    this.showRestartDialog('Auto-save setting requires an app restart to take full effect.');
+                }, 500);
+            }
         });
     }
 
@@ -4622,6 +4627,53 @@ Please provide a helpful response based on the note content and conversation his
             }
         `;
         document.head.appendChild(style);
+    }
+
+    showRestartDialog(message = null) {
+        // Default message if none provided
+        const defaultMessage = 'This change requires an app restart to take full effect.';
+        const displayMessage = message || defaultMessage;
+        
+        const content = `
+            <div style="padding: 10px 0;">
+                <p style="margin: 0 0 20px 0; color: var(--text-primary);">
+                    <i class="fas fa-exclamation-circle" style="color: var(--warning-color, #ff9800); margin-right: 8px;"></i>
+                    ${displayMessage}
+                </p>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                    Would you like to restart CogNotez now?
+                </p>
+            </div>
+        `;
+
+        const modal = this.createModal('Restart Required', content, [
+            { text: 'Restart Now', type: 'primary', action: 'restart', callback: () => this.restartApp() },
+            { text: 'Later', type: 'secondary', action: 'cancel' }
+        ]);
+    }
+
+    restartApp() {
+        console.log('[DEBUG] Restarting application...');
+        
+        // Try to use Electron's app.relaunch if available
+        try {
+            if (typeof ipcRenderer !== 'undefined') {
+                // Request main process to relaunch the app
+                ipcRenderer.send('restart-app');
+                
+                // Fallback to reload if restart message doesn't work after 1 second
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                // Not in Electron, just reload the page
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('[DEBUG] Failed to restart via IPC, falling back to reload:', error);
+            // Fallback: Simple page reload
+            window.location.reload();
+        }
     }
 
     showShareOptions() {
@@ -5351,6 +5403,12 @@ Please provide a helpful response based on the note content and conversation his
                         this.showNotification(result.message || 'Successfully connected to Google Drive', 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
+                        
+                        // Close the sync settings modal and show restart dialog
+                        this.closeModal(modal);
+                        setTimeout(() => {
+                            this.showRestartDialog('Google Drive connection requires an app restart to sync properly.');
+                        }, 500);
                     } else {
                         // Don't show notification here - let the IPC error event handler do it
                         // This prevents duplicate notifications
@@ -5378,6 +5436,12 @@ Please provide a helpful response based on the note content and conversation his
                         this.showNotification('Successfully disconnected from Google Drive', 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
+                        
+                        // Close the sync settings modal and show restart dialog
+                        this.closeModal(modal);
+                        setTimeout(() => {
+                            this.showRestartDialog('Google Drive disconnection requires an app restart to complete.');
+                        }, 500);
                     } else {
                         this.showNotification(result.error || 'Failed to disconnect from Google Drive', 'error');
                     }
