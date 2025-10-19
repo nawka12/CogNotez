@@ -349,6 +349,30 @@ async function initApp() {
   }
 }
 
+// Request single instance lock to prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Another instance is already running, quit this instance
+  console.log('[Main] Another instance is already running. Exiting...');
+  app.quit();
+} else {
+  // This is the first instance, set up event handlers
+  
+  // Handle second instance attempts - focus the existing window
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('[Main] Second instance detected, focusing existing window');
+    // If we have a window, focus it
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
+    }
+  });
+}
+
 // Initialize app when ready
 if (app) {
   app.on('ready', initApp);
