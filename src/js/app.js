@@ -961,7 +961,6 @@ class CogNotezApp {
     setupIPC() {
         // Menu actions from main process
         ipcRenderer.on('menu-new-note', () => this.createNewNote());
-        ipcRenderer.on('menu-open-note', () => this.openNoteDialog());
         ipcRenderer.on('menu-summarize', () => this.summarizeSelection());
         ipcRenderer.on('menu-ask-ai', () => this.askAIAboutSelection());
         ipcRenderer.on('menu-edit-ai', () => this.editSelectionWithAI());
@@ -969,14 +968,12 @@ class CogNotezApp {
         ipcRenderer.on('menu-export-markdown', () => this.exportNote('markdown'));
         ipcRenderer.on('menu-export-text', () => this.exportNote('text'));
         ipcRenderer.on('menu-export-pdf', () => this.exportNote('pdf'));
-        ipcRenderer.on('menu-export-json', () => this.exportAllNotesJSON());
         ipcRenderer.on('menu-create-backup', () => this.createFullBackup());
 
         // Import menu actions
         ipcRenderer.on('menu-import-note', () => this.importNote());
         ipcRenderer.on('menu-import-multiple', () => this.importMultipleFiles());
         ipcRenderer.on('menu-restore-backup', () => this.restoreFromBackup());
-        ipcRenderer.on('menu-migration-wizard', () => this.showMigrationWizard());
 
         // New AI menu actions
         ipcRenderer.on('menu-rewrite', () => this.rewriteSelection());
@@ -3235,50 +3232,6 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     // Enhanced data portability methods
-    async exportAllNotesJSON() {
-        if (!this.notes || !this.backendAPI) {
-            this.showNotification('No notes available to export', 'warning');
-            return;
-        }
-
-        if (this.notes.length === 0) {
-            this.showNotification('No notes to export. Create some notes first!', 'info');
-            return;
-        }
-
-        try {
-            this.showLoading();
-            this.updateLoadingText('Preparing notes for export...');
-
-            this.updateLoadingText(`Exporting ${this.notes.length} notes...`);
-            const filePath = await this.backendAPI.exportDatabaseJSON(this.notes, {});
-
-            if (filePath) {
-                const stats = this.notes.length > 1 ?
-                    `${this.notes.length} notes (${this.notes.reduce((sum, n) => sum + (n.word_count || 0), 0)} words)` :
-                    '1 note';
-                this.showNotification(`✅ Successfully exported ${stats} to ${filePath}!`, 'success');
-            } else {
-                throw new Error('Export returned no file path');
-            }
-            this.hideLoading();
-        } catch (error) {
-            console.error('JSON export failed:', error);
-            let errorMessage = 'Failed to export notes as JSON';
-
-            if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please choose a different location.';
-            } else if (error.message.includes('disk')) {
-                errorMessage = 'Not enough disk space for export.';
-            } else if (error.message) {
-                errorMessage = `Export failed: ${error.message}`;
-            }
-
-            this.showNotification(errorMessage, 'error');
-            this.hideLoading();
-        }
-    }
-
     async createFullBackup() {
         if (!this.backendAPI) {
             this.showNotification('Backup functionality not available', 'error');
@@ -3503,171 +3456,6 @@ Please provide a helpful response based on the note content and conversation his
         } finally {
             this.hideLoading();
         }
-    }
-
-    async showMigrationWizard() {
-        if (!this.backendAPI) return;
-
-        const content = `
-            <div style="max-width: 600px;">
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-exchange-alt"></i> Migration Wizard</h4>
-                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                        Migrate your notes from another CogNotez installation or supported format.
-                    </p>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <div style="background: var(--context-menu-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <h5 style="margin: 0 0 8px 0; color: var(--text-primary);">📁 From CogNotez JSON Export</h5>
-                        <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 13px;">
-                            Select a JSON file exported from another CogNotez installation.
-                        </p>
-                        <button class="migration-option-btn" data-action="migrate-json" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer;">
-                            Choose JSON File
-                        </button>
-                    </div>
-
-                </div>
-
-                <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tips:</strong><br>
-                        • Always create a backup before migrating<br>
-                        • Migration will merge notes with existing data<br>
-                        • Settings can be migrated along with notes<br>
-                        • Check the migration report for any issues
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const modal = this.createModal('Migration Wizard', content);
-
-        // Add event listeners for migration options
-        const migrationButtons = modal.querySelectorAll('.migration-option-btn');
-        migrationButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const action = e.target.dataset.action;
-                this.handleMigrationAction(action);
-                this.closeModal(modal);
-            });
-        });
-    }
-
-    async handleMigrationAction(action) {
-        switch (action) {
-            case 'migrate-json':
-                await this.performJSONMigration();
-                break;
-
-
-            default:
-                console.warn('Unknown migration action:', action);
-                this.showNotification('Unknown migration action', 'error');
-        }
-    }
-
-    async performJSONMigration() {
-        try {
-            this.showLoading();
-            this.updateLoadingText('Starting JSON migration...');
-
-            this.updateLoadingText('Importing data from JSON file...');
-            const importedData = await this.backendAPI.importDatabaseJSON();
-
-            if (!importedData || !importedData.notes) {
-                throw new Error('No valid data found in the selected file');
-            }
-
-            if (importedData.notes.length === 0) {
-                this.showNotification('No notes found in the imported file', 'warning');
-                this.hideLoading();
-                return;
-            }
-
-            this.updateLoadingText(`Processing ${importedData.notes.length} notes...`);
-
-            // Reload notes from the database since importDatabaseJSON already saved them
-            await this.loadNotes();
-            this.renderNotesList();
-
-            // Show detailed results
-            const successful = importedData.metadata?.totalNotesImported || importedData.notes.length;
-            const warnings = importedData.metadata?.warnings || [];
-
-            let message = `✅ Successfully migrated ${successful} note${successful !== 1 ? 's' : ''}`;
-            const totalWords = importedData.notes.reduce((sum, n) => sum + (n.word_count || 0), 0);
-            if (totalWords > 0) {
-                message += ` (${totalWords} words)`;
-            }
-
-            if (warnings.length > 0) {
-                message += ` Some notes had validation warnings (${warnings.length}).`;
-                this.showNotification(message, 'warning');
-            } else {
-                this.showNotification(message, 'success');
-            }
-
-            // Show migration summary if there were issues
-            if (warnings.length > 0) {
-                setTimeout(() => {
-                    this.showMigrationSummary(importedData, [], warnings);
-                }, 3000);
-            }
-
-        } catch (error) {
-            console.error('JSON migration failed:', error);
-
-            let errorMessage = 'Migration failed';
-            if (error.message.includes('No file selected')) {
-                errorMessage = 'Please select a JSON file to migrate from.';
-            } else if (error.message.includes('Invalid JSON')) {
-                errorMessage = 'The selected file is not a valid CogNotez export. Please check the file format.';
-            } else if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please check file permissions or choose a different location.';
-            } else if (error.message) {
-                errorMessage = `Migration failed: ${error.message}`;
-            }
-
-            this.showNotification(errorMessage, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    showMigrationSummary(importData, conflicts, warnings) {
-        const content = `
-            <div style="max-width: 500px;">
-                <h4 style="margin: 0 0 16px 0; color: var(--text-primary);">📊 Migration Summary</h4>
-
-                <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                    <strong>Successfully migrated:</strong> ${importData.metadata?.totalNotesImported || 0} notes<br>
-                    <strong>Total words:</strong> ${importData.notes.reduce((sum, n) => sum + (n.word_count || 0), 0)}<br>
-                    <strong>Settings migrated:</strong> ${importData.settings ? 'Yes' : 'No'}
-                </div>
-
-                ${conflicts.length > 0 ? `
-                    <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #ffeaa7;">
-                        <strong><i class="fas fa-exclamation-triangle"></i> ID Conflicts:</strong> ${conflicts.length} notes had conflicting IDs and were assigned new IDs.
-                    </div>
-                ` : ''}
-
-                ${warnings.length > 0 ? `
-                    <div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #f5c6cb;">
-                        <strong><i class="fas fa-exclamation-triangle"></i> Validation Warnings:</strong><br>
-                        <small>${warnings.slice(0, 5).join('<br>')}${warnings.length > 5 ? `<br>... and ${warnings.length - 5} more` : ''}</small>
-                    </div>
-                ` : ''}
-
-                <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px;">
-                    <strong>💡 Tips:</strong><br>
-                    <small>• Check your notes to ensure everything migrated correctly<br>• You can find backups in your user data directory<br>• Settings have been merged with your existing preferences</small>
-                </div>
-            </div>
-        `;
-
-        this.createModal('Migration Complete', content);
     }
 
     generateId() {
@@ -3990,11 +3778,6 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     // Menu actions
-    openNoteDialog() {
-        // Placeholder for opening existing notes
-        console.log('Open note dialog - to be implemented');
-    }
-
     summarizeNote() {
         if (!this.currentNote || !this.currentNote.content) {
             this.showNotification('No note content to summarize', 'info');
@@ -4744,16 +4527,6 @@ Please provide a helpful response based on the note content and conversation his
                         </button>
                         <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
                             Delete all AI conversations for all notes. This action cannot be undone. Note content will not be affected.
-                        </div>
-                    </div>
-
-                    <!-- Database Management (placeholder for future options) -->
-                    <div class="setting-item" style="margin-bottom: 24px;">
-                        <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 8px;">
-                            <i class="fas fa-database"></i> Database
-                        </label>
-                        <div style="color: var(--text-secondary); font-size: 12px; padding: 8px; background: var(--note-preview-bg, #f5f5f5); border-radius: 4px;">
-                            ℹ️ Additional database management options will be available here in future updates.
                         </div>
                     </div>
                 </div>

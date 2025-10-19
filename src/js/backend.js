@@ -384,21 +384,6 @@ class BackendAPI {
     }
 
     // Enhanced export with JSON format for full data portability
-    async exportDatabaseJSON(notes, settings = {}) {
-        // Get data from the database manager
-        if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
-            throw new Error('Database manager not available');
-        }
-
-        const dbManager = this.app.notesManager.db;
-        const jsonData = dbManager.exportDataAsJSON();
-
-        const timestamp = new Date().toISOString().split('T')[0];
-        const filename = `cognotez_backup_${timestamp}.json`;
-
-        return await this.saveFile(jsonData, filename, 'json');
-    }
-
     // Import utilities
     async importNote() {
         try {

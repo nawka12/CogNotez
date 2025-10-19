@@ -1640,90 +1640,71 @@ if (ipcMain) {
 // Create application menu
 const createMenu = () => {
   const template = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'New Note',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            mainWindow.webContents.send('menu-new-note');
-          }
-        },
-        {
-          label: 'Open Note',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => {
-            mainWindow.webContents.send('menu-open-note');
-          }
-        },
-        { type: 'separator' },
-        {
-          label: 'Export',
-          submenu: [
-            {
-              label: 'Export as Markdown',
-              click: () => {
-                mainWindow.webContents.send('menu-export-markdown');
-              }
-            },
-            {
-              label: 'Export as Text',
-              click: () => {
-                mainWindow.webContents.send('menu-export-text');
-              }
-            },
-            {
-              label: 'Share as PDF',
-              click: () => {
-                mainWindow.webContents.send('menu-export-pdf');
-              }
-            },
-            { type: 'separator' },
-            {
-              label: 'Export All Notes (JSON)',
-              click: () => {
-                mainWindow.webContents.send('menu-export-json');
-              }
-            },
-            {
-              label: 'Create Full Backup',
-              click: () => {
-                mainWindow.webContents.send('menu-create-backup');
-              }
+      {
+        label: 'File',
+        submenu: [
+          {
+            label: 'New Note',
+            accelerator: 'CmdOrCtrl+N',
+            click: () => {
+              mainWindow.webContents.send('menu-new-note');
             }
-          ]
-        },
-        {
-          label: 'Import',
-          submenu: [
-            {
-              label: 'Import Note',
-              click: () => {
-                mainWindow.webContents.send('menu-import-note');
+          },
+          { type: 'separator' },
+          {
+            label: 'Export',
+            submenu: [
+              {
+                label: 'Export as Markdown',
+                click: () => {
+                  mainWindow.webContents.send('menu-export-markdown');
+                }
+              },
+              {
+                label: 'Export as Text',
+                click: () => {
+                  mainWindow.webContents.send('menu-export-text');
+                }
+              },
+              {
+                label: 'Share as PDF',
+                click: () => {
+                  mainWindow.webContents.send('menu-export-pdf');
+                }
+              },
+              { type: 'separator' },
+              {
+                label: 'Create Full Backup',
+                click: () => {
+                  mainWindow.webContents.send('menu-create-backup');
+                }
               }
-            },
-            {
-              label: 'Import Multiple Files',
-              click: () => {
-                mainWindow.webContents.send('menu-import-multiple');
+            ]
+          },
+          {
+            label: 'Import',
+            submenu: [
+              {
+                label: 'Import Note',
+                click: () => {
+                  mainWindow.webContents.send('menu-import-note');
+                }
+              },
+              {
+                label: 'Import Multiple Files',
+                click: () => {
+                  mainWindow.webContents.send('menu-import-multiple');
+                }
+              },
+              { type: 'separator' },
+              {
+                label: 'Restore from Backup',
+                click: () => {
+                  mainWindow.webContents.send('menu-restore-backup');
+                }
               }
-            },
-            { type: 'separator' },
-            {
-              label: 'Restore from Backup',
-              click: () => {
-                mainWindow.webContents.send('menu-restore-backup');
-              }
-            },
-            {
-              label: 'Migration Wizard',
-              click: () => {
-                mainWindow.webContents.send('menu-migration-wizard');
-              }
-            }
-          ]
-        },
+            ]
+          },
         { type: 'separator' },
         {
           label: 'Quit',
