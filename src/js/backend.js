@@ -606,17 +606,64 @@ class BackendAPI {
     }
 
     generatePreview(content) {
-        if (!content) return '';
+        if (!content || !content.trim()) return 'Empty note';
 
-        // Extract first non-empty line or first 100 characters
-        const lines = content.split('\n').filter(line => line.trim());
-        if (lines.length > 0) {
-            const firstLine = lines[0].trim();
-            return firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+        // Split content into lines
+        const lines = content.split('\n');
+        
+        for (let line of lines) {
+            line = line.trim();
+            
+            // Skip empty lines
+            if (!line) continue;
+            
+            // Skip image markdown: ![alt](url) or ![alt][ref]
+            if (/^!\[.*?\](\(.*?\)|\[.*?\])/.test(line)) continue;
+            
+            // Skip HTML image tags: <img src="..." />
+            if (/^<img\s+.*?>/.test(line)) continue;
+            
+            // Skip standalone HTML tags without content
+            if (/^<[^>]+>$/.test(line)) continue;
+            
+            // Skip video/audio markdown embeds
+            if (/^<(video|audio|iframe)\s+.*?>/.test(line)) continue;
+            
+            // Clean the line for preview
+            let preview = line;
+            
+            // Remove markdown headers (# ## ### etc)
+            preview = preview.replace(/^#+\s*/, '');
+            
+            // Remove HTML tags but keep content
+            preview = preview.replace(/<[^>]+>/g, '');
+            
+            // Convert markdown links [text](url) to just text
+            preview = preview.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+            
+            // Convert markdown bold/italic to plain text
+            preview = preview.replace(/\*\*([^\*]+)\*\*/g, '$1'); // bold
+            preview = preview.replace(/\*([^\*]+)\*/g, '$1'); // italic
+            preview = preview.replace(/__([^_]+)__/g, '$1'); // bold
+            preview = preview.replace(/_([^_]+)_/g, '$1'); // italic
+            
+            // Remove inline code backticks
+            preview = preview.replace(/`([^`]+)`/g, '$1');
+            
+            // Remove remaining markdown image syntax if any
+            preview = preview.replace(/!\[.*?\]\(.*?\)/g, '');
+            
+            // Clean up extra whitespace
+            preview = preview.trim();
+            
+            // If we have actual content after cleaning, use it
+            if (preview) {
+                return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
+            }
         }
-
-        // Fallback to first 100 characters
-        return content.substring(0, 100) + (content.length > 100 ? '...' : '');
+        
+        // If no meaningful content found, return fallback
+        return 'Empty note';
     }
 
     calculateWordCount(content) {
