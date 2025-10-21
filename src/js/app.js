@@ -1174,6 +1174,56 @@ class CogNotezApp {
         // Render markdown and sanitize for security
         const renderedHTML = renderMarkdown(content);
         preview.innerHTML = renderedHTML;
+        
+        // Ensure external links open in default browser (renderer-side handling)
+        this.setupExternalLinkHandling(preview);
+    }
+
+    // Setup link handling to open external links in default browser
+    setupExternalLinkHandling(container) {
+        if (!container) return;
+        
+        // Remove any existing listeners to avoid duplicates
+        const oldHandler = container._linkClickHandler;
+        if (oldHandler) {
+            container.removeEventListener('click', oldHandler);
+        }
+        
+        // Create new handler
+        const linkClickHandler = (event) => {
+            const target = event.target;
+            
+            // Check if the clicked element is a link or is inside a link
+            const link = target.closest('a');
+            if (!link) return;
+            
+            const href = link.getAttribute('href');
+            if (!href) return;
+            
+            // Only handle external links (http/https)
+            if (href.startsWith('http://') || href.startsWith('https://')) {
+                event.preventDefault();
+                
+                // Use Electron's shell to open in default browser
+                if (typeof require !== 'undefined') {
+                    try {
+                        const { shell } = require('electron');
+                        shell.openExternal(href);
+                    } catch (error) {
+                        console.error('Failed to open external link:', error);
+                        // Fallback: try window.open as last resort
+                        window.open(href, '_blank');
+                    }
+                }
+            }
+            // Allow internal links (anchors, etc.) to work normally
+        };
+        
+        // Store handler reference for cleanup
+        container._linkClickHandler = linkClickHandler;
+        
+        // Add event listener
+        container.addEventListener('click', linkClickHandler);
     }
 
     // Note management

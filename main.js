@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, protocol } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const { autoUpdater } = require('electron-updater');
@@ -67,6 +67,26 @@ function createWindow() {
   // Show window when ready to prevent visual flash
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
+  });
+
+  // Prevent navigation and open external links in default browser
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Allow navigation to the app's own files
+    if (url.startsWith('file://') || url.startsWith('cognotez-media://')) {
+      return;
+    }
+    // Prevent navigation and open in external browser instead
+    event.preventDefault();
+    shell.openExternal(url);
+  });
+
+  // Handle new window requests (e.g., target="_blank")
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Open external links in the user's default browser
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
   });
 
   // Open DevTools in development
