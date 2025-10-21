@@ -1406,6 +1406,7 @@ body {
     resize: none;
     outline: none;
     padding: var(--spacing-lg);
+    padding-bottom: 80px; /* Extra padding to prevent word count obstruction and content cutoff */
     overflow-y: auto;
     overflow-x: hidden;
     border-radius: var(--radius-lg);

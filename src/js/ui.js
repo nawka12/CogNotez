@@ -573,9 +573,10 @@ class UIManager {
 
             if (noteEditor) {
                 const viewportHeight = window.innerHeight;
-                const editorHeight = Math.max(300, viewportHeight - 150);
-                const maxEditorHeight = viewportHeight - 120;
-                noteEditor.style.height = `${Math.min(editorHeight, maxEditorHeight)}px`;
+                // Match markdown-preview calculation for consistency, with extra room for bottom padding
+                const editorHeight = Math.max(300, viewportHeight - 200);
+                noteEditor.style.height = `${editorHeight}px`;
+                noteEditor.style.maxHeight = `${editorHeight}px`;
             }
 
             if (markdownPreview) {
