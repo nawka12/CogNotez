@@ -1175,8 +1175,67 @@ class CogNotezApp {
         const renderedHTML = renderMarkdown(content);
         preview.innerHTML = renderedHTML;
         
+        // Setup horizontal scroll functionality
+        this.setupHorizontalScroll(preview);
+        
         // Ensure external links open in default browser (renderer-side handling)
         this.setupExternalLinkHandling(preview);
+    }
+
+    // Setup horizontal scroll functionality for markdown preview
+    setupHorizontalScroll(container) {
+        if (!container) return;
+        
+        // Wrap tables in scrollable containers
+        const tables = container.querySelectorAll('table');
+        tables.forEach(table => {
+            if (!table.parentElement.classList.contains('table-container')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-container';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+        
+        // Check for horizontal scroll and add visual indicators
+        const checkHorizontalScroll = () => {
+            const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
+            container.classList.toggle('scrollable-x', hasHorizontalScroll);
+        };
+        
+        // Initial check
+        checkHorizontalScroll();
+        
+        // Check on resize
+        const resizeObserver = new ResizeObserver(checkHorizontalScroll);
+        resizeObserver.observe(container);
+        
+        // Check on content changes
+        const mutationObserver = new MutationObserver(checkHorizontalScroll);
+        mutationObserver.observe(container, { 
+            childList: true, 
+            subtree: true, 
+            attributes: true 
+        });
+        
+        // Add keyboard navigation for horizontal scrolling
+        container.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        container.scrollBy({ left: -100, behavior: 'smooth' });
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        container.scrollBy({ left: 100, behavior: 'smooth' });
+                        break;
+                }
+            }
+        });
+        
+        // Store observers for cleanup
+        container._horizontalScrollObservers = { resizeObserver, mutationObserver };
     }
 
     // Setup link handling to open external links in default browser

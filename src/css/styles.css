@@ -1447,6 +1447,49 @@ body {
     max-height: none;
     position: relative;
     z-index: 1;
+    /* Enhanced horizontal scrolling */
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+/* Custom scrollbar for markdown preview */
+.markdown-preview::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.markdown-preview::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.markdown-preview::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color-light);
+}
+
+/* Horizontal scroll indicator */
+.markdown-preview::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    width: 20px;
+    background: linear-gradient(to left, var(--editor-bg) 0%, transparent 100%);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 2;
+}
+
+.markdown-preview.scrollable-x::after {
+    opacity: 1;
 }
 
 .markdown-preview h1,
@@ -1503,6 +1546,27 @@ body {
     border-radius: 5px;
     overflow-x: auto;
     margin: 1em 0;
+    /* Enhanced horizontal scrolling for code blocks */
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.markdown-preview pre::-webkit-scrollbar {
+    height: 6px;
+}
+
+.markdown-preview pre::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.markdown-preview pre::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.markdown-preview pre::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color-light);
 }
 
 .markdown-preview pre code {
@@ -1523,6 +1587,43 @@ body {
     border-collapse: collapse;
     width: 100%;
     margin: 1em 0;
+    /* Enhanced table scrolling */
+    overflow-x: auto;
+    display: block;
+    white-space: nowrap;
+}
+
+/* Table wrapper for better horizontal scrolling */
+.markdown-preview table {
+    min-width: 100%;
+    display: table;
+}
+
+/* Table container for horizontal scroll */
+.markdown-preview .table-container {
+    overflow-x: auto;
+    margin: 1em 0;
+    border-radius: 5px;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.markdown-preview .table-container::-webkit-scrollbar {
+    height: 6px;
+}
+
+.markdown-preview .table-container::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.markdown-preview .table-container::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 3px;
+}
+
+.markdown-preview .table-container::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color-light);
 }
 
 .markdown-preview th,
@@ -3417,6 +3518,17 @@ body {
         font-size: 16px;
         padding: var(--spacing-md);
         min-height: 300px;
+    }
+    
+    /* Enhanced mobile horizontal scrolling */
+    .markdown-preview {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+    
+    .markdown-preview pre,
+    .markdown-preview .table-container {
+        -webkit-overflow-scrolling: touch;
     }
 
     /* AI Panel - mobile overlay style */
