@@ -712,7 +712,7 @@ body {
 @media (max-width: 768px) {
   .sidebar {
     width: 100%;
-    max-height: 180px; /* Slightly smaller sidebar height */
+    max-height: none; /* Allow full height on small windows */
   }
 
   .ai-panel {

@@ -206,16 +206,21 @@ class UIManager {
         const sidebar = document.querySelector('.sidebar');
         const toggle = document.getElementById('sidebar-toggle');
 
-        // Collapsible sidebar
+        // Collapsible sidebar (desktop-only)
         let isCollapsed = false;
         toggle.addEventListener('click', () => {
+            // Ignore collapse on mobile; the sidebar is a full-screen overlay there
+            if (window.innerWidth <= 768) {
+                return;
+            }
+
             isCollapsed = !isCollapsed;
-            sidebar.style.width = isCollapsed ? '60px' : '280px';
+            sidebar.style.width = isCollapsed ? '60px' : '';
 
             // Hide/show sidebar content
             const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
             content.forEach(el => {
-                el.style.display = isCollapsed ? 'none' : 'block';
+                el.style.display = isCollapsed ? 'none' : '';
             });
 
             toggle.innerHTML = isCollapsed ? '<i class="fas fa-bars"></i>' : '<i class="fas fa-chevron-left"></i>';
@@ -616,6 +621,17 @@ class UIManager {
                     }
                 }
             }
+
+            // Normalize sidebar across breakpoints to avoid overflow from inline widths
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                if (window.innerWidth <= 768) {
+                    // Clear desktop inline widths and restore content visibility for mobile overlay
+                    sidebar.style.width = '';
+                    const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
+                    content.forEach(el => { el.style.display = ''; });
+                }
+            }
         };
 
         // Initial call
@@ -736,6 +752,12 @@ class UIManager {
             
             // Prevent body scroll when sidebar is open
             if (isOpen) {
+                // Ensure mobile overlay uses responsive width (clear any desktop inline width)
+                if (window.innerWidth <= 768) {
+                    sidebar.style.width = '';
+                    const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
+                    content.forEach(el => { el.style.display = ''; });
+                }
                 document.body.style.overflow = 'hidden';
             } else {
                 document.body.style.overflow = '';
