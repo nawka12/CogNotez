@@ -812,7 +812,7 @@ class RichMediaManager {
     }
 
     async insertImageFromUrl() {
-        const url = prompt('Enter image URL:');
+        const url = await this.app.showInputPrompt('Insert Image from URL', 'Enter the URL of the image you want to insert:', '', 'https://example.com/image.jpg');
         if (!url) return;
 
         try {

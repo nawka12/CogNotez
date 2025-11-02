@@ -413,7 +413,7 @@ class NotesManager {
 
             if (!currentlyPinned && pinnedCount >= 3) {
                 // Cannot pin more than 3 notes
-                alert('You can only pin up to 3 notes. Please unpin another note first.');
+                await this.app.showAlert('Pin Limit Reached', 'You can only pin up to 3 notes. Please unpin another note first.');
                 return;
             }
 

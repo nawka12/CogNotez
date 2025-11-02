@@ -2353,6 +2353,137 @@ class CogNotezApp {
         }, 300);
     }
 
+    // Show confirmation dialog (replaces native confirm())
+    showConfirmation(title, message) {
+        return new Promise((resolve) => {
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0; color: var(--text-primary); white-space: pre-line;">
+                        ${this.escapeHtml(message)}
+                    </p>
+                </div>
+            `;
+
+            const modal = this.createModal(title, content, [
+                { text: 'Cancel', type: 'secondary', action: 'cancel', callback: () => resolve(false) },
+                { text: 'Confirm', type: 'primary', action: 'confirm', callback: () => resolve(true) }
+            ]);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve(false);
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    // Show input prompt dialog (replaces native prompt())
+    showInputPrompt(title, message, defaultValue = '', placeholder = '') {
+        return new Promise((resolve) => {
+            const inputId = 'prompt-input-' + Date.now();
+            const content = `
+                <div style="padding: 10px 0;">
+                    ${message ? `<p style="margin: 0 0 16px 0; color: var(--text-primary);">${this.escapeHtml(message)}</p>` : ''}
+                    <input type="text" 
+                           id="${inputId}" 
+                           class="ai-dialog-input" 
+                           placeholder="${this.escapeHtml(placeholder)}" 
+                           value="${this.escapeHtml(defaultValue)}"
+                           style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px;">
+                </div>
+            `;
+
+            const modal = this.createModal(title, content, [
+                { text: 'Cancel', type: 'secondary', action: 'cancel', callback: () => resolve(null) },
+                { text: 'OK', type: 'primary', action: 'confirm', callback: () => {
+                    const input = modal.querySelector(`#${inputId}`);
+                    resolve(input ? input.value.trim() : null);
+                }}
+            ]);
+
+            // Focus input on mount
+            setTimeout(() => {
+                const input = modal.querySelector(`#${inputId}`);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 100);
+
+            // Handle Enter key
+            const handleEnter = (e) => {
+                if (e.key === 'Enter') {
+                    const input = modal.querySelector(`#${inputId}`);
+                    const okBtn = modal.querySelector('[data-action="confirm"]');
+                    if (okBtn && input) {
+                        e.preventDefault();
+                        okBtn.click();
+                    }
+                }
+            };
+            modal.addEventListener('keydown', handleEnter);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve(null);
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(null);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    // Show alert dialog (replaces native alert())
+    showAlert(title, message) {
+        return new Promise((resolve) => {
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0; color: var(--text-primary); white-space: pre-line;">
+                        ${this.escapeHtml(message)}
+                    </p>
+                </div>
+            `;
+
+            const modal = this.createModal(title, content, [
+                { text: 'OK', type: 'primary', action: 'ok', callback: () => resolve() }
+            ]);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve();
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve();
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
     // AI functionality
     toggleAIPanel() {
         const panel = document.getElementById('ai-panel');
@@ -4717,7 +4848,10 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             // Confirm action
-            const confirmClear = confirm('Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.');
+            const confirmClear = await this.showConfirmation(
+                'Clear Unused Tags',
+                'Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.'
+            );
             if (!confirmClear) return;
 
             try {
@@ -4749,7 +4883,10 @@ Please provide a helpful response based on the note content and conversation his
         const clearAIConversationsBtn = modal.querySelector('#clear-all-ai-conversations-btn');
         clearAIConversationsBtn.addEventListener('click', async () => {
             // Confirm action
-            const confirmed = confirm('Are you sure you want to clear all AI conversations?\n\nThis will delete ALL AI conversations for ALL notes and cannot be undone.\n\nNote: Your note content will not be affected.');
+            const confirmed = await this.showConfirmation(
+                'Clear All AI Conversations',
+                'Are you sure you want to clear all AI conversations?\n\nThis will delete ALL AI conversations for ALL notes and cannot be undone.\n\nNote: Your note content will not be affected.'
+            );
             if (!confirmed) return;
 
             try {

@@ -3426,19 +3426,21 @@ body {
         transition: transform 0.3s ease;
         box-shadow: none;
         border-right: none;
-    }
-
-    /* Ensure sidebar content fills available height on mobile */
-    .sidebar {
         display: flex;
         flex-direction: column;
         min-height: 0;
-        bottom: 0; /* stretch to bottom for full height */
-        height: auto; /* rely on top/bottom anchoring */
+        height: auto;
     }
 
     .sidebar.mobile-open {
         transform: translateX(0);
+    }
+
+    /* Ensure sidebar flex container allows child to grow */
+    .notes-list {
+        min-height: 0;
+        height: auto;
+        max-height: none;
     }
 
     /* Hide sidebar toggle button on mobile */
@@ -3592,6 +3594,16 @@ body {
     .note-pin-btn,
     .note-delete-btn {
         opacity: 1;
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    /* Adjust delete button position to account for larger size */
+    .note-delete-btn {
+        right: calc(var(--spacing-sm) + 40px + var(--spacing-xs));
     }
 
     /* Modals optimized for mobile */
@@ -3682,8 +3694,17 @@ body {
     /* Reduce animations on mobile for better performance */
     .note-item:hover,
     .action-btn:hover,
-    .new-note-btn:hover {
-        transform: none;
+    .new-note-btn:hover,
+    .note-item:hover .note-pin-btn,
+    .note-item:hover .note-delete-btn,
+    .note-pin-btn:hover,
+    .note-delete-btn:hover {
+        transform: none !important;
+    }
+
+    /* Keep rotation for pinned state on mobile */
+    .note-pin-btn.pinned {
+        transform: rotate(-45deg) !important;
     }
 }
 
@@ -3717,6 +3738,16 @@ body {
         padding: 8px;
     }
 
+    /* Adjust overlay elements to match smaller header */
+    .sidebar,
+    .sidebar-backdrop,
+    .search-container,
+    .ai-panel,
+    .advanced-search-panel,
+    .find-replace-dialog {
+        top: 52px;
+    }
+
     /* Even more compact editor */
     .editor-header {
         padding: 8px;
@@ -3739,16 +3770,6 @@ body {
 
     .note-item-preview {
         font-size: 13px;
-    }
-
-    /* Keep sidebar full screen on small mobile */
-    .sidebar {
-        width: 100%;
-        bottom: 0; /* fill below shorter header */
-        display: flex;
-        flex-direction: column;
-        min-height: 0;
-        height: auto;
     }
 
     .sidebar-toggle {
@@ -3794,14 +3815,9 @@ body {
         bottom: 0;
         width: 100%;
         transform: translateX(-100%);
-    }
-
-    /* Ensure full-height and flex layout in landscape mobile */
-    .sidebar {
         display: flex;
         flex-direction: column;
         min-height: 0;
-        bottom: 0; /* stretch to bottom in landscape */
         height: auto;
     }
 
@@ -3938,21 +3954,6 @@ body {
     .search-container,
     .sidebar-backdrop {
         transition: none !important;
-    }
-}
-
-@media (max-width: 768px) {
-    /* Ensure sidebar flex container allows child to grow */
-    .sidebar {
-        min-height: 0;
-        display: flex;
-        flex-direction: column;
-    }
-
-    .notes-list {
-        min-height: 0;
-        height: auto;
-        max-height: none;
     }
 }
 
