@@ -3303,6 +3303,11 @@ body {
         position: relative; /* Keep relative positioning on tablet */
     }
 
+    /* Reduce sidebar header padding on tablet */
+    .sidebar-header {
+        padding: var(--spacing-md);
+    }
+
     /* Reduce AI panel width */
     .ai-panel {
         width: 320px;
@@ -3322,6 +3327,11 @@ body {
     /* Stack editor actions if needed */
     .editor-actions {
         flex-wrap: wrap;
+    }
+
+    /* Remove rotation from pinned button on tablet */
+    .note-pin-btn.pinned {
+        transform: none;
     }
 }
 
@@ -3702,9 +3712,9 @@ body {
         transform: none !important;
     }
 
-    /* Keep rotation for pinned state on mobile */
+    /* Remove rotation from pinned button on mobile */
     .note-pin-btn.pinned {
-        transform: rotate(-45deg) !important;
+        transform: none !important;
     }
 }
 
