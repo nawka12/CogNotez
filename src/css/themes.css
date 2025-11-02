@@ -16,7 +16,7 @@
 
   /* Enhanced Accent Color System - Keeping #bdabe3 as primary */
   --accent-color: #bdabe3;
-  --accent-color-light: rgba(189, 171, 227, 0.12);
+  --accent-color-light: rgba(189, 171, 227, 0.35);
   --accent-color-lighter: rgba(189, 171, 227, 0.06);
   --accent-color-dark: #a890d1;
   --accent-color-darker: #9678c1;
