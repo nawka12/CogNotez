@@ -1891,12 +1891,7 @@ const createMenu = () => {
         {
           label: 'About CogNotez',
           click: () => {
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'About CogNotez',
-              message: 'CogNotez - AI-Powered Note App',
-              detail: `Version ${app.getVersion()}\nAn offline-first note-taking application with local LLM integration.`
-            });
+            mainWindow.webContents.send('menu-about');
           }
         }
       ]

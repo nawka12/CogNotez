@@ -1261,6 +1261,7 @@ class CogNotezApp {
 
         // Update-related menu actions
         ipcRenderer.on('menu-check-updates', () => this.checkForUpdates());
+        ipcRenderer.on('menu-about', () => this.showAboutDialog());
 
         // Update-related IPC events
         ipcRenderer.on('update-checking', () => this.showUpdateStatus('Checking for updates...'));
@@ -2742,6 +2743,69 @@ class CogNotezApp {
             };
             document.addEventListener('keydown', handleEscape);
         });
+    }
+
+    // Show About dialog
+    async showAboutDialog() {
+        try {
+            const version = await ipcRenderer.invoke('get-app-version');
+            const content = `
+                <div style="padding: 20px 0; text-align: center;">
+                    <div style="margin-bottom: 24px;">
+                        <h2 style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 24px; font-weight: 600;">
+                            CogNotez
+                        </h2>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 16px;">
+                            AI-Powered Note App
+                        </p>
+                    </div>
+                    <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-secondary, rgba(128, 128, 128, 0.1)); border-radius: 8px;">
+                        <p style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 14px;">
+                            <strong>Version:</strong> ${this.escapeHtml(version)}
+                        </p>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            An offline-first note-taking application<br>
+                            with local LLM integration.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px; color: var(--text-secondary); font-size: 12px;">
+                        <p style="margin: 0;">© 2025 KayfaHaarukku/nawka12</p>
+                    </div>
+                </div>
+            `;
+
+            this.createModal('About CogNotez', content, [
+                { text: 'Close', type: 'primary', action: 'close' }
+            ]);
+        } catch (error) {
+            console.error('Error showing about dialog:', error);
+            // Fallback if version retrieval fails
+            const content = `
+                <div style="padding: 20px 0; text-align: center;">
+                    <div style="margin-bottom: 24px;">
+                        <h2 style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 24px; font-weight: 600;">
+                            CogNotez
+                        </h2>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 16px;">
+                            AI-Powered Note App
+                        </p>
+                    </div>
+                    <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-secondary, rgba(128, 128, 128, 0.1)); border-radius: 8px;">
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            An offline-first note-taking application<br>
+                            with local LLM integration.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px; color: var(--text-secondary); font-size: 12px;">
+                        <p style="margin: 0;">© 2025 KayfaHaarukku/nawka12</p>
+                    </div>
+                </div>
+            `;
+
+            this.createModal('About CogNotez', content, [
+                { text: 'Close', type: 'primary', action: 'close' }
+            ]);
+        }
     }
 
     // Show alert dialog (replaces native alert())
