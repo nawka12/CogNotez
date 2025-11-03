@@ -45,6 +45,10 @@ class FindReplaceDialog {
                 <button id="find-replace-close" class="find-replace-close"><i class="fas fa-times"></i></button>
             </div>
             <div class="find-replace-body">
+                <div class="find-disclaimer">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Find only works in edit mode. Preview mode support coming soon.</span>
+                </div>
                 <div class="find-section">
                     <label for="find-input">Find:</label>
                     <input type="text" id="find-input" class="find-input" placeholder="Search text...">
@@ -254,7 +258,20 @@ class FindReplaceDialog {
 
     findMatches() {
         const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+        
         if (!editor || !this.findText) {
+            this.matches = [];
+            this.currentMatchIndex = -1;
+            this.updateMatchCount();
+            this.clearHighlights();
+            return;
+        }
+
+        // Find functionality is currently only supported in edit mode
+        // Preview mode is disabled until next version
+        if (isPreviewMode) {
             this.matches = [];
             this.currentMatchIndex = -1;
             this.updateMatchCount();
@@ -294,20 +311,30 @@ class FindReplaceDialog {
     }
 
     highlightMatches() {
-        this.clearHighlights();
-        if (this.matches.length === 0) return;
-
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
 
-        // Always select the match in the textarea for consistency
+        // If no matches, clear highlights and return
+        if (this.matches.length === 0) {
+            this.clearHighlights();
+            return;
+        }
+
+        // Always select the current match in the textarea for consistency
         if (editor) {
             this.selectCurrentMatch();
         }
 
-        // If in preview mode, also highlight in the markdown preview
-        if (preview && !preview.classList.contains('hidden') && this.currentMatchIndex >= 0) {
-            this.highlightInPreview();
+        // Find functionality is currently only supported in edit mode
+        // Preview mode highlighting is disabled until next version
+        if (isPreviewMode) {
+            // Clear any existing highlights in preview mode
+            this.clearHighlights();
+            // Note: No highlighting in preview mode for now
+        } else if (editor && !isPreviewMode) {
+            // In edit mode, apply visual highlighting wrapper to textarea
+            this.highlightInEditor();
         }
     }
 
@@ -315,6 +342,12 @@ class FindReplaceDialog {
         // Reset preview to normal content
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
+        
+        if (editor) {
+            // Remove find mode class
+            editor.classList.remove('find-mode-active');
+        }
+        
         if (preview && editor) {
             // Process media URLs before rendering
             let content = editor.value;
@@ -329,39 +362,279 @@ class FindReplaceDialog {
         }
     }
 
-    highlightInPreview() {
-        if (this.currentMatchIndex < 0 || this.currentMatchIndex >= this.matches.length) return;
+    async highlightInPreview() {
+        if (this.matches.length === 0) return;
 
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
         if (!preview || !editor) return;
 
-        const match = this.matches[this.currentMatchIndex];
         const editorText = editor.value;
 
-        // Find the corresponding text in the rendered HTML
-        // This is a simplified approach - we'll wrap the matched text in a highlight span
         try {
-            const beforeMatch = editorText.substring(0, match.start);
-            const matchText = editorText.substring(match.start, match.end);
-            const afterMatch = editorText.substring(match.end);
+            // Process media URLs before rendering
+            let content = editorText;
+            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
+                try {
+                    content = await this.app.richMediaManager.processContentForPreview(content);
+                } catch (error) {
+                    console.warn('[Preview] Failed to process media URLs in highlightInPreview:', error);
+                }
+            }
 
-            // Render the content with the match highlighted
-            const highlightedText = beforeMatch +
-                `<mark class="find-highlight">${matchText}</mark>` +
-                afterMatch;
+            // Use marker-based approach: Insert unique markers before markdown parsing
+            // This preserves exact match positions even after markdown transformation
+            const markerPrefix = '\u200B\u200C'; // Zero-width non-joiner + Zero-width joiner (safe markers)
+            const markerSuffix = '\u200D\u200E'; // Zero-width joiner + Left-to-right mark
+            
+            let markedContent = content;
+            let offset = 0;
+            
+            // Insert markers in reverse order to preserve positions
+            for (let i = this.matches.length - 1; i >= 0; i--) {
+                const match = this.matches[i];
+                const adjustedStart = match.start + offset;
+                const adjustedEnd = match.end + offset;
+                
+                const beforeMatch = markedContent.substring(0, adjustedStart);
+                const matchText = markedContent.substring(adjustedStart, adjustedEnd);
+                const afterMatch = markedContent.substring(adjustedEnd);
+                
+                // Create unique marker that won't interfere with markdown
+                const marker = `${markerPrefix}${i}_${i === this.currentMatchIndex ? 'C' : 'N'}${markerSuffix}`;
+                markedContent = beforeMatch + marker + matchText + marker + afterMatch;
+                
+                // Update offset for next iteration
+                offset += marker.length * 2;
+            }
+            
+            // Parse markdown with markers
+            let html = marked.parse(markedContent);
+            
+            // Create a temporary container
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            // Get all text nodes
+            const getAllTextNodes = (node) => {
+                const textNodes = [];
+                const walker = document.createTreeWalker(
+                    node,
+                    NodeFilter.SHOW_TEXT,
+                    null
+                );
+                
+                let textNode;
+                while (textNode = walker.nextNode()) {
+                    textNodes.push(textNode);
+                }
+                return textNodes;
+            };
+            
+            const textNodes = getAllTextNodes(tempDiv);
+            const replacements = [];
+            
+            // Find and replace markers in text nodes
+            for (const textNode of textNodes) {
+                if (!textNode.parentNode) continue;
+                
+                const text = textNode.textContent;
+                
+                // Find marker pattern: markerPrefix + matchIndex + C/N + markerSuffix
+                const markerPattern = new RegExp(
+                    markerPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
+                    '(\\d+)_([CN])' + 
+                    markerSuffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+                    'g'
+                );
+                
+                let match;
+                const matchesToProcess = [];
+                
+                while ((match = markerPattern.exec(text)) !== null) {
+                    const matchIdx = parseInt(match[1]);
+                    const isCurrentMarker = match[2] === 'C';
+                    matchesToProcess.push({
+                        index: match.index,
+                        matchIdx: matchIdx,
+                        isCurrentMarker: isCurrentMarker,
+                        fullMatch: match[0]
+                    });
+                }
+                
+                // Process matches in reverse order to preserve indices
+                for (let i = matchesToProcess.length - 1; i >= 0; i--) {
+                    const markerMatch = matchesToProcess[i];
+                    const markerStart = markerMatch.index;
+                    const markerEnd = markerStart + markerMatch.fullMatch.length;
+                    
+                    // Find the corresponding closing marker right after the match text
+                    // The closing marker has the same format: prefix + matchIdx + C/N + suffix
+                    const afterMarker = text.substring(markerEnd);
+                    const closingMarkerStr = markerPrefix + markerMatch.matchIdx + '_' + (markerMatch.isCurrentMarker ? 'C' : 'N') + markerSuffix;
+                    const closingMarkerIndex = afterMarker.indexOf(closingMarkerStr);
+                    
+                    if (closingMarkerIndex >= 0) {
+                        const textStart = markerEnd;
+                        const textEnd = markerEnd + closingMarkerIndex;
+                        const beforeMatch = text.substring(0, markerStart);
+                        const matched = text.substring(textStart, textEnd);
+                        const afterMatch = text.substring(textEnd + closingMarkerStr.length);
+                        
+                        const isCurrent = markerMatch.matchIdx === this.currentMatchIndex;
+                        
+                        replacements.push({
+                            textNode: textNode,
+                            start: markerStart,
+                            end: textEnd + closingMarkerStr.length,
+                            matchIndex: markerMatch.matchIdx,
+                            isCurrent: isCurrent,
+                            before: beforeMatch,
+                            matched: matched,
+                            after: afterMatch
+                        });
+                    }
+                }
+            }
 
-            preview.innerHTML = marked.parse(highlightedText);
+            // Sort replacements in reverse order (end to start) to preserve indices
+            replacements.sort((a, b) => {
+                if (a.textNode !== b.textNode) {
+                    const position = a.textNode.compareDocumentPosition(b.textNode);
+                    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return 1;
+                    if (position & Node.DOCUMENT_POSITION_PRECEDING) return -1;
+                }
+                return b.end - a.end;
+            });
 
-            // Scroll the highlight into view
-            const highlightElement = preview.querySelector('.find-highlight');
-            if (highlightElement) {
-                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Apply replacements
+            for (const replacement of replacements) {
+                if (!replacement.textNode.parentNode) continue; // Already processed
+
+                const highlightClass = replacement.isCurrent ? 'find-highlight find-highlight-current' : 'find-highlight';
+                const highlightSpan = document.createElement('mark');
+                highlightSpan.className = highlightClass;
+                highlightSpan.textContent = replacement.matched;
+
+                const fragment = document.createDocumentFragment();
+                if (replacement.before) fragment.appendChild(document.createTextNode(replacement.before));
+                fragment.appendChild(highlightSpan);
+                if (replacement.after) fragment.appendChild(document.createTextNode(replacement.after));
+
+                replacement.textNode.parentNode.replaceChild(fragment, replacement.textNode);
+            }
+
+            preview.innerHTML = tempDiv.innerHTML;
+
+            // Scroll the current highlight into view with better positioning
+            const currentHighlight = preview.querySelector('.find-highlight-current');
+            if (currentHighlight) {
+                // Use better scroll options for smaller screens
+                const rect = currentHighlight.getBoundingClientRect();
+                const previewRect = preview.getBoundingClientRect();
+                const headerHeight = 64; // Approximate header height
+                
+                // Calculate if highlight is visible
+                const isVisible = rect.top >= previewRect.top + headerHeight && 
+                                 rect.bottom <= previewRect.bottom;
+                
+                if (!isVisible) {
+                    // Scroll with offset to account for header
+                    const scrollTop = preview.scrollTop + rect.top - previewRect.top - (window.innerHeight / 3);
+                    preview.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
+                }
+            } else {
+                // Fallback: try to find any highlight
+                const firstHighlight = preview.querySelector('.find-highlight');
+                if (firstHighlight) {
+                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                }
             }
         } catch (error) {
             console.warn('Error highlighting in preview:', error);
             // Fallback to normal rendering
-            preview.innerHTML = marked.parse(editor.value);
+            let content = editor.value;
+            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
+                try {
+                    content = await this.app.richMediaManager.processContentForPreview(content);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+            preview.innerHTML = marked.parse(content);
+        }
+    }
+
+    highlightInEditor() {
+        // For textarea, we can't directly add HTML highlights, but we can:
+        // 1. Ensure the selection is visible (handled by selectCurrentMatch)
+        // 2. Add a wrapper element with visual indicator
+        // Since textarea doesn't support HTML, we rely on the selection being visible
+        // The CSS will make the selection more prominent
+        const editor = document.getElementById('note-editor');
+        if (!editor) return;
+
+        // Add a class to indicate find mode is active
+        editor.classList.add('find-mode-active');
+        
+        // Scroll to the current match with better calculation for smaller screens
+        if (this.currentMatchIndex >= 0 && this.currentMatchIndex < this.matches.length) {
+            const match = this.matches[this.currentMatchIndex];
+            
+            // Use a more accurate scroll calculation
+            const textBeforeMatch = editor.value.substring(0, match.start);
+            const lines = textBeforeMatch.split('\n').length;
+            
+            // Get actual line height
+            const style = getComputedStyle(editor);
+            const lineHeight = parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.5 || 20;
+            const paddingTop = parseInt(style.paddingTop) || 0;
+            
+            // Calculate the target scroll position
+            // Account for viewport height and header on smaller screens
+            const editorRect = editor.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const headerHeight = 64; // Approximate header + editor header height
+            const availableHeight = viewportHeight - headerHeight;
+            
+            // Calculate line position of match
+            const targetLinePosition = (lines - 1) * lineHeight;
+            
+            // Ideal scroll position: center the match in the visible area
+            // But on smaller screens, we want it closer to the top
+            const idealScrollTop = targetLinePosition - (availableHeight / 2) + paddingTop;
+            
+            // Ensure we don't scroll past the top
+            const minScrollTop = 0;
+            // Calculate max scroll (content height - visible height)
+            const contentHeight = editor.scrollHeight;
+            const visibleHeight = editorRect.height;
+            const maxScrollTop = Math.max(0, contentHeight - visibleHeight);
+            
+            // For smaller screens, prefer showing match near top
+            const isSmallScreen = viewportHeight < 800;
+            const scrollOffset = isSmallScreen ? availableHeight * 0.2 : availableHeight * 0.4;
+            const finalScrollTop = Math.max(minScrollTop, Math.min(maxScrollTop, targetLinePosition - scrollOffset + paddingTop));
+            
+            editor.scrollTop = finalScrollTop;
+            
+            // Ensure cursor/selection is visible after scroll
+            // Small delay to let scroll complete
+            setTimeout(() => {
+                const selectionStart = editor.selectionStart;
+                const selectionEnd = editor.selectionEnd;
+                
+                // Check if selection is visible
+                const textBeforeStart = editor.value.substring(0, selectionStart);
+                const startLine = textBeforeStart.split('\n').length;
+                const startLineTop = (startLine - 1) * lineHeight;
+                const startLineBottom = startLineTop + lineHeight;
+                
+                if (startLineTop < editor.scrollTop || startLineBottom > editor.scrollTop + visibleHeight) {
+                    // Selection not visible, adjust scroll
+                    editor.scrollTop = Math.max(0, startLineTop - scrollOffset);
+                }
+            }, 50);
         }
     }
 
@@ -386,6 +659,7 @@ class FindReplaceDialog {
         if (this.matches.length === 0) return;
 
         this.currentMatchIndex = (this.currentMatchIndex + 1) % this.matches.length;
+        this.updateMatchCount();
         this.highlightMatches();
         this.selectCurrentMatch(true); // Focus editor when navigating
     }
@@ -395,6 +669,7 @@ class FindReplaceDialog {
 
         this.currentMatchIndex = this.currentMatchIndex <= 0 ?
             this.matches.length - 1 : this.currentMatchIndex - 1;
+        this.updateMatchCount();
         this.highlightMatches();
         this.selectCurrentMatch(true); // Focus editor when navigating
     }
@@ -1681,7 +1956,7 @@ class CogNotezApp {
         // Initialize history for undo/redo functionality
         this.initializeHistoryForNote(note.content);
 
-        // Display tags in the editor header
+        // Display tags in the editor header (this will also handle wrapping tags+date)
         this.displayNoteTags(note);
 
         // Update password lock icon
@@ -1742,9 +2017,17 @@ class CogNotezApp {
     // Helper method to display tags in the note editor header
     displayNoteTags(note) {
         const tagsDisplay = document.getElementById('note-tags-display');
+        const noteDate = document.getElementById('note-date');
+        const noteInfo = document.querySelector('.note-info');
 
         if (!note.tags || note.tags.length === 0) {
             tagsDisplay.innerHTML = '';
+            // Unwrap date if it was wrapped
+            const wrapper = document.querySelector('.tags-date-wrapper');
+            if (wrapper && noteDate && noteDate.parentElement === wrapper) {
+                noteInfo.appendChild(noteDate);
+                wrapper.remove();
+            }
             return;
         }
 
@@ -1756,6 +2039,16 @@ class CogNotezApp {
         tagsHtml += '</div>';
 
         tagsDisplay.innerHTML = tagsHtml;
+
+        // Wrap tags and date in a flex container for inline layout when tags exist
+        const existingWrapper = document.querySelector('.tags-date-wrapper');
+        if (!existingWrapper && noteDate && noteDate.parentElement === noteInfo) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tags-date-wrapper';
+            noteInfo.insertBefore(wrapper, tagsDisplay.nextSibling);
+            wrapper.appendChild(tagsDisplay);
+            wrapper.appendChild(noteDate);
+        }
     }
 
     // Helper method to escape HTML
