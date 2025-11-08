@@ -262,6 +262,24 @@ class UIManager {
 
         // Handle scrolling properly for textarea
         editor.addEventListener('keydown', (e) => {
+            // Handle Tab key to insert tab character instead of moving focus
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const tab = '\t';
+                
+                // Insert tab at cursor position
+                editor.value = editor.value.substring(0, start) + tab + editor.value.substring(end);
+                
+                // Move cursor to after the inserted tab
+                editor.selectionStart = editor.selectionEnd = start + tab.length;
+                
+                // Trigger input event for autosave
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
+            }
+            
             // Handle arrow keys for scrolling
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 // Check if content overflows and we're at the boundaries

@@ -339,10 +339,20 @@ class GoogleDriveSyncManager {
             });
 
             const jsonData = response.data;
-            let parsed = JSON.parse(jsonData);
+            
+            // Parse JSON with error handling
+            let parsed;
+            let isEncrypted = false;
+            try {
+                parsed = JSON.parse(jsonData);
+                isEncrypted = encryptionManager.isEncrypted(parsed);
+            } catch (parseError) {
+                console.error('[GoogleDriveSync] Failed to parse downloaded JSON data:', parseError);
+                throw new Error(`Downloaded data is not valid JSON: ${parseError.message}`);
+            }
 
             // Check if data is encrypted and decrypt if necessary
-            if (encryptionManager.isEncrypted(parsed)) {
+            if (isEncrypted) {
                 console.log('[GoogleDriveSync] Downloaded data is encrypted, attempting decryption...');
 
                 if (!this.encryptionPassphrase) {
@@ -373,7 +383,7 @@ class GoogleDriveSyncManager {
                 data: parsed,
                 checksum: checksum,
                 size: jsonData.length,
-                isEncrypted: encryptionManager.isEncrypted(JSON.parse(jsonData))
+                isEncrypted: isEncrypted
             };
 
         } catch (error) {
@@ -462,14 +472,17 @@ class GoogleDriveSyncManager {
     async sync(options = {}) {
         let progressCallback = () => {};
         try {
-            // Ensure the sync manager is fully initialized before proceeding
-            await this.ensureInitialized();
-
+            // Check if sync is already in progress BEFORE async initialization to prevent race conditions
             if (this.syncInProgress) {
                 throw new Error('Sync already in progress');
             }
 
+            // Set flag immediately to prevent concurrent sync attempts
             this.syncInProgress = true;
+
+            // Ensure the sync manager is fully initialized before proceeding
+            await this.ensureInitialized();
+
             console.log('[GoogleDriveSync] Starting sync process');
 
             // Progress callback support
@@ -562,6 +575,7 @@ class GoogleDriveSyncManager {
                 console.log('[GoogleDriveSync] No local changes - downloading remote data');
                 await this.applyRemoteData(remoteData);
                 result.action = 'download';
+                result.remoteData = remoteData; // Include remote data in result to avoid redundant download
                 result.stats.downloaded = 1;
                 result.success = true;
                 // After applying remote data, local content now matches remote

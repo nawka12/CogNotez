@@ -109,11 +109,17 @@
                             <span id="note-date" class="note-date"></span>
                         </div>
                         <div class="editor-actions">
-                            <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
-                            <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
-                            <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit"><i class="fas fa-edit"></i></button>
-                            <button id="save-btn" class="action-btn" title="Save"><i class="fas fa-save"></i></button>
-                            <button id="editor-overflow-btn" class="action-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
+                            <div class="action-btn-group">
+                                <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+                                <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+                            </div>
+                            <div class="action-btn-group">
+                                <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit"><i class="fas fa-edit"></i></button>
+                                <button id="save-btn" class="action-btn" title="Save"><i class="fas fa-save"></i></button>
+                            </div>
+                            <div class="action-btn-group">
+                                <button id="editor-overflow-btn" class="action-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
+                            </div>
                             
                             <!-- Overflow menu -->
                             <div id="editor-overflow-menu" class="editor-overflow-menu hidden">
@@ -188,8 +194,8 @@
                         <!-- AI conversation will appear here -->
                     </div>
                     <div class="ai-input-container">
-                        <input type="text" id="ai-input" placeholder="Ask me anything..." class="ai-input">
-                        <button id="ai-send-btn" class="ai-send-btn">Send</button>
+                        <textarea id="ai-input" placeholder="Ask me anything..." class="ai-input" rows="1"></textarea>
+                        <button id="ai-send-btn" class="ai-send-btn" title="Send message"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </aside>

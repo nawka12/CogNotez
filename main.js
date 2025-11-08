@@ -8,6 +8,8 @@ let mainWindow;
 // App-level quit guards for sync-before-exit
 let isQuittingAfterSync = false;
 let appQuittingRequested = false;
+// Global sync lock to prevent concurrent sync operations across IPC handlers
+let globalSyncInProgress = false;
 
 // Log version information for debugging
 console.log('Node.js version:', process.version);
@@ -229,21 +231,24 @@ async function performSyncBeforeClose() {
       global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
     }
 
-    // Check if sync is already in progress
-    if (global.googleDriveSyncManager.syncInProgress) {
+    // Check if sync is already in progress (check both global and manager-level locks)
+    if (globalSyncInProgress || global.googleDriveSyncManager.syncInProgress) {
       console.log('[Main] Sync already in progress, waiting for it to complete...');
       // Wait for the existing sync to complete (with a timeout)
       let attempts = 0;
-      while (global.googleDriveSyncManager.syncInProgress && attempts < 60) { // Wait up to 30 seconds
+      while ((globalSyncInProgress || global.googleDriveSyncManager.syncInProgress) && attempts < 60) { // Wait up to 30 seconds
         await new Promise(resolve => setTimeout(resolve, 500));
         attempts++;
       }
 
-      if (global.googleDriveSyncManager.syncInProgress) {
+      if (globalSyncInProgress || global.googleDriveSyncManager.syncInProgress) {
         console.warn('[Main] Sync still in progress after timeout, proceeding with close');
         return; // Don't start another sync
       }
     }
+
+    // Set global lock
+    globalSyncInProgress = true;
 
     // Get local data for sync
     if (!global.databaseManager) {
@@ -298,6 +303,10 @@ async function performSyncBeforeClose() {
   } catch (error) {
     console.error('[Main] Sync before close failed:', error);
     throw error;
+  } finally {
+    // Always release the global sync lock
+    globalSyncInProgress = false;
+    console.log('[Main] Released global sync lock (performSyncBeforeClose)');
   }
 }
 
@@ -1020,6 +1029,12 @@ if (ipcMain) {
 
   ipcMain.handle('google-drive-sync', async (event, options = {}) => {
     try {
+      // Check global sync lock to prevent concurrent sync operations
+      if (globalSyncInProgress) {
+        console.warn('[Sync] Sync already in progress globally, rejecting concurrent request');
+        return { success: false, error: 'Sync operation already in progress' };
+      }
+
       if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
         throw new Error('Not authenticated with Google Drive');
       }
@@ -1029,6 +1044,9 @@ if (ipcMain) {
         const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
         global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
       }
+
+      // Set global lock
+      globalSyncInProgress = true;
 
       // Get local data - use provided data or fallback to database manager
       let localData;
@@ -1086,16 +1104,23 @@ if (ipcMain) {
         });
 
         // If we downloaded data, apply it
-        if (syncResult.action === 'download') {
-          // Get the remote data that was downloaded
-          const remoteData = await global.googleDriveSyncManager.downloadData();
-          const importResult = global.databaseManager.importDataFromSync(remoteData.data, {
+        if (syncResult.action === 'download' && syncResult.remoteData) {
+          // Use the remote data that was already downloaded during sync
+          console.log('[Sync] Applying downloaded data to main process database');
+          const importResult = global.databaseManager.importDataFromSync(syncResult.remoteData, {
             mergeStrategy: 'merge',
             force: false,
             preserveSyncMeta: true,
             mergeTags: true,
             mergeConversations: true
           });
+
+          // Check if import succeeded
+          if (!importResult.success) {
+            console.error('[Sync] Failed to import downloaded data:', importResult.error);
+            throw new Error(`Failed to import downloaded data: ${importResult.error || 'Unknown error'}`);
+          }
+          console.log('[Sync] Successfully imported downloaded data');
         } else if (syncResult.action === 'merge' && syncResult.mergedData) {
           // For merge operations, import the merged data directly
           console.log('[Sync] Applying merged data to main process database');
@@ -1106,6 +1131,13 @@ if (ipcMain) {
             mergeTags: true,
             mergeConversations: true
           });
+
+          // Check if import succeeded
+          if (!importResult.success) {
+            console.error('[Sync] Failed to import merged data:', importResult.error);
+            throw new Error(`Failed to import merged data: ${importResult.error || 'Unknown error'}`);
+          }
+          console.log('[Sync] Successfully imported merged data');
         }
 
         // Send updated data back to renderer process to update localStorage
@@ -1125,6 +1157,10 @@ if (ipcMain) {
     } catch (error) {
       console.error('Google Drive sync failed:', error);
       return { success: false, error: error.message };
+    } finally {
+      // Always release the global sync lock
+      globalSyncInProgress = false;
+      console.log('[Sync] Released global sync lock');
     }
   });
 

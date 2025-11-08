@@ -1022,23 +1022,33 @@ class DatabaseManager {
             // Preserve local sync settings that should not be overridden by remote
             const localSyncSettings = { ...(this.data && this.data.sync ? this.data.sync : {}) };
 
-            // Apply sync data
-            if (options.mergeStrategy === 'replace') {
-                // Complete replacement but preserve local-only data (settings, encryption)
-                const preservedSettings = { ...(this.data.settings || {}) };
-                const preservedEncryption = { ...(this.data.encryption || {}) };
-                this.data = importData;
-                // Restore preserved local-only fields
-                this.data.settings = preservedSettings;
-                this.data.encryption = preservedEncryption;
-            } else {
-                // Merge strategy (default)
-                this.mergeSyncData(importData, options);
-            }
+            // Create a backup of current data before applying changes (for rollback on error)
+            const dataBackup = JSON.parse(JSON.stringify(this.data));
 
-            // Update sync metadata if provided
-            if (syncData.syncMetadata) {
-                this.updateSyncMetadata(syncData.syncMetadata);
+            try {
+                // Apply sync data
+                if (options.mergeStrategy === 'replace') {
+                    // Complete replacement but preserve local-only data (settings, encryption)
+                    const preservedSettings = { ...(this.data.settings || {}) };
+                    const preservedEncryption = { ...(this.data.encryption || {}) };
+                    this.data = importData;
+                    // Restore preserved local-only fields
+                    this.data.settings = preservedSettings;
+                    this.data.encryption = preservedEncryption;
+                } else {
+                    // Merge strategy (default)
+                    this.mergeSyncData(importData, options);
+                }
+
+                // Update sync metadata if provided
+                if (syncData.syncMetadata) {
+                    this.updateSyncMetadata(syncData.syncMetadata);
+                }
+            } catch (applyError) {
+                // Restore backup if an error occurred during data application
+                console.error('[Database] Error during sync data application, restoring backup:', applyError);
+                this.data = dataBackup;
+                throw new Error(`Failed to apply sync data: ${applyError.message}`);
             }
 
             // Restore local sync controls and metadata (do not let remote toggle your sync settings)

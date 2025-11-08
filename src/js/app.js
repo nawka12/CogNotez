@@ -870,6 +870,9 @@ class CogNotezApp {
 		// Cache of passwords for unlocked notes (noteId -> password)
 		this.notePasswordCache = {};
 
+		// Interval for updating note date in real-time
+		this.noteDateUpdateInterval = null;
+
         // Phase 5 managers
         this.advancedSearchManager = null;
         this.templatesManager = null;
@@ -953,7 +956,11 @@ class CogNotezApp {
             }
 
             // Show welcome message in AI panel
-            this.showAIMessage('Hello! I\'m your AI assistant. Select some text and right-click to use AI features.', 'assistant');
+            // Show welcome message when panel is first opened
+            const messagesContainer = document.getElementById('ai-messages');
+            if (messagesContainer.children.length === 0 || messagesContainer.querySelector('.ai-messages-empty')) {
+                this.showWelcomeMessage();
+            }
 
             this.updateSplashProgress('Ready!', 100);
             console.log('[DEBUG] CogNotez application initialized successfully');
@@ -1152,8 +1159,15 @@ class CogNotezApp {
             this.resetAIConversation();
         });
         document.getElementById('ai-send-btn').addEventListener('click', () => this.sendAIMessage());
-        document.getElementById('ai-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this.sendAIMessage();
+        const aiInput = document.getElementById('ai-input');
+        aiInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendAIMessage();
+            }
+        });
+        aiInput.addEventListener('input', () => {
+            this.autoResizeTextarea(aiInput);
         });
 
         // Global context menu closer
@@ -1951,8 +1965,7 @@ class CogNotezApp {
 
         document.getElementById('note-title').value = note.title;
         document.getElementById('note-editor').value = note.content;
-        document.getElementById('note-date').textContent =
-            `Modified: ${new Date(note.modified).toLocaleDateString()} ${new Date(note.modified).toLocaleTimeString()}`;
+        this.updateNoteDate();
 
         // Initialize history for undo/redo functionality
         this.initializeHistoryForNote(note.content);
@@ -1975,6 +1988,9 @@ class CogNotezApp {
 
         // Load conversation history for this note
         this.loadConversationHistory(note.id);
+
+        // Start real-time date updates
+        this.startNoteDateUpdates();
     }
 
     // Show the note editor interface
@@ -2009,6 +2025,15 @@ class CogNotezApp {
         // Clear current note
         this.currentNote = null;
 
+        // Stop date updates
+        this.stopNoteDateUpdates();
+
+        // Clear date display
+        const noteDateElement = document.getElementById('note-date');
+        if (noteDateElement) {
+            noteDateElement.textContent = '';
+        }
+
         // Update sidebar to show no active note
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.remove('active');
@@ -2021,11 +2046,17 @@ class CogNotezApp {
         const noteDate = document.getElementById('note-date');
         const noteInfo = document.querySelector('.note-info');
 
+        // Defensive check: ensure required elements exist
+        if (!tagsDisplay) {
+            console.warn('[displayNoteTags] note-tags-display element not found');
+            return;
+        }
+
         if (!note.tags || note.tags.length === 0) {
             tagsDisplay.innerHTML = '';
             // Unwrap date if it was wrapped
             const wrapper = document.querySelector('.tags-date-wrapper');
-            if (wrapper && noteDate && noteDate.parentElement === wrapper) {
+            if (wrapper && noteDate && noteDate.parentElement === wrapper && noteInfo) {
                 noteInfo.appendChild(noteDate);
                 wrapper.remove();
             }
@@ -2043,7 +2074,7 @@ class CogNotezApp {
 
         // Wrap tags and date in a flex container for inline layout when tags exist
         const existingWrapper = document.querySelector('.tags-date-wrapper');
-        if (!existingWrapper && noteDate && noteDate.parentElement === noteInfo) {
+        if (!existingWrapper && noteDate && noteInfo && noteDate.parentElement === noteInfo) {
             const wrapper = document.createElement('div');
             wrapper.className = 'tags-date-wrapper';
             noteInfo.insertBefore(wrapper, tagsDisplay.nextSibling);
@@ -2057,6 +2088,56 @@ class CogNotezApp {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+
+    // Update note date display
+    updateNoteDate() {
+        if (!this.currentNote) return;
+
+        const noteDateElement = document.getElementById('note-date');
+        if (!noteDateElement) return;
+
+        // Try to get the latest note data from database if available
+        let modifiedDate;
+        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+            const latestNote = this.notesManager.db.getNote(this.currentNote.id);
+            if (latestNote && latestNote.modified) {
+                modifiedDate = new Date(latestNote.modified);
+                // Update currentNote with latest modified date
+                this.currentNote.modified = latestNote.modified;
+            } else {
+                modifiedDate = this.currentNote.modified ? new Date(this.currentNote.modified) : new Date();
+            }
+        } else {
+            modifiedDate = this.currentNote.modified ? new Date(this.currentNote.modified) : new Date();
+        }
+        
+        // Format the date
+        const dateStr = modifiedDate.toLocaleDateString();
+        const timeStr = modifiedDate.toLocaleTimeString();
+        noteDateElement.textContent = `Modified: ${dateStr} ${timeStr}`;
+    }
+
+    // Start real-time date updates
+    startNoteDateUpdates() {
+        // Clear any existing interval
+        this.stopNoteDateUpdates();
+
+        // Update immediately
+        this.updateNoteDate();
+
+        // Update every 30 seconds to feel more real-time
+        this.noteDateUpdateInterval = setInterval(() => {
+            this.updateNoteDate();
+        }, 30000);
+    }
+
+    // Stop real-time date updates
+    stopNoteDateUpdates() {
+        if (this.noteDateUpdateInterval) {
+            clearInterval(this.noteDateUpdateInterval);
+            this.noteDateUpdateInterval = null;
+        }
     }
 
     // Show tag management dialog
@@ -2396,6 +2477,9 @@ class CogNotezApp {
             }
 
             await this.notesManager.renderNotesList();
+
+            // Update note date display after saving
+            this.updateNoteDate();
 
             // After saving, recompute local checksum and update UI readiness if remote differs
             try {
@@ -2881,9 +2965,10 @@ class CogNotezApp {
         console.log('[DEBUG] Current note state - title:', this.currentNote?.title, 'content length:', this.currentNote?.content?.length);
         this.showAIMessage(message, 'user');
         input.value = '';
+        this.autoResizeTextarea(input);
 
-        // Show typing indicator
-        this.showAIMessage('🤔 Thinking...', 'assistant');
+        // Show typing indicator instead of "Thinking..." message
+        this.showTypingIndicator();
 
         try {
             // Prepare the AI prompt with note context and conversation history
@@ -2972,8 +3057,9 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             // Remove typing indicator and show actual response
-            this.removeLastAIMessage();
-            this.showAIMessage(response, 'assistant');
+                this.hideTypingIndicator();
+                this.removeLastAIMessage();
+                this.showAIMessage(response, 'assistant');
 
             // Save conversation to database
             if (this.aiManager && this.currentNote) {
@@ -2989,7 +3075,7 @@ Please provide a helpful response based on the note content and conversation his
         } catch (error) {
             console.error('[DEBUG] Error sending AI message:', error);
             // Remove typing indicator and show error
-            this.removeLastAIMessage();
+            this.hideTypingIndicator();
             const backend = this.aiManager ? this.aiManager.backend : 'ollama';
             let errorMsg = '❌ Sorry, I encountered an error. ';
             if (backend === 'ollama') {
@@ -3001,25 +3087,209 @@ Please provide a helpful response based on the note content and conversation his
         }
     }
 
-    showAIMessage(message, type) {
+    showAIMessage(message, type, options = {}) {
         const messagesContainer = document.getElementById('ai-messages');
+        
+        // Remove empty state if it exists
+        const emptyState = messagesContainer.querySelector('.ai-messages-empty');
+        if (emptyState) {
+            emptyState.remove();
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = `ai-message ${type}`;
 
-        // Render markdown for assistant messages, use plain text for user messages
-        if (type === 'assistant') {
-            messageElement.innerHTML = renderMarkdown(message);
+        // Create avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'ai-message-avatar';
+        if (type === 'user') {
+            avatar.innerHTML = '<i class="fas fa-user"></i>';
         } else {
-            messageElement.textContent = message;
+            avatar.innerHTML = '<i class="fas fa-robot"></i>';
         }
 
+        // Create message content wrapper
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'ai-message-content';
+
+        // Create message bubble
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-message-bubble';
+
+        // Render markdown for assistant messages, use plain text for user messages
+        if (type === 'assistant') {
+            bubble.innerHTML = renderMarkdown(message);
+        } else {
+            bubble.textContent = message;
+        }
+
+        // Create message meta (timestamp and actions)
+        const meta = document.createElement('div');
+        meta.className = 'ai-message-meta';
+
+        const timestamp = document.createElement('div');
+        timestamp.className = 'ai-message-timestamp';
+        const now = new Date();
+        timestamp.textContent = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'ai-message-actions';
+
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'ai-message-action';
+        copyBtn.title = 'Copy message';
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const textToCopy = type === 'assistant' ? message : bubble.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                this.showNotification('Message copied to clipboard', 'success');
+                copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                this.showNotification('Failed to copy message', 'error');
+            });
+        });
+
+        actions.appendChild(copyBtn);
+
+        // Add regenerate button for assistant messages (if not a welcome message)
+        if (type === 'assistant' && !options.isWelcome && !message.includes('Hello! I\'m your AI assistant')) {
+            const regenerateBtn = document.createElement('button');
+            regenerateBtn.className = 'ai-message-action';
+            regenerateBtn.title = 'Regenerate response';
+            regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
+            
+            // Capture app instance for use in event listener
+            const appInstance = this;
+            
+            regenerateBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                // Find the user message that prompted this response
+                const messages = Array.from(messagesContainer.querySelectorAll('.ai-message'));
+                const currentIndex = messages.indexOf(messageElement);
+                let userMessage = null;
+                
+                // Look backwards for the user message
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                    if (messages[i].classList.contains('user')) {
+                        userMessage = messages[i].querySelector('.ai-message-bubble').textContent;
+                        break;
+                    }
+                }
+
+                if (userMessage) {
+                    // Remove current assistant message
+                    messageElement.remove();
+                    // Show typing indicator
+                    appInstance.showTypingIndicator();
+                    // Regenerate response
+                    try {
+                        const response = await appInstance.aiManager.askQuestion(userMessage, appInstance.currentNote?.content || '');
+                        appInstance.hideTypingIndicator();
+                        appInstance.showAIMessage(response, 'assistant');
+                    } catch (error) {
+                        appInstance.hideTypingIndicator();
+                        appInstance.showAIMessage(`❌ Failed to regenerate: ${error.message}`, 'assistant');
+                    }
+                }
+            });
+            actions.appendChild(regenerateBtn);
+        }
+
+        meta.appendChild(timestamp);
+        meta.appendChild(actions);
+
+        // Assemble message structure
+        contentWrapper.appendChild(bubble);
+        contentWrapper.appendChild(meta);
+        messageElement.appendChild(avatar);
+        messageElement.appendChild(contentWrapper);
+
         messagesContainer.appendChild(messageElement);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Smooth scroll to bottom
+        setTimeout(() => {
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }, 100);
+    }
+
+    showTypingIndicator() {
+        const messagesContainer = document.getElementById('ai-messages');
+        const typingElement = document.createElement('div');
+        typingElement.className = 'ai-message assistant';
+        typingElement.id = 'ai-typing-indicator';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'ai-message-avatar';
+        avatar.innerHTML = '<i class="fas fa-robot"></i>';
+        
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'ai-message-content';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-message-bubble';
+        
+        const typingIndicator = document.createElement('div');
+        typingIndicator.className = 'ai-typing-indicator';
+        typingIndicator.innerHTML = '<div class="ai-typing-dot"></div><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div>';
+        
+        bubble.appendChild(typingIndicator);
+        contentWrapper.appendChild(bubble);
+        typingElement.appendChild(avatar);
+        typingElement.appendChild(contentWrapper);
+        
+        messagesContainer.appendChild(typingElement);
+        messagesContainer.scrollTo({
+            top: messagesContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+
+    hideTypingIndicator() {
+        const typingIndicator = document.getElementById('ai-typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+
+    showWelcomeMessage() {
+        const messagesContainer = document.getElementById('ai-messages');
+        messagesContainer.innerHTML = '';
+        
+        const emptyState = document.createElement('div');
+        emptyState.className = 'ai-messages-empty';
+        emptyState.innerHTML = `
+            <div class="ai-messages-empty-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="ai-messages-empty-title">AI Assistant</div>
+            <div class="ai-messages-empty-description">
+                I'm here to help! Select text and right-click for AI features, or ask me anything about your note.
+            </div>
+        `;
+        
+        messagesContainer.appendChild(emptyState);
+    }
+
+    autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     }
 
     removeLastAIMessage() {
         const messagesContainer = document.getElementById('ai-messages');
-        const messages = messagesContainer.querySelectorAll('.ai-message');
+        const messages = messagesContainer.querySelectorAll('.ai-message:not(#ai-typing-indicator)');
         if (messages.length > 0) {
             messages[messages.length - 1].remove();
         }
@@ -3038,8 +3308,8 @@ Please provide a helpful response based on the note content and conversation his
         const messagesContainer = document.getElementById('ai-messages');
         messagesContainer.innerHTML = '';
 
-        // Show welcome message
-        this.showAIMessage('Hello! I\'m your AI assistant. Select some text and right-click to use AI features, or ask me anything about your note.', 'assistant');
+        // Show welcome message with empty state
+        this.showWelcomeMessage();
     }
 
     async loadConversationHistory(noteId) {
@@ -3055,42 +3325,25 @@ Please provide a helpful response based on the note content and conversation his
             if (conversations.length > 0) {
                 const messagesContainer = document.getElementById('ai-messages');
 
-                // Clear existing messages (keep welcome message if any)
-                const welcomeMessages = messagesContainer.querySelectorAll('.ai-message');
-                if (welcomeMessages.length === 1 && welcomeMessages[0].textContent.includes('Hello! I\'m your AI assistant')) {
-                    // Keep the welcome message and add history below it
-                } else {
-                    messagesContainer.innerHTML = '';
-                }
-
-                // Add a separator for conversation history
-                const separator = document.createElement('div');
-                separator.className = 'ai-message history-separator';
-                separator.textContent = `--- Previous Conversations (${conversations.length} messages) ---`;
-                separator.style.fontStyle = 'italic';
-                separator.style.color = 'var(--text-secondary)';
-                separator.style.fontSize = '12px';
-                separator.style.textAlign = 'center';
-                separator.style.margin = '8px 0';
-                messagesContainer.appendChild(separator);
+                // Clear existing messages and empty state
+                messagesContainer.innerHTML = '';
 
                 // Display conversations in chronological order (oldest first)
                 conversations.reverse().forEach(conv => {
-                    // Add user message (plain text)
-                    const userMessage = document.createElement('div');
-                    userMessage.className = 'ai-message user';
-                    userMessage.textContent = conv.user_message;
-                    messagesContainer.appendChild(userMessage);
-
-                    // Add AI response (with markdown rendering)
-                    const aiMessage = document.createElement('div');
-                    aiMessage.className = 'ai-message assistant';
-                    aiMessage.innerHTML = renderMarkdown(conv.ai_response);
-                    messagesContainer.appendChild(aiMessage);
+                    // Add user message
+                    this.showAIMessage(conv.user_message, 'user');
+                    
+                    // Add AI response
+                    this.showAIMessage(conv.ai_response, 'assistant');
                 });
 
                 // Scroll to bottom to show latest messages
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                setTimeout(() => {
+                    messagesContainer.scrollTo({
+                        top: messagesContainer.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }, 100);
 
                 console.log('[DEBUG] Loaded', conversations.length, 'conversation messages');
             }
@@ -5018,11 +5271,22 @@ Please provide a helpful response based on the note content and conversation his
                     const searxngUrl = modal.querySelector('#searxng-url').value.trim();
                     const searxngMaxResults = modal.querySelector('#searxng-max-results').value;
 
-                    await this.aiManager.updateOpenRouterApiKey(apiKey);
+                    const restartTriggered = await this.aiManager.updateOpenRouterApiKey(apiKey);
                     await this.aiManager.updateOpenRouterModel(model);
                     await this.aiManager.updateSearxngEnabled(searxngEnabled);
                     await this.aiManager.updateSearxngUrl(searxngUrl);
                     await this.aiManager.updateSearxngMaxResults(searxngMaxResults);
+
+                    // If API key changed and restart was triggered, show message and return early
+                    if (restartTriggered) {
+                        this.showNotification('✅ OpenRouter API key updated. Restarting app to apply changes...', 'success');
+                        this.closeModal(modal);
+                        // Small delay before restart to allow notification to show
+                        setTimeout(() => {
+                            ipcRenderer.send('restart-app');
+                        }, 1000);
+                        return;
+                    }
                 }
 
                 // Now switch backend (which will validate connection with the updated settings)

@@ -595,12 +595,23 @@ class AIManager {
 
     // OpenRouter settings
     async updateOpenRouterApiKey(newApiKey) {
+        const oldApiKey = this.openRouterApiKey;
+        const keyChanged = oldApiKey !== newApiKey;
+        
         this.openRouterApiKey = newApiKey;
         await this.saveSettings();
-        if (this.backend === 'openrouter') {
+        
+        // If API key changed, return true to indicate restart is needed
+        // Restart is needed even if clearing the key, as it affects app initialization
+        if (keyChanged) {
+            console.log('[AIManager] OpenRouter API key changed, restart will be triggered');
+        } else if (this.backend === 'openrouter') {
+            // Only check connection if key didn't change (to avoid unnecessary API calls before restart)
             await this.checkConnection();
             await this.loadAvailableModels();
         }
+        
+        return keyChanged; // Return true if restart is needed
     }
 
     async updateOpenRouterModel(newModel) {
