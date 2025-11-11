@@ -1445,6 +1445,233 @@ class GoogleDriveSyncManager {
         // The renderer process will discover this file when it tries to access it via cognotez-media://
         // The RichMediaManager will handle the file discovery automatically
     }
+
+    // ============================================================
+    // PHASE 1: COLLABORATION FEATURES - NOTE SHARING
+    // ============================================================
+
+    /**
+     * Share a note on Google Drive with specific permissions
+     * @param {Object} note - Note object to share
+     * @param {Object} permissions - Sharing permissions { view: true, comment: false, edit: false }
+     * @param {string} email - Email address to share with (optional, for direct sharing)
+     * @returns {Object} Share result with fileId and shareLink
+     */
+    async shareNoteOnDrive(note, permissions = { view: true, comment: false, edit: false }, email = null) {
+        try {
+            await this.ensureInitialized();
+
+            if (!this.drive || !this.appFolderId) {
+                throw new Error('Drive API not initialized');
+            }
+
+            // Check if note is already shared and update existing file
+            let fileId = null;
+            let isUpdate = false;
+            
+            if (note.collaboration && note.collaboration.google_drive_file_id) {
+                fileId = note.collaboration.google_drive_file_id;
+                isUpdate = true;
+                console.log('[GoogleDriveSync] Updating existing shared note:', fileId);
+            }
+
+            // Format note as markdown text
+            let noteContent = `# ${note.title}\n\n`;
+            if (note.tags && note.tags.length > 0) {
+                noteContent += `**Tags:** ${note.tags.join(', ')}\n\n`;
+            }
+            noteContent += `**Created:** ${new Date(note.created_at).toLocaleString()}\n`;
+            noteContent += `**Last Updated:** ${new Date(note.updated_at).toLocaleString()}\n\n`;
+            noteContent += `---\n\n`;
+            noteContent += note.content;
+
+            const fileName = `${note.title.replace(/[^a-zA-Z0-9\s]/g, '_').substring(0, 50)}.md`;
+
+            const media = {
+                mimeType: 'text/markdown',
+                body: noteContent
+            };
+
+            let response;
+            
+            if (isUpdate) {
+                // Update existing file
+                const updateMetadata = {
+                    name: fileName,
+                    description: `Shared note: ${note.title}`
+                };
+                
+                response = await this.drive.files.update({
+                    fileId: fileId,
+                    resource: updateMetadata,
+                    media: media,
+                    fields: 'id,webViewLink,webContentLink'
+                });
+            } else {
+                // Create new file
+                const fileMetadata = {
+                    name: fileName,
+                    parents: [this.appFolderId],
+                    description: `Shared note: ${note.title}`
+                };
+                
+                response = await this.drive.files.create({
+                    resource: fileMetadata,
+                    media: media,
+                    fields: 'id,webViewLink,webContentLink'
+                });
+                
+                fileId = response.data.id;
+            }
+
+            // Set sharing permissions (only if creating new file)
+            if (!isUpdate) {
+                if (email) {
+                    // Share with specific email
+                    await this.drive.permissions.create({
+                        fileId: fileId,
+                        requestBody: {
+                            role: permissions.edit ? 'writer' : (permissions.comment ? 'commenter' : 'reader'),
+                            type: 'user',
+                            emailAddress: email
+                        }
+                    });
+                } else {
+                    // Make file accessible to anyone with the link
+                    await this.drive.permissions.create({
+                        fileId: fileId,
+                        requestBody: {
+                            role: permissions.edit ? 'writer' : (permissions.comment ? 'commenter' : 'reader'),
+                            type: 'anyone'
+                        }
+                    });
+                }
+            }
+
+            // Get shareable link
+            const shareLink = response.data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`;
+
+            console.log('[GoogleDriveSync] Note shared successfully:', {
+                noteId: note.id,
+                fileId: fileId,
+                shareLink: shareLink,
+                isUpdate: isUpdate
+            });
+
+            return {
+                success: true,
+                fileId: fileId,
+                shareLink: shareLink,
+                permissions: permissions,
+                isUpdate: isUpdate
+            };
+
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to share note:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Update sharing permissions for a shared note
+     * @param {string} fileId - Google Drive file ID
+     * @param {Object} permissions - New permissions
+     * @param {string} email - Email address (optional)
+     */
+    async updateNoteSharingPermissions(fileId, permissions, email = null) {
+        try {
+            await this.ensureInitialized();
+
+            if (!this.drive) {
+                throw new Error('Drive API not initialized');
+            }
+
+            // List existing permissions
+            const existingPermissions = await this.drive.permissions.list({
+                fileId: fileId,
+                fields: 'permissions(id,type,emailAddress,role)'
+            });
+
+            // Update or create permission
+            const role = permissions.edit ? 'writer' : (permissions.comment ? 'commenter' : 'reader');
+            
+            if (email) {
+                // Find existing permission for this email
+                const existingPerm = existingPermissions.data.permissions.find(
+                    p => p.type === 'user' && p.emailAddress === email
+                );
+
+                if (existingPerm) {
+                    // Update existing permission
+                    await this.drive.permissions.update({
+                        fileId: fileId,
+                        permissionId: existingPerm.id,
+                        requestBody: {
+                            role: role
+                        }
+                    });
+                } else {
+                    // Create new permission
+                    await this.drive.permissions.create({
+                        fileId: fileId,
+                        requestBody: {
+                            role: role,
+                            type: 'user',
+                            emailAddress: email
+                        }
+                    });
+                }
+            } else {
+                // Update 'anyone' permission
+                const anyonePerm = existingPermissions.data.permissions.find(
+                    p => p.type === 'anyone'
+                );
+
+                if (anyonePerm) {
+                    await this.drive.permissions.update({
+                        fileId: fileId,
+                        permissionId: anyonePerm.id,
+                        requestBody: {
+                            role: role
+                        }
+                    });
+                }
+            }
+
+            console.log('[GoogleDriveSync] Sharing permissions updated:', fileId);
+            return true;
+
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to update sharing permissions:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Stop sharing a note (delete the file from Google Drive)
+     * @param {string} fileId - Google Drive file ID
+     */
+    async stopSharingNote(fileId) {
+        try {
+            await this.ensureInitialized();
+
+            if (!this.drive) {
+                throw new Error('Drive API not initialized');
+            }
+
+            // Delete the file from Google Drive
+            await this.drive.files.delete({
+                fileId: fileId
+            });
+
+            console.log('[GoogleDriveSync] Shared note deleted:', fileId);
+            return true;
+
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to delete shared note:', error);
+            throw error;
+        }
+    }
 }
 
 // Export for use in main app

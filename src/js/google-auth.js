@@ -15,7 +15,7 @@ class GoogleAuthManager {
 
         // Google Drive API scopes
         this.scopes = [
-            'https://www.googleapis.com/auth/drive.file', // Access to files created by the app
+            'https://www.googleapis.com/auth/drive.file', // Access to files created by the app (includes permission management)
             'https://www.googleapis.com/auth/drive.metadata.readonly' // Read metadata of files
         ];
 

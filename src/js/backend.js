@@ -927,12 +927,44 @@ ${notes.map(note => `- **${note.title}** (${note.word_count || 0} words) - ${new
         }
     }
 
-    // URL generation for sharing (future feature)
-    generateShareableLink(note) {
-        // This would generate a shareable link for web access
-        // For now, return a placeholder
-        const shareId = btoa(note.id).replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
-        return `cognotez://share/${shareId}`;
+    async shareNoteOnGoogleDrive(note, permissions = { view: true, comment: false, edit: false }, email = null) {
+        try {
+            // Call IPC handler in main process
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-share-note', {
+                note: note,
+                permissions: permissions,
+                email: email
+            });
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to share note on Google Drive');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error sharing note on Google Drive:', error);
+            throw error;
+        }
+    }
+
+    async revokeGoogleDriveShare(fileId, noteId) {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-revoke-share', {
+                fileId: fileId,
+                noteId: noteId
+            });
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to revoke share');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error revoking Google Drive share:', error);
+            throw error;
+        }
     }
 
     // Migration wizard functionality

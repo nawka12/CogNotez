@@ -187,6 +187,7 @@ class DatabaseManager {
     }
 
     ensureDataStructure() {
+        if (!this.data) this.data = {};
         if (!this.data.notes) this.data.notes = {};
         if (!this.data.ai_conversations) this.data.ai_conversations = {};
         if (!this.data.settings) this.data.settings = {};
@@ -249,7 +250,16 @@ class DatabaseManager {
             created_at: now,
             updated_at: now,
             created: new Date(now),
-            modified: new Date(now)
+            modified: new Date(now),
+            // Collaboration metadata
+            collaboration: noteData.collaboration || {
+                is_shared: false,
+                shared_with: [],
+                last_edited_by: null,
+                edit_history: [],
+                google_drive_file_id: null,
+                google_drive_share_link: null
+            }
         };
 
         this.data.notes[id] = note;
@@ -410,6 +420,35 @@ class DatabaseManager {
 		if (noteData.encrypted_content !== undefined) {
 			note.encrypted_content = noteData.encrypted_content;
 		}
+
+        // Collaboration metadata
+        if (noteData.collaboration !== undefined) {
+            note.collaboration = { ...note.collaboration, ...noteData.collaboration };
+        }
+
+        // Track changes for collaboration (if content or title changed)
+        if ((noteData.content !== undefined || noteData.title !== undefined) && note.collaboration) {
+            if (!note.collaboration.edit_history) {
+                note.collaboration.edit_history = [];
+            }
+            // Add edit entry (limit to last 50 entries)
+            note.collaboration.edit_history.push({
+                timestamp: now,
+                edited_by: noteData.edited_by || note.collaboration.last_edited_by || 'local',
+                changes: {
+                    title_changed: noteData.title !== undefined,
+                    content_changed: noteData.content !== undefined
+                }
+            });
+            // Keep only last 50 entries
+            if (note.collaboration.edit_history.length > 50) {
+                note.collaboration.edit_history = note.collaboration.edit_history.slice(-50);
+            }
+            // Update last edited by
+            if (noteData.edited_by) {
+                note.collaboration.last_edited_by = noteData.edited_by;
+            }
+        }
 
         // Update timestamps
         note.updated_at = now;

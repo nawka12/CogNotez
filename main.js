@@ -1213,6 +1213,107 @@ if (ipcMain) {
     }
   });
 
+  // Share note on Google Drive
+  ipcMain.handle('google-drive-share-note', async (event, { note, permissions, email }) => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive. Please connect Google Drive in Sync Settings.');
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
+      }
+
+      console.log('[Google Drive] Sharing note:', note.title);
+      const result = await global.googleDriveSyncManager.shareNoteOnDrive(note, permissions, email);
+      console.log('[Google Drive] Share result:', result);
+      
+      // Update note in database with share information
+      if (result.success && global.databaseManager) {
+        const noteData = global.databaseManager.data.notes[note.id];
+        if (noteData) {
+          if (!noteData.collaboration) {
+            noteData.collaboration = {
+              is_shared: false,
+              shared_with: [],
+              last_edited_by: null,
+              edit_history: [],
+              google_drive_file_id: null,
+              google_drive_share_link: null
+            };
+          }
+          noteData.collaboration.is_shared = true;
+          noteData.collaboration.google_drive_file_id = result.fileId;
+          noteData.collaboration.google_drive_share_link = result.shareLink;
+          global.databaseManager.saveToLocalStorage();
+          console.log('[Google Drive] Updated note with share information');
+          
+          // Return the updated collaboration data so renderer can update its database
+          result.updatedCollaboration = {
+            is_shared: true,
+            shared_with: noteData.collaboration.shared_with || [],
+            last_edited_by: noteData.collaboration.last_edited_by,
+            edit_history: noteData.collaboration.edit_history || [],
+            google_drive_file_id: result.fileId,
+            google_drive_share_link: result.shareLink
+          };
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('[Google Drive] Share note failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Revoke share (delete shared note from Google Drive)
+  ipcMain.handle('google-drive-revoke-share', async (event, { fileId, noteId }) => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
+      }
+
+      console.log('[Google Drive] Revoking share for file:', fileId);
+      const result = await global.googleDriveSyncManager.stopSharingNote(fileId);
+      
+      // Update note in database to remove share information
+      if (result && global.databaseManager) {
+        const noteData = global.databaseManager.data.notes[noteId];
+        if (noteData && noteData.collaboration) {
+          noteData.collaboration.is_shared = false;
+          noteData.collaboration.google_drive_file_id = null;
+          noteData.collaboration.google_drive_share_link = null;
+          global.databaseManager.saveToLocalStorage();
+          console.log('[Google Drive] Removed share information from note');
+        }
+      }
+      
+      return { 
+        success: true,
+        updatedCollaboration: {
+          is_shared: false,
+          shared_with: [],
+          last_edited_by: null,
+          edit_history: [],
+          google_drive_file_id: null,
+          google_drive_share_link: null
+        }
+      };
+    } catch (error) {
+      console.error('[Google Drive] Revoke share failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('google-drive-download', async () => {
     try {
       if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {

@@ -2719,9 +2719,43 @@ class CogNotezApp {
             if (!isAutoSave) {
                 this.showNotification('Note saved successfully!');
             }
+
+            // Auto-update shared notes on Google Drive
+            if (this.currentNote.collaboration?.is_shared && 
+                this.currentNote.collaboration?.google_drive_file_id) {
+                this.updateSharedNoteOnDrive(this.currentNote).catch(error => {
+                    console.error('[Google Drive] Failed to auto-update shared note:', error);
+                    // Don't show notification for auto-update failures to avoid spam
+                });
+            }
         } catch (error) {
             console.error('Error saving note:', error);
             this.showNotification('Failed to save note', 'error');
+        }
+    }
+
+    async updateSharedNoteOnDrive(note) {
+        // Silent update of shared note on Google Drive
+        try {
+            if (!this.backendAPI) return;
+            
+            // Check if Google Drive is authenticated
+            const syncStatus = await this.backendAPI.getGoogleDriveSyncStatus();
+            if (!syncStatus || !syncStatus.isAuthenticated) {
+                return; // Silently skip if not authenticated
+            }
+
+            // Update the shared note
+            await this.backendAPI.shareNoteOnGoogleDrive(
+                note,
+                { view: true, comment: false, edit: false }, // Maintain existing permissions
+                null // No email, just update existing share
+            );
+            
+            console.log('[Google Drive] Shared note auto-updated:', note.title);
+        } catch (error) {
+            console.error('[Google Drive] Failed to auto-update shared note:', error);
+            // Don't throw, just log the error
         }
     }
 
@@ -2946,6 +2980,15 @@ class CogNotezApp {
                 modal.parentNode.removeChild(modal);
             }
         }, 300);
+    }
+
+    closeAllModals() {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        });
     }
 
     // Show confirmation dialog (replaces native confirm())
@@ -5841,8 +5884,47 @@ Please provide a helpful response based on the note content and conversation his
     showShareOptions() {
         if (!this.currentNote || !this.backendAPI) return;
 
+        // Always refresh current note from database to get latest collaboration status
+        if (this.notesManager && this.notesManager.db) {
+            const freshNote = this.notesManager.db.getNote(this.currentNote.id);
+            if (freshNote) {
+                // Preserve decrypted content if note is password protected
+                if (this.currentNote.password_protected && this.currentNote.content) {
+                    freshNote.content = this.currentNote.content;
+                }
+                this.currentNote = freshNote;
+            }
+        }
+
+        const isShared = this.currentNote.collaboration?.is_shared;
+        const shareLink = this.currentNote.collaboration?.google_drive_share_link;
+
+        let sharedStatusHtml = '';
+        if (isShared && shareLink) {
+            sharedStatusHtml = `
+                <div style="margin-bottom: 20px; padding: 16px; background: var(--context-menu-bg); border-radius: 8px; border: 1px solid var(--accent-primary);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <i class="fas fa-check-circle" style="color: var(--accent-primary);"></i>
+                        <span style="font-weight: 500; color: var(--accent-primary);">Note is currently shared on Google Drive</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Share Link:</div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="text" id="current-share-link" readonly value="${shareLink}" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font-family: monospace; font-size: 11px;">
+                            <button id="copy-share-link-btn" class="btn-secondary" style="padding: 8px 12px;" title="Copy link">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="revoke-share-btn" class="btn-secondary" style="width: 100%; padding: 10px; background: var(--error-color); color: white; border: none;">
+                        <i class="fas fa-times-circle"></i> Revoke Share
+                    </button>
+                </div>
+            `;
+        }
+
         const content = `
-            <div style="max-width: 400px;">
+            <div style="max-width: 500px;">
                 <div style="margin-bottom: 20px;">
                     <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-share"></i> Share "${this.currentNote.title}"</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
@@ -5850,51 +5932,69 @@ Please provide a helpful response based on the note content and conversation his
                     </p>
                 </div>
 
+                ${sharedStatusHtml}
+
                 <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="share-option-btn" data-action="clipboard-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span><i class="fas fa-clipboard"></i></span>
-                        <div>
-                            <div style="font-weight: 500;">Copy to Clipboard (Markdown)</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Share formatted content</div>
-                        </div>
-                    </button>
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 8px;">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Collaboration</div>
+                        
+                        <button class="share-option-btn" data-action="share-google-drive" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
+                            <span><i class="fab fa-google-drive" style="color: #4285F4;"></i></span>
+                            <div>
+                                <div style="font-weight: 500;">${isShared ? 'Update Google Drive Share' : 'Share via Google Drive'}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${isShared ? 'Update existing shared note on Google Drive' : 'Upload and share on Google Drive with permissions'}</div>
+                            </div>
+                        </button>
+                    </div>
 
-                    <button class="share-option-btn" data-action="clipboard-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📄</span>
-                        <div>
-                            <div style="font-weight: 500;">Copy to Clipboard (Plain Text)</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Share plain text content</div>
-                        </div>
-                    </button>
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 8px;">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Export</div>
+                        
+                        <button class="share-option-btn" data-action="clipboard-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
+                            <span><i class="fas fa-clipboard"></i></span>
+                            <div>
+                                <div style="font-weight: 500;">Copy to Clipboard (Markdown)</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Share formatted content</div>
+                            </div>
+                        </button>
 
-                    <button class="share-option-btn" data-action="export-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📁</span>
-                        <div>
-                            <div style="font-weight: 500;">Export as Markdown File</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
-                        </div>
-                    </button>
+                        <button class="share-option-btn" data-action="clipboard-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📄</span>
+                            <div>
+                                <div style="font-weight: 500;">Copy to Clipboard (Plain Text)</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Share plain text content</div>
+                            </div>
+                        </button>
 
-                    <button class="share-option-btn" data-action="export-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📄</span>
-                        <div>
-                            <div style="font-weight: 500;">Export as Text File</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
-                        </div>
-                    </button>
+                        <button class="share-option-btn" data-action="export-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📁</span>
+                            <div>
+                                <div style="font-weight: 500;">Export as Markdown File</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
+                            </div>
+                        </button>
 
-                    <button class="share-option-btn" data-action="export-pdf" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📋</span>
-                        <div>
-                            <div style="font-weight: 500;">Share as PDF</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Preserves media and formatting</div>
-                        </div>
-                    </button>
+                        <button class="share-option-btn" data-action="export-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📄</span>
+                            <div>
+                                <div style="font-weight: 500;">Export as Text File</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
+                            </div>
+                        </button>
+
+                        <button class="share-option-btn" data-action="export-pdf" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📋</span>
+                            <div>
+                                <div style="font-weight: 500;">Share as PDF</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">Preserves media and formatting</div>
+                            </div>
+                        </button>
+                    </div>
                 </div>
 
                 <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
                     <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tip:</strong> You can also right-click on selected text for quick AI-powered sharing options.
+                        <strong>💡 Tip:</strong> Google Drive sharing enables cloud-based collaboration with permission control. Export options let you share files directly.
                     </div>
                 </div>
             </div>
@@ -5904,12 +6004,59 @@ Please provide a helpful response based on the note content and conversation his
             { text: 'Close', type: 'secondary', action: 'close' }
         ]);
 
+        // Handle copy link button
+        if (isShared && shareLink) {
+            const copyBtn = modal.querySelector('#copy-share-link-btn');
+            copyBtn?.addEventListener('click', () => {
+                const linkInput = modal.querySelector('#current-share-link');
+                linkInput.select();
+                document.execCommand('copy');
+                this.showNotification('Link copied to clipboard!', 'success');
+            });
+
+            // Handle revoke share button
+            const revokeBtn = modal.querySelector('#revoke-share-btn');
+            revokeBtn?.addEventListener('click', async () => {
+                if (confirm('Are you sure you want to revoke this share? The Google Drive file will be deleted.')) {
+                    try {
+                        this.showLoading('Revoking share...');
+                        const result = await this.backendAPI.revokeGoogleDriveShare(
+                            this.currentNote.collaboration.google_drive_file_id,
+                            this.currentNote.id
+                        );
+                        this.hideLoading();
+                        this.showNotification('Share revoked successfully', 'success');
+                        
+                        // Update the note's collaboration data in renderer's database
+                        if (result.success && result.updatedCollaboration && this.notesManager && this.notesManager.db) {
+                            const noteData = this.notesManager.db.data.notes[this.currentNote.id];
+                            if (noteData) {
+                                noteData.collaboration = result.updatedCollaboration;
+                                this.notesManager.db.saveToLocalStorage();
+                                this.currentNote = this.notesManager.db.getNote(this.currentNote.id);
+                            }
+                        }
+                        // Close ALL modals (in case there are multiple stacked)
+                        this.closeAllModals();
+                        
+                        // Reload the share options to reflect updated state
+                        setTimeout(() => this.showShareOptions(), 300);
+                    } catch (error) {
+                        this.hideLoading();
+                        this.showNotification('Failed to revoke share: ' + error.message, 'error');
+                    }
+                }
+            });
+        }
+
         // Add click handlers for share options
         modal.querySelectorAll('.share-option-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const action = e.currentTarget.dataset.action;
                 await this.handleShareAction(action);
-                this.closeModal(modal);
+                if (action !== 'share-google-drive') {
+                    this.closeModal(modal);
+                }
             });
         });
     }
@@ -5922,6 +6069,10 @@ Please provide a helpful response based on the note content and conversation his
             let message = '';
 
             switch (action) {
+                case 'share-google-drive':
+                    await this.showGoogleDriveShareDialog();
+                    return; // Don't close modal yet
+
                 case 'clipboard-markdown':
                     success = await this.backendAPI.shareNoteToClipboard(this.currentNote, 'markdown');
                     message = 'Note copied to clipboard as Markdown!';
@@ -5967,6 +6118,132 @@ Please provide a helpful response based on the note content and conversation his
             this.showNotification('Failed to share note', 'error');
         }
     }
+
+    async showGoogleDriveShareDialog() {
+        // Check if user is authenticated with Google Drive
+        try {
+            const syncStatus = await this.backendAPI.getGoogleDriveSyncStatus();
+            if (!syncStatus || !syncStatus.isAuthenticated) {
+                this.showNotification('Please authenticate with Google Drive first. Go to Sync Settings and click "Connect Google Drive".', 'error');
+                return;
+            }
+        } catch (error) {
+            this.showNotification('Google Drive sync is not set up. Please connect Google Drive in Sync Settings.', 'error');
+            return;
+        }
+
+        const content = `
+            <div style="max-width: 500px;">
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fab fa-google-drive"></i> Share via Google Drive</h4>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                        Upload and share this note on Google Drive:
+                    </p>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
+                        <input type="radio" name="gd-perm" value="view" checked style="cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary);">View Only</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Recipients can only view</div>
+                        </div>
+                    </label>
+
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
+                        <input type="radio" name="gd-perm" value="comment" style="cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary);">Comment</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Recipients can view and comment</div>
+                        </div>
+                    </label>
+
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
+                        <input type="radio" name="gd-perm" value="edit" style="cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary);">Edit</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">Recipients can view and edit</div>
+                        </div>
+                    </label>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Share with email (optional):</label>
+                    <input type="email" id="gd-email" placeholder="user@example.com" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary);">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Leave empty to create a public link</div>
+                </div>
+
+                <div id="gd-share-result" style="display: none; margin-bottom: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Google Drive Link:</div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="gd-link-input" readonly style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font-family: monospace; font-size: 12px;">
+                        <button id="copy-gd-link-btn" class="btn-secondary" style="padding: 8px 12px;">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = this.createModal('Share via Google Drive', content, [
+            { text: 'Cancel', type: 'secondary', action: 'close' },
+            { text: 'Share', type: 'primary', action: 'share-gd' }
+        ]);
+
+        // Handle share button
+        const shareBtn = modal.querySelector('[data-action="share-gd"]');
+        shareBtn.addEventListener('click', async () => {
+            const permValue = modal.querySelector('input[name="gd-perm"]:checked').value;
+            const email = modal.querySelector('#gd-email').value.trim();
+
+            const permissions = {
+                view: true,
+                comment: permValue === 'comment' || permValue === 'edit',
+                edit: permValue === 'edit'
+            };
+
+            try {
+                this.showLoading('Sharing note on Google Drive...');
+                const result = await this.backendAPI.shareNoteOnGoogleDrive(
+                    this.currentNote,
+                    permissions,
+                    email || null
+                );
+
+                this.hideLoading();
+
+                if (result.success) {
+                    // Update the note's collaboration data in renderer's database
+                    if (result.success && result.updatedCollaboration && this.notesManager && this.notesManager.db) {
+                        const noteData = this.notesManager.db.data.notes[this.currentNote.id];
+                        if (noteData) {
+                            noteData.collaboration = result.updatedCollaboration;
+                            this.notesManager.db.saveToLocalStorage();
+                            this.currentNote = this.notesManager.db.getNote(this.currentNote.id);
+                            console.log('[Share] Updated note collaboration data:', this.currentNote.collaboration);
+                        }
+                    }
+
+                    const message = result.isUpdate ? 
+                        'Shared note updated successfully on Google Drive!' : 
+                        'Note shared on Google Drive successfully!';
+                    this.showNotification(message, 'success');
+
+                    // Close ALL modals (including parent Share Note dialog) and reopen
+                    this.closeAllModals();
+                    
+                    // Reload the share options to reflect updated state
+                    setTimeout(() => this.showShareOptions(), 300);
+                }
+            } catch (error) {
+                this.hideLoading();
+                console.error('Error sharing on Google Drive:', error);
+                this.showNotification('Failed to share on Google Drive: ' + error.message, 'error');
+            }
+        });
+    }
+
+
 
 
     showCustomAIDialog(title, context, action, customContent) {
@@ -7318,3 +7595,4 @@ function resolveModalConflict(conflictId, resolution, modalId) {
 document.addEventListener('DOMContentLoaded', () => {
     window.cognotezApp = new CogNotezApp();
 });
+
