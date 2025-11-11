@@ -1278,6 +1278,33 @@ if (ipcMain) {
         throw new Error('Not authenticated with Google Drive');
       }
 
+      // Check if note already has no collaboration data (might have been revoked on another device)
+      if (global.databaseManager) {
+        const noteData = global.databaseManager.data.notes[noteId];
+        if (noteData && noteData.collaboration) {
+          // If fileId is null or collaboration is already not shared, just update local state
+          if (!fileId || !noteData.collaboration.google_drive_file_id || !noteData.collaboration.is_shared) {
+            console.log('[Google Drive] Note already not shared, clearing collaboration data');
+            noteData.collaboration.is_shared = false;
+            noteData.collaboration.google_drive_file_id = null;
+            noteData.collaboration.google_drive_share_link = null;
+            noteData.updated_at = new Date().toISOString();
+            global.databaseManager.saveToLocalStorage();
+            return { 
+              success: true,
+              updatedCollaboration: {
+                is_shared: false,
+                shared_with: [],
+                last_edited_by: null,
+                edit_history: [],
+                google_drive_file_id: null,
+                google_drive_share_link: null
+              }
+            };
+          }
+        }
+      }
+
       if (!global.googleDriveSyncManager) {
         const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
         const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;

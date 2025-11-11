@@ -733,8 +733,25 @@ class GoogleDriveSyncManager {
                     const contentChanged = JSON.stringify(localNote.content) !== JSON.stringify(remoteNote.content) ||
                                          JSON.stringify(localNote.title) !== JSON.stringify(remoteNote.title);
 
+                    // Check if collaboration data differs (important for share revocation)
+                    const localCollaboration = localNote.collaboration || {};
+                    const remoteCollaboration = remoteNote.collaboration || {};
+                    const collaborationChanged = JSON.stringify(localCollaboration.google_drive_file_id) !== JSON.stringify(remoteCollaboration.google_drive_file_id) ||
+                                                JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
+
                     if (localModified > remoteModified) {
-                        // Local is newer - keep local
+                        // Local is newer - keep local content but merge collaboration data if remote revoked
+                        // This ensures share revocations sync even when local content is newer
+                        if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                            // Remote revoked the share - update collaboration data even though local is newer
+                            console.log('[GoogleDriveSync] Merging collaboration revocation from remote (local content is newer):', localNote.title);
+                            if (!mergedData.notes[noteId].collaboration) {
+                                mergedData.notes[noteId].collaboration = {};
+                            }
+                            mergedData.notes[noteId].collaboration.is_shared = false;
+                            mergedData.notes[noteId].collaboration.google_drive_file_id = null;
+                            mergedData.notes[noteId].collaboration.google_drive_share_link = null;
+                        }
                         continue;
                     } else if (remoteModified > localModified) {
                         // Remote timestamp is newer, but check for content conflicts
@@ -755,7 +772,17 @@ class GoogleDriveSyncManager {
                                     reason: 'both_edited_offline'
                                 });
                                 
-                                // For safety, keep local version (user can see their work)
+                                // For safety, keep local content but merge collaboration data if remote revoked
+                                if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                                    console.log('[GoogleDriveSync] Merging collaboration revocation from remote (content conflict):', localNote.title);
+                                    if (!mergedData.notes[noteId].collaboration) {
+                                        mergedData.notes[noteId].collaboration = {};
+                                    }
+                                    mergedData.notes[noteId].collaboration.is_shared = false;
+                                    mergedData.notes[noteId].collaboration.google_drive_file_id = null;
+                                    mergedData.notes[noteId].collaboration.google_drive_share_link = null;
+                                }
+                                
                                 // Remote version is not lost - it's still in cloud
                                 console.log('[GoogleDriveSync] Keeping local version to prevent data loss');
                                 continue;
@@ -776,13 +803,51 @@ class GoogleDriveSyncManager {
                                 reason: 'same_timestamp_different_content'
                             });
 
-                            // For merge strategy, keep local version
+                            // For merge strategy, keep local version but merge collaboration data
                             if (strategy === 'local') {
+                                if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                                    console.log('[GoogleDriveSync] Merging collaboration revocation from remote (same timestamp):', localNote.title);
+                                    if (!mergedData.notes[noteId].collaboration) {
+                                        mergedData.notes[noteId].collaboration = {};
+                                    }
+                                    mergedData.notes[noteId].collaboration.is_shared = false;
+                                    mergedData.notes[noteId].collaboration.google_drive_file_id = null;
+                                    mergedData.notes[noteId].collaboration.google_drive_share_link = null;
+                                }
                                 continue;
                             } else if (strategy === 'remote') {
                                 mergedData.notes[noteId] = remoteNote;
                             }
-                            // For 'merge', we keep local as default
+                            // For 'merge', we keep local as default but merge collaboration
+                            if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                                console.log('[GoogleDriveSync] Merging collaboration revocation from remote (merge strategy):', localNote.title);
+                                if (!mergedData.notes[noteId].collaboration) {
+                                    mergedData.notes[noteId].collaboration = {};
+                                }
+                                mergedData.notes[noteId].collaboration.is_shared = false;
+                                mergedData.notes[noteId].collaboration.google_drive_file_id = null;
+                                mergedData.notes[noteId].collaboration.google_drive_share_link = null;
+                            }
+                        } else if (collaborationChanged) {
+                            // Content is same but collaboration changed - merge collaboration data
+                            if (remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                                console.log('[GoogleDriveSync] Merging collaboration revocation from remote (same content):', localNote.title);
+                                if (!mergedData.notes[noteId].collaboration) {
+                                    mergedData.notes[noteId].collaboration = {};
+                                }
+                                mergedData.notes[noteId].collaboration.is_shared = false;
+                                mergedData.notes[noteId].collaboration.google_drive_file_id = null;
+                                mergedData.notes[noteId].collaboration.google_drive_share_link = null;
+                            } else if (remoteCollaboration.google_drive_file_id && remoteCollaboration.is_shared) {
+                                // Remote shared the note - update collaboration data
+                                console.log('[GoogleDriveSync] Merging collaboration share from remote (same content):', localNote.title);
+                                if (!mergedData.notes[noteId].collaboration) {
+                                    mergedData.notes[noteId].collaboration = {};
+                                }
+                                mergedData.notes[noteId].collaboration.is_shared = remoteCollaboration.is_shared;
+                                mergedData.notes[noteId].collaboration.google_drive_file_id = remoteCollaboration.google_drive_file_id;
+                                mergedData.notes[noteId].collaboration.google_drive_share_link = remoteCollaboration.google_drive_share_link;
+                            }
                         }
                     }
                 }
@@ -1668,6 +1733,13 @@ class GoogleDriveSyncManager {
             return true;
 
         } catch (error) {
+            // If file doesn't exist (404), treat it as already revoked
+            // This can happen when the file was already deleted on another device
+            if (error.code === 404 || (error.response && error.response.status === 404)) {
+                console.log('[GoogleDriveSync] File already deleted (likely revoked on another device):', fileId);
+                return true; // Return success since the goal (file not shared) is already achieved
+            }
+            
             console.error('[GoogleDriveSync] Failed to delete shared note:', error);
             throw error;
         }

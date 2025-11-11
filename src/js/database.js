@@ -1192,15 +1192,52 @@ class DatabaseManager {
                     const localTime = new Date(localNote.updated_at || localNote.created_at);
                     const remoteTime = new Date(remoteNote.updated_at || remoteNote.created_at);
 
+                    // Check if collaboration data differs (important for share revocation)
+                    const localCollaboration = localNote.collaboration || {};
+                    const remoteCollaboration = remoteNote.collaboration || {};
+                    const collaborationChanged = JSON.stringify(localCollaboration.google_drive_file_id) !== JSON.stringify(remoteCollaboration.google_drive_file_id) ||
+                                                JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
+
                     if (remoteTime > localTime) {
                         // Remote is newer - use remote note completely, including its collaboration state
                         // This ensures revocations and updates sync properly
                         this.data.notes[noteId] = { ...remoteNote };
                     } else if (localTime > remoteTime) {
-                        // Local is newer - keep local completely
+                        // Local is newer - keep local content but merge collaboration data if remote revoked
+                        // This ensures share revocations sync even when local content is newer
+                        if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                            // Remote revoked the share - update collaboration data even though local is newer
+                            if (!this.data.notes[noteId].collaboration) {
+                                this.data.notes[noteId].collaboration = {};
+                            }
+                            this.data.notes[noteId].collaboration.is_shared = false;
+                            this.data.notes[noteId].collaboration.google_drive_file_id = null;
+                            this.data.notes[noteId].collaboration.google_drive_share_link = null;
+                        }
+                        // Keep local note (it's already in place)
+                    } else {
+                        // Same timestamp - merge collaboration data if it changed
+                        if (collaborationChanged) {
+                            if (remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                                // Remote revoked the share
+                                if (!this.data.notes[noteId].collaboration) {
+                                    this.data.notes[noteId].collaboration = {};
+                                }
+                                this.data.notes[noteId].collaboration.is_shared = false;
+                                this.data.notes[noteId].collaboration.google_drive_file_id = null;
+                                this.data.notes[noteId].collaboration.google_drive_share_link = null;
+                            } else if (remoteCollaboration.google_drive_file_id && remoteCollaboration.is_shared) {
+                                // Remote shared the note
+                                if (!this.data.notes[noteId].collaboration) {
+                                    this.data.notes[noteId].collaboration = {};
+                                }
+                                this.data.notes[noteId].collaboration.is_shared = remoteCollaboration.is_shared;
+                                this.data.notes[noteId].collaboration.google_drive_file_id = remoteCollaboration.google_drive_file_id;
+                                this.data.notes[noteId].collaboration.google_drive_share_link = remoteCollaboration.google_drive_share_link;
+                            }
+                        }
                         // Keep local note (it's already in place)
                     }
-                    // If times are equal, keep local
                 }
             }
         }
