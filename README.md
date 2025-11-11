@@ -1,8 +1,52 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
+![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
+![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
+
 An offline-first, privacy-focused note-taking application that leverages local Large Language Models (LLMs) for intelligent features. Built with Electron and featuring web scraping, advanced import/export capabilities, and seamless AI integration.
 
-## CogNotez is still on development.
+**[Download Latest Release](https://github.com/nawka12/CogNotez/releases)** | **[Report Issues](https://github.com/nawka12/CogNotez/issues)** | **[View Documentation](https://github.com/nawka12/CogNotez)**
+
+## Table of Contents
+
+- [Quick Start](#quick-start)
+- [Features](#features)
+- [Installation & Setup](#installation--setup)
+- [Usage](#usage)
+  - [Basic Note Taking](#basic-note-taking)
+  - [Advanced Features](#advanced-features)
+  - [AI Features](#ai-features)
+  - [Keyboard Shortcuts](#keyboard-shortcuts)
+- [Google Drive Sync](#google-drive-sync-basic-setup)
+- [Rich Media Support](#rich-media-support)
+- [Note Templates](#note-templates)
+- [Themes](#themes)
+- [Offline Functionality](#offline-functionality)
+- [Troubleshooting](#troubleshooting)
+- [Version History](#version-history)
+- [Contributing](#contributing)
+- [Support](#support)
+- [License](#license)
+
+## Quick Start
+
+Get CogNotez up and running in minutes:
+
+1. **Download**: Get the latest release for your platform from [GitHub Releases](https://github.com/nawka12/CogNotez/releases)
+2. **Install Ollama** (for AI features):
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama pull llama3.2:latest
+   ollama serve
+   ```
+3. **Launch CogNotez** and start taking notes!
+4. **Create your first note**: Press `Ctrl+N` or click the "+" button
+5. **Try AI features**: Select text, right-click, and explore AI-powered actions
+
+> **Note**: CogNotez works great offline! AI features require Ollama to be running locally or OpenRouter API key for online use.
 
 ## Features
 
@@ -418,7 +462,15 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-### v1.4.0 (Current)
+### v1.4.1 (Current)
+- Share your notes to your colleagues through Google Drive! No CogNotez required for viewing!
+- Bug fixes and stability improvements
+- Performance optimizations
+- Enhanced error handling
+- Improved sync reliability
+- Minor UI/UX refinements
+
+### v1.4.0
 - Find & Replace functionality with regex support
 - Undo/Redo with full history tracking
 - Preview mode toggle (Edit/Preview)
@@ -590,12 +642,51 @@ The app displays real-time network status:
    - Ensure sufficient disk space
 
 
+## Contributing
+
+We welcome contributions from the community! Here's how you can help:
+
+### Ways to Contribute
+
+- **Report Bugs**: Found an issue? [Create a bug report](https://github.com/nawka12/CogNotez/issues)
+- **Suggest Features**: Have an idea? [Submit a feature request](https://github.com/nawka12/CogNotez/issues)
+- **Submit Pull Requests**: Want to contribute code? Fork the repo and submit a PR
+- **Improve Documentation**: Help make our docs better
+- **Share Feedback**: Tell us about your experience
+
+### Development Setup
+
+1. Fork and clone the repository
+2. Install dependencies: `npm install`
+3. Run in development mode: `npm run dev`
+4. Make your changes and test thoroughly
+5. Submit a pull request with a clear description
+
+### Code Guidelines
+
+- Follow existing code style and conventions
+- Write clear commit messages
+- Test your changes before submitting
+- Update documentation as needed
+
 ## Support
 
-- **Issues**: Create an issue on GitHub
-- **Discussions**: Use GitHub Discussions for questions
-- **Documentation**: Check the specs.md file for detailed requirements
+- **Issues**: Create an issue on [GitHub](https://github.com/nawka12/CogNotez/issues)
+- **Discussions**: Use [GitHub Discussions](https://github.com/nawka12/CogNotez/discussions) for questions
+- **Documentation**: Check the [specs.md](specs.md) file for detailed requirements
+- **Email**: For private inquiries, contact the maintainer
+
+## Acknowledgments
+
+CogNotez is built with:
+- [Electron](https://www.electronjs.org/) - Cross-platform desktop framework
+- [Ollama](https://ollama.com/) - Local LLM integration
+- [Marked](https://marked.js.org/) - Markdown parsing
+- [Google Drive API](https://developers.google.com/drive) - Cloud sync
+- And many other amazing open-source projects
 
 ---
 
 **CogNotez** - Taking notes into the AI era, while keeping your data private and secure.
+
+Made with ❤️ by [nawka12](https://github.com/nawka12)
