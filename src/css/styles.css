@@ -1688,6 +1688,9 @@ body {
     font-weight: var(--font-weight-normal);
     letter-spacing: 0.01em;
     box-shadow: none !important;
+    scroll-behavior: smooth;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
 }
 
 .note-editor:hover,
@@ -1703,6 +1706,26 @@ body {
     color: var(--text-tertiary);
     font-style: italic;
     font-weight: 400;
+}
+
+/* Custom scrollbar for note editor */
+.note-editor::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.note-editor::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.note-editor::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 4px;
+    transition: background 0.2s ease;
+}
+
+.note-editor::-webkit-scrollbar-thumb:hover {
+    background: var(--accent-color-light);
 }
 
 .markdown-preview {
@@ -1762,6 +1785,92 @@ body {
 }
 
 .markdown-preview.scrollable-x::after {
+    opacity: 1;
+}
+
+/* Split-pane mode for live preview */
+.editor-wrapper.split-mode {
+    display: flex;
+    gap: 0;
+    background: var(--editor-bg);
+    position: relative;
+}
+
+.editor-wrapper.split-mode .note-editor,
+.editor-wrapper.split-mode .markdown-preview {
+    flex: 1;
+    width: 50%;
+    min-width: 0; /* Allow flex items to shrink below content size */
+}
+
+.editor-wrapper.split-mode .note-editor {
+    border-right: 2px solid var(--border-color);
+}
+
+/* Show both editor and preview in split mode */
+.editor-wrapper.split-mode .note-editor.hidden,
+.editor-wrapper.split-mode .markdown-preview.hidden {
+    display: block !important;
+}
+
+/* Add resize handle between panes */
+.split-mode-handle {
+    position: absolute;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 10px;
+    height: 100%;
+    cursor: col-resize;
+    z-index: 10;
+    display: none; /* Hidden by default, shown in split mode */
+}
+
+.editor-wrapper.split-mode .split-mode-handle {
+    display: block;
+}
+
+.split-mode-handle::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 4px;
+    height: 40px;
+    background: var(--border-color);
+    border-radius: 2px;
+    transition: background 0.2s ease;
+}
+
+.split-mode-handle:hover::before {
+    background: var(--accent-color);
+}
+
+/* Adjust scrollbars in split mode */
+.editor-wrapper.split-mode .note-editor::-webkit-scrollbar,
+.editor-wrapper.split-mode .markdown-preview::-webkit-scrollbar {
+    width: 6px;
+}
+
+/* Sync scroll indicator */
+.split-mode-sync-indicator {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    padding: 4px 8px;
+    background: var(--accent-color-lightest);
+    border: 1px solid var(--accent-color);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-xs);
+    color: var(--accent-color);
+    z-index: 5;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+}
+
+.split-mode-sync-indicator.active {
     opacity: 1;
 }
 

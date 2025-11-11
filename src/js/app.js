@@ -882,6 +882,14 @@ class CogNotezApp {
         this.historyDebounceTimer = null;
         this.historyDebounceDelay = 500; // 500ms delay for batching history updates
 
+        // Live preview state
+        this.previewMode = 'preview'; // 'edit', 'preview', or 'split'
+        this.livePreviewDebounce = null;
+        this.livePreviewListener = null;
+        this.syncScrollEnabled = true;
+        this.syncScrollTimeout = null;
+        this.syncScrollSource = null; // Track which pane initiated scroll
+
         this.init();
     }
 
@@ -936,6 +944,7 @@ class CogNotezApp {
             this.updateSplashProgress('Finalizing setup...', 85);
             this.setupEventListeners();
             this.loadTheme();
+            this.syncPreviewModeUI(); // Ensure UI matches initial preview mode
             await this.loadNotes();
             // After UI loads notes, run startup sync if enabled
             try {
@@ -1330,35 +1339,238 @@ class CogNotezApp {
         this.loadTheme();
     }
 
-    // Preview/Edit mode toggle
+    // Update preview toggle button icon to reflect current mode
+    updatePreviewToggleIcon() {
+        const toggleBtn = document.getElementById('preview-toggle-btn');
+        if (!toggleBtn) return;
+
+        switch (this.previewMode) {
+            case 'edit':
+                toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                toggleBtn.title = 'Edit Mode';
+                break;
+            case 'preview':
+                toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+                toggleBtn.title = 'Preview Mode';
+                break;
+            case 'split':
+                toggleBtn.innerHTML = '<i class="fas fa-columns"></i>';
+                toggleBtn.title = 'Split Mode';
+                break;
+        }
+    }
+
+    // Sync UI visibility with current preview mode
+    syncPreviewModeUI() {
+        const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        const wrapper = document.querySelector('.editor-wrapper');
+        
+        if (!editor || !preview || !wrapper) return;
+
+        switch (this.previewMode) {
+            case 'edit':
+                editor.classList.remove('hidden');
+                preview.classList.add('hidden');
+                wrapper.classList.remove('split-mode');
+                this.removeLivePreview();
+                this.removeSyncScroll();
+                break;
+            case 'preview':
+                editor.classList.add('hidden');
+                preview.classList.remove('hidden');
+                wrapper.classList.remove('split-mode');
+                this.removeLivePreview();
+                this.removeSyncScroll();
+                break;
+            case 'split':
+                editor.classList.remove('hidden');
+                preview.classList.remove('hidden');
+                wrapper.classList.add('split-mode');
+                this.setupLivePreview();
+                this.setupSyncScroll();
+                break;
+        }
+        
+        this.updatePreviewToggleIcon();
+    }
+
+    // Preview/Edit mode toggle - cycles through three states: edit → preview → split
     togglePreview() {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
         const toggleBtn = document.getElementById('preview-toggle-btn');
+        const wrapper = document.querySelector('.editor-wrapper');
 
-        const isPreviewMode = !preview.classList.contains('hidden');
-
-        if (isPreviewMode) {
-            // Switch to edit mode
-            preview.classList.add('hidden');
-            editor.classList.remove('hidden');
-            toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-            toggleBtn.title = 'Toggle Preview/Edit';
-            toggleBtn.classList.remove('active');
-        } else {
-            // Switch to preview mode
+        // Cycle through three states: edit → preview → split → edit
+        if (this.previewMode === 'edit') {
+            // State 1 → State 2: Switch to preview only
+            this.previewMode = 'preview';
             editor.classList.add('hidden');
             preview.classList.remove('hidden');
+            wrapper.classList.remove('split-mode');
+            this.removeLivePreview();
             this.renderMarkdownPreview();
-            toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
-            toggleBtn.title = 'Toggle Preview/Edit';
-            toggleBtn.classList.add('active');
+        } else if (this.previewMode === 'preview') {
+            // State 2 → State 3: Switch to live split
+            this.previewMode = 'split';
+            editor.classList.remove('hidden');
+            preview.classList.remove('hidden');
+            wrapper.classList.add('split-mode');
+            this.renderMarkdownPreview();
+            this.setupLivePreview();
+            this.setupSyncScroll();
+        } else {
+            // State 3 → State 1: Switch to edit only
+            this.previewMode = 'edit';
+            editor.classList.remove('hidden');
+            preview.classList.add('hidden');
+            wrapper.classList.remove('split-mode');
+            this.removeLivePreview();
+            this.removeSyncScroll();
+            toggleBtn.classList.remove('active');
         }
+
+        // Update button icon to reflect current mode
+        this.updatePreviewToggleIcon();
 
         // Update find highlighting after mode switch
         if (this.findReplaceDialog && this.findReplaceDialog.isVisible && this.findReplaceDialog.findText) {
             this.findReplaceDialog.highlightMatches();
         }
+    }
+
+    // Setup live preview with debouncing for performance
+    setupLivePreview() {
+        const editor = document.getElementById('note-editor');
+        
+        // Remove old listener if exists
+        if (this.livePreviewListener) {
+            editor.removeEventListener('input', this.livePreviewListener);
+        }
+        
+        // Create new listener with debouncing
+        this.livePreviewListener = () => {
+            clearTimeout(this.livePreviewDebounce);
+            this.livePreviewDebounce = setTimeout(() => {
+                this.renderMarkdownPreview();
+            }, 300); // 300ms debounce for smooth typing experience
+        };
+        
+        editor.addEventListener('input', this.livePreviewListener);
+        console.log('[DEBUG] Live preview enabled');
+    }
+
+    // Remove live preview listener
+    removeLivePreview() {
+        const editor = document.getElementById('note-editor');
+        if (this.livePreviewListener) {
+            editor.removeEventListener('input', this.livePreviewListener);
+            this.livePreviewListener = null;
+        }
+        clearTimeout(this.livePreviewDebounce);
+        console.log('[DEBUG] Live preview disabled');
+    }
+
+    // Setup synchronized scrolling between editor and preview
+    setupSyncScroll() {
+        const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        
+        if (!editor || !preview) return;
+
+        // Track which element is being scrolled to prevent feedback loops
+        this.syncScrollSource = null;
+        this.syncScrollTimeout = null;
+
+        // Editor scroll handler
+        this.editorScrollHandler = () => {
+            if (!this.syncScrollEnabled) return;
+            
+            // If preview initiated the scroll, ignore
+            if (this.syncScrollSource === 'preview') return;
+            
+            // Mark editor as the scroll source
+            this.syncScrollSource = 'editor';
+            
+            // Clear any existing timeout
+            if (this.syncScrollTimeout) {
+                clearTimeout(this.syncScrollTimeout);
+            }
+            
+            // Calculate scroll percentage
+            const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
+            
+            // Apply to preview (with bounds check)
+            if (isFinite(scrollPercentage) && scrollPercentage >= 0) {
+                preview.scrollTop = scrollPercentage * (preview.scrollHeight - preview.clientHeight);
+            }
+            
+            // Reset source after smooth scroll animation completes (300ms for smooth behavior)
+            this.syncScrollTimeout = setTimeout(() => {
+                this.syncScrollSource = null;
+            }, 350);
+        };
+
+        // Preview scroll handler
+        this.previewScrollHandler = () => {
+            if (!this.syncScrollEnabled) return;
+            
+            // If editor initiated the scroll, ignore
+            if (this.syncScrollSource === 'editor') return;
+            
+            // Mark preview as the scroll source
+            this.syncScrollSource = 'preview';
+            
+            // Clear any existing timeout
+            if (this.syncScrollTimeout) {
+                clearTimeout(this.syncScrollTimeout);
+            }
+            
+            // Calculate scroll percentage
+            const scrollPercentage = preview.scrollTop / (preview.scrollHeight - preview.clientHeight);
+            
+            // Apply to editor (with bounds check)
+            if (isFinite(scrollPercentage) && scrollPercentage >= 0) {
+                editor.scrollTop = scrollPercentage * (editor.scrollHeight - editor.clientHeight);
+            }
+            
+            // Reset source after smooth scroll animation completes (300ms for smooth behavior)
+            this.syncScrollTimeout = setTimeout(() => {
+                this.syncScrollSource = null;
+            }, 350);
+        };
+
+        // Attach listeners
+        editor.addEventListener('scroll', this.editorScrollHandler, { passive: true });
+        preview.addEventListener('scroll', this.previewScrollHandler, { passive: true });
+        
+        console.log('[DEBUG] Synchronized scrolling enabled');
+    }
+
+    // Remove synchronized scrolling
+    removeSyncScroll() {
+        const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        
+        if (editor && this.editorScrollHandler) {
+            editor.removeEventListener('scroll', this.editorScrollHandler);
+            this.editorScrollHandler = null;
+        }
+        
+        if (preview && this.previewScrollHandler) {
+            preview.removeEventListener('scroll', this.previewScrollHandler);
+            this.previewScrollHandler = null;
+        }
+        
+        // Clear sync scroll timeout and source
+        if (this.syncScrollTimeout) {
+            clearTimeout(this.syncScrollTimeout);
+            this.syncScrollTimeout = null;
+        }
+        this.syncScrollSource = null;
+        
+        console.log('[DEBUG] Synchronized scrolling disabled');
     }
 
     // Toggle editor overflow menu
@@ -1991,6 +2203,11 @@ class CogNotezApp {
 
         // Start real-time date updates
         this.startNoteDateUpdates();
+
+        // Update preview if we're in preview or split mode
+        if (this.previewMode === 'preview' || this.previewMode === 'split') {
+            this.renderMarkdownPreview();
+        }
     }
 
     // Show the note editor interface
@@ -3371,29 +3588,29 @@ Please provide a helpful response based on the note content and conversation his
         const downloadItem = menu.querySelector('[data-action="download-media"]');
         const separator = menu.querySelector('.context-menu-separator');
 
-        // Check if in preview mode
-        const preview = document.getElementById('markdown-preview');
-        const isPreviewMode = preview && !preview.classList.contains('hidden');
+        // Check if context menu was triggered from editor (textarea)
+        // Content-modifying operations (edit, generate) only work when right-clicking on the editor
+        const isEditorContext = this.contextElement && this.contextElement.tagName === 'TEXTAREA';
+        
+        // AI items that modify content (edit, generate) only work when clicking on editor
+        // AI items that don't modify content (summarize, ask) work everywhere
 
-        // AI items that modify content (edit, generate) are disabled in preview mode
-        // AI items that don't modify content (summarize, ask) work in both modes
-
-        // Edit AI: only when text selected AND not in preview mode
+        // Edit AI: only when text selected AND clicking on editor (textarea)
         if (editItem) {
-            const shouldShow = hasSelection && !isPreviewMode;
+            const shouldShow = hasSelection && isEditorContext;
             editItem.style.display = shouldShow ? 'flex' : 'none';
-            if (isPreviewMode) {
+            if (!isEditorContext) {
                 editItem.classList.add('disabled');
             } else {
                 editItem.classList.remove('disabled');
             }
         }
 
-        // Generate AI: only when NO text selected AND not in preview mode
+        // Generate AI: only when NO text selected AND clicking on editor (textarea)
         if (generateItem) {
-            const shouldShow = !hasSelection && !isPreviewMode;
+            const shouldShow = !hasSelection && isEditorContext;
             generateItem.style.display = shouldShow ? 'flex' : 'none';
-            if (isPreviewMode) {
+            if (!isEditorContext) {
                 generateItem.classList.add('disabled');
             } else {
                 generateItem.classList.remove('disabled');
@@ -3437,9 +3654,9 @@ Please provide a helpful response based on the note content and conversation his
             }
         }
 
-        // Show download option when right-clicking on media elements in preview mode
+        // Show download option when right-clicking on media elements in preview pane
         if (downloadItem) {
-            const hasMediaElement = this.contextMediaElement && isPreviewMode;
+            const hasMediaElement = this.contextMediaElement && !isEditorContext;
             downloadItem.style.display = hasMediaElement ? 'flex' : 'none';
 
             if (hasMediaElement) {
@@ -3967,6 +4184,13 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             this.updateNotePreview();
+            
+            // Update markdown preview if visible (preview or split mode)
+            const preview = document.getElementById('markdown-preview');
+            if (preview && !preview.classList.contains('hidden')) {
+                this.renderMarkdownPreview();
+            }
+            
             this.ignoreHistoryUpdate = false;
 
             console.log('[DEBUG] Undo operation completed');
@@ -3998,6 +4222,13 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             this.updateNotePreview();
+            
+            // Update markdown preview if visible (preview or split mode)
+            const preview = document.getElementById('markdown-preview');
+            if (preview && !preview.classList.contains('hidden')) {
+                this.renderMarkdownPreview();
+            }
+            
             this.ignoreHistoryUpdate = false;
 
             console.log('[DEBUG] Redo operation completed');
@@ -4556,6 +4787,10 @@ Please provide a helpful response based on the note content and conversation his
                     e.preventDefault();
                     this.showReplaceDialog();
                     break;
+                case 'p':
+                    e.preventDefault();
+                    this.togglePreview();
+                    break;
 
                 // AI shortcuts (with Shift)
                 case 'S': // Ctrl+Shift+S
@@ -4630,6 +4865,7 @@ Please provide a helpful response based on the note content and conversation his
             { key: 'Ctrl+Y', description: 'Redo last undone change' },
             { key: 'Ctrl+F', description: 'Find text in current note' },
             { key: 'Ctrl+H', description: 'Find and replace text' },
+            { key: 'Ctrl+P', description: 'Toggle preview mode (Edit → Preview → Split)' },
 
             // AI operations (all require text selection)
             { key: 'Ctrl+Shift+S', description: 'Summarize selected text' },
@@ -4868,12 +5104,14 @@ Please provide a helpful response based on the note content and conversation his
     generateContentWithAI() {
         console.log('[DEBUG] generateContentWithAI called');
 
-        // Check if in preview mode
+        // Check if in preview-only mode (preview visible AND editor hidden)
         const preview = document.getElementById('markdown-preview');
-        const isPreviewMode = preview && !preview.classList.contains('hidden');
+        const editor = document.getElementById('note-editor');
+        const isPreviewOnlyMode = preview && !preview.classList.contains('hidden') && 
+                                  editor && editor.classList.contains('hidden');
 
-        if (isPreviewMode) {
-            this.showNotification('Generate with AI is not available in preview mode. Switch to edit mode first.', 'info');
+        if (isPreviewOnlyMode) {
+            this.showNotification('Generate with AI is not available in preview-only mode. Switch to edit or split mode first.', 'info');
             return;
         }
 
