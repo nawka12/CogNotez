@@ -1066,6 +1066,14 @@ class DatabaseManager {
 
             // Preserve local sync settings that should not be overridden by remote
             const localSyncSettings = { ...(this.data && this.data.sync ? this.data.sync : {}) };
+            const localSettings = { ...(this.data && this.data.settings ? this.data.settings : {}) };
+            const localEncryption = { ...(this.data && this.data.encryption ? this.data.encryption : {}) };
+
+            console.log('[Database] Preserving local settings:', {
+                settingsCount: Object.keys(localSettings).length,
+                syncSettings: Object.keys(localSyncSettings).length,
+                encryptionSettings: Object.keys(localEncryption).length
+            });
 
             // Create a backup of current data before applying changes (for rollback on error)
             const dataBackup = JSON.parse(JSON.stringify(this.data));
@@ -1073,16 +1081,19 @@ class DatabaseManager {
             try {
                 // Apply sync data
                 if (options.mergeStrategy === 'replace') {
-                    // Complete replacement but preserve local-only data (settings, encryption)
-                    const preservedSettings = { ...(this.data.settings || {}) };
-                    const preservedEncryption = { ...(this.data.encryption || {}) };
+                    // Complete replacement but preserve local-only data (settings, encryption, sync)
                     this.data = importData;
                     // Restore preserved local-only fields
-                    this.data.settings = preservedSettings;
-                    this.data.encryption = preservedEncryption;
+                    this.data.settings = localSettings;
+                    this.data.encryption = localEncryption;
+                    this.data.sync = localSyncSettings;
                 } else {
                     // Merge strategy (default)
                     this.mergeSyncData(importData, options);
+                    // Always restore settings, encryption, and sync after merge (they should never be synced)
+                    this.data.settings = localSettings;
+                    this.data.encryption = localEncryption;
+                    this.data.sync = localSyncSettings;
                 }
 
                 // Update sync metadata if provided
@@ -1098,6 +1109,7 @@ class DatabaseManager {
 
             // Restore local sync controls and metadata (do not let remote toggle your sync settings)
             // Preserve user toggles and existing sync metadata like lastSync/remoteFileId
+            // Note: sync was already restored above, but we need to preserve specific toggles
             if (!this.data.sync) this.data.sync = {};
             const preservedToggles = {
                 enabled: localSyncSettings.enabled === true,
@@ -1106,6 +1118,7 @@ class DatabaseManager {
                 syncOnStartup: localSyncSettings.syncOnStartup === true,
                 syncInterval: localSyncSettings.syncInterval || 300000
             };
+            // Merge preserved toggles with existing sync (which may have metadata from remote)
             this.data.sync = {
                 ...this.data.sync,
                 ...preservedToggles
@@ -1124,8 +1137,22 @@ class DatabaseManager {
 
             // Log collaboration data that was imported
             const importedSharedNotes = Object.values(importData.notes).filter(n => n.collaboration?.is_shared);
+            const localSharedNotesBefore = Object.values(this.data.notes).filter(n => n.collaboration?.is_shared);
+            
+            console.log(`[Database] Import sync summary:`);
+            console.log(`  - Local shared notes before sync: ${localSharedNotesBefore.length}`);
+            console.log(`  - Remote shared notes: ${importedSharedNotes.length}`);
+            
             if (importedSharedNotes.length > 0) {
-                console.log(`[Database] Imported ${importedSharedNotes.length} shared note(s) with collaboration data`);
+                console.log(`  - Remote shared note IDs:`, importedSharedNotes.map(n => `${n.id} (${n.title?.substring(0, 30)})`).join(', '));
+            }
+            
+            // Log after merge
+            const finalSharedNotes = Object.values(this.data.notes).filter(n => n.collaboration?.is_shared);
+            console.log(`  - Final shared notes after merge: ${finalSharedNotes.length}`);
+            
+            if (finalSharedNotes.length > 0) {
+                console.log(`  - Final shared note IDs:`, finalSharedNotes.map(n => `${n.id} (${n.title?.substring(0, 30)})`).join(', '));
             }
 
             return {
