@@ -992,6 +992,8 @@ class DatabaseManager {
             }
         }
 
+        // IMPORTANT: Exclude device-specific settings from sync
+        // Each device should maintain its own settings, encryption, and sync configuration
         const exportData = {
             notes: sanitizedNotes,
             ai_conversations: this.data.ai_conversations,
@@ -1003,8 +1005,19 @@ class DatabaseManager {
                 exportedAt: new Date().toISOString(),
                 exportVersion: '1.0'
             }
+            // Explicitly NOT including: settings, encryption, sync
         };
 
+        // Verify settings are NOT included in export
+        console.log('[Database] Export for sync - EXCLUDING device-specific data:', {
+            settings: 'NOT synced (device-specific)',
+            encryption: 'NOT synced (device-specific)',
+            sync: 'NOT synced (device-specific)',
+            notes: Object.keys(sanitizedNotes).length,
+            conversations: Object.keys(this.data.ai_conversations || {}).length,
+            tags: Object.keys(this.data.tags || {}).length
+        });
+        
         // Log collaboration data being exported for debugging
         const sharedNotes = Object.values(sanitizedNotes).filter(n => n.collaboration?.is_shared);
         if (sharedNotes.length > 0) {
@@ -1047,10 +1060,20 @@ class DatabaseManager {
                 throw new Error('Invalid sync data: missing notes');
             }
 
-            // Never import settings, encryption, or sync objects from cloud
-            if (importData.settings) delete importData.settings;
-            if (importData.encryption) delete importData.encryption;
-            if (importData.sync) delete importData.sync;
+            // CRITICAL: Never import device-specific settings from cloud
+            // Each device maintains its own AI settings, sync settings, and encryption config
+            if (importData.settings) {
+                console.log('[Database] Blocking settings import - settings are device-specific');
+                delete importData.settings;
+            }
+            if (importData.encryption) {
+                console.log('[Database] Blocking encryption import - encryption is device-specific');
+                delete importData.encryption;
+            }
+            if (importData.sync) {
+                console.log('[Database] Blocking sync import - sync settings are device-specific');
+                delete importData.sync;
+            }
 
             // Check for potential conflicts
             const conflicts = this.detectSyncConflicts(importData);
@@ -1090,10 +1113,12 @@ class DatabaseManager {
                 } else {
                     // Merge strategy (default)
                     this.mergeSyncData(importData, options);
-                    // Always restore settings, encryption, and sync after merge (they should never be synced)
+                    // CRITICAL: Always restore device-specific settings after merge
+                    // These are NEVER synced across devices
                     this.data.settings = localSettings;
                     this.data.encryption = localEncryption;
                     this.data.sync = localSyncSettings;
+                    console.log('[Database] Restored device-specific settings after sync');
                 }
 
                 // Update sync metadata if provided
