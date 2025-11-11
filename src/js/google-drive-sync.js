@@ -1109,6 +1109,49 @@ class GoogleDriveSyncManager {
     }
 
     /**
+     * Get or create share folder in Google Drive (for shared note media files)
+     */
+    async getShareFolderId() {
+        try {
+            if (this.shareFolderId) {
+                return this.shareFolderId;
+            }
+
+            // Search for existing share folder in app folder
+            const response = await this.drive.files.list({
+                q: `name='share' and '${this.appFolderId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`,
+                fields: 'files(id, name)',
+                spaces: 'drive'
+            });
+
+            if (response.data.files && response.data.files.length > 0) {
+                this.shareFolderId = response.data.files[0].id;
+                console.log('[GoogleDriveSync] Found existing share folder:', this.shareFolderId);
+            } else {
+                // Create share folder
+                const folderMetadata = {
+                    name: 'share',
+                    mimeType: 'application/vnd.google-apps.folder',
+                    parents: [this.appFolderId]
+                };
+
+                const folder = await this.drive.files.create({
+                    resource: folderMetadata,
+                    fields: 'id'
+                });
+
+                this.shareFolderId = folder.data.id;
+                console.log('[GoogleDriveSync] Created share folder:', this.shareFolderId);
+            }
+
+            return this.shareFolderId;
+        } catch (error) {
+            console.error('[GoogleDriveSync] Failed to get/create share folder:', error);
+            throw error;
+        }
+    }
+
+    /**
      * Upload media file to Google Drive
      * @param {string} fileName - Name of the file
      * @param {Buffer} fileData - File data as Buffer
@@ -1540,7 +1583,156 @@ class GoogleDriveSyncManager {
                 console.log('[GoogleDriveSync] Updating existing shared note:', fileId);
             }
 
-            // Format note as markdown text
+            // Extract media file IDs from note content and upload them
+            const mediaUrlPattern = /cognotez-media:\/\/([a-z0-9]+)/gi;
+            const mediaMatches = note.content ? note.content.match(mediaUrlPattern) : [];
+            const mediaFileMap = new Map(); // Maps cognotez-media:// URLs to Google Drive URLs
+
+            if (mediaMatches && mediaMatches.length > 0) {
+                console.log(`[GoogleDriveSync] Found ${mediaMatches.length} media files to upload`);
+                
+                for (const mediaUrl of mediaMatches) {
+                    const mediaFileId = mediaUrl.replace('cognotez-media://', '');
+                    
+                    try {
+                        // Read media file from filesystem
+                        let fileData = null;
+                        let fileName = mediaFileId;
+                        let mimeType = 'application/octet-stream';
+
+                        if (typeof window !== 'undefined' && window.RichMediaManager) {
+                            // Renderer process - use RichMediaManager
+                            const mediaRef = await window.RichMediaManager.getMediaReference(mediaFileId);
+                            if (mediaRef) {
+                                fileName = mediaRef.name || mediaFileId;
+                                mimeType = mediaRef.type || 'application/octet-stream';
+                                
+                                if (mediaRef.storageType === 'filesystem' && mediaRef.path) {
+                                    const electron = require('electron');
+                                    const fileDataObj = await electron.ipcRenderer.invoke('get-media-file', mediaRef.path);
+                                    fileData = fileDataObj.data;
+                                } else if (mediaRef.storageType === 'indexeddb') {
+                                    const fileDataObj = await window.RichMediaManager.getMediaFile(mediaFileId);
+                                    fileData = fileDataObj ? fileDataObj.data : null;
+                                }
+                            }
+                        } else {
+                            // Main process - use direct file access
+                            const mediaDir = await this.getMediaDirectory();
+                            
+                            // Try to find the file (could have extension)
+                            try {
+                                const files = await fs.readdir(mediaDir);
+                                const matchingFile = files.find(file => file.startsWith(mediaFileId));
+                                
+                                if (matchingFile) {
+                                    const filePath = path.join(mediaDir, matchingFile);
+                                    fileData = await fs.readFile(filePath);
+                                    fileName = matchingFile;
+                                    
+                                    // Try to determine MIME type from extension
+                                    const ext = path.extname(matchingFile).toLowerCase();
+                                    const mimeTypes = {
+                                        '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg',
+                                        '.png': 'image/png', '.gif': 'image/gif',
+                                        '.webp': 'image/webp', '.svg': 'image/svg+xml',
+                                        '.mp4': 'video/mp4', '.webm': 'video/webm',
+                                        '.mp3': 'audio/mpeg', '.wav': 'audio/wav'
+                                    };
+                                    if (mimeTypes[ext]) {
+                                        mimeType = mimeTypes[ext];
+                                    }
+                                }
+                            } catch (error) {
+                                console.warn(`[GoogleDriveSync] Could not read media file ${mediaFileId}:`, error.message);
+                            }
+                        }
+
+                        if (fileData) {
+                            // Upload media file to Google Drive in the share folder
+                            const shareFolderId = await this.getShareFolderId();
+
+                            // Check if media file already exists in Drive share folder
+                            const existingMedia = await this.drive.files.list({
+                                q: `name='${fileName}' and '${shareFolderId}' in parents and trashed=false`,
+                                fields: 'files(id, webContentLink)',
+                                spaces: 'drive'
+                            });
+
+                            let mediaDriveFileId;
+                            let mediaDriveUrl;
+
+                            if (existingMedia.data.files && existingMedia.data.files.length > 0) {
+                                // File exists - update it
+                                mediaDriveFileId = existingMedia.data.files[0].id;
+                                const { Readable } = require('stream');
+                                const bufferStream = Readable.from(fileData);
+                                
+                                await this.drive.files.update({
+                                    fileId: mediaDriveFileId,
+                                    media: {
+                                        mimeType: mimeType,
+                                        body: bufferStream
+                                    },
+                                    fields: 'id,webContentLink'
+                                });
+                                
+                                // Get updated file info
+                                const updatedFile = await this.drive.files.get({
+                                    fileId: mediaDriveFileId,
+                                    fields: 'webContentLink'
+                                });
+                                mediaDriveUrl = updatedFile.data.webContentLink;
+                                
+                                console.log(`[GoogleDriveSync] Updated media file: ${fileName}`);
+                            } else {
+                                // Create new file
+                                const { Readable } = require('stream');
+                                const bufferStream = Readable.from(fileData);
+                                
+                                const mediaFileMetadata = {
+                                    name: fileName,
+                                    parents: [shareFolderId],
+                                    description: `Media file from shared note: ${note.title}`
+                                };
+                                
+                                const createResponse = await this.drive.files.create({
+                                    resource: mediaFileMetadata,
+                                    media: {
+                                        mimeType: mimeType,
+                                        body: bufferStream
+                                    },
+                                    fields: 'id,webContentLink'
+                                });
+                                
+                                mediaDriveFileId = createResponse.data.id;
+                                mediaDriveUrl = createResponse.data.webContentLink;
+                                
+                                // Make media file accessible to anyone with the link (same permissions as note)
+                                await this.drive.permissions.create({
+                                    fileId: mediaDriveFileId,
+                                    requestBody: {
+                                        role: 'reader',
+                                        type: 'anyone'
+                                    }
+                                });
+                                
+                                console.log(`[GoogleDriveSync] Uploaded media file: ${fileName}`);
+                            }
+
+                            // Map the cognotez-media URL to the Google Drive URL
+                            mediaFileMap.set(mediaUrl, mediaDriveUrl);
+                        } else {
+                            console.warn(`[GoogleDriveSync] Media file ${mediaFileId} not found, skipping upload`);
+                        }
+                    } catch (error) {
+                        console.error(`[GoogleDriveSync] Failed to upload media file ${mediaFileId}:`, error);
+                        // Continue with other media files even if one fails
+                    }
+                }
+            }
+
+            // Format note as markdown text and replace media URLs
             let noteContent = `# ${note.title}\n\n`;
             if (note.tags && note.tags.length > 0) {
                 noteContent += `**Tags:** ${note.tags.join(', ')}\n\n`;
@@ -1548,7 +1740,14 @@ class GoogleDriveSyncManager {
             noteContent += `**Created:** ${new Date(note.created_at).toLocaleString()}\n`;
             noteContent += `**Last Updated:** ${new Date(note.updated_at).toLocaleString()}\n\n`;
             noteContent += `---\n\n`;
-            noteContent += note.content;
+            
+            // Replace cognotez-media:// URLs with Google Drive URLs
+            let processedContent = note.content || '';
+            for (const [cognotezUrl, driveUrl] of mediaFileMap.entries()) {
+                processedContent = processedContent.replace(new RegExp(cognotezUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), driveUrl);
+            }
+            
+            noteContent += processedContent;
 
             const fileName = `${note.title.replace(/[^a-zA-Z0-9\s]/g, '_').substring(0, 50)}.md`;
 
@@ -1559,12 +1758,42 @@ class GoogleDriveSyncManager {
 
             let response;
             
+            // Get share folder ID for placing the note file
+            const shareFolderId = await this.getShareFolderId();
+            
             if (isUpdate) {
                 // Update existing file
                 const updateMetadata = {
                     name: fileName,
                     description: `Shared note: ${note.title}`
                 };
+                
+                // Check if file is already in the share folder, if not, move it
+                try {
+                    const fileInfo = await this.drive.files.get({
+                        fileId: fileId,
+                        fields: 'parents'
+                    });
+                    
+                    const currentParents = fileInfo.data.parents || [];
+                    const isInShareFolder = currentParents.includes(shareFolderId);
+                    
+                    if (!isInShareFolder) {
+                        // Move file to share folder
+                        // Remove old parent and add share folder as parent
+                        const previousParent = currentParents[0];
+                        await this.drive.files.update({
+                            fileId: fileId,
+                            addParents: shareFolderId,
+                            removeParents: previousParent,
+                            fields: 'id'
+                        });
+                        console.log('[GoogleDriveSync] Moved shared note to share folder');
+                    }
+                } catch (error) {
+                    console.warn('[GoogleDriveSync] Could not check/move file to share folder:', error.message);
+                    // Continue with update even if move fails
+                }
                 
                 response = await this.drive.files.update({
                     fileId: fileId,
@@ -1573,10 +1802,10 @@ class GoogleDriveSyncManager {
                     fields: 'id,webViewLink,webContentLink'
                 });
             } else {
-                // Create new file
+                // Create new file in share folder
                 const fileMetadata = {
                     name: fileName,
-                    parents: [this.appFolderId],
+                    parents: [shareFolderId],
                     description: `Shared note: ${note.title}`
                 };
                 
@@ -1620,7 +1849,8 @@ class GoogleDriveSyncManager {
                 noteId: note.id,
                 fileId: fileId,
                 shareLink: shareLink,
-                isUpdate: isUpdate
+                isUpdate: isUpdate,
+                mediaFilesUploaded: mediaFileMap.size
             });
 
             return {
@@ -1628,7 +1858,8 @@ class GoogleDriveSyncManager {
                 fileId: fileId,
                 shareLink: shareLink,
                 permissions: permissions,
-                isUpdate: isUpdate
+                isUpdate: isUpdate,
+                mediaFilesUploaded: mediaFileMap.size
             };
 
         } catch (error) {
@@ -1715,8 +1946,9 @@ class GoogleDriveSyncManager {
     /**
      * Stop sharing a note (delete the file from Google Drive)
      * @param {string} fileId - Google Drive file ID
+     * @param {Object} note - Optional note object to extract media files from
      */
-    async stopSharingNote(fileId) {
+    async stopSharingNote(fileId, note = null) {
         try {
             await this.ensureInitialized();
 
@@ -1724,7 +1956,60 @@ class GoogleDriveSyncManager {
                 throw new Error('Drive API not initialized');
             }
 
-            // Delete the file from Google Drive
+            // Extract and delete media files if note is provided
+            if (note && note.content) {
+                const mediaUrlPattern = /cognotez-media:\/\/([a-z0-9]+)/gi;
+                const mediaMatches = note.content.match(mediaUrlPattern);
+                
+                if (mediaMatches && mediaMatches.length > 0) {
+                    console.log(`[GoogleDriveSync] Found ${mediaMatches.length} media files to delete`);
+                    
+                    const shareFolderId = await this.getShareFolderId();
+                    const mediaFileIds = new Set();
+                    
+                    // Extract unique media file IDs
+                    for (const mediaUrl of mediaMatches) {
+                        const mediaFileId = mediaUrl.replace('cognotez-media://', '');
+                        mediaFileIds.add(mediaFileId);
+                    }
+                    
+                    // Get list of files in share folder
+                    const shareFiles = await this.drive.files.list({
+                        q: `'${shareFolderId}' in parents and trashed=false`,
+                        fields: 'files(id, name)',
+                        spaces: 'drive'
+                    });
+                    
+                    // Find and delete matching media files
+                    let deletedCount = 0;
+                    for (const file of shareFiles.data.files || []) {
+                        // Check if file name starts with any of the media file IDs
+                        // Files are stored as "fileId" or "fileId.extension"
+                        const matchesMediaId = Array.from(mediaFileIds).some(id => 
+                            file.name === id || file.name.startsWith(id + '.')
+                        );
+                        
+                        if (matchesMediaId) {
+                            try {
+                                await this.drive.files.delete({
+                                    fileId: file.id
+                                });
+                                deletedCount++;
+                                console.log(`[GoogleDriveSync] Deleted media file: ${file.name}`);
+                            } catch (error) {
+                                // If file doesn't exist (404), that's okay - continue
+                                if (error.code !== 404 && (!error.response || error.response.status !== 404)) {
+                                    console.warn(`[GoogleDriveSync] Failed to delete media file ${file.name}:`, error.message);
+                                }
+                            }
+                        }
+                    }
+                    
+                    console.log(`[GoogleDriveSync] Deleted ${deletedCount} media files from share folder`);
+                }
+            }
+
+            // Delete the note file from Google Drive
             await this.drive.files.delete({
                 fileId: fileId
             });

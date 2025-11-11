@@ -1311,13 +1311,18 @@ if (ipcMain) {
         global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
       }
 
+      // Get note data to extract media files for deletion
+      let noteData = null;
+      if (global.databaseManager && noteId) {
+        noteData = global.databaseManager.data.notes[noteId];
+      }
+
       console.log('[Google Drive] Revoking share for file:', fileId);
-      const result = await global.googleDriveSyncManager.stopSharingNote(fileId);
+      const result = await global.googleDriveSyncManager.stopSharingNote(fileId, noteData);
       
       // Update note in database to remove share information
-      if (result && global.databaseManager) {
-        const noteData = global.databaseManager.data.notes[noteId];
-        if (noteData && noteData.collaboration) {
+      if (result && global.databaseManager && noteData) {
+        if (noteData.collaboration) {
           noteData.collaboration.is_shared = false;
           noteData.collaboration.google_drive_file_id = null;
           noteData.collaboration.google_drive_share_link = null;
