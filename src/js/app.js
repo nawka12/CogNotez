@@ -6032,6 +6032,8 @@ Please provide a helpful response based on the note content and conversation his
                             const noteData = this.notesManager.db.data.notes[this.currentNote.id];
                             if (noteData) {
                                 noteData.collaboration = result.updatedCollaboration;
+                                // Update timestamp so sync knows this version is newer
+                                noteData.updated_at = new Date().toISOString();
                                 this.notesManager.db.saveToLocalStorage();
                                 this.currentNote = this.notesManager.db.getNote(this.currentNote.id);
                             }
@@ -6218,6 +6220,8 @@ Please provide a helpful response based on the note content and conversation his
                         const noteData = this.notesManager.db.data.notes[this.currentNote.id];
                         if (noteData) {
                             noteData.collaboration = result.updatedCollaboration;
+                            // Update timestamp so sync knows this version is newer
+                            noteData.updated_at = new Date().toISOString();
                             this.notesManager.db.saveToLocalStorage();
                             this.currentNote = this.notesManager.db.getNote(this.currentNote.id);
                             console.log('[Share] Updated note collaboration data:', this.currentNote.collaboration);

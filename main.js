@@ -1247,6 +1247,8 @@ if (ipcMain) {
           noteData.collaboration.is_shared = true;
           noteData.collaboration.google_drive_file_id = result.fileId;
           noteData.collaboration.google_drive_share_link = result.shareLink;
+          // Update timestamp so sync knows this version is newer
+          noteData.updated_at = new Date().toISOString();
           global.databaseManager.saveToLocalStorage();
           console.log('[Google Drive] Updated note with share information');
           
@@ -1292,6 +1294,8 @@ if (ipcMain) {
           noteData.collaboration.is_shared = false;
           noteData.collaboration.google_drive_file_id = null;
           noteData.collaboration.google_drive_share_link = null;
+          // Update timestamp so sync knows this version is newer
+          noteData.updated_at = new Date().toISOString();
           global.databaseManager.saveToLocalStorage();
           console.log('[Google Drive] Removed share information from note');
         }
