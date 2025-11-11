@@ -33,6 +33,9 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - **Context Menus**: Right-click AI actions on selected text
 - **Theme Support**: Light and dark modes with custom accent color
 - **Search**: Fast, real-time note search
+- **Find & Replace**: Powerful text search and replace with regex support
+- **Undo/Redo**: Full history tracking for text editing
+- **Preview Mode**: Toggle between edit, preview, and split view modes
 - **Auto-Save**: Automatic saving with manual override
 - **Data Portability**: JSON export/import for easy migration
 - **Backup & Restore**: Complete data backup and restoration
@@ -50,7 +53,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 
 ### Prerequisites
 
-1. **Node.js** (v16 or higher)
+1. **Node.js** (v20 or higher)
 2. **Ollama** (for AI features) - [Download here](https://ollama.com/)
 
 #### Optional Components
@@ -118,6 +121,9 @@ CogNotez uses localStorage for data storage, which provides a simple yet robust 
 2. **Edit notes**: Click on any note in the sidebar to edit
 3. **Save notes**: Press `Ctrl+S` or click the save button
 4. **Search notes**: Use the search bar to find notes instantly
+5. **Find & Replace**: Press `Ctrl+F` to find text, or `Ctrl+H` for find and replace
+6. **Undo/Redo**: Press `Ctrl+Z` to undo or `Ctrl+Y` to redo changes
+7. **Preview Mode**: Press `Ctrl+P` to toggle between edit, preview, and split view modes
 
 ### Advanced Features
 
@@ -146,7 +152,7 @@ Comprehensive import and export capabilities for maximum data portability:
 #### Sharing & Collaboration
 - **Clipboard Sharing**: Copy notes to clipboard in multiple formats
 - **File Export**: Export individual or multiple notes as files
-- **Format Options**: Markdown and plain text export formats
+- **Format Options**: Markdown, plain text, and PDF export formats
 - **Shareable Links**: Generate shareable note references
 
 ### Advanced Search & Filtering
@@ -284,6 +290,38 @@ You can manually control image dimensions by using HTML img tags:
 
 **Tip:** After inserting a video, you can edit the `width` attribute directly in the note to resize it as needed.
 
+### Text Editing Features
+
+#### Find & Replace
+CogNotez includes a powerful find and replace dialog for efficient text editing:
+
+- **Find Text**: Press `Ctrl+F` to open the find dialog
+- **Find & Replace**: Press `Ctrl+H` to open find and replace dialog
+- **Search Options**:
+  - Case-sensitive matching
+  - Whole word matching
+  - Regular expression support
+- **Navigation**: Jump between matches with Previous/Next buttons
+- **Replace Operations**: Replace single matches or all matches at once
+- **Note**: Find & Replace currently works in edit mode. Preview mode support coming soon.
+
+#### Undo/Redo
+Full history tracking for all text edits:
+
+- **Undo**: Press `Ctrl+Z` to undo the last change
+- **Redo**: Press `Ctrl+Y` or `Ctrl+Shift+Z` to redo the last undone change
+- **History Tracking**: All text changes are automatically tracked
+- **Visual Feedback**: Undo/Redo buttons show availability status
+
+#### Preview Mode
+Toggle between different viewing modes:
+
+- **Edit Mode**: Full editing capabilities with markdown syntax highlighting
+- **Preview Mode**: Rendered markdown preview (read-only)
+- **Split Mode**: Side-by-side edit and preview views
+- **Toggle**: Press `Ctrl+P` to cycle through modes (Edit → Preview → Split → Edit)
+- **Auto-Update**: Preview automatically updates as you type
+
 ### AI Features
 
 #### Text Selection Actions (Right-click or keyboard shortcuts)
@@ -313,6 +351,11 @@ You can manually control image dimensions by using HTML img tags:
 | `Ctrl+S` | Save current note |
 | `Ctrl+O` | Open note dialog |
 | `Ctrl+/` | Focus search |
+| `Ctrl+F` | Find text in current note |
+| `Ctrl+H` | Find and replace text |
+| `Ctrl+Z` | Undo last change |
+| `Ctrl+Y` | Redo last undone change |
+| `Ctrl+P` | Toggle preview mode (Edit → Preview → Split) |
 | `Ctrl+Shift+S` | Summarize selected text |
 | `Ctrl+Shift+A` | Ask AI about selected text |
 | `Ctrl+Shift+E` | Edit selected text with AI |
@@ -373,7 +416,27 @@ ollama serve
 
 MIT License - see LICENSE file for details.
 
-## v1.0 Highlights (Completed)
+## Version History
+
+### v1.4.0 (Current)
+- Find & Replace functionality with regex support
+- Undo/Redo with full history tracking
+- Preview mode toggle (Edit/Preview)
+- Split mode (side-by-side edit and preview views)
+- Enhanced keyboard shortcuts
+- Improved text editing experience
+
+### v1.3.0
+- Bug fixes, AI Assistant revamp, and stability improvements
+
+### v1.2.x
+- Bug fixes, critical security improvements, UI/UX improvements.
+
+### v1.1.x
+- Code refactor, UI/UX improvements.
+- PDF export support
+
+### v1.0
 
 - Offline‑first note taking (create, edit, delete, search)
 - Local AI via Ollama: summarization, Q&A, edit, generate, rewrite, key points, tags
@@ -459,7 +522,7 @@ The app displays real-time network status:
 
 ### Application Won't Start
 
-1. **Check Node.js version**: `node --version` (should be v16+)
+1. **Check Node.js version**: `node --version` (should be v20+)
 2. **Reinstall dependencies**: `rm -rf node_modules && npm install`
 3. **Check for errors**: `npm start` and check console output
 
