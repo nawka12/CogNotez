@@ -6515,6 +6515,40 @@ Please provide a helpful response based on the note content and conversation his
         try {
             console.log('[Sync] Sync completed, refreshing UI...');
 
+            // Sync data from main process file to renderer's localStorage
+            // Main process uses file storage, renderer uses localStorage - need to sync them
+            if (this.notesManager && this.notesManager.db && typeof localStorage !== 'undefined') {
+                try {
+                    console.log('[Sync] Syncing main process data to renderer localStorage');
+                    const { ipcRenderer } = require('electron');
+                    const mainProcessData = await ipcRenderer.invoke('get-database-data');
+                    
+                    if (mainProcessData) {
+                        // Update renderer's localStorage with main process data
+                        localStorage.setItem('cognotez_data', JSON.stringify(mainProcessData));
+                        console.log('[Sync] Updated renderer localStorage with main process data');
+                        
+                        // Reload from localStorage
+                        this.notesManager.db.loadFromLocalStorage();
+                        
+                        // If current note is open, refresh it from database
+                        if (this.currentNote) {
+                            const refreshedNote = this.notesManager.db.getNote(this.currentNote.id);
+                            if (refreshedNote) {
+                                // Preserve decrypted content if note is password protected
+                                if (this.currentNote.password_protected && this.currentNote.content) {
+                                    refreshedNote.content = this.currentNote.content;
+                                }
+                                this.currentNote = refreshedNote;
+                                console.log('[Sync] Refreshed current note from database');
+                            }
+                        }
+                    }
+                } catch (error) {
+                    console.error('[Sync] Failed to sync data from main process:', error);
+                }
+            }
+
             // Refresh notes list
             await this.loadNotes();
 
