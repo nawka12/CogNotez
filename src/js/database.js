@@ -1005,6 +1005,12 @@ class DatabaseManager {
             }
         };
 
+        // Log collaboration data being exported for debugging
+        const sharedNotes = Object.values(sanitizedNotes).filter(n => n.collaboration?.is_shared);
+        if (sharedNotes.length > 0) {
+            console.log(`[Database] Exporting ${sharedNotes.length} shared note(s) with collaboration data`);
+        }
+
         // Calculate checksum based on content only (exclude sync state and timestamp metadata)
         // This ensures checksum consistency across devices when content hasn't changed
         const contentOnlyData = {
@@ -1116,6 +1122,12 @@ class DatabaseManager {
 
             this.saveToLocalStorage();
 
+            // Log collaboration data that was imported
+            const importedSharedNotes = Object.values(importData.notes).filter(n => n.collaboration?.is_shared);
+            if (importedSharedNotes.length > 0) {
+                console.log(`[Database] Imported ${importedSharedNotes.length} shared note(s) with collaboration data`);
+            }
+
             return {
                 success: true,
                 conflicts: conflicts,
@@ -1181,10 +1193,48 @@ class DatabaseManager {
                     const remoteTime = new Date(remoteNote.updated_at || remoteNote.created_at);
 
                     if (remoteTime > localTime) {
-                        // Remote is newer
-                        this.data.notes[noteId] = { ...remoteNote };
+                        // Remote is newer - use remote note but preserve local collaboration if more recent
+                        const mergedNote = { ...remoteNote };
+                        
+                        // Intelligently merge collaboration metadata
+                        // If local has share information that remote doesn't, preserve it
+                        if (localNote.collaboration) {
+                            if (!mergedNote.collaboration) {
+                                mergedNote.collaboration = localNote.collaboration;
+                            } else {
+                                // Both have collaboration data - merge intelligently
+                                // Preserve is_shared and share links if they exist in either
+                                mergedNote.collaboration = {
+                                    ...mergedNote.collaboration,
+                                    is_shared: remoteNote.collaboration.is_shared || localNote.collaboration.is_shared,
+                                    google_drive_file_id: remoteNote.collaboration.google_drive_file_id || localNote.collaboration.google_drive_file_id,
+                                    google_drive_share_link: remoteNote.collaboration.google_drive_share_link || localNote.collaboration.google_drive_share_link,
+                                    // For arrays and other fields, prefer remote as it's newer
+                                    shared_with: remoteNote.collaboration.shared_with || localNote.collaboration.shared_with || [],
+                                    edit_history: remoteNote.collaboration.edit_history || localNote.collaboration.edit_history || []
+                                };
+                            }
+                        }
+                        
+                        this.data.notes[noteId] = mergedNote;
+                    } else if (localTime > remoteTime) {
+                        // Local is newer - keep local but merge in remote collaboration if it has share info we don't
+                        if (remoteNote.collaboration && remoteNote.collaboration.is_shared) {
+                            if (!localNote.collaboration) {
+                                localNote.collaboration = remoteNote.collaboration;
+                            } else if (!localNote.collaboration.is_shared && remoteNote.collaboration.is_shared) {
+                                // Remote has share info that local doesn't - merge it in
+                                localNote.collaboration = {
+                                    ...localNote.collaboration,
+                                    is_shared: remoteNote.collaboration.is_shared,
+                                    google_drive_file_id: remoteNote.collaboration.google_drive_file_id,
+                                    google_drive_share_link: remoteNote.collaboration.google_drive_share_link
+                                };
+                            }
+                        }
+                        // Keep local note (it's already in place)
                     }
-                    // If local is newer or same time, keep local
+                    // If times are equal, keep local
                 }
             }
         }
