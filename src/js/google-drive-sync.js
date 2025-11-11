@@ -1659,22 +1659,12 @@ class GoogleDriveSyncManager {
                 throw new Error('Drive API not initialized');
             }
 
-            // Try to delete the file from Google Drive
-            try {
-                await this.drive.files.delete({
-                    fileId: fileId
-                });
-                console.log('[GoogleDriveSync] Shared note deleted:', fileId);
-            } catch (error) {
-                // If file not found (404), it's already deleted - that's fine
-                if (error.code === 404 || (error.response && error.response.status === 404)) {
-                    console.log('[GoogleDriveSync] Shared note already deleted (404):', fileId);
-                    return true; // Consider it successful since the goal is achieved
-                }
-                // Re-throw other errors
-                throw error;
-            }
+            // Delete the file from Google Drive
+            await this.drive.files.delete({
+                fileId: fileId
+            });
 
+            console.log('[GoogleDriveSync] Shared note deleted:', fileId);
             return true;
 
         } catch (error) {

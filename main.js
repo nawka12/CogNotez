@@ -1271,20 +1271,6 @@ if (ipcMain) {
     }
   });
 
-  // Get database data from main process (for syncing to renderer's localStorage)
-  ipcMain.handle('get-database-data', async () => {
-    try {
-      if (global.databaseManager && global.databaseManager.data) {
-        console.log('[IPC] Providing database data to renderer');
-        return global.databaseManager.data;
-      }
-      return null;
-    } catch (error) {
-      console.error('[IPC] Failed to get database data:', error);
-      return null;
-    }
-  });
-
   // Revoke share (delete shared note from Google Drive)
   ipcMain.handle('google-drive-revoke-share', async (event, { fileId, noteId }) => {
     try {
