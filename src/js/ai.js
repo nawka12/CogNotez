@@ -282,8 +282,8 @@ class AIManager {
     async _doInitialize() {
         try {
             // Initialize AI edit approval system first
-            if (typeof AIEditApproval !== 'undefined') {
-                this.editApproval = new AIEditApproval(this.app);
+            if (typeof window.AIEditApproval !== 'undefined') {
+                this.editApproval = new window.AIEditApproval(this.app);
                 this.editApproval.initialize();
                 console.log('[DEBUG] AI Manager: Edit approval system initialized');
             } else {
@@ -916,12 +916,16 @@ class AIManager {
             }
         };
 
+        // Get abort signal from app if available
+        const abortSignal = this.app?.currentAIAbortController?.signal;
+
         const response = await fetch(`${this.ollamaEndpoint}/api/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
         });
 
         if (!response.ok) {
@@ -1015,6 +1019,9 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
             console.log(`⚠️ [INITIAL TOOLS] No tools available (SearXNG not connected or disabled)`);
         }
 
+        // Get abort signal from app if available
+        const abortSignal = this.app?.currentAIAbortController?.signal;
+
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -1023,7 +1030,8 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
                 'HTTP-Referer': 'https://cognotez.kayfahaarukku.com',
                 'X-Title': 'CogNotez'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
         });
 
         if (!response.ok) {
@@ -2010,12 +2018,18 @@ Suggested tags:`;
                 this.app.toggleAIPanel();
             }
             this.app.updateLoadingText('Editing text with AI...');
-            this.app.showLoading();
+            this.app.showLoading(null, true); // Show cancel button for AI operations
 
             console.log('[DEBUG] AI handleEditText: Starting with text:', text.substring(0, 50) + '...');
             console.log('[DEBUG] AI handleEditText: Instruction:', instruction);
 
             editedResult = await this.editText(text, instruction);
+
+            // Check if operation was cancelled before applying result
+            if (this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleEditText: Operation was cancelled, not applying result');
+                return;
+            }
 
             // Check if the result indicates tool failure
             if (editedResult && (
@@ -2033,10 +2047,16 @@ Suggested tags:`;
 
             // Show approval interface instead of directly applying changes
             // Ensure edit approval system is available (lazy-init if needed)
-            if (!this.editApproval && typeof AIEditApproval !== 'undefined') {
+            if (!this.editApproval && typeof window.AIEditApproval !== 'undefined') {
                 console.log('[DEBUG] AI handleEditText: Lazily initializing edit approval system');
-                this.editApproval = new AIEditApproval(this.app);
+                this.editApproval = new window.AIEditApproval(this.app);
                 this.editApproval.initialize();
+            }
+
+            // Check again if operation was cancelled before showing approval dialog
+            if (this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleEditText: Operation was cancelled before showing approval dialog');
+                return;
             }
 
             if (this.editApproval && editedResult) {
@@ -2069,6 +2089,11 @@ Suggested tags:`;
             }
 
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('cancelled') || this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleEditText: Operation was cancelled');
+                return;
+            }
             console.error('[DEBUG] AI handleEditText error:', error);
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
@@ -2076,6 +2101,7 @@ Suggested tags:`;
             this.app.showAIMessage(`❌ Failed to edit text: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
         } finally {
             this.app.hideLoading();
+            this.app.isAIOperationCancelled = false; // Reset flag
         }
     }
 
@@ -2097,11 +2123,17 @@ Suggested tags:`;
                 this.app.toggleAIPanel();
             }
             this.app.updateLoadingText('Generating content with AI...');
-            this.app.showLoading();
+            this.app.showLoading(null, true); // Show cancel button for AI operations
 
             console.log('[DEBUG] AI handleGenerateContent: Starting with prompt:', prompt);
 
             generatedResult = await this.generateContent(prompt);
+
+            // Check if operation was cancelled before applying result
+            if (this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleGenerateContent: Operation was cancelled, not applying result');
+                return;
+            }
 
             // Check if the result indicates tool failure
             if (generatedResult && (
@@ -2119,9 +2151,9 @@ Suggested tags:`;
 
             // Show approval interface for generated content (insertion instead of replacement)
             // For now, we'll use the same approval system but with insertion logic
-            if (!this.generateApproval && typeof AIGenerateApproval !== 'undefined') {
+            if (!this.generateApproval && typeof window.AIGenerateApproval !== 'undefined') {
                 console.log('[DEBUG] AI handleGenerateContent: Lazily initializing generate approval system');
-                this.generateApproval = new AIGenerateApproval(this.app);
+                this.generateApproval = new window.AIGenerateApproval(this.app);
                 this.generateApproval.initialize();
             }
 
@@ -2155,6 +2187,11 @@ Suggested tags:`;
             }
 
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('cancelled') || this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleGenerateContent: Operation was cancelled');
+                return;
+            }
             console.error('[DEBUG] AI handleGenerateContent error:', error);
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
@@ -2162,6 +2199,7 @@ Suggested tags:`;
             this.app.showAIMessage(`❌ Failed to generate content: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
         } finally {
             this.app.hideLoading();
+            this.app.isAIOperationCancelled = false; // Reset flag
         }
     }
 

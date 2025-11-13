@@ -2985,6 +2985,28 @@ body {
     font-size: 14px;
 }
 
+.loading-cancel-btn {
+    margin-top: 24px;
+    padding: 10px 24px;
+    background: rgba(255, 255, 255, 0.1);
+    color: white;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.loading-cancel-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.loading-cancel-btn:active {
+    background: rgba(255, 255, 255, 0.15);
+}
+
 /* Hidden class */
 .hidden {
     display: none !important;

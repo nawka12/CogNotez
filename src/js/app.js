@@ -890,6 +890,10 @@ class CogNotezApp {
         this.syncScrollTimeout = null;
         this.syncScrollSource = null; // Track which pane initiated scroll
 
+        // AI operation cancellation
+        this.currentAIAbortController = null;
+        this.isAIOperationCancelled = false;
+
         this.init();
     }
 
@@ -4044,19 +4048,28 @@ Please provide a helpful response based on the note content and conversation his
         }
         
         this.hideAIDialog();
-        this.showLoading();
+        // Create abort controller for this AI operation
+        this.currentAIAbortController = new AbortController();
+        this.isAIOperationCancelled = false; // Reset cancellation flag
+        this.showLoading(null, true); // Show cancel button for AI operations
 
         try {
             console.log('[DEBUG] processAIDialog: calling handleAIAction with action =', actionToProcess, 'input =', input);
             await this.handleAIAction(actionToProcess, input, customData);
             console.log('[DEBUG] processAIDialog: handleAIAction completed');
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || this.isAIOperationCancelled) {
+                console.log('[DEBUG] processAIDialog: AI operation was cancelled');
+                return;
+            }
             console.error('[DEBUG] processAIDialog: AI action failed:', error);
             const backend = this.aiManager ? this.aiManager.backend : 'ollama';
             const connectionType = backend === 'ollama' ? 'Ollama service' : 'internet connection and API key';
             this.showNotification(`AI action failed. Please check your ${connectionType}.`, 'error');
         } finally {
             this.hideLoading();
+            this.isAIOperationCancelled = false; // Reset flag
         }
     }
 
@@ -4101,11 +4114,17 @@ Please provide a helpful response based on the note content and conversation his
 
                 case 'edit-ai':
                     console.log('[DEBUG] handleAIAction: Processing edit-ai action');
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     await this.aiManager.handleEditText(this.selectedText, input);
                     break;
 
                 case 'generate-ai':
                     console.log('[DEBUG] handleAIAction: Processing generate-ai action');
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     await this.aiManager.handleGenerateContent(input);
                     break;
 
@@ -4114,13 +4133,23 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     this.updateLoadingText('Rewriting text...');
-                    this.showLoading();
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         console.log('[DEBUG] handleAIAction rewrite: starting with selectedText:', this.selectedText.substring(0, 50) + '...');
                         const style = input || customData.style || 'professional';
                         console.log('[DEBUG] handleAIAction rewrite: using style:', style);
                         const response = await this.aiManager.rewriteText(this.selectedText, style);
+                        
+                        // Check if operation was cancelled before applying result
+                        if (this.isAIOperationCancelled) {
+                            console.log('[DEBUG] handleAIAction rewrite: Operation was cancelled, not applying result');
+                            return;
+                        }
+                        
                         console.log('[DEBUG] handleAIAction rewrite: got response:', response.substring(0, 50) + '...');
                         await this.aiManager.saveConversation(noteId, `Rewrite "${this.selectedText.substring(0, 50)}..." in ${style} style`, response, this.selectedText, 'rewrite');
                         this.replaceSelection(response);
@@ -4130,6 +4159,7 @@ Please provide a helpful response based on the note content and conversation his
                         this.showAIMessage(`❌ Failed to rewrite text: ${error.message}`, 'assistant');
                     } finally {
                         this.hideLoading();
+                        this.isAIOperationCancelled = false; // Reset flag
                     }
                     break;
 
@@ -4138,14 +4168,25 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     this.updateLoadingText('Extracting key points...');
-                    this.showLoading();
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         const keyPointsResponse = await this.aiManager.extractKeyPoints(this.selectedText);
+                        
+                        // Check if operation was cancelled before applying result
+                        if (this.isAIOperationCancelled) {
+                            console.log('[DEBUG] handleAIAction key-points: Operation was cancelled, not applying result');
+                            return;
+                        }
+                        
                         await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, keyPointsResponse, this.selectedText, 'key-points');
                         this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${keyPointsResponse}`, 'assistant');
                     } finally {
                         this.hideLoading();
+                        this.isAIOperationCancelled = false; // Reset flag
                     }
                     break;
 
@@ -4154,21 +4195,37 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     this.updateLoadingText('Generating tags...');
-                    this.showLoading();
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         // Include note title for better tag generation context
                         const noteTitle = this.currentNote ? this.currentNote.title : document.getElementById('note-title').value;
                         const tagsResponse = await this.aiManager.generateTags(this.selectedText, { noteTitle });
+                        
+                        // Check if operation was cancelled before applying result
+                        if (this.isAIOperationCancelled) {
+                            console.log('[DEBUG] handleAIAction generate-tags: Operation was cancelled, not applying result');
+                            return;
+                        }
+                        
                         await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, tagsResponse, this.selectedText, 'tags');
                         this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${tagsResponse}`, 'assistant');
                     } finally {
                         this.hideLoading();
+                        this.isAIOperationCancelled = false; // Reset flag
                     }
                     break;
 
             }
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('cancelled') || this.isAIOperationCancelled) {
+                console.log('[AI] Operation was cancelled');
+                return;
+            }
             console.error('AI action error:', error);
             // Ensure AI panel is visible for error message
             if (!this.aiPanelVisible) {
@@ -4694,12 +4751,58 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     // Utility methods
-    showLoading() {
-        document.getElementById('loading-overlay').classList.remove('hidden');
+    showLoading(text = null, showCancel = false) {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const cancelBtn = document.getElementById('loading-cancel-btn');
+        
+        loadingOverlay.classList.remove('hidden');
+        
+        if (text) {
+            this.updateLoadingText(text);
+        }
+        
+        // Show/hide cancel button for AI operations
+        if (showCancel) {
+            cancelBtn.classList.remove('hidden');
+            // Set up cancel handler if not already set
+            if (!cancelBtn.hasAttribute('data-handler-attached')) {
+                cancelBtn.addEventListener('click', () => this.cancelAIOperation());
+                cancelBtn.setAttribute('data-handler-attached', 'true');
+            }
+        } else {
+            cancelBtn.classList.add('hidden');
+        }
     }
 
     hideLoading() {
-        document.getElementById('loading-overlay').classList.add('hidden');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const cancelBtn = document.getElementById('loading-cancel-btn');
+        
+        loadingOverlay.classList.add('hidden');
+        cancelBtn.classList.add('hidden');
+        
+        // Clear abort controller when hiding loading (but keep cancellation flag until operation completes)
+        // The flag will be cleared when the operation finishes or is cancelled
+    }
+
+    cancelAIOperation() {
+        console.log('[AI] Cancelling current AI operation...');
+        
+        // Set cancellation flag
+        this.isAIOperationCancelled = true;
+        
+        if (this.currentAIAbortController) {
+            this.currentAIAbortController.abort();
+            this.currentAIAbortController = null;
+        }
+        
+        this.hideLoading();
+        this.showNotification('AI operation cancelled', 'info');
+        
+        // Clear any pending AI operations
+        if (this.aiManager) {
+            // Reset any AI manager state if needed
+        }
     }
 
     updateLoadingText(text) {
@@ -4983,12 +5086,23 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     this.updateLoadingText('Extracting key points...');
-                    this.showLoading();
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     response = await this.aiManager.extractKeyPoints(this.selectedText);
+                    
+                    // Check if operation was cancelled before applying result
+                    if (this.isAIOperationCancelled) {
+                        console.log('[DEBUG] processAIActionWithoutDialog key-points: Operation was cancelled, not applying result');
+                        return;
+                    }
+                    
                     await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'key-points');
                     this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${response}`, 'assistant');
                     this.hideLoading();
+                    this.isAIOperationCancelled = false; // Reset flag
                     break;
 
                 case 'generate-tags':
@@ -4996,10 +5110,20 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     this.updateLoadingText('Generating tags...');
-                    this.showLoading();
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     // Include note title for better tag generation context
                     response = await this.aiManager.generateTags(this.selectedText, { noteTitle: this.noteTitle });
+                    
+                    // Check if operation was cancelled before applying result
+                    if (this.isAIOperationCancelled) {
+                        console.log('[DEBUG] processAIActionWithoutDialog generate-tags: Operation was cancelled, not applying result');
+                        return;
+                    }
+                    
                     await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'tags');
 
                     // Parse and save tags to the current note
@@ -5008,6 +5132,7 @@ Please provide a helpful response based on the note content and conversation his
 
                     this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${response}\n\n*Tags have been saved to this note*`, 'assistant');
                     this.hideLoading();
+                    this.isAIOperationCancelled = false; // Reset flag
                     break;
 
                 case 'summarize-note':
@@ -5408,12 +5533,16 @@ Please provide a helpful response based on the note content and conversation his
                     </div>
 
                     <div style="margin-bottom: 20px;">
-                        <label for="openrouter-model" style="display: block; margin-bottom: 6px; font-weight: 500;">OpenRouter Model:</label>
-                        <select id="openrouter-model" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                            ${this.aiManager.availableModels && this.aiManager.backend === 'openrouter' ? this.aiManager.availableModels.map(model =>
-                                `<option value="${model.id}" ${model.id === this.aiManager.openRouterModel ? 'selected' : ''}>${model.name || model.id}</option>`
-                            ).join('') : `<option value="${this.aiManager.openRouterModel}" selected>${this.aiManager.openRouterModel}</option>`}
-                        </select>
+                        <label for="openrouter-model-search" style="display: block; margin-bottom: 6px; font-weight: 500;">OpenRouter Model:</label>
+                        <div id="openrouter-model-container" style="position: relative;">
+                            <input type="text" id="openrouter-model-search" 
+                                   placeholder="Search models..." 
+                                   value="${this.aiManager.availableModels && this.aiManager.backend === 'openrouter' ? (this.aiManager.availableModels.find(m => m.id === this.aiManager.openRouterModel)?.name || this.aiManager.openRouterModel) : this.aiManager.openRouterModel}"
+                                   style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); padding-right: 30px; box-sizing: border-box;">
+                            <input type="hidden" id="openrouter-model" value="${this.aiManager.openRouterModel}">
+                            <div id="openrouter-model-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 300px; overflow-y: auto; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; margin-top: 4px; z-index: 1000; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                            </div>
+                        </div>
                     </div>
 
                     <div style="margin-bottom: 20px;">
@@ -5512,6 +5641,144 @@ Please provide a helpful response based on the note content and conversation his
             }
         });
 
+        // Initialize searchable OpenRouter model dropdown
+        if (this.aiManager.backend === 'openrouter' && this.aiManager.availableModels && this.aiManager.availableModels.length > 0) {
+            const modelSearchInput = modal.querySelector('#openrouter-model-search');
+            const modelDropdown = modal.querySelector('#openrouter-model-dropdown');
+            const modelHiddenInput = modal.querySelector('#openrouter-model');
+            const modelContainer = modal.querySelector('#openrouter-model-container');
+            
+            let filteredModels = [...this.aiManager.availableModels];
+            
+            // Function to render dropdown items
+            const renderDropdown = (models) => {
+                if (models.length === 0) {
+                    modelDropdown.innerHTML = '<div style="padding: 12px; color: var(--text-secondary); text-align: center;">No models found</div>';
+                    return;
+                }
+                
+                modelDropdown.innerHTML = models.map(model => {
+                    const displayName = model.name || model.id;
+                    const isSelected = model.id === this.aiManager.openRouterModel;
+                    return `
+                        <div class="model-dropdown-item" data-model-id="${model.id}" data-model-name="${displayName}" 
+                             style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); 
+                                    ${isSelected ? 'background: var(--accent-color); color: white;' : 'background: var(--bg-primary); color: var(--text-primary);'}
+                                    transition: background 0.2s;">
+                            <div style="font-weight: ${isSelected ? '600' : '500'}; font-size: 14px;">${displayName}</div>
+                            ${model.id !== displayName ? `<div style="font-size: 12px; opacity: 0.7; margin-top: 2px;">${model.id}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Add click handlers
+                modelDropdown.querySelectorAll('.model-dropdown-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const modelId = item.dataset.modelId;
+                        const modelName = item.dataset.modelName;
+                        modelHiddenInput.value = modelId;
+                        modelSearchInput.value = modelName;
+                        modelDropdown.style.display = 'none';
+                        
+                        // Update selected state
+                        modelDropdown.querySelectorAll('.model-dropdown-item').forEach(i => {
+                            i.style.background = i.dataset.modelId === modelId ? 'var(--accent-color)' : 'var(--bg-primary)';
+                            i.style.color = i.dataset.modelId === modelId ? 'white' : 'var(--text-primary)';
+                        });
+                    });
+                    
+                    item.addEventListener('mouseenter', function() {
+                        if (this.dataset.modelId !== modelHiddenInput.value) {
+                            this.style.background = 'var(--bg-hover)';
+                        }
+                    });
+                    
+                    item.addEventListener('mouseleave', function() {
+                        if (this.dataset.modelId !== modelHiddenInput.value) {
+                            this.style.background = 'var(--bg-primary)';
+                        }
+                    });
+                });
+            };
+            
+            // Initial render
+            renderDropdown(filteredModels);
+            
+            // Search functionality
+            modelSearchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                
+                if (searchTerm === '') {
+                    filteredModels = [...this.aiManager.availableModels];
+                } else {
+                    filteredModels = this.aiManager.availableModels.filter(model => {
+                        const name = (model.name || model.id).toLowerCase();
+                        const id = model.id.toLowerCase();
+                        return name.includes(searchTerm) || id.includes(searchTerm);
+                    });
+                }
+                
+                renderDropdown(filteredModels);
+                modelDropdown.style.display = filteredModels.length > 0 ? 'block' : 'none';
+            });
+            
+            // Show dropdown on focus
+            modelSearchInput.addEventListener('focus', () => {
+                if (filteredModels.length > 0) {
+                    modelDropdown.style.display = 'block';
+                }
+            });
+            
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!modelContainer.contains(e.target)) {
+                    modelDropdown.style.display = 'none';
+                }
+            });
+            
+            // Handle keyboard navigation
+            let selectedIndex = -1;
+            modelSearchInput.addEventListener('keydown', (e) => {
+                const items = modelDropdown.querySelectorAll('.model-dropdown-item');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    // Reset previous selection
+                    if (selectedIndex >= 0 && items[selectedIndex]) {
+                        const prevModelId = items[selectedIndex].dataset.modelId;
+                        items[selectedIndex].style.background = prevModelId === modelHiddenInput.value ? 'var(--accent-color)' : 'var(--bg-primary)';
+                    }
+                    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                    if (items[selectedIndex]) {
+                        items[selectedIndex].scrollIntoView({ block: 'nearest' });
+                        items[selectedIndex].style.background = 'var(--bg-hover)';
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    // Reset previous selection
+                    if (selectedIndex >= 0 && items[selectedIndex]) {
+                        const prevModelId = items[selectedIndex].dataset.modelId;
+                        items[selectedIndex].style.background = prevModelId === modelHiddenInput.value ? 'var(--accent-color)' : 'var(--bg-primary)';
+                    }
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    if (items[selectedIndex]) {
+                        items[selectedIndex].scrollIntoView({ block: 'nearest' });
+                        items[selectedIndex].style.background = 'var(--bg-hover)';
+                    }
+                } else if (e.key === 'Enter' && selectedIndex >= 0 && items[selectedIndex]) {
+                    e.preventDefault();
+                    items[selectedIndex].click();
+                    selectedIndex = -1;
+                } else if (e.key === 'Escape') {
+                    modelDropdown.style.display = 'none';
+                    selectedIndex = -1;
+                } else {
+                    // Reset selection when typing
+                    selectedIndex = -1;
+                }
+            });
+        }
+
         // Add custom button handlers
         const testBtn = modal.querySelector('[data-action="test-connection"]');
         const saveBtn = modal.querySelector('[data-action="save-settings"]');
@@ -5519,8 +5786,11 @@ Please provide a helpful response based on the note content and conversation his
         testBtn.addEventListener('click', async () => {
             const backend = modal.querySelector('#ai-backend').value;
 
+            // Create abort controller for this AI operation
+            this.currentAIAbortController = new AbortController();
+            this.isAIOperationCancelled = false; // Reset cancellation flag
             this.updateLoadingText('Testing AI connection...');
-            this.showLoading();
+            this.showLoading(null, true); // Show cancel button for AI operations
             try {
                 await this.aiManager.switchBackend(backend);
                 await this.aiManager.loadAvailableModels();
