@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-1.4.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -18,6 +18,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - [Usage](#usage)
   - [Basic Note Taking](#basic-note-taking)
   - [Advanced Features](#advanced-features)
+  - [Folder & Tag Navigation](#folder--tag-navigation)
   - [AI Features](#ai-features)
   - [Keyboard Shortcuts](#keyboard-shortcuts)
 - [Google Drive Sync](#google-drive-sync-basic-setup)
@@ -76,7 +77,8 @@ Get CogNotez up and running in minutes:
 - **Keyboard Shortcuts**: Full keyboard navigation support
 - **Context Menus**: Right-click AI actions on selected text
 - **Theme Support**: Light and dark modes with custom accent color
-- **Search**: Fast, real-time note search
+- **Search**: Fast, real-time note search with clear button
+- **Folder & Tag Navigation**: Organize notes with folder-based navigation using tags
 - **Find & Replace**: Powerful text search and replace with regex support
 - **Undo/Redo**: Full history tracking for text editing
 - **Preview Mode**: Toggle between edit, preview, and split view modes
@@ -86,6 +88,7 @@ Get CogNotez up and running in minutes:
 - **Migration Wizard**: Guided data migration between installations
 - **Sharing**: Share notes via clipboard or exported files
 - **Statistics**: Note statistics and analytics dashboard
+- **Enhanced Splash Screen**: Animated startup screen with progress indicators
 
 ### Security & Privacy
 - **Password-Locked Notes**: Full end-to-end encryption for protected notes. Note content is encrypted at rest using AES-256-GCM encryption; passwords are stored as salted PBKDF2 hashes (210,000 iterations) for verification.
@@ -164,10 +167,12 @@ CogNotez uses localStorage for data storage, which provides a simple yet robust 
 1. **Create a new note**: Click the "+" button or press `Ctrl+N`
 2. **Edit notes**: Click on any note in the sidebar to edit
 3. **Save notes**: Press `Ctrl+S` or click the save button
-4. **Search notes**: Use the search bar to find notes instantly
-5. **Find & Replace**: Press `Ctrl+F` to find text, or `Ctrl+H` for find and replace
-6. **Undo/Redo**: Press `Ctrl+Z` to undo or `Ctrl+Y` to redo changes
-7. **Preview Mode**: Press `Ctrl+P` to toggle between edit, preview, and split view modes
+4. **Search notes**: Use the search bar to find notes instantly (click the × button to clear search)
+5. **Filter by folders/tags**: Click on folder items in the sidebar (All Notes, Untagged, or tag folders) to filter notes
+6. **Find & Replace**: Press `Ctrl+F` to find text, or `Ctrl+H` for find and replace
+7. **Undo/Redo**: Press `Ctrl+Z` to undo or `Ctrl+Y` to redo changes
+8. **Preview Mode**: Press `Ctrl+P` to toggle between edit, preview, and split view modes
+9. **Insert media**: Use the image (🖼️) and video (🎥) buttons in the editor toolbar to quickly add media
 
 ### Advanced Features
 
@@ -198,6 +203,28 @@ Comprehensive import and export capabilities for maximum data portability:
 - **File Export**: Export individual or multiple notes as files
 - **Format Options**: Markdown, plain text, and PDF export formats
 - **Shareable Links**: Generate shareable note references
+
+### Folder & Tag Navigation
+
+Organize and filter your notes using folder-based navigation:
+
+#### Folder Types
+- **All Notes**: View all your notes (default view)
+- **Untagged**: View notes that don't have any tags assigned
+- **Tag Folders**: Each tag you create becomes a folder you can click to filter notes
+
+#### Using Folder Navigation
+1. **Browse folders**: Click on any folder item in the sidebar to filter notes
+2. **Create tag folders**: Click the "+" button next to "Tags" to create a new tag folder
+3. **Manage tag folders**: Right-click on a tag folder to rename or delete it
+4. **Collapse/Expand**: Click the chevron icon to collapse or expand the tags section
+5. **Folder counts**: Each folder shows the number of notes it contains
+
+#### Benefits
+- Quick access to notes by category
+- Visual organization with color-coded tag folders
+- Easy filtering without using search
+- Persistent folder selection (remembers your last selected folder)
 
 ### Advanced Search & Filtering
 
@@ -275,6 +302,7 @@ Speed up your workflow with ready-to-use templates:
 Enhance your notes with images, videos, and attachments:
 
 #### Adding Images
+- **Toolbar Button**: Click the image button (🖼️) in the editor toolbar
 - **Drag & Drop**: Drag image files directly into the editor
 - **Paste**: Copy and paste images from clipboard
 - **URL**: Insert image from URL via context menu
@@ -311,6 +339,7 @@ You can manually control image dimensions by using HTML img tags:
 - Still responsive: images won't exceed container width even with explicit dimensions
 
 #### Embedding Videos
+- **Toolbar Button**: Click the video button (🎥) in the editor toolbar
 - **Drag & drop video files** (MP4, WebM, OGG)
 - **Videos play directly in notes** with full controls
 - **Size control**: Videos are inserted at 100% width by default, but you can manually adjust by editing the `width` attribute:
@@ -462,7 +491,27 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-### v1.4.1 (Current)
+### v2.0.0 (Current)
+- **Folder & Tag Navigation**: Organize notes with folder-based navigation using tags
+  - Filter notes by "All Notes", "Untagged", or any tag folder
+  - Create, rename, and delete tag folders with right-click context menu
+  - Collapsible tags section with visual folder counts
+- **Enhanced Search**: Added clear button (×) to search input for quick reset
+- **Media Insertion Buttons**: Quick access to insert images and videos via toolbar buttons
+- **Revamped Header Toolbar**: Unified button layout for better organization
+- **Enhanced Splash Screen**: Animated background with particles and progress indicators
+- Improved sidebar functionality and responsiveness
+- Better visual consistency across different screen sizes
+
+### v1.5.0
+- Multi-tab support for working with multiple notes simultaneously
+- Enhanced header and search functionality
+- Improved sidebar functionality
+
+### v1.4.2
+- Add cancel button for AI operations and implement cancellation logic
+
+### v1.4.1
 - Share your notes to your colleagues through Google Drive! No CogNotez required for viewing!
 - Bug fixes and stability improvements
 - Performance optimizations
