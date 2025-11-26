@@ -2275,10 +2275,17 @@ class CogNotezApp {
 
         if (!note.tags || note.tags.length === 0) {
             tagsDisplay.innerHTML = '';
-            // Unwrap date if it was wrapped
+            // Unwrap tags and date if they were wrapped
             const wrapper = document.querySelector('.tags-date-wrapper');
-            if (wrapper && noteDate && noteDate.parentElement === wrapper && noteInfo) {
-                noteInfo.appendChild(noteDate);
+            if (wrapper && noteInfo) {
+                // Move tagsDisplay back to noteInfo before removing wrapper
+                if (tagsDisplay.parentElement === wrapper) {
+                    noteInfo.appendChild(tagsDisplay);
+                }
+                // Move noteDate back to noteInfo before removing wrapper
+                if (noteDate && noteDate.parentElement === wrapper) {
+                    noteInfo.appendChild(noteDate);
+                }
                 wrapper.remove();
             }
             return;
