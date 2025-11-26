@@ -54,8 +54,11 @@
                     <h1 class="app-title">CogNotez</h1>
                 </div>
                 <div class="search-container" id="search-container">
-                    <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
-                    <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
+                    <div class="search-input-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
+                        <kbd class="search-shortcut" id="search-shortcut">Ctrl+K</kbd>
+                    </div>
                 </div>
             </div>
             <div class="header-right">
@@ -65,22 +68,41 @@
                     <span class="sync-btn-text" id="sync-btn-text">Sync</span>
                 </button>
                 
-                <button id="theme-toggle" class="theme-toggle-btn" title="Toggle theme">
-                    <span class="theme-icon-light"><i class="fas fa-sun"></i></span>
-                    <span class="theme-icon-dark"><i class="fas fa-moon"></i></span>
+                <div class="header-btn-group">
+                    <button id="theme-toggle" class="header-action-btn" title="Toggle theme">
+                        <span class="theme-icon-light"><i class="fas fa-sun"></i></span>
+                        <span class="theme-icon-dark"><i class="fas fa-moon"></i></span>
+                    </button>
+                    <button id="ai-toggle-btn" class="header-action-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
+                </div>
+                
+                <button id="new-note-btn" class="new-note-btn-primary" title="New note">
+                    <i class="fas fa-plus"></i>
+                    <span class="btn-label">New</span>
                 </button>
-                <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
-                <button id="new-note-btn" class="new-note-btn" title="New note"><i class="fas fa-plus"></i></button>
-                <button id="header-overflow-btn" class="header-overflow-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
+                
+                <button id="header-overflow-btn" class="header-action-btn header-overflow-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
                 
                 <!-- Header Overflow Menu -->
                 <div id="header-overflow-menu" class="header-overflow-menu hidden">
                     <button id="mobile-search-btn" class="header-overflow-item" title="Search Notes"><i class="fas fa-search"></i> Search Notes</button>
                     <button id="advanced-search-btn" class="header-overflow-item" title="Advanced Search"><i class="fas fa-filter"></i> Advanced Search</button>
                     <button id="templates-btn" class="header-overflow-item" title="Templates"><i class="fas fa-file-alt"></i> Templates</button>
+                    <button id="mobile-theme-toggle" class="header-overflow-item mobile-only-item" title="Toggle Theme"><i class="fas fa-adjust"></i> Toggle Theme</button>
+                    <button id="mobile-ai-toggle" class="header-overflow-item mobile-only-item" title="AI Assistant"><i class="fas fa-robot"></i> AI Assistant</button>
                 </div>
             </div>
         </header>
+        
+        <!-- Note Tabs Bar -->
+        <div class="note-tabs-bar" id="note-tabs-bar">
+            <div class="note-tabs-container" id="note-tabs-container">
+                <!-- Tabs will be populated here -->
+            </div>
+            <button class="tabs-overflow-btn hidden" id="tabs-overflow-btn" title="More tabs">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
 
         <!-- Main Content -->
         <main class="main-content">
@@ -168,14 +190,42 @@
 
                 <!-- No Note Selected Placeholder -->
                 <div class="no-note-placeholder hidden" id="no-note-placeholder">
+                    <!-- Animated background elements -->
+                    <div class="placeholder-bg-elements">
+                        <div class="floating-shape shape-1"></div>
+                        <div class="floating-shape shape-2"></div>
+                        <div class="floating-shape shape-3"></div>
+                        <div class="floating-shape shape-4"></div>
+                        <div class="floating-shape shape-5"></div>
+                    </div>
+                    
                     <div class="placeholder-content">
-                        <div class="placeholder-icon"><i class="fas fa-sticky-note"></i></div>
-                        <h2 class="placeholder-title">Select a note to start</h2>
-                        <p class="placeholder-description">Choose a note from the sidebar or create a new one to begin writing</p>
-                        <button id="create-first-note-btn" class="create-note-btn">
-                            <span class="btn-icon"><i class="fas fa-plus"></i></span>
-                            Create New Note
-                        </button>
+                        <div class="placeholder-icon-wrapper">
+                            <div class="placeholder-icon-ring"></div>
+                            <div class="placeholder-icon">
+                                <i class="fas fa-feather-alt"></i>
+                            </div>
+                        </div>
+                        <h2 class="placeholder-title">Ready to capture your thoughts?</h2>
+                        <p class="placeholder-description">Select an existing note from the sidebar or start fresh with a new canvas</p>
+                        
+                        <div class="placeholder-actions">
+                            <button id="create-first-note-btn" class="create-note-btn">
+                                <span class="btn-icon"><i class="fas fa-plus"></i></span>
+                                <span>Create New Note</span>
+                            </button>
+                        </div>
+                        
+                        <div class="placeholder-tips">
+                            <div class="tip-item">
+                                <i class="fas fa-keyboard"></i>
+                                <span>Press <kbd>Ctrl</kbd> + <kbd>N</kbd> for quick note</span>
+                            </div>
+                            <div class="tip-item">
+                                <i class="fas fa-magic"></i>
+                                <span>AI assistant ready to help you write</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>

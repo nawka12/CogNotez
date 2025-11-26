@@ -894,6 +894,12 @@ class CogNotezApp {
         this.currentAIAbortController = null;
         this.isAIOperationCancelled = false;
 
+        // Multi-tab system
+        this.openTabs = []; // Array of { noteId, title, unsaved } objects
+        this.maxTabs = 10; // Maximum number of tabs allowed
+        this._ignoreNextInputForUnsaved = false; // Flag to prevent marking tab unsaved during note load
+        this._draggedTabIndex = null; // Index of tab being dragged for reordering
+
         this.init();
     }
 
@@ -1051,6 +1057,16 @@ class CogNotezApp {
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('mobile-search-btn').addEventListener('click', () => this.toggleMobileSearch());
         document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
+        
+        // Mobile-specific overflow menu items
+        const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
+        if (mobileThemeToggle) {
+            mobileThemeToggle.addEventListener('click', () => this.toggleTheme());
+        }
+        const mobileAIToggle = document.getElementById('mobile-ai-toggle');
+        if (mobileAIToggle) {
+            mobileAIToggle.addEventListener('click', () => this.toggleAIPanel());
+        }
         const syncSettingsBtn = document.getElementById('sync-settings-btn');
         if (syncSettingsBtn) {
             syncSettingsBtn.addEventListener('click', () => this.showSyncSettings());
@@ -1062,7 +1078,15 @@ class CogNotezApp {
             syncBtn.addEventListener('click', () => this.manualSync());
         }
         
-        document.getElementById('search-button').addEventListener('click', () => this.searchNotes());
+        // Initialize tabs system
+        this.initializeTabsEventListeners();
+        
+        // Update search shortcut for platform
+        const searchShortcut = document.getElementById('search-shortcut');
+        if (searchShortcut) {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            searchShortcut.textContent = isMac ? '⌘K' : 'Ctrl+K';
+        }
 
         // Network online/offline event listeners
         window.addEventListener('online', () => {
@@ -1154,11 +1178,25 @@ class CogNotezApp {
         // Placeholder actions
         document.getElementById('create-first-note-btn').addEventListener('click', () => this.createNewNote());
 
-        // Editor input for real-time preview updates
+        // Editor input for real-time preview updates and unsaved tracking
         document.getElementById('note-editor').addEventListener('input', () => {
             const preview = document.getElementById('markdown-preview');
             if (!preview.classList.contains('hidden')) {
                 this.renderMarkdownPreview();
+            }
+            // Mark tab as unsaved when content changes (skip if loading note)
+            if (this.currentNote && !this._ignoreNextInputForUnsaved) {
+                this.markTabUnsaved(this.currentNote.id, true);
+            }
+            this._ignoreNextInputForUnsaved = false;
+        });
+        
+        // Also track title changes for unsaved indicator and update tab title
+        document.getElementById('note-title').addEventListener('input', (e) => {
+            if (this.currentNote && !this._ignoreNextInputForUnsaved) {
+                this.markTabUnsaved(this.currentNote.id, true);
+                // Update tab title live
+                this.updateTabTitle(this.currentNote.id, e.target.value || 'Untitled');
             }
         });
 
@@ -2179,6 +2217,9 @@ class CogNotezApp {
         this.currentNote = note;
         this.showNoteEditor();
 
+        // Add to tabs if not already open
+        this.addNoteToTabs(note.id);
+
         document.getElementById('note-title').value = note.title;
         document.getElementById('note-editor').value = note.content;
         this.updateNoteDate();
@@ -2198,6 +2239,8 @@ class CogNotezApp {
         });
 
         // Trigger word count update since we set content programmatically
+        // Use a flag to prevent this from marking the tab as unsaved
+        this._ignoreNextInputForUnsaved = true;
         const editor = document.getElementById('note-editor');
         const inputEvent = new Event('input', { bubbles: true });
         editor.dispatchEvent(inputEvent);
@@ -2212,6 +2255,9 @@ class CogNotezApp {
         if (this.previewMode === 'preview' || this.previewMode === 'split') {
             this.renderMarkdownPreview();
         }
+        
+        // Ensure tab is marked as saved after loading (not unsaved)
+        this.markTabUnsaved(note.id, false);
     }
 
     // Show the note editor interface
@@ -2259,6 +2305,369 @@ class CogNotezApp {
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.remove('active');
         });
+    }
+
+    // =====================================================
+    // MULTI-TAB SYSTEM
+    // =====================================================
+
+    // Add a note to the tabs bar
+    addNoteToTabs(noteId) {
+        // Normalize ID to string for consistent comparison
+        const normalizedId = String(noteId);
+        
+        // Check if tab already exists
+        const existingTab = this.openTabs.find(tab => String(tab.noteId) === normalizedId);
+        if (existingTab) {
+            // Update tab title from currentNote if available
+            if (this.currentNote && String(this.currentNote.id) === normalizedId) {
+                existingTab.title = this.currentNote.title || 'Untitled';
+            }
+            this.setActiveTab(normalizedId);
+            return;
+        }
+
+        // Check max tabs limit
+        if (this.openTabs.length >= this.maxTabs) {
+            // Close the oldest non-active tab that isn't unsaved
+            const currentId = this.currentNote ? String(this.currentNote.id) : null;
+            const tabToClose = this.openTabs.find(tab => 
+                String(tab.noteId) !== currentId && !tab.unsaved
+            );
+            if (tabToClose) {
+                this.closeTab(tabToClose.noteId, true);
+            } else {
+                this.showNotification('Maximum tabs reached. Close some tabs first.', 'warning');
+                return;
+            }
+        }
+
+        // Get title from currentNote if it matches
+        let title = 'Untitled';
+        if (this.currentNote && String(this.currentNote.id) === normalizedId) {
+            title = this.currentNote.title || 'Untitled';
+        } else {
+            // Try to find in notes array
+            const note = this.notes.find(n => String(n.id) === normalizedId);
+            if (note) {
+                title = note.title || 'Untitled';
+            }
+        }
+
+        // Add new tab with normalized ID and title
+        this.openTabs.push({ noteId: normalizedId, title: title, unsaved: false });
+        this.renderTabs();
+        this.setActiveTab(normalizedId);
+    }
+
+    // Remove a note from tabs
+    closeTab(noteId, silent = false) {
+        const noteIdStr = String(noteId);
+        const tabIndex = this.openTabs.findIndex(tab => String(tab.noteId) === noteIdStr);
+        if (tabIndex === -1) return;
+
+        const tab = this.openTabs[tabIndex];
+        
+        // If tab has unsaved changes and not silent, show confirmation
+        if (tab.unsaved && !silent) {
+            const noteName = tab.title || 'Untitled';
+            if (!confirm(`"${noteName}" has unsaved changes. Close anyway?`)) {
+                return;
+            }
+        }
+
+        // Remove from openTabs array
+        this.openTabs.splice(tabIndex, 1);
+
+        // If we're closing the active tab, switch to another tab
+        if (this.currentNote && String(this.currentNote.id) === noteIdStr) {
+            if (this.openTabs.length > 0) {
+                // Switch to the nearest tab
+                const newIndex = Math.min(tabIndex, this.openTabs.length - 1);
+                const newTab = this.openTabs[newIndex];
+                this.switchToTab(newTab.noteId);
+                return; // switchToTab will call renderTabs via displayNote
+            } else {
+                // No tabs left, show placeholder
+                this.showNoNotePlaceholder();
+            }
+        }
+
+        this.renderTabs();
+    }
+
+    // Set a tab as active
+    setActiveTab(noteId) {
+        this.renderTabs();
+    }
+
+    // Mark a tab as having unsaved changes
+    markTabUnsaved(noteId, unsaved = true) {
+        const noteIdStr = String(noteId);
+        const tab = this.openTabs.find(tab => String(tab.noteId) === noteIdStr);
+        if (tab && tab.unsaved !== unsaved) {
+            tab.unsaved = unsaved;
+            this.renderTabs();
+        }
+    }
+
+    // Update tab title
+    updateTabTitle(noteId, title) {
+        const noteIdStr = String(noteId);
+        const tab = this.openTabs.find(tab => String(tab.noteId) === noteIdStr);
+        if (tab && tab.title !== title) {
+            tab.title = title || 'Untitled';
+            this.renderTabs();
+        }
+    }
+
+    // Render all tabs
+    renderTabs() {
+        const tabsBar = document.getElementById('note-tabs-bar');
+        const tabsContainer = document.getElementById('note-tabs-container');
+        
+        if (!tabsBar || !tabsContainer) return;
+
+        // Show/hide tabs bar based on whether we have tabs
+        if (this.openTabs.length > 0) {
+            tabsBar.classList.add('has-tabs');
+        } else {
+            tabsBar.classList.remove('has-tabs');
+            tabsContainer.innerHTML = '';
+            return;
+        }
+
+        // Build tabs HTML
+        let tabsHtml = '';
+        this.openTabs.forEach(tab => {
+            const tabIdStr = String(tab.noteId);
+            const isActive = this.currentNote && String(this.currentNote.id) === tabIdStr;
+            
+            // For active tab, use currentNote title and update stored title
+            // For inactive tabs, use stored title
+            let title;
+            if (isActive && this.currentNote) {
+                title = this.currentNote.title || 'Untitled';
+                // Update stored title
+                tab.title = title;
+            } else {
+                // Use stored title from tab
+                title = tab.title || 'Untitled';
+            }
+            
+            const unsavedClass = tab.unsaved ? 'unsaved' : '';
+            const activeClass = isActive ? 'active' : '';
+
+            tabsHtml += `
+                <div class="note-tab ${activeClass} ${unsavedClass}" data-note-id="${tab.noteId}">
+                    <span class="note-tab-title" title="${this.escapeHtml(title)}">${this.escapeHtml(title)}</span>
+                    <button class="note-tab-close" data-note-id="${tab.noteId}" title="Close tab">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        });
+
+        tabsContainer.innerHTML = tabsHtml;
+
+        // Add event listeners to tabs
+        tabsContainer.querySelectorAll('.note-tab').forEach((tabEl, index) => {
+            const noteId = tabEl.dataset.noteId;
+            
+            // Make tab draggable
+            tabEl.setAttribute('draggable', 'true');
+            
+            // Click on tab to switch
+            tabEl.addEventListener('click', (e) => {
+                if (!e.target.closest('.note-tab-close')) {
+                    this.switchToTab(noteId);
+                }
+            });
+
+            // Middle click to close
+            tabEl.addEventListener('auxclick', (e) => {
+                if (e.button === 1) { // Middle click
+                    e.preventDefault();
+                    this.closeTab(noteId);
+                }
+            });
+            
+            // Drag start
+            tabEl.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', noteId);
+                tabEl.classList.add('dragging');
+                this._draggedTabIndex = index;
+            });
+            
+            // Drag end
+            tabEl.addEventListener('dragend', () => {
+                tabEl.classList.remove('dragging');
+                // Clear all drag-over states
+                tabsContainer.querySelectorAll('.note-tab').forEach(t => {
+                    t.classList.remove('drag-over', 'drag-over-right');
+                });
+                this._draggedTabIndex = null;
+            });
+            
+            // Drag over
+            tabEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                if (this._draggedTabIndex === null || this._draggedTabIndex === index) return;
+                
+                // Determine if dropping before or after this tab
+                const rect = tabEl.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+                
+                // Clear previous states
+                tabEl.classList.remove('drag-over', 'drag-over-right');
+                
+                if (e.clientX < midpoint) {
+                    tabEl.classList.add('drag-over');
+                } else {
+                    tabEl.classList.add('drag-over-right');
+                }
+            });
+            
+            // Drag leave
+            tabEl.addEventListener('dragleave', () => {
+                tabEl.classList.remove('drag-over', 'drag-over-right');
+            });
+            
+            // Drop
+            tabEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                tabEl.classList.remove('drag-over', 'drag-over-right');
+                
+                if (this._draggedTabIndex === null || this._draggedTabIndex === index) return;
+                
+                // Determine drop position
+                const rect = tabEl.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+                let targetIndex = e.clientX < midpoint ? index : index + 1;
+                
+                // Adjust if dragging from before the target
+                if (this._draggedTabIndex < targetIndex) {
+                    targetIndex--;
+                }
+                
+                this.reorderTab(this._draggedTabIndex, targetIndex);
+            });
+        });
+
+        // Add event listeners to close buttons
+        tabsContainer.querySelectorAll('.note-tab-close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const noteId = closeBtn.dataset.noteId;
+                this.closeTab(noteId);
+            });
+        });
+    }
+    
+    // Reorder a tab from one position to another
+    reorderTab(fromIndex, toIndex) {
+        if (fromIndex === toIndex) return;
+        if (fromIndex < 0 || fromIndex >= this.openTabs.length) return;
+        if (toIndex < 0 || toIndex >= this.openTabs.length) return;
+        
+        // Remove tab from old position and insert at new position
+        const [movedTab] = this.openTabs.splice(fromIndex, 1);
+        this.openTabs.splice(toIndex, 0, movedTab);
+        
+        this.renderTabs();
+    }
+
+    // Switch to a specific tab
+    async switchToTab(noteId) {
+        const noteIdStr = String(noteId);
+        if (this.currentNote && String(this.currentNote.id) === noteIdStr) return;
+
+        // Save current note before switching
+        if (this.currentNote) {
+            await this.saveCurrentNote();
+        }
+
+        // Try to find note in array first
+        let note = this.notes.find(n => String(n.id) === noteIdStr);
+        
+        // If not found in array, try to fetch from database
+        if (!note && this.notesManager && this.notesManager.db) {
+            try {
+                note = await this.notesManager.db.getNote(noteId);
+            } catch (e) {
+                console.warn('[switchToTab] Failed to get note from database:', e);
+            }
+        }
+        
+        if (note) {
+            // Handle password-protected notes
+            if (note.password_protected) {
+                const cachedPassword = this.getCachedNotePassword(note.id);
+                if (cachedPassword && note.encrypted_content && window.encryptionManager) {
+                    // Try to decrypt with cached password
+                    try {
+                        const envelope = JSON.parse(note.encrypted_content);
+                        const decrypted = window.encryptionManager.decryptData(envelope, cachedPassword);
+                        note.content = decrypted.content || '';
+                        this.displayNote(note);
+                    } catch (e) {
+                        console.warn('[switchToTab] Failed to decrypt with cached password:', e);
+                        // Password might have changed, clear cache and prompt
+                        this.clearCachedNotePassword(note.id);
+                        await this.promptForNotePassword(note);
+                    }
+                } else {
+                    // No cached password, prompt for it
+                    await this.promptForNotePassword(note);
+                }
+            } else {
+                this.displayNote(note);
+            }
+        } else {
+            console.warn('[switchToTab] Note not found:', noteId);
+            // Remove the tab if note doesn't exist
+            this.closeTab(noteId, true);
+        }
+    }
+
+    // Close all tabs except the current one
+    closeOtherTabs() {
+        const currentId = this.currentNote ? String(this.currentNote.id) : null;
+        const tabsToClose = this.openTabs.filter(tab => String(tab.noteId) !== currentId);
+        
+        // Check for unsaved changes
+        const unsavedTabs = tabsToClose.filter(tab => tab.unsaved);
+        if (unsavedTabs.length > 0) {
+            if (!confirm(`${unsavedTabs.length} tab(s) have unsaved changes. Close all anyway?`)) {
+                return;
+            }
+        }
+
+        this.openTabs = this.openTabs.filter(tab => String(tab.noteId) === currentId);
+        this.renderTabs();
+    }
+
+    // Close all tabs
+    closeAllTabs() {
+        const unsavedTabs = this.openTabs.filter(tab => tab.unsaved);
+        if (unsavedTabs.length > 0) {
+            if (!confirm(`${unsavedTabs.length} tab(s) have unsaved changes. Close all anyway?`)) {
+                return;
+            }
+        }
+
+        this.openTabs = [];
+        this.showNoNotePlaceholder();
+        this.renderTabs();
+    }
+
+    // Initialize tabs event listeners (called during setup)
+    initializeTabsEventListeners() {
+        // Initial render
+        this.renderTabs();
     }
 
     // Helper method to display tags in the note editor header
@@ -2729,6 +3138,11 @@ class CogNotezApp {
             // Only show notification for manual saves, not auto-saves
             if (!isAutoSave) {
                 this.showNotification('Note saved successfully!');
+            }
+
+            // Clear unsaved flag on tab
+            if (this.currentNote) {
+                this.markTabUnsaved(this.currentNote.id, false);
             }
 
             // Auto-update shared notes on Google Drive
@@ -4925,6 +5339,7 @@ Please provide a helpful response based on the note content and conversation his
                     this.createNewNote();
                     break;
                 case '/':
+                case 'k':
                     e.preventDefault();
                     document.getElementById('search-input').focus();
                     break;

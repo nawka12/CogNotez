@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<!--
+    Note Rescue Tool - Development Only
+    
+    This tool allows you to rescue notes from encrypted backup JSON files.
+    
+    How to use:
+    1. Open this file in Electron (or load it in the app)
+    2. Paste your encrypted backup JSON in Step 1
+    3. Enter the backup decryption key (passphrase used to encrypt the backup)
+    4. Click "Decrypt Backup" to decrypt the backup
+    5. Select the note you want to rescue from the dropdown
+    6. If the note is password-protected, enter the note password
+    7. Click "Rescue Note" to decrypt and display the note content
+    
+    To open this file:
+    - In Electron: You can load it via file:// protocol or add a menu item
+    - Or open it directly: file:///path/to/src/rescue-note.html
+-->
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Note Rescue Tool - Development Only</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #1a1a1a;
+            color: #e0e0e0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            background: #2a2a2a;
+            border-radius: 8px;
+            padding: 30px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+        }
+
+        h1 {
+            color: #3ECF8E;
+            margin-bottom: 10px;
+            font-size: 24px;
+        }
+
+        .warning {
+            background: #ff6b6b;
+            color: white;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-weight: 500;
+        }
+
+        .section {
+            margin-bottom: 25px;
+        }
+
+        .section-title {
+            color: #3ECF8E;
+            font-size: 16px;
+            margin-bottom: 10px;
+            font-weight: 600;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #b0b0b0;
+            font-size: 14px;
+        }
+
+        textarea, input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+
+        input[type="text"], input[type="password"] {
+            height: 40px;
+        }
+
+        button {
+            background: #3ECF8E;
+            color: #1a1a1a;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        button:hover {
+            background: #2fb876;
+        }
+
+        button:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .result-section {
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #444;
+        }
+
+        .result-content {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+        }
+
+        .error {
+            color: #ff6b6b;
+            background: #3a1a1a;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: 1px solid #ff6b6b;
+        }
+
+        .success {
+            color: #3ECF8E;
+            background: #1a3a2a;
+            padding: 12px;
+            border-radius: 4px;
+            margin-top: 10px;
+            border: 1px solid #3ECF8E;
+        }
+
+        .note-info {
+            background: #1a1a1a;
+            padding: 15px;
+            border-radius: 4px;
+            border: 1px solid #444;
+            margin-bottom: 15px;
+        }
+
+        .note-info-item {
+            margin-bottom: 8px;
+        }
+
+        .note-info-label {
+            color: #3ECF8E;
+            font-weight: 600;
+            display: inline-block;
+            width: 120px;
+        }
+
+        .note-selector {
+            margin-bottom: 15px;
+        }
+
+        select {
+            width: 100%;
+            padding: 10px;
+            background: #1a1a1a;
+            border: 1px solid #444;
+            border-radius: 4px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Note Rescue Tool</h1>
+        <div class="warning">
+            ⚠️ DEVELOPMENT ONLY - This tool is for rescuing notes from encrypted backups. Use with caution.
+        </div>
+
+        <div class="section">
+            <div class="section-title">Step 1: Encrypted Backup JSON</div>
+            <label for="backup-json">Paste your encrypted backup JSON here:</label>
+            <textarea id="backup-json" placeholder='{"v": 1, "alg": "AES-256-GCM", "ct": "...", ...}'></textarea>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Step 2: Decryption Keys</div>
+            <label for="backup-key">Backup Decryption Key (passphrase):</label>
+            <input type="password" id="backup-key" placeholder="Enter the key used to encrypt the backup">
+            
+            <label for="note-password" style="margin-top: 15px;">Note Password (if note is password-protected):</label>
+            <input type="password" id="note-password" placeholder="Enter the password for the protected note">
+        </div>
+
+        <div class="button-group">
+            <button id="decrypt-backup-btn">Decrypt Backup</button>
+            <button id="rescue-note-btn" disabled>Rescue Note</button>
+        </div>
+
+        <div id="error-message" class="error" style="display: none;"></div>
+        <div id="success-message" class="success" style="display: none;"></div>
+
+        <div id="decrypted-backup-section" style="display: none;">
+            <div class="section">
+                <div class="section-title">Step 3: Select Note to Rescue</div>
+                <div class="note-selector">
+                    <label for="note-select">Select a note:</label>
+                    <select id="note-select"></select>
+                </div>
+            </div>
+        </div>
+
+        <div id="result-section" class="result-section" style="display: none;">
+            <div class="section-title">Rescued Note Content</div>
+            <div class="note-info" id="note-info"></div>
+            <div class="result-content" id="rescued-content"></div>
+        </div>
+    </div>
+
+    <!-- Browser-compatible Encryption Manager using Web Crypto API -->
+    <script>
+        // Browser-compatible EncryptionManager using Web Crypto API
+        class BrowserEncryptionManager {
+            constructor() {
+                this.defaultIterations = 210000;
+            }
+
+            /**
+             * Convert base64 string to Uint8Array
+             */
+            base64ToBytes(base64) {
+                const binary = atob(base64);
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) {
+                    bytes[i] = binary.charCodeAt(i);
+                }
+                return bytes;
+            }
+
+            /**
+             * Convert Uint8Array to base64 string
+             */
+            bytesToBase64(bytes) {
+                const binary = String.fromCharCode(...bytes);
+                return btoa(binary);
+            }
+
+            /**
+             * Convert string to Uint8Array (UTF-8)
+             */
+            stringToBytes(str) {
+                return new TextEncoder().encode(str);
+            }
+
+            /**
+             * Convert Uint8Array to string (UTF-8)
+             */
+            bytesToString(bytes) {
+                return new TextDecoder().decode(bytes);
+            }
+
+            /**
+             * Derive key using PBKDF2 (Web Crypto API)
+             */
+            async deriveKey(passphrase, saltBytes, iterations) {
+                const passphraseKey = await crypto.subtle.importKey(
+                    'raw',
+                    this.stringToBytes(passphrase),
+                    'PBKDF2',
+                    false,
+                    ['deriveBits', 'deriveKey']
+                );
+
+                const keyMaterial = await crypto.subtle.deriveKey(
+                    {
+                        name: 'PBKDF2',
+                        salt: saltBytes,
+                        iterations: iterations,
+                        hash: 'SHA-256'
+                    },
+                    passphraseKey,
+                    {
+                        name: 'AES-GCM',
+                        length: 256
+                    },
+                    false,
+                    ['decrypt']
+                );
+
+                return keyMaterial;
+            }
+
+            /**
+             * Check if data is encrypted
+             */
+            isEncrypted(data) {
+                return data &&
+                       typeof data === 'object' &&
+                       data.v === 1 &&
+                       data.alg === 'AES-256-GCM' &&
+                       data.ct &&
+                       data.tag;
+            }
+
+            /**
+             * Decrypt encrypted envelope with passphrase (async)
+             */
+            async decryptData(envelope, passphrase) {
+                if (!envelope || !passphrase) {
+                    throw new Error('Envelope and passphrase are required');
+                }
+
+                // Validate envelope format
+                if (envelope.v !== 1 || envelope.alg !== 'AES-256-GCM') {
+                    throw new Error('Unsupported encryption format');
+                }
+
+                try {
+                    const saltBytes = this.base64ToBytes(envelope.salt);
+                    const ivBytes = this.base64ToBytes(envelope.iv);
+                    const tagBytes = this.base64ToBytes(envelope.tag);
+                    const ctBytes = this.base64ToBytes(envelope.ct);
+                    const iterations = envelope.iter || this.defaultIterations;
+
+                    // Derive key using PBKDF2
+                    const key = await this.deriveKey(passphrase, saltBytes, iterations);
+
+                    // Combine ciphertext and auth tag for Web Crypto API
+                    // Web Crypto API expects ciphertext + tag concatenated
+                    const ciphertextWithTag = new Uint8Array(ctBytes.length + tagBytes.length);
+                    ciphertextWithTag.set(ctBytes, 0);
+                    ciphertextWithTag.set(tagBytes, ctBytes.length);
+
+                    // Decrypt using AES-GCM
+                    const plaintextBytes = await crypto.subtle.decrypt(
+                        {
+                            name: 'AES-GCM',
+                            iv: ivBytes,
+                            tagLength: 128 // 128-bit auth tag
+                        },
+                        key,
+                        ciphertextWithTag
+                    );
+
+                    const plaintext = this.bytesToString(new Uint8Array(plaintextBytes));
+                    return JSON.parse(plaintext);
+
+                } catch (error) {
+                    if (error.name === 'OperationError' || error.message.includes('decrypt')) {
+                        throw new Error('Incorrect passphrase or corrupted data');
+                    }
+                    throw new Error(`Decryption failed: ${error.message}`);
+                }
+            }
+        }
+
+        // Create singleton instance
+        const encryptionManager = new BrowserEncryptionManager();
+    </script>
+    
+    <script>
+        // Wait for DOM to be ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Check if Web Crypto API is available
+            if (!window.crypto || !window.crypto.subtle) {
+                document.getElementById('error-message').textContent = 'Web Crypto API is not available. Please use a modern browser.';
+                document.getElementById('error-message').style.display = 'block';
+                return;
+            }
+
+            let decryptedBackup = null;
+            let selectedNote = null;
+
+            // Decrypt backup button
+            document.getElementById('decrypt-backup-btn').addEventListener('click', async () => {
+                const backupJson = document.getElementById('backup-json').value.trim();
+                const backupKey = document.getElementById('backup-key').value;
+
+                // Hide previous messages
+                document.getElementById('error-message').style.display = 'none';
+                document.getElementById('success-message').style.display = 'none';
+
+                if (!backupJson) {
+                    showError('Please paste the encrypted backup JSON');
+                    return;
+                }
+
+                if (!backupKey) {
+                    showError('Please enter the backup decryption key');
+                    return;
+                }
+
+                if (!encryptionManager) {
+                    showError('Encryption manager not available');
+                    return;
+                }
+
+                try {
+                    // Parse the backup JSON
+                    let backupEnvelope;
+                    try {
+                        backupEnvelope = JSON.parse(backupJson);
+                    } catch (e) {
+                        showError('Invalid JSON format: ' + e.message);
+                        return;
+                    }
+
+                    // Check if it's encrypted
+                    if (!encryptionManager.isEncrypted(backupEnvelope)) {
+                        showError('The provided JSON does not appear to be encrypted. It should have v, alg, ct, and tag fields.');
+                        return;
+                    }
+
+                    // Show loading state
+                    const decryptBtn = document.getElementById('decrypt-backup-btn');
+                    decryptBtn.disabled = true;
+                    decryptBtn.textContent = 'Decrypting...';
+
+                    try {
+                        // Decrypt the backup (async)
+                        decryptedBackup = await encryptionManager.decryptData(backupEnvelope, backupKey);
+                        
+                        // Populate note selector
+                        populateNoteSelector(decryptedBackup);
+                        
+                        // Show success and enable rescue button
+                        showSuccess('Backup decrypted successfully! Select a note to rescue.');
+                        document.getElementById('decrypted-backup-section').style.display = 'block';
+                        document.getElementById('rescue-note-btn').disabled = false;
+                    } catch (error) {
+                        showError('Decryption failed: ' + error.message);
+                        console.error('Decryption error:', error);
+                    } finally {
+                        decryptBtn.disabled = false;
+                        decryptBtn.textContent = 'Decrypt Backup';
+                    }
+                    
+                } catch (error) {
+                    showError('Failed to parse backup: ' + error.message);
+                    console.error('Parse error:', error);
+                }
+                });
+
+            // Populate note selector
+            function populateNoteSelector(backup) {
+                const noteSelect = document.getElementById('note-select');
+                noteSelect.innerHTML = '<option value="">-- Select a note --</option>';
+
+                if (!backup.notes || Object.keys(backup.notes).length === 0) {
+                    noteSelect.innerHTML = '<option value="">No notes found in backup</option>';
+                    return;
+                }
+
+                // Add all notes to selector
+                for (const [noteId, note] of Object.entries(backup.notes)) {
+                    const title = note.title || 'Untitled Note';
+                    const isProtected = note.password_protected ? ' 🔒' : '';
+                    const option = document.createElement('option');
+                    option.value = noteId;
+                    option.textContent = `${title}${isProtected} (ID: ${noteId.substring(0, 8)}...)`;
+                    option.dataset.note = JSON.stringify(note);
+                    noteSelect.appendChild(option);
+                }
+
+                // Update selected note when selection changes
+                noteSelect.addEventListener('change', (e) => {
+                    if (e.target.value) {
+                        selectedNote = JSON.parse(e.target.options[e.target.selectedIndex].dataset.note);
+                    } else {
+                        selectedNote = null;
+                    }
+                });
+            }
+
+        // Rescue note button
+        document.getElementById('rescue-note-btn').addEventListener('click', async () => {
+            if (!selectedNote) {
+                showError('Please select a note first');
+                return;
+            }
+
+            const notePassword = document.getElementById('note-password').value;
+
+            // Hide previous messages
+            document.getElementById('error-message').style.display = 'none';
+            document.getElementById('success-message').style.display = 'none';
+
+            try {
+                let noteContent = '';
+                let noteInfo = {
+                    id: selectedNote.id,
+                    title: selectedNote.title || 'Untitled Note',
+                    created: selectedNote.created || 'Unknown',
+                    modified: selectedNote.modified || 'Unknown',
+                    tags: selectedNote.tags || [],
+                    password_protected: selectedNote.password_protected || false
+                };
+
+                // Show loading state
+                const rescueBtn = document.getElementById('rescue-note-btn');
+                rescueBtn.disabled = true;
+                rescueBtn.textContent = 'Rescuing...';
+
+                // If note is password-protected, decrypt it
+                if (selectedNote.password_protected) {
+                    if (!notePassword) {
+                        showError('This note is password-protected. Please enter the note password.');
+                        rescueBtn.disabled = false;
+                        rescueBtn.textContent = 'Rescue Note';
+                        return;
+                    }
+
+                    if (!selectedNote.encrypted_content) {
+                        showError('Note is marked as password-protected but has no encrypted_content field.');
+                        rescueBtn.disabled = false;
+                        rescueBtn.textContent = 'Rescue Note';
+                        return;
+                    }
+
+                    try {
+                        const envelope = JSON.parse(selectedNote.encrypted_content);
+                        const decrypted = await encryptionManager.decryptData(envelope, notePassword);
+                        noteContent = decrypted.content || '';
+                    } catch (error) {
+                        showError('Failed to decrypt note content: ' + error.message + '. Check if the password is correct.');
+                        rescueBtn.disabled = false;
+                        rescueBtn.textContent = 'Rescue Note';
+                        return;
+                    }
+                } else {
+                    // Note is not password-protected, use content directly
+                    noteContent = selectedNote.content || '';
+                }
+
+                // Display the rescued note
+                displayRescuedNote(noteInfo, noteContent);
+                showSuccess('Note rescued successfully!');
+                rescueBtn.disabled = false;
+                rescueBtn.textContent = 'Rescue Note';
+
+            } catch (error) {
+                showError('Failed to rescue note: ' + error.message);
+                console.error('Rescue error:', error);
+                const rescueBtn = document.getElementById('rescue-note-btn');
+                rescueBtn.disabled = false;
+                rescueBtn.textContent = 'Rescue Note';
+            }
+        });
+
+            // Display rescued note
+            function displayRescuedNote(noteInfo, content) {
+            const noteInfoDiv = document.getElementById('note-info');
+            const contentDiv = document.getElementById('rescued-content');
+
+            // Display note info
+            noteInfoDiv.innerHTML = `
+                <div class="note-info-item">
+                    <span class="note-info-label">Title:</span>
+                    <span>${escapeHtml(noteInfo.title)}</span>
+                </div>
+                <div class="note-info-item">
+                    <span class="note-info-label">ID:</span>
+                    <span>${escapeHtml(noteInfo.id)}</span>
+                </div>
+                <div class="note-info-item">
+                    <span class="note-info-label">Created:</span>
+                    <span>${escapeHtml(noteInfo.created)}</span>
+                </div>
+                <div class="note-info-item">
+                    <span class="note-info-label">Modified:</span>
+                    <span>${escapeHtml(noteInfo.modified)}</span>
+                </div>
+                <div class="note-info-item">
+                    <span class="note-info-label">Tags:</span>
+                    <span>${noteInfo.tags.length > 0 ? escapeHtml(noteInfo.tags.join(', ')) : 'None'}</span>
+                </div>
+                <div class="note-info-item">
+                    <span class="note-info-label">Protected:</span>
+                    <span>${noteInfo.password_protected ? 'Yes 🔒' : 'No'}</span>
+                </div>
+            `;
+
+            // Display content
+            contentDiv.textContent = content || '(Empty note)';
+
+            // Show result section
+            document.getElementById('result-section').style.display = 'block';
+        }
+
+            // Helper functions
+            function showError(message) {
+            const errorDiv = document.getElementById('error-message');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+        }
+
+            function showSuccess(message) {
+                const successDiv = document.getElementById('success-message');
+                successDiv.textContent = message;
+                successDiv.style.display = 'block';
+            }
+
+            function escapeHtml(text) {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            }
+        }); // End DOMContentLoaded
+    </script>
+</body>
+</html>
+
