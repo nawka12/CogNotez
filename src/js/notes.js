@@ -19,7 +19,7 @@ class NotesManager {
         }
     }
 
-    async renderNotesList(searchQuery = '') {
+    async renderNotesList(searchQuery = '', folderFilter = null) {
         try {
             let notes;
             if (this.db && this.db.initialized) {
@@ -35,11 +35,17 @@ class NotesManager {
                 console.log('[DEBUG] NotesManager.renderNotesList got', notes.length, 'notes from localStorage fallback');
             }
 
+            // Apply folder/tag filter
+            if (folderFilter) {
+                notes = this.filterNotesByFolder(notes, folderFilter);
+                console.log('[DEBUG] After folder filter:', notes.length, 'notes for folder:', folderFilter);
+            }
+
             this.currentNotes = notes;
             this.notesListElement.innerHTML = '';
 
             if (notes.length === 0) {
-                this.renderEmptyState();
+                this.renderEmptyState(folderFilter);
                 return;
             }
 
@@ -47,9 +53,73 @@ class NotesManager {
                 const noteElement = this.createNoteElement(note);
                 this.notesListElement.appendChild(noteElement);
             });
+            
+            // Update folder counts after rendering
+            this.updateFolderCounts();
         } catch (error) {
             console.error('Error rendering notes list:', error);
-            this.renderEmptyState();
+            this.renderEmptyState(folderFilter);
+        }
+    }
+
+    // Filter notes by folder (tag or special folder)
+    filterNotesByFolder(notes, folderFilter) {
+        if (!folderFilter || folderFilter === 'all') {
+            return notes;
+        }
+
+        if (folderFilter === 'untagged') {
+            return notes.filter(note => !note.tags || note.tags.length === 0);
+        }
+
+        // Filter by specific tag ID
+        return notes.filter(note => note.tags && note.tags.includes(folderFilter));
+    }
+
+    // Update folder counts in the sidebar
+    async updateFolderCounts() {
+        try {
+            let allNotes;
+            if (this.db && this.db.initialized) {
+                allNotes = await this.db.getAllNotes();
+            } else {
+                allNotes = this.getNotesFromLocalStorage();
+            }
+
+            // Update "All Notes" count
+            const allCountEl = document.getElementById('folder-count-all');
+            if (allCountEl) {
+                allCountEl.textContent = allNotes.length;
+            }
+
+            // Update "Untagged" count
+            const untaggedCountEl = document.getElementById('folder-count-untagged');
+            if (untaggedCountEl) {
+                const untaggedCount = allNotes.filter(note => !note.tags || note.tags.length === 0).length;
+                untaggedCountEl.textContent = untaggedCount;
+            }
+
+            // Update tag folder counts
+            const tagCounts = {};
+            allNotes.forEach(note => {
+                if (note.tags && note.tags.length > 0) {
+                    note.tags.forEach(tagId => {
+                        tagCounts[tagId] = (tagCounts[tagId] || 0) + 1;
+                    });
+                }
+            });
+
+            // Update each tag folder count element
+            Object.entries(tagCounts).forEach(([tagId, count]) => {
+                const countEl = document.querySelector(`.tag-folder-item[data-tag-id="${tagId}"] .tag-folder-count`);
+                if (countEl) {
+                    countEl.textContent = count;
+                }
+            });
+
+            return { total: allNotes.length, tagCounts };
+        } catch (error) {
+            console.error('Error updating folder counts:', error);
         }
     }
 
@@ -117,14 +187,30 @@ class NotesManager {
         return element;
     }
 
-    renderEmptyState() {
+    renderEmptyState(folderFilter = null) {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
+        
+        let icon = 'fa-sticky-note';
+        let title = 'No notes yet';
+        let subtitle = 'Click the + button to create your first note';
+
+        if (folderFilter === 'untagged') {
+            icon = 'fa-file-alt';
+            title = 'No untagged notes';
+            subtitle = 'All your notes have been organized with tags';
+        } else if (folderFilter && folderFilter !== 'all') {
+            icon = 'fa-folder-open';
+            const tagName = this.getTagName(folderFilter);
+            title = `No notes in "${tagName}"`;
+            subtitle = 'Add this tag to notes to see them here';
+        }
+
         emptyState.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: var(--text-tertiary);">
-                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-sticky-note"></i></div>
-                <div style="font-size: 16px; margin-bottom: 8px;">No notes yet</div>
-                <div style="font-size: 14px;">Click the + button to create your first note</div>
+                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas ${icon}"></i></div>
+                <div style="font-size: 16px; margin-bottom: 8px;">${title}</div>
+                <div style="font-size: 14px;">${subtitle}</div>
             </div>
         `;
         this.notesListElement.appendChild(emptyState);
@@ -256,7 +342,10 @@ class NotesManager {
                         this.app.showNoNotePlaceholder();
                     }
 
-                    await this.renderNotesList();
+                    await this.renderNotesList('', this.app.currentFolder);
+                    
+                    // Update folder counts
+                    await this.app.renderTagFolders();
                     
                     // Force a reflow/repaint to ensure UI is responsive
                     this.forceReflow();
@@ -281,7 +370,10 @@ class NotesManager {
                     }
 
                     this.app.saveNotes();
-                    this.renderNotesList();
+                    this.renderNotesList('', this.app.currentFolder);
+                    
+                    // Update folder counts
+                    this.app.renderTagFolders();
                     
                     // Force a reflow/repaint to ensure UI is responsive
                     this.forceReflow();
@@ -377,16 +469,18 @@ class NotesManager {
 
             if (this.db && this.db.initialized) {
                 await this.db.createNote(duplicate);
-                await this.renderNotesList();
+                await this.renderNotesList('', this.app.currentFolder);
                 const newNote = await this.db.getNote(duplicate.id);
                 this.app.displayNote(newNote);
+                await this.app.renderTagFolders();
             } else {
                 duplicate.created = new Date();
                 duplicate.modified = new Date();
                 this.app.notes.unshift(duplicate);
                 this.app.saveNotes();
-                this.renderNotesList();
+                this.renderNotesList('', this.app.currentFolder);
                 this.app.displayNote(duplicate);
+                this.app.renderTagFolders();
             }
         } catch (error) {
             console.error('Error duplicating note:', error);
@@ -428,7 +522,7 @@ class NotesManager {
             }
 
             // Re-render the notes list to reflect the change
-            await this.renderNotesList();
+            await this.renderNotesList('', this.app.currentFolder);
         } catch (error) {
             console.error('Error toggling pin status:', error);
         }

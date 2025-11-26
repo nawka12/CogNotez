@@ -206,28 +206,121 @@ class UIManager {
         const sidebar = document.querySelector('.sidebar');
         const toggle = document.getElementById('sidebar-toggle');
 
+        // Track collapsed state as instance property
+        this.sidebarCollapsed = false;
+
         // Collapsible sidebar (desktop-only)
-        let isCollapsed = false;
         toggle.addEventListener('click', () => {
             // Ignore collapse on mobile; the sidebar is a full-screen overlay there
             if (window.innerWidth <= 768) {
                 return;
             }
 
-            isCollapsed = !isCollapsed;
-            sidebar.style.width = isCollapsed ? '60px' : '';
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+            sidebar.style.width = this.sidebarCollapsed ? '60px' : '';
+            
+            // Add/remove collapsed class for CSS styling (hides resize handle)
+            sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
 
-            // Hide/show sidebar content
-            const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
+            // Hide/show sidebar content (including folders section)
+            const content = sidebar.querySelectorAll('.sidebar-header h2, .sidebar-folders, .notes-list');
             content.forEach(el => {
-                el.style.display = isCollapsed ? 'none' : '';
+                el.style.display = this.sidebarCollapsed ? 'none' : '';
             });
 
-            toggle.innerHTML = isCollapsed ? '<i class="fas fa-bars"></i>' : '<i class="fas fa-chevron-left"></i>';
+            toggle.innerHTML = this.sidebarCollapsed ? '<i class="fas fa-bars"></i>' : '<i class="fas fa-chevron-left"></i>';
         });
+
+        // Resizable sidebar (desktop-only)
+        this.setupSidebarResize();
 
         // Note drag and drop (placeholder)
         this.setupDragAndDrop();
+    }
+
+    // Setup sidebar resize functionality
+    setupSidebarResize() {
+        const sidebar = document.getElementById('sidebar');
+        const resizeHandle = document.getElementById('sidebar-resize-handle');
+        
+        if (!sidebar || !resizeHandle) return;
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        // Min and max width constraints
+        const MIN_WIDTH = 200;
+        const MAX_WIDTH = 600;
+        const DEFAULT_WIDTH = 320;
+
+        // Restore saved width from localStorage
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth && window.innerWidth > 768) {
+            const width = parseInt(savedWidth, 10);
+            if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
+                sidebar.style.width = `${width}px`;
+            }
+        }
+
+        const startResize = (e) => {
+            // Only allow resize on desktop and when not collapsed
+            if (window.innerWidth <= 768) return;
+            if (this.sidebarCollapsed) return;
+            
+            isResizing = true;
+            startX = e.clientX || e.touches?.[0]?.clientX || 0;
+            startWidth = sidebar.offsetWidth;
+            
+            sidebar.classList.add('resizing');
+            document.body.classList.add('sidebar-resizing');
+            
+            // Prevent text selection during resize
+            e.preventDefault();
+        };
+
+        const doResize = (e) => {
+            if (!isResizing) return;
+            
+            const currentX = e.clientX || e.touches?.[0]?.clientX || 0;
+            const diff = currentX - startX;
+            let newWidth = startWidth + diff;
+            
+            // Clamp to min/max
+            newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
+            
+            sidebar.style.width = `${newWidth}px`;
+        };
+
+        const stopResize = () => {
+            if (!isResizing) return;
+            
+            isResizing = false;
+            sidebar.classList.remove('resizing');
+            document.body.classList.remove('sidebar-resizing');
+            
+            // Save the width to localStorage
+            const currentWidth = sidebar.offsetWidth;
+            localStorage.setItem('sidebarWidth', currentWidth.toString());
+        };
+
+        // Mouse events
+        resizeHandle.addEventListener('mousedown', startResize);
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+
+        // Touch events for tablet
+        resizeHandle.addEventListener('touchstart', startResize, { passive: false });
+        document.addEventListener('touchmove', doResize, { passive: false });
+        document.addEventListener('touchend', stopResize);
+
+        // Double-click to reset to default width (only when not collapsed)
+        resizeHandle.addEventListener('dblclick', () => {
+            if (window.innerWidth <= 768) return;
+            if (this.sidebarCollapsed) return;
+            sidebar.style.width = `${DEFAULT_WIDTH}px`;
+            localStorage.setItem('sidebarWidth', DEFAULT_WIDTH.toString());
+        });
     }
 
     setupDragAndDrop() {
@@ -646,7 +739,7 @@ class UIManager {
                 if (window.innerWidth <= 768) {
                     // Clear desktop inline widths and restore content visibility for mobile overlay
                     sidebar.style.width = '';
-                    const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
+                    const content = sidebar.querySelectorAll('.sidebar-header h2, .sidebar-folders, .notes-list');
                     content.forEach(el => { el.style.display = ''; });
                 }
             }
@@ -773,7 +866,7 @@ class UIManager {
                 // Ensure mobile overlay uses responsive width (clear any desktop inline width)
                 if (window.innerWidth <= 768) {
                     sidebar.style.width = '';
-                    const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
+                    const content = sidebar.querySelectorAll('.sidebar-header h2, .sidebar-folders, .notes-list');
                     content.forEach(el => { el.style.display = ''; });
                 }
                 document.body.style.overflow = 'hidden';

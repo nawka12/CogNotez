@@ -900,103 +900,102 @@ class CogNotezApp {
         this._ignoreNextInputForUnsaved = false; // Flag to prevent marking tab unsaved during note load
         this._draggedTabIndex = null; // Index of tab being dragged for reordering
 
+        // Folder/Category navigation
+        this.currentFolder = localStorage.getItem('currentFolder') || 'all'; // Current active folder: 'all', 'untagged', or a tag ID
+
         this.init();
     }
 
     async init() {
         console.log('[DEBUG] Starting CogNotez application initialization...');
+        const startTime = performance.now();
 
         // Show splash screen immediately
         this.showSplashScreen();
         this.updateSplashVersion();
-        this.updateSplashProgress('Starting CogNotez...', 5);
+        this.updateSplashProgress('Starting up...', 5);
 
         try {
-            // Initialize database and managers
+            // Phase 1: Core initialization (required before app can function)
             console.log('[DEBUG] Initializing backend API...');
-            this.updateSplashProgress('Initializing backend services...', 15);
+            this.updateSplashProgress('Connecting services...', 15);
             this.backendAPI = new BackendAPI();
             this.backendAPI.setAppReference(this);
-            await this.backendAPI.initialize();
 
+            // Run backend and notes manager init in parallel
+            const [, ] = await Promise.all([
+                this.backendAPI.initialize(),
+                (async () => {
             console.log('[DEBUG] Initializing notes manager...');
-            this.updateSplashProgress('Loading notes database...', 30);
             this.notesManager = new NotesManager(this);
             await this.notesManager.initialize();
+                })()
+            ]);
+            this.updateSplashProgress('Loading your notes...', 40);
 
             // Start auto-save if enabled in settings
             this.initializeAutoSave();
 
-            console.log('[DEBUG] Initializing AI manager...');
-            this.updateSplashProgress('Setting up AI features...', 50);
+            // Phase 2: UI and features (can run in parallel)
+            console.log('[DEBUG] Initializing managers...');
+            this.updateSplashProgress('Preparing interface...', 55);
+            
+            // Initialize AI manager, UI manager, and Phase 5 features in parallel
+            await Promise.all([
+                (async () => {
             this.aiManager = new AIManager(this);
             await this.aiManager.initialize();
-
-            console.log('[DEBUG] Initializing UI manager...');
-            this.updateSplashProgress('Preparing user interface...', 70);
+                })(),
+                (async () => {
             this.uiManager = new UIManager(this);
             this.uiManager.initialize();
+                })(),
+                this.initializePhase5Features()
+            ]);
 
-            // Initialize Phase 5 features
-            console.log('[DEBUG] Initializing Phase 5 features...');
-            this.updateSplashProgress('Loading advanced features...', 75);
-            await this.initializePhase5Features();
-
-            // Register IPC listeners before any sync to ensure we catch startup sync events
+            // Register IPC listeners before any sync
             this.setupIPC();
 
-            console.log('[DEBUG] Initializing sync manager...');
-            this.updateSplashProgress('Setting up cloud sync...', 80);
+            // Phase 3: Sync setup (quick, just registers - doesn't sync yet)
+            console.log('[DEBUG] Setting up sync...');
+            this.updateSplashProgress('Setting up sync...', 75);
             await this.initializeSync();
 
-            // Setup UI and event listeners
+            // Phase 4: Final UI setup
             console.log('[DEBUG] Setting up event listeners and UI...');
-            this.updateSplashProgress('Finalizing setup...', 85);
+            this.updateSplashProgress('Almost ready...', 90);
             this.setupEventListeners();
             this.loadTheme();
-            this.syncPreviewModeUI(); // Ensure UI matches initial preview mode
+            this.syncPreviewModeUI();
             await this.loadNotes();
-            // After UI loads notes, run startup sync if enabled
-            try {
-                const syncMeta = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
-                if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
-                    // Check if we're online before attempting startup sync
-                    const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
-                    if (isOnline) {
-                        console.log('[Sync] Running startup sync after initial note load...');
-                        await this.manualSync();
-                    } else {
-                        console.log('[Sync] Skipping startup sync - device is offline');
-                        this.showNotification('Startup sync skipped - no internet connection', 'info');
-                    }
-                }
-            } catch (e) {
-                console.warn('[Sync] Post-load startup sync failed:', e.message);
-            }
 
             // Show welcome message in AI panel
-            // Show welcome message when panel is first opened
             const messagesContainer = document.getElementById('ai-messages');
             if (messagesContainer.children.length === 0 || messagesContainer.querySelector('.ai-messages-empty')) {
                 this.showWelcomeMessage();
             }
 
-            this.updateSplashProgress('Ready!', 100);
-            console.log('[DEBUG] CogNotez application initialized successfully');
-
             // Setup external link handling
             this.setupExternalLinkHandling();
 
-            // Hide splash screen with a small delay to show completion
+            // Mark as ready and hide splash quickly
+            this.updateSplashProgress('Ready!', 100);
+            const elapsed = Math.round(performance.now() - startTime);
+            console.log(`[DEBUG] CogNotez initialized in ${elapsed}ms`);
+
+            // Short delay to show completion, then hide
             setTimeout(() => {
                 this.hideSplashScreen();
-            }, 800);
+                
+                // Run startup sync in BACKGROUND after app is visible
+                this.runBackgroundStartupSync();
+            }, 300);
 
         } catch (error) {
             console.error('[DEBUG] Failed to initialize application:', error);
             // Continue with basic functionality even if database fails
             console.log('[DEBUG] Continuing with basic functionality...');
-            this.updateSplashProgress('Loading basic features...', 60);
+            this.updateSplashProgress('Loading basics...', 60);
             this.setupEventListeners();
             this.setupIPC();
             this.loadTheme();
@@ -1006,13 +1005,33 @@ class CogNotezApp {
             this.initializeAutoSave();
 
             this.updateSplashProgress('Ready!', 100);
-
-            // Setup external link handling even in fallback mode
             this.setupExternalLinkHandling();
 
             setTimeout(() => {
                 this.hideSplashScreen();
-            }, 800);
+            }, 300);
+        }
+    }
+
+    // Run startup sync in background after app is visible
+    async runBackgroundStartupSync() {
+        try {
+            const syncMeta = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
+            if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
+                // Small delay to ensure app is fully interactive first
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Check if we're online before attempting startup sync
+                const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
+                if (isOnline) {
+                    console.log('[Sync] Running background startup sync...');
+                    await this.manualSync();
+                } else {
+                    console.log('[Sync] Skipping startup sync - device is offline');
+                }
+            }
+        } catch (e) {
+            console.warn('[Sync] Background startup sync failed:', e.message);
         }
     }
 
@@ -1080,6 +1099,9 @@ class CogNotezApp {
         
         // Initialize tabs system
         this.initializeTabsEventListeners();
+        
+        // Initialize folder navigation
+        this.setupFolderNavigation();
         
         // Update search shortcut for platform
         const searchShortcut = document.getElementById('search-shortcut');
@@ -1832,7 +1854,10 @@ class CogNotezApp {
     // Note management
     async loadNotes() {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList();
+            await this.notesManager.renderNotesList('', this.currentFolder);
+            
+            // Render tag folders in sidebar
+            await this.renderTagFolders();
 
             // Check if there are any notes and show placeholder if none exist
             let totalNotes = 0;
@@ -2191,7 +2216,7 @@ class CogNotezApp {
         try {
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 await this.notesManager.db.createNote(note);
-                await this.notesManager.renderNotesList();
+                await this.notesManager.renderNotesList('', this.currentFolder);
                 const createdNote = await this.notesManager.db.getNote(note.id);
                 this.displayNote(createdNote);
             } else {
@@ -2203,6 +2228,9 @@ class CogNotezApp {
                 this.renderNotesList();
                 this.displayNote(note);
             }
+            
+            // Update folder counts
+            await this.renderTagFolders();
         } catch (error) {
             console.error('Error creating note:', error);
         }
@@ -2585,9 +2613,9 @@ class CogNotezApp {
         const noteIdStr = String(noteId);
         if (this.currentNote && String(this.currentNote.id) === noteIdStr) return;
 
-        // Save current note before switching
-        if (this.currentNote) {
-            await this.saveCurrentNote();
+        // Only save current note if there are unsaved changes
+        if (this.currentNote && this.notesManager && this.notesManager.hasUnsavedChanges()) {
+            await this.saveCurrentNote(true); // Pass true to indicate it's an auto-save (no notification)
         }
 
         // Try to find note in array first
@@ -2924,6 +2952,9 @@ class CogNotezApp {
 
             await this.addTagToNote(tagId);
             input.value = '';
+            
+            // Refresh folder navigation to show new tag
+            await this.renderTagFolders();
 
         } catch (error) {
             console.error('Error adding tag:', error);
@@ -2967,10 +2998,11 @@ class CogNotezApp {
 
             // Update UI
             this.displayNoteTags(this.currentNote);
-            await this.notesManager.renderNotesList();
+            await this.notesManager.renderNotesList('', this.currentFolder);
 
-            // Refresh the tag manager
+            // Refresh the tag manager and folder navigation
             this.refreshTagManager();
+            await this.renderTagFolders();
 
             this.showNotification('Tag added successfully', 'success');
         } catch (error) {
@@ -3003,10 +3035,11 @@ class CogNotezApp {
 
             // Update UI
             this.displayNoteTags(this.currentNote);
-            await this.notesManager.renderNotesList();
+            await this.notesManager.renderNotesList('', this.currentFolder);
 
-            // Refresh the tag manager
+            // Refresh the tag manager and folder navigation
             this.refreshTagManager();
+            await this.renderTagFolders();
 
             this.showNotification('Tag removed successfully', 'success');
         } catch (error) {
@@ -3267,7 +3300,415 @@ class CogNotezApp {
     // Search functionality
     async searchNotes(query = '') {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList(query);
+            await this.notesManager.renderNotesList(query, this.currentFolder);
+        }
+    }
+
+    // Folder/Category Navigation
+    setupFolderNavigation() {
+        const foldersContainer = document.getElementById('sidebar-folders');
+        if (!foldersContainer) return;
+
+        // Handle folder item clicks (All Notes, Untagged)
+        foldersContainer.addEventListener('click', async (e) => {
+            const folderItem = e.target.closest('.folder-item');
+            const tagFolderItem = e.target.closest('.tag-folder-item');
+            const createFolderBtn = e.target.closest('#create-folder-btn');
+
+            if (createFolderBtn) {
+                this.showCreateTagDialog();
+                return;
+            }
+
+            if (folderItem) {
+                const folder = folderItem.dataset.folder;
+                await this.switchFolder(folder);
+            } else if (tagFolderItem) {
+                const tagId = tagFolderItem.dataset.tagId;
+                await this.switchFolder(tagId);
+            }
+        });
+
+        // Right-click context menu for tag folders
+        foldersContainer.addEventListener('contextmenu', (e) => {
+            const tagFolderItem = e.target.closest('.tag-folder-item');
+            if (tagFolderItem) {
+                e.preventDefault();
+                const tagId = tagFolderItem.dataset.tagId;
+                this.showTagFolderContextMenu(tagId, e.clientX, e.clientY);
+            }
+        });
+
+        // Setup tags list toggle (collapsible)
+        this.setupTagsListToggle();
+
+        // Set initial active state based on saved folder
+        this.updateFolderActiveState();
+
+        // Render tag folders on load
+        this.renderTagFolders();
+    }
+
+    // Setup collapsible tags list toggle
+    setupTagsListToggle() {
+        const toggleBtn = document.getElementById('tags-toggle-btn');
+        const tagFoldersList = document.getElementById('tag-folders-list');
+        const tagsDivider = document.getElementById('tags-divider');
+        
+        if (!toggleBtn || !tagFoldersList) return;
+
+        // Restore collapsed state from localStorage
+        const isCollapsed = localStorage.getItem('tagsListCollapsed') === 'true';
+        if (isCollapsed) {
+            toggleBtn.classList.add('collapsed');
+            tagFoldersList.classList.add('collapsed');
+        }
+
+        // Toggle button click
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleTagsList();
+        });
+
+        // Also allow clicking the "Tags" text to toggle
+        tagsDivider.addEventListener('click', (e) => {
+            // Don't toggle if clicking on the create button
+            if (e.target.closest('#create-folder-btn')) return;
+            this.toggleTagsList();
+        });
+    }
+
+    toggleTagsList() {
+        const toggleBtn = document.getElementById('tags-toggle-btn');
+        const tagFoldersList = document.getElementById('tag-folders-list');
+        
+        if (!toggleBtn || !tagFoldersList) return;
+
+        const isCollapsed = toggleBtn.classList.toggle('collapsed');
+        tagFoldersList.classList.toggle('collapsed', isCollapsed);
+        
+        // Save state to localStorage
+        localStorage.setItem('tagsListCollapsed', isCollapsed.toString());
+    }
+
+    // Update folder active state in UI
+    updateFolderActiveState() {
+        document.querySelectorAll('.folder-item, .tag-folder-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        const activeItem = document.querySelector(`.folder-item[data-folder="${this.currentFolder}"]`) ||
+                          document.querySelector(`.tag-folder-item[data-tag-id="${this.currentFolder}"]`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        } else {
+            // If saved folder no longer exists (e.g., deleted tag), default to "all"
+            this.currentFolder = 'all';
+            localStorage.setItem('currentFolder', 'all');
+            const allItem = document.querySelector('.folder-item[data-folder="all"]');
+            if (allItem) allItem.classList.add('active');
+        }
+    }
+
+    async switchFolder(folder) {
+        this.currentFolder = folder;
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('currentFolder', folder);
+
+        // Update active state in UI
+        document.querySelectorAll('.folder-item, .tag-folder-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        const activeItem = document.querySelector(`.folder-item[data-folder="${folder}"]`) ||
+                          document.querySelector(`.tag-folder-item[data-tag-id="${folder}"]`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        }
+
+        // Re-render notes list with folder filter
+        const searchQuery = document.getElementById('search-input').value || '';
+        if (this.notesManager) {
+            await this.notesManager.renderNotesList(searchQuery, folder);
+        }
+
+        // Close mobile sidebar after selecting folder
+        if (window.innerWidth <= 768 && this.uiManager) {
+            this.uiManager.closeMobileSidebar();
+        }
+    }
+
+    async renderTagFolders() {
+        const tagFoldersList = document.getElementById('tag-folders-list');
+        if (!tagFoldersList) return;
+
+        try {
+            let tags = [];
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                tags = this.notesManager.db.getAllTags();
+            }
+
+            if (tags.length === 0) {
+                tagFoldersList.innerHTML = '<div class="tag-folders-empty">No tags created yet</div>';
+                return;
+            }
+
+            // Get note counts for each tag
+            let allNotes = [];
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                allNotes = await this.notesManager.db.getAllNotes();
+            }
+
+            const tagCounts = {};
+            allNotes.forEach(note => {
+                if (note.tags && note.tags.length > 0) {
+                    note.tags.forEach(tagId => {
+                        tagCounts[tagId] = (tagCounts[tagId] || 0) + 1;
+                    });
+                }
+            });
+
+            tagFoldersList.innerHTML = tags.map(tag => {
+                const count = tagCounts[tag.id] || 0;
+                const isActive = this.currentFolder === tag.id;
+                return `
+                    <div class="tag-folder-item${isActive ? ' active' : ''}" data-tag-id="${tag.id}">
+                        <div class="tag-folder-color" style="background: ${tag.color || '#BDABE3'}"></div>
+                        <span class="tag-folder-name">${this.escapeHtml(tag.name)}</span>
+                        <span class="tag-folder-count">${count}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Update main folder counts
+            if (this.notesManager) {
+                this.notesManager.updateFolderCounts();
+            }
+            
+            // Ensure active state is properly set (handles case where saved folder was a tag)
+            this.updateFolderActiveState();
+        } catch (error) {
+            console.error('Error rendering tag folders:', error);
+            tagFoldersList.innerHTML = '<div class="tag-folders-empty">Error loading tags</div>';
+        }
+    }
+
+    showCreateTagDialog() {
+        const content = `
+            <div class="create-tag-form">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="new-folder-tag-name" style="display: block; margin-bottom: 6px; font-weight: 500;">Tag Name</label>
+                    <input type="text" id="new-folder-tag-name" placeholder="Enter tag name..." 
+                           class="filter-input" style="width: 100%; padding: 10px 12px; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Tag Color</label>
+                    <div class="color-options" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="color-option active" data-color="#BDABE3" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #BDABE3; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#3ECF8E" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #3ECF8E; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#F59E0B" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #F59E0B; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#EF4444" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #EF4444; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#3B82F6" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #3B82F6; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#8B5CF6" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #8B5CF6; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#EC4899" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #EC4899; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#06B6D4" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #06B6D4; cursor: pointer;"></button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = this.createModal('Create New Tag', content, [
+            { text: 'Create', type: 'primary', action: 'create', callback: () => this.createTagFromDialog() },
+            { text: 'Cancel', type: 'secondary', action: 'cancel' }
+        ]);
+
+        // Setup color selection
+        const colorOptions = modal.querySelectorAll('.color-option');
+        colorOptions.forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.preventDefault();
+                colorOptions.forEach(o => {
+                    o.classList.remove('active');
+                    o.style.borderColor = 'transparent';
+                });
+                option.classList.add('active');
+                option.style.borderColor = 'var(--text-primary)';
+            });
+        });
+
+        // Focus the input
+        setTimeout(() => {
+            const input = document.getElementById('new-folder-tag-name');
+            if (input) input.focus();
+        }, 100);
+
+        // Handle Enter key to create
+        const input = document.getElementById('new-folder-tag-name');
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.createTagFromDialog();
+                    modal.remove();
+                }
+            });
+        }
+    }
+
+    async createTagFromDialog() {
+        const nameInput = document.getElementById('new-folder-tag-name');
+        const selectedColor = document.querySelector('.color-option.active');
+
+        if (!nameInput || !nameInput.value.trim()) {
+            this.showNotification('Please enter a tag name', 'error');
+            return;
+        }
+
+        const tagName = nameInput.value.trim();
+        const tagColor = selectedColor ? selectedColor.dataset.color : '#BDABE3';
+
+        try {
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                // Check if tag with same name exists
+                const existingTags = this.notesManager.db.getAllTags();
+                if (existingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase())) {
+                    this.showNotification('A tag with this name already exists', 'warning');
+                    return;
+                }
+
+                this.notesManager.db.createTag({ name: tagName, color: tagColor });
+                this.showNotification(`Tag "${tagName}" created`, 'success');
+                await this.renderTagFolders();
+            } else {
+                this.showNotification('Database not available', 'error');
+            }
+        } catch (error) {
+            console.error('Error creating tag:', error);
+            this.showNotification('Failed to create tag', 'error');
+        }
+    }
+
+    showTagFolderContextMenu(tagId, x, y) {
+        // Remove existing context menu
+        const existingMenu = document.querySelector('.tag-folder-context-menu');
+        if (existingMenu) existingMenu.remove();
+
+        const menu = document.createElement('div');
+        menu.className = 'tag-folder-context-menu context-menu';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            z-index: 1000;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            min-width: 150px;
+        `;
+
+        menu.innerHTML = `
+            <div class="context-menu-item" data-action="rename"><i class="fas fa-edit"></i> Rename</div>
+            <div class="context-menu-item" data-action="delete" style="color: #dc3545;"><i class="fas fa-trash"></i> Delete</div>
+        `;
+
+        document.body.appendChild(menu);
+
+        // Handle menu item clicks
+        menu.addEventListener('click', async (e) => {
+            const action = e.target.closest('.context-menu-item')?.dataset.action;
+            if (action === 'rename') {
+                await this.renameTagFolder(tagId);
+            } else if (action === 'delete') {
+                await this.deleteTagFolder(tagId);
+            }
+            menu.remove();
+        });
+
+        // Close on click outside
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
+    async renameTagFolder(tagId) {
+        if (!this.notesManager || !this.notesManager.db) return;
+
+        const tag = this.notesManager.db.data.tags[tagId];
+        if (!tag) return;
+
+        const newName = prompt('Enter new tag name:', tag.name);
+        if (!newName || newName.trim() === '' || newName.trim() === tag.name) return;
+
+        try {
+            this.notesManager.db.data.tags[tagId].name = newName.trim();
+            this.notesManager.db.saveToLocalStorage();
+            this.showNotification(`Tag renamed to "${newName.trim()}"`, 'success');
+            await this.renderTagFolders();
+            await this.notesManager.renderNotesList('', this.currentFolder);
+        } catch (error) {
+            console.error('Error renaming tag:', error);
+            this.showNotification('Failed to rename tag', 'error');
+        }
+    }
+
+    async deleteTagFolder(tagId) {
+        if (!this.notesManager || !this.notesManager.db) return;
+
+        const tag = this.notesManager.db.data.tags[tagId];
+        if (!tag) return;
+
+        const confirmDelete = confirm(`Delete tag "${tag.name}"? This will remove the tag from all notes.`);
+        if (!confirmDelete) return;
+
+        try {
+            // Remove tag from all notes
+            const notes = await this.notesManager.db.getAllNotes();
+            for (const note of notes) {
+                if (note.tags && note.tags.includes(tagId)) {
+                    const updatedTags = note.tags.filter(t => t !== tagId);
+                    await this.notesManager.db.updateNote(note.id, { tags: updatedTags });
+                }
+            }
+
+            // Delete the tag itself
+            delete this.notesManager.db.data.tags[tagId];
+
+            // Remove from note_tags associations
+            const noteTagsToDelete = [];
+            Object.keys(this.notesManager.db.data.note_tags || {}).forEach(key => {
+                if (this.notesManager.db.data.note_tags[key].tag_id === tagId) {
+                    noteTagsToDelete.push(key);
+                }
+            });
+            noteTagsToDelete.forEach(key => {
+                delete this.notesManager.db.data.note_tags[key];
+            });
+
+            this.notesManager.db.saveToLocalStorage();
+
+            // If we were viewing this tag, switch back to all notes
+            if (this.currentFolder === tagId) {
+                await this.switchFolder('all');
+            }
+
+            this.showNotification(`Tag "${tag.name}" deleted`, 'success');
+            await this.renderTagFolders();
+            await this.notesManager.renderNotesList('', this.currentFolder);
+
+            // Update current note's tag display if open
+            if (this.currentNote) {
+                this.displayNoteTags(this.currentNote);
+            }
+        } catch (error) {
+            console.error('Error deleting tag:', error);
+            this.showNotification('Failed to delete tag', 'error');
         }
     }
 
@@ -5123,6 +5564,7 @@ Please provide a helpful response based on the note content and conversation his
             splash.style.display = 'flex';
             splash.style.opacity = '1';
             splash.style.visibility = 'visible';
+            splash.classList.remove('hiding', 'ready');
         }
         if (app) {
             app.classList.add('app-hidden');
@@ -5133,13 +5575,26 @@ Please provide a helpful response based on the note content and conversation his
     hideSplashScreen() {
         const splash = document.getElementById('splash-screen');
         const app = document.getElementById('app');
+        
         if (splash) {
-            splash.style.opacity = '0';
-            splash.style.visibility = 'hidden';
+            // Add ready state first
+            splash.classList.add('ready');
+            
+            // Update status to show completion
+            const statusText = splash.querySelector('.status-text');
+            if (statusText) statusText.textContent = 'Ready';
+            
+            // Short delay to show ready state, then animate out
+            setTimeout(() => {
+                splash.classList.add('hiding');
+                
+                // Remove from DOM after animation
             setTimeout(() => {
                 splash.style.display = 'none';
-            }, 500);
+                }, 400);
+            }, 100);
         }
+        
         if (app) {
             app.classList.remove('app-hidden');
             app.classList.add('app-visible');
@@ -5161,13 +5616,41 @@ Please provide a helpful response based on the note content and conversation his
     updateSplashProgress(text, percentage = null) {
         const progressText = document.getElementById('progress-text');
         const progressFill = document.getElementById('progress-fill');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressGlow = document.querySelector('.progress-glow');
+        const statusText = document.querySelector('.status-text');
 
         if (progressText && text) {
             progressText.textContent = text;
         }
 
-        if (progressFill && percentage !== null) {
-            progressFill.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+        if (percentage !== null) {
+            const percent = Math.min(100, Math.max(0, percentage));
+            
+            if (progressFill) {
+                progressFill.style.width = `${percent}%`;
+            }
+            
+            if (progressGlow) {
+                progressGlow.style.width = `${percent}%`;
+            }
+            
+            if (progressPercent) {
+                progressPercent.textContent = `${Math.round(percent)}%`;
+            }
+            
+            // Update status text based on progress
+            if (statusText) {
+                if (percent >= 100) {
+                    statusText.textContent = 'Ready';
+                } else if (percent >= 75) {
+                    statusText.textContent = 'Almost there';
+                } else if (percent >= 50) {
+                    statusText.textContent = 'Loading';
+                } else {
+                    statusText.textContent = 'Starting';
+                }
+            }
         }
     }
 
@@ -7117,10 +7600,14 @@ Please provide a helpful response based on the note content and conversation his
                     const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
                     await Promise.race([this.updateSyncStatus(), timeoutPromise]);
 
-                    // Show sync button
+                    // Show sync button and divider
                     const syncBtn = document.getElementById('sync-btn');
+                    const syncDivider = document.querySelector('.sync-divider');
                     if (syncBtn) {
                         syncBtn.classList.remove('hidden');
+                    }
+                    if (syncDivider) {
+                        syncDivider.classList.remove('hidden');
                     }
 
                     // Set up auto-sync if enabled

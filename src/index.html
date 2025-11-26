@@ -23,21 +23,55 @@
 <body>
     <!-- Splash Screen -->
     <div id="splash-screen" class="splash-screen">
+        <!-- Animated background -->
+        <div class="splash-bg">
+            <div class="splash-gradient"></div>
+            <div class="splash-particles">
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+            </div>
+            <div class="splash-rings">
+                <div class="ring ring-1"></div>
+                <div class="ring ring-2"></div>
+                <div class="ring ring-3"></div>
+            </div>
+        </div>
+        
         <div class="splash-content">
             <div class="splash-logo">
-                <div class="splash-icon"><img src="../assets/icon.svg" alt="CogNotez Logo" width="64" height="64"></div>
-                <h1 class="splash-title">CogNotez</h1>
-                <p class="splash-subtitle">AI-Powered Note App</p>
+                <div class="splash-icon-wrapper">
+                    <div class="splash-icon-glow"></div>
+                    <div class="splash-icon">
+                        <img src="../assets/icon.svg" alt="CogNotez Logo" width="72" height="72">
+                    </div>
+                </div>
+                <h1 class="splash-title">
+                    <span class="title-letter">C</span><span class="title-letter">o</span><span class="title-letter">g</span><span class="title-letter">N</span><span class="title-letter">o</span><span class="title-letter">t</span><span class="title-letter">e</span><span class="title-letter">z</span>
+                </h1>
+                <p class="splash-subtitle">AI-Powered Note Taking</p>
             </div>
+            
             <div class="splash-progress">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
+                    <div class="progress-glow"></div>
                 </div>
-                <div class="progress-text" id="progress-text">Initializing...</div>
+                <div class="progress-info">
+                    <span class="progress-text" id="progress-text">Starting up...</span>
+                    <span class="progress-percent" id="progress-percent">0%</span>
+                </div>
             </div>
+            
             <div class="splash-footer">
                 <p class="splash-version" id="splash-version">Version</p>
-                <div class="splash-spinner"></div>
+                <div class="splash-status">
+                    <div class="status-dot"></div>
+                    <span class="status-text">Loading</span>
+                </div>
             </div>
         </div>
     </div>
@@ -62,26 +96,35 @@
                 </div>
             </div>
             <div class="header-right">
-                <!-- Simplified Sync Button (hidden until sync is enabled) -->
-                <button id="sync-btn" class="sync-btn hidden" title="Sync status - Click to sync">
-                    <i class="fas fa-cloud" id="sync-btn-icon"></i>
-                    <span class="sync-btn-text" id="sync-btn-text">Sync</span>
-                </button>
-                
-                <div class="header-btn-group">
-                    <button id="theme-toggle" class="header-action-btn" title="Toggle theme">
-                        <span class="theme-icon-light"><i class="fas fa-sun"></i></span>
-                        <span class="theme-icon-dark"><i class="fas fa-moon"></i></span>
+                <!-- Unified Header Toolbar -->
+                <div class="header-toolbar">
+                    <!-- Sync Button (hidden until sync is enabled) -->
+                    <button id="sync-btn" class="header-toolbar-btn hidden" title="Sync status - Click to sync">
+                        <i class="fas fa-cloud" id="sync-btn-icon"></i>
+                        <span class="toolbar-btn-label" id="sync-btn-text">Sync</span>
                     </button>
-                    <button id="ai-toggle-btn" class="header-action-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
+                    
+                    <div class="toolbar-divider sync-divider hidden"></div>
+                    
+                    <button id="theme-toggle" class="header-toolbar-btn" title="Toggle theme">
+                        <i class="fas fa-sun theme-icon-light"></i>
+                        <i class="fas fa-moon theme-icon-dark"></i>
+                    </button>
+                    <button id="ai-toggle-btn" class="header-toolbar-btn" title="Toggle AI Assistant">
+                        <i class="fas fa-robot"></i>
+                    </button>
+                    
+                    <div class="toolbar-divider"></div>
+                    
+                    <button id="new-note-btn" class="header-toolbar-btn new-note-btn" title="New note">
+                        <i class="fas fa-plus"></i>
+                        <span class="toolbar-btn-label">New</span>
+                    </button>
+                    
+                    <button id="header-overflow-btn" class="header-toolbar-btn" title="More options">
+                        <i class="fas fa-ellipsis-v"></i>
+                    </button>
                 </div>
-                
-                <button id="new-note-btn" class="new-note-btn-primary" title="New note">
-                    <i class="fas fa-plus"></i>
-                    <span class="btn-label">New</span>
-                </button>
-                
-                <button id="header-overflow-btn" class="header-action-btn header-overflow-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
                 
                 <!-- Header Overflow Menu -->
                 <div id="header-overflow-menu" class="header-overflow-menu hidden">
@@ -115,9 +158,39 @@
                     <h2>Notes</h2>
                     <button id="sidebar-toggle" class="sidebar-toggle"><i class="fas fa-chevron-left"></i></button>
                 </div>
+                
+                <!-- Folder/Category Navigation -->
+                <div class="sidebar-folders" id="sidebar-folders">
+                    <div class="folder-item active" data-folder="all">
+                        <i class="fas fa-layer-group folder-icon"></i>
+                        <span class="folder-name">All Notes</span>
+                        <span class="folder-count" id="folder-count-all">0</span>
+                    </div>
+                    <div class="folder-item" data-folder="untagged">
+                        <i class="fas fa-file-alt folder-icon"></i>
+                        <span class="folder-name">Untagged</span>
+                        <span class="folder-count" id="folder-count-untagged">0</span>
+                    </div>
+                    <div class="folders-divider" id="tags-divider">
+                        <button id="tags-toggle-btn" class="tags-toggle-btn" title="Toggle tags list">
+                            <i class="fas fa-chevron-down" id="tags-toggle-icon"></i>
+                        </button>
+                        <span>Tags</span>
+                        <button id="create-folder-btn" class="create-folder-btn" title="Create new tag">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="tag-folders-list" id="tag-folders-list">
+                        <!-- Tag folders will be populated dynamically -->
+                    </div>
+                </div>
+                
                 <div class="notes-list" id="notes-list">
                     <!-- Notes will be populated here -->
                 </div>
+                
+                <!-- Resize Handle -->
+                <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
             </aside>
 
             <!-- Main Content Area -->
@@ -125,37 +198,35 @@
                 <!-- Editor Area -->
                 <div class="editor-container" id="editor-container">
                     <div class="editor-header">
-                        <div class="note-info">
-                            <input type="text" id="note-title" placeholder="Note title..." class="note-title-input">
+                        <div class="editor-header-top">
+                            <input type="text" id="note-title" placeholder="Untitled note..." class="note-title-input">
+                            <div class="editor-toolbar">
+                                <button id="undo-btn" class="editor-tool-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
+                                <button id="redo-btn" class="editor-tool-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
+                                <div class="editor-toolbar-divider"></div>
+                                <button id="preview-toggle-btn" class="editor-tool-btn" title="Preview Mode"><i class="fas fa-eye"></i></button>
+                                <button id="save-btn" class="editor-tool-btn" title="Save"><i class="fas fa-save"></i></button>
+                                <div class="editor-toolbar-divider"></div>
+                                <button id="editor-overflow-btn" class="editor-tool-btn" title="More options"><i class="fas fa-ellipsis-h"></i></button>
+                            </div>
+                        </div>
+                        <div class="editor-header-meta">
                             <div id="note-tags-display" class="note-tags-display"></div>
                             <span id="note-date" class="note-date"></span>
                         </div>
-                        <div class="editor-actions">
-                            <div class="action-btn-group">
-                                <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
-                                <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
-                            </div>
-                            <div class="action-btn-group">
-                                <button id="preview-toggle-btn" class="action-btn" title="Preview Mode"><i class="fas fa-eye"></i></button>
-                                <button id="save-btn" class="action-btn" title="Save"><i class="fas fa-save"></i></button>
-                            </div>
-                            <div class="action-btn-group">
-                                <button id="editor-overflow-btn" class="action-btn" title="More options"><i class="fas fa-ellipsis-v"></i></button>
-                            </div>
-                            
-                            <!-- Overflow menu -->
-                            <div id="editor-overflow-menu" class="editor-overflow-menu hidden">
-                                <button id="find-btn" class="overflow-menu-item" title="Find (Ctrl+F)"><i class="fas fa-search"></i> Find</button>
-                                <button id="replace-btn" class="overflow-menu-item" title="Replace (Ctrl+H)"><i class="fas fa-exchange-alt"></i> Replace</button>
-                                <div class="overflow-menu-separator"></div>
-                                <button id="ai-summary-btn" class="overflow-menu-item" title="AI Summary"><i class="fas fa-file-alt"></i> AI Summary</button>
-                                <button id="generate-tags-btn" class="overflow-menu-item" title="Generate Tags"><i class="fas fa-tags"></i> Generate Tags</button>
-                                <button id="manage-tags-btn" class="overflow-menu-item" title="Manage Tags"><i class="fas fa-clipboard-list"></i> Manage Tags</button>
-                                <div class="overflow-menu-separator"></div>
-                                <button id="export-btn" class="overflow-menu-item" title="Export"><i class="fas fa-download"></i> Export</button>
-                                <button id="share-btn" class="overflow-menu-item" title="Share"><i class="fas fa-share"></i> Share</button>
-                                <button id="password-lock-btn" class="overflow-menu-item" title="Password Protection"><i class="fas fa-lock"></i> Password Lock</button>
-                            </div>
+                        
+                        <!-- Overflow menu -->
+                        <div id="editor-overflow-menu" class="editor-overflow-menu hidden">
+                            <button id="find-btn" class="overflow-menu-item" title="Find (Ctrl+F)"><i class="fas fa-search"></i> Find</button>
+                            <button id="replace-btn" class="overflow-menu-item" title="Replace (Ctrl+H)"><i class="fas fa-exchange-alt"></i> Replace</button>
+                            <div class="overflow-menu-separator"></div>
+                            <button id="ai-summary-btn" class="overflow-menu-item" title="AI Summary"><i class="fas fa-file-alt"></i> AI Summary</button>
+                            <button id="generate-tags-btn" class="overflow-menu-item" title="Generate Tags"><i class="fas fa-tags"></i> Generate Tags</button>
+                            <button id="manage-tags-btn" class="overflow-menu-item" title="Manage Tags"><i class="fas fa-clipboard-list"></i> Manage Tags</button>
+                            <div class="overflow-menu-separator"></div>
+                            <button id="export-btn" class="overflow-menu-item" title="Export"><i class="fas fa-download"></i> Export</button>
+                            <button id="share-btn" class="overflow-menu-item" title="Share"><i class="fas fa-share"></i> Share</button>
+                            <button id="password-lock-btn" class="overflow-menu-item" title="Password Protection"><i class="fas fa-lock"></i> Password Lock</button>
                         </div>
                     </div>
                     <div class="editor-wrapper">
