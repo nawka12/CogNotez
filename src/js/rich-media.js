@@ -76,30 +76,8 @@ class RichMediaManager {
     }
 
     createMediaToolbar() {
-        // Add media buttons to existing editor actions toolbar
-        const editorActions = document.querySelector('.editor-actions');
-        if (!editorActions) return;
-
-        // Create compact media buttons that match existing style
-        const mediaButtons = `
-            <button id="insert-image-btn" class="action-btn" title="Insert Image">
-                <i class="fas fa-image"></i>
-            </button>
-            <button id="insert-video-btn" class="action-btn" title="Insert Video">
-                <i class="fas fa-video"></i>
-            </button>
-        `;
-
-        // Insert media buttons after the save button
-        const saveBtn = document.getElementById('save-btn');
-        if (saveBtn) {
-            saveBtn.insertAdjacentHTML('afterend', mediaButtons);
-        } else {
-            // Fallback: add at the end of editor actions
-            editorActions.insertAdjacentHTML('beforeend', mediaButtons);
-        }
-
-        // Setup button handlers
+        // Toolbar buttons are now part of the static editor header in index.html
+        // Just wire up their behavior if they exist
         this.setupToolbarButtons();
     }
 

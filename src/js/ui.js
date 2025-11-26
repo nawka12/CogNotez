@@ -250,7 +250,7 @@ class UIManager {
         let startWidth = 0;
 
         // Min and max width constraints
-        const MIN_WIDTH = 200;
+        const MIN_WIDTH = 260;
         const MAX_WIDTH = 600;
         const DEFAULT_WIDTH = 320;
 

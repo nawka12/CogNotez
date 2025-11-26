@@ -336,6 +336,11 @@ class NotesManager {
                 if (shouldDelete) {
                     await this.db.deleteNote(noteId);
 
+                    // Close any open tab for this note
+                    if (this.app && typeof this.app.closeTab === 'function') {
+                        this.app.closeTab(noteId, true);
+                    }
+
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
                         this.app.currentNote = null;
                         this.clearEditor();
@@ -362,6 +367,11 @@ class NotesManager {
                 
                 if (shouldDelete) {
                     this.app.notes.splice(index, 1);
+
+                    // Close any open tab for this note
+                    if (this.app && typeof this.app.closeTab === 'function') {
+                        this.app.closeTab(noteId, true);
+                    }
 
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
                         this.app.currentNote = null;

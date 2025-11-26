@@ -134,7 +134,7 @@ body {
 
 .search-input {
     flex: 1;
-    padding: 8px 16px 8px 36px;
+    padding: 8px 32px 8px 36px;
     border: none;
     background: transparent;
     color: var(--text-primary);
@@ -166,6 +166,28 @@ body {
 
 .search-input-wrapper:focus-within .search-shortcut {
     opacity: 0;
+}
+
+/* Search clear button */
+.search-clear-btn {
+    position: absolute;
+    right: 36px;
+    border: none;
+    background: transparent;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 4px;
+    display: none;
+}
+
+.search-clear-btn:hover {
+    color: var(--text-secondary);
+}
+
+.search-input:not(:placeholder-shown) ~ .search-clear-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* Unified Header Toolbar */

@@ -91,6 +91,9 @@
                     <div class="search-input-wrapper">
                         <i class="fas fa-search search-icon"></i>
                         <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
+                        <button id="search-clear-btn" class="search-clear-btn" title="Clear search">
+                            <i class="fas fa-times"></i>
+                        </button>
                         <kbd class="search-shortcut" id="search-shortcut">Ctrl+K</kbd>
                     </div>
                 </div>
@@ -200,12 +203,15 @@
                     <div class="editor-header">
                         <div class="editor-header-top">
                             <input type="text" id="note-title" placeholder="Untitled note..." class="note-title-input">
-                            <div class="editor-toolbar">
+                            <div class="editor-toolbar editor-actions">
                                 <button id="undo-btn" class="editor-tool-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
                                 <button id="redo-btn" class="editor-tool-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
                                 <div class="editor-toolbar-divider"></div>
                                 <button id="preview-toggle-btn" class="editor-tool-btn" title="Preview Mode"><i class="fas fa-eye"></i></button>
                                 <button id="save-btn" class="editor-tool-btn" title="Save"><i class="fas fa-save"></i></button>
+                                <!-- Rich media buttons (image / video) -->
+                                <button id="insert-image-btn" class="editor-tool-btn" title="Insert Image"><i class="fas fa-image"></i></button>
+                                <button id="insert-video-btn" class="editor-tool-btn" title="Insert Video"><i class="fas fa-video"></i></button>
                                 <div class="editor-toolbar-divider"></div>
                                 <button id="editor-overflow-btn" class="editor-tool-btn" title="More options"><i class="fas fa-ellipsis-h"></i></button>
                             </div>

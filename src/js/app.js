@@ -1128,10 +1128,25 @@ class CogNotezApp {
         });
 
         // Search input
-        document.getElementById('search-input').addEventListener('input', (e) => this.searchNotes(e.target.value));
-        document.getElementById('search-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this.searchNotes();
-        });
+        const searchInputEl = document.getElementById('search-input');
+        const searchClearBtn = document.getElementById('search-clear-btn');
+
+        if (searchInputEl) {
+            searchInputEl.addEventListener('input', (e) => {
+                this.searchNotes(e.target.value);
+            });
+            searchInputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') this.searchNotes();
+            });
+        }
+
+        if (searchClearBtn && searchInputEl) {
+            searchClearBtn.addEventListener('click', () => {
+                searchInputEl.value = '';
+                this.searchNotes('');
+                searchInputEl.focus();
+            });
+        }
 
         // Note list click handler (delegate to notes manager)
         document.getElementById('notes-list').addEventListener('click', async (e) => {
@@ -1854,7 +1869,10 @@ class CogNotezApp {
     // Note management
     async loadNotes() {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList('', this.currentFolder);
+            // Respect current search query and folder when loading notes
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? (searchInput.value || '') : '';
+            await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
             
             // Render tag folders in sidebar
             await this.renderTagFolders();
@@ -2089,9 +2107,11 @@ class CogNotezApp {
 
                     // Update the lock icon in the UI
                     this.updatePasswordLockIcon();
-                    // Refresh notes list to show lock icon
+                    // Refresh notes list to show lock icon without clearing filters
                     if (this.notesManager) {
-                        await this.notesManager.renderNotesList();
+                        const searchInput = document.getElementById('search-input');
+                        const searchQuery = searchInput ? (searchInput.value || '') : '';
+                        await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
                     }
                 } catch (error) {
                     console.error('Error managing password protection:', error);
@@ -3146,7 +3166,10 @@ class CogNotezApp {
                 this.saveNotes();
             }
 
-            await this.notesManager.renderNotesList();
+            // Preserve current search and folder filters when refreshing the list
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? (searchInput.value || '') : '';
+            await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
 
             // Update note date display after saving
             this.updateNoteDate();
@@ -3219,7 +3242,9 @@ class CogNotezApp {
 
     async renderNotesList() {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList();
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? (searchInput.value || '') : '';
+            await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
         }
     }
 
