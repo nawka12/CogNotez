@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -78,7 +78,7 @@ Get CogNotez up and running in minutes:
 - **Keyboard Shortcuts**: Full keyboard navigation support
 - **Context Menus**: Right-click AI actions on selected text
 - **Theme Support**: Light and dark modes with custom accent color
-- **Internationalization**: Multi-language support with English, Indonesian, and Japanese
+- **Internationalization**: Multi-language support with English, Indonesian, Japanese, and Javanese (Basa Jawa)
 - **Search**: Fast, real-time note search with clear button
 - **Folder & Tag Navigation**: Organize notes with folder-based navigation using tags
 - **Find & Replace**: Powerful text search and replace with regex support
@@ -470,6 +470,7 @@ CogNotez supports multiple languages to make the app accessible to users worldwi
 - **English (en)** - Default language
 - **Bahasa Indonesia (id)** - Indonesian language support
 - **日本語 (ja)** - Japanese language support
+- **Basa Jawa (jv)** - Javanese language support
 
 #### Changing Language
 1. Click the "More options" button (⋯) in the header
@@ -519,7 +520,12 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-### v2.1.0 (Current)
+### v2.1.1 (Current)
+- **Enhanced Internationalization**: Added Javanese (Basa Jawa) language support
+- **Improved i18n Coverage**: Enhanced translations for user notifications, prompts, tag management, and sharing features
+- **Better Language Support**: Complete UI translation including all user-facing messages and dialogs
+
+### v2.1.0
 - **Internationalization (i18n)**: Full multi-language support
   - English, Indonesian (Bahasa Indonesia), and Japanese language support
   - Complete UI translation including menus, dialogs, and tooltips
