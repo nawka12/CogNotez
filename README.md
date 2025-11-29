@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-2.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -25,6 +25,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - [Rich Media Support](#rich-media-support)
 - [Note Templates](#note-templates)
 - [Themes](#themes)
+- [Internationalization](#internationalization)
 - [Offline Functionality](#offline-functionality)
 - [Troubleshooting](#troubleshooting)
 - [Version History](#version-history)
@@ -77,6 +78,7 @@ Get CogNotez up and running in minutes:
 - **Keyboard Shortcuts**: Full keyboard navigation support
 - **Context Menus**: Right-click AI actions on selected text
 - **Theme Support**: Light and dark modes with custom accent color
+- **Internationalization**: Multi-language support with English, Indonesian, and Japanese
 - **Search**: Fast, real-time note search with clear button
 - **Folder & Tag Navigation**: Organize notes with folder-based navigation using tags
 - **Find & Replace**: Powerful text search and replace with regex support
@@ -460,6 +462,32 @@ Select any text in your notes and right-click to access powerful AI features:
 - **Dark Mode**: Easy on the eyes for low-light environments
 - Toggle using the theme button in the header
 
+### Internationalization
+
+CogNotez supports multiple languages to make the app accessible to users worldwide:
+
+#### Supported Languages
+- **English (en)** - Default language
+- **Bahasa Indonesia (id)** - Indonesian language support
+- **日本語 (ja)** - Japanese language support
+
+#### Changing Language
+1. Click the "More options" button (⋯) in the header
+2. Select your preferred language from the language dropdown
+3. The interface will update immediately, including:
+   - All UI elements and labels
+   - Menu items and context menus
+   - Dialog boxes and notifications
+   - Tooltips and help text
+
+#### Language Persistence
+- Your language preference is automatically saved
+- The app remembers your choice across sessions
+- Language selection applies to both the main interface and application menus
+
+#### Contributing Translations
+We welcome contributions for additional languages! If you'd like to add support for your language, please see the [Contributing](#contributing) section.
+
 ### AI Settings
 
 Configure your AI integration through the **AI → AI Settings** menu:
@@ -491,7 +519,15 @@ MIT License - see LICENSE file for details.
 
 ## Version History
 
-### v2.0.0 (Current)
+### v2.1.0 (Current)
+- **Internationalization (i18n)**: Full multi-language support
+  - English, Indonesian (Bahasa Indonesia), and Japanese language support
+  - Complete UI translation including menus, dialogs, and tooltips
+  - Language selector in header overflow menu
+  - Automatic language detection based on system preferences
+  - Persistent language preference across sessions
+
+### v2.0.0
 - **Folder & Tag Navigation**: Organize notes with folder-based navigation using tags
   - Filter notes by "All Notes", "Untagged", or any tag folder
   - Create, rename, and delete tag folders with right-click context menu
@@ -560,7 +596,7 @@ MIT License - see LICENSE file for details.
 - 🔄 Custom web scraping rules and selectors
 - 🔄 Browser extension for quick note capture
 - 🔄 Advanced encryption options (hardware security keys, biometric auth)
-- 🔄 Multi-language support and internationalization
+- 🔄 Additional language translations (expand i18n support)
 - 🔄 Voice notes and transcription
 - 🔄 OCR for handwritten notes and images
 
