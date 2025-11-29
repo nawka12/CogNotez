@@ -1096,9 +1096,13 @@ class CogNotezApp {
                 }
             });
             
-            // Listen for language changes to update selector
+            // Listen for language changes to update selector and notify main process
             window.addEventListener('languageChanged', (e) => {
                 languageSelector.value = e.detail.language;
+                // Notify main process to update menu language
+                if (ipcRenderer) {
+                    ipcRenderer.send('menu-language-changed', e.detail.language);
+                }
             });
         }
         
@@ -2814,6 +2818,53 @@ class CogNotezApp {
         return div.innerHTML;
     }
 
+    /**
+     * Format date and time according to current language
+     * @param {Date} date - Date object to format
+     * @param {boolean} includeTime - Whether to include time
+     * @returns {string} Formatted date string
+     */
+    formatLocalizedDateTime(date, includeTime = true) {
+        if (!date) return '';
+        
+        const lang = window.i18n ? window.i18n.getLanguage() : 'en';
+        const d = new Date(date);
+        
+        // Get date components
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        
+        let dateStr, timeStr;
+        
+        switch (lang) {
+            case 'id': // Indonesian: DD/MM/YYYY, 24-hour
+                dateStr = `${day}/${month}/${year}`;
+                if (includeTime) {
+                    timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+                }
+                break;
+            case 'ja': // Japanese: YYYY/MM/DD, 24-hour
+                dateStr = `${year}/${month}/${day}`;
+                if (includeTime) {
+                    timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+                }
+                break;
+            default: // English: MM/DD/YYYY, 12-hour with AM/PM
+                dateStr = `${month}/${day}/${year}`;
+                if (includeTime) {
+                    const hours12 = hours % 12 || 12;
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    timeStr = `${hours12}:${minutes} ${ampm}`;
+                }
+                break;
+        }
+        
+        return includeTime ? `${dateStr} ${timeStr}` : dateStr;
+    }
+
     // Update note date display
     updateNoteDate() {
         if (!this.currentNote) return;
@@ -2836,10 +2887,10 @@ class CogNotezApp {
             modifiedDate = this.currentNote.modified ? new Date(this.currentNote.modified) : new Date();
         }
         
-        // Format the date
-        const dateStr = modifiedDate.toLocaleDateString();
-        const timeStr = modifiedDate.toLocaleTimeString();
-        noteDateElement.textContent = `Modified: ${dateStr} ${timeStr}`;
+        // Format the date according to current language
+        const formattedDateTime = this.formatLocalizedDateTime(modifiedDate, true);
+        const modifiedLabel = window.i18n ? window.i18n.t('editor.modified') : 'Modified';
+        noteDateElement.textContent = `${modifiedLabel}: ${formattedDateTime}`;
     }
 
     // Start real-time date updates
@@ -3842,7 +3893,7 @@ class CogNotezApp {
             element.innerHTML = `
                 <div class="note-item-title">${this.escapeHtml(note.title)}</div>
                 <div class="note-item-preview">${this.escapeHtml(note.preview || '')}</div>
-                <div class="note-item-date">${new Date(note.modified || note.created).toLocaleDateString()}</div>
+                <div class="note-item-date">${this.formatLocalizedDateTime(note.modified || note.created, false)}</div>
             `;
 
             element.addEventListener('click', () => this.switchToNoteWithWarning(note.id));
@@ -5490,7 +5541,8 @@ Please provide a helpful response based on the note content and conversation his
 
             let message = `✅ Successfully imported ${successful} file${successful !== 1 ? 's' : ''}`;
             if (totalWords > 0) {
-                message += ` (${totalWords} words)`;
+                const wordsLabel = window.i18n ? window.i18n.t('editor.words') : 'words';
+                message += ` (${totalWords} ${wordsLabel})`;
             }
             if (failed > 0) {
                 message += `. ${failed} file${failed !== 1 ? 's' : ''} failed to import.`;
@@ -6553,32 +6605,32 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                     <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tips:</strong><br>
+                        <strong>${t('settings.ai.tips', '💡 Tips:')}</strong><br>
                         <div id="ollama-tips" style="display: ${this.aiManager.backend === 'ollama' ? 'block' : 'none'}">
-                            • Default Ollama endpoint is usually <code>http://localhost:11434</code><br>
-                            • Popular models: llama2, codellama, mistral<br>
-                            • Use <code>ollama pull model_name</code> to download models<br>
+                            • ${t('settings.ai.ollamaTipEndpoint', 'Default Ollama endpoint is usually')} <code>http://localhost:11434</code><br>
+                            • ${t('settings.ai.ollamaTipPopularModels', 'Popular models: llama2, codellama, mistral')}<br>
+                            • ${t('settings.ai.ollamaTipDownload', 'Use')} <code>ollama pull model_name</code> ${t('settings.ai.ollamaTipDownloadCommand', 'to download models')}<br>
                         </div>
                         <div id="openrouter-tips" style="display: ${this.aiManager.backend === 'openrouter' ? 'block' : 'none'}">
-                            • Get your API key from <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">OpenRouter</a><br>
-                            • Popular models: GPT-4, Claude, Gemini<br>
-                            • API key starts with <code>sk-or-v1-</code><br>
+                            • ${t('settings.ai.openRouterTipGetKey', 'Get your API key from')} <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">OpenRouter</a><br>
+                            • ${t('settings.ai.openRouterTipPopularModels', 'Popular models: GPT-4, Claude, Gemini')}<br>
+                            • ${t('settings.ai.openRouterTipKeyFormat', 'API key starts with')} <code>sk-or-v1-</code><br>
                             <div id="searxng-tip" style="display: ${this.aiManager.searxngEnabled ? 'block' : 'none'}">
-                                • SearXNG provides privacy-focused web search<br>
-                                • Install SearXNG: <code>pip install searxng</code><br>
-                                ${this.aiManager.backend === 'ollama' ? '• <strong>Note:</strong> Ollama tool calling may not work with all models. If you experience issues, try a different model or use OpenRouter.' : ''}
+                                • ${t('settings.ai.searxngTipPrivacy', 'SearXNG provides privacy-focused web search')}<br>
+                                • ${t('settings.ai.searxngTipInstall', 'Install SearXNG:')} <code>pip install searxng</code><br>
+                                ${this.aiManager.backend === 'ollama' ? `• <strong>${t('settings.ai.note', 'Note:')}</strong> ${t('settings.ai.ollamaToolCallingNote', 'Ollama tool calling may not work with all models. If you experience issues, try a different model or use OpenRouter.')}` : ''}
                             </div>
                         </div>
-                        • Right-click selected text for quick AI actions
+                        • ${t('settings.ai.tipRightClick', 'Right-click selected text for quick AI actions')}
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('AI Settings', content, [
-            { text: 'Test Connection', type: 'secondary', action: 'test-connection' },
-            { text: 'Save Settings', type: 'primary', action: 'save-settings' },
-            { text: 'Cancel', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('settings.ai.title', 'AI Settings'), content, [
+            { text: t('settings.ai.testConnection', 'Test Connection'), type: 'secondary', action: 'test-connection' },
+            { text: t('settings.general.saveButton', 'Save Settings'), type: 'primary', action: 'save-settings' },
+            { text: window.i18n ? window.i18n.t('modals.cancel') : 'Cancel', type: 'secondary', action: 'cancel' }
         ]);
 
         // Add backend switching handler
@@ -7936,7 +7988,7 @@ Please provide a helpful response based on the note content and conversation his
             return window.i18n ? window.i18n.t('settings.sync.timeDaysAgo', { count: diffDays }) : `${diffDays}d ago`;
         }
 
-        return date.toLocaleDateString();
+        return this.formatLocalizedDateTime(date, false);
     }
 
     showSyncSettings() {

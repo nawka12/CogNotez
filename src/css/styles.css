@@ -478,7 +478,7 @@ body {
     margin-left: auto;
     padding: 4px 8px;
     min-width: 140px;
-    background: transparent;
+    background: var(--input-bg);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     color: var(--text-primary);
@@ -497,13 +497,14 @@ body {
 }
 
 .language-selector:hover {
-    background: var(--bg-hover);
-    border-color: var(--accent-color);
+    background: var(--button-hover-bg);
+    border-color: var(--accent-color-light);
 }
 
 .language-selector:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.25);
+    box-shadow: 0 0 0 3px var(--accent-color-light);
+    background: var(--input-bg);
 }
 
 .header-overflow-separator {

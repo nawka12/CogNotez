@@ -33,7 +33,7 @@ class TemplatesManager {
                 icon: '📋',
                 content: `# Meeting Notes
 
-**Date:** ${new Date().toLocaleDateString()}
+**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
 **Attendees:** 
 
 ## Agenda
@@ -54,7 +54,7 @@ class TemplatesManager {
                 name: 'Daily Journal',
                 description: 'Daily journaling template',
                 icon: '📓',
-                content: `# Daily Journal - ${new Date().toLocaleDateString()}
+                content: `# Daily Journal - ${this.app.formatLocalizedDateTime(new Date(), false)}
 
 ## Mood
 😊 / 😐 / 😔
@@ -85,7 +85,7 @@ class TemplatesManager {
 
 ## Overview
 **Project Name:** 
-**Start Date:** ${new Date().toLocaleDateString()}
+**Start Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
 **Status:** Planning
 
 ## Objectives
@@ -147,7 +147,7 @@ Brief overview of the book...
                 content: `# Research Notes
 
 **Topic:** 
-**Date:** ${new Date().toLocaleDateString()}
+**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
 **Source:** 
 
 ## Research Question
@@ -172,7 +172,7 @@ Brief overview of the book...
                 name: 'To-Do List',
                 description: 'Task management template',
                 icon: '✅',
-                content: `# To-Do List - ${new Date().toLocaleDateString()}
+                content: `# To-Do List - ${this.app.formatLocalizedDateTime(new Date(), false)}
 
 ## High Priority
 - [ ] 
@@ -199,7 +199,7 @@ Brief overview of the book...
                 content: `# Brainstorming Session
 
 **Topic:** 
-**Date:** ${new Date().toLocaleDateString()}
+**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
 
 ## Ideas
 1. 
@@ -251,7 +251,7 @@ Brief overview of the book...
 
 **Language:** 
 **Purpose:** 
-**Date:** ${new Date().toLocaleDateString()}
+**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
 
 ## Code
 \`\`\`javascript

@@ -489,7 +489,9 @@ class UIManager {
             const text = editor.value;
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
             const chars = text.length;
-            wordCountElement.textContent = `${words} words, ${chars} chars`;
+            const wordsLabel = window.i18n ? window.i18n.t('editor.words') : 'words';
+            const charsLabel = window.i18n ? window.i18n.t('editor.chars') : 'chars';
+            wordCountElement.textContent = `${words} ${wordsLabel}, ${chars} ${charsLabel}`;
             updateWordCountPosition(); // Update position when content changes
         };
 

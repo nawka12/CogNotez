@@ -351,7 +351,10 @@ async function initApp() {
   
   createWindow();
   setupAutoUpdater();
-  createMenu();
+  // Load default language (en) and create menu
+  createMenu('en').catch(err => {
+    console.error('[Main] Failed to create menu:', err);
+  });
 
   // Initialize database manager for Google Drive sync
   try {
@@ -1833,18 +1836,60 @@ if (ipcMain) {
     }
   });
 
+  // Handle language change from renderer
+  ipcMain.on('menu-language-changed', async (event, lang) => {
+    try {
+      await updateMenuLanguage(lang);
+      console.log(`[Menu] Menu language updated to: ${lang}`);
+    } catch (error) {
+      console.error('[Menu] Failed to update menu language:', error);
+    }
+  });
+
 } else {
   console.error('ipcMain not available - Electron may not be properly initialized');
 }
 
+// Load translations for menu
+let menuTranslations = {};
+let currentMenuLanguage = 'en';
+
+const loadMenuTranslations = async (lang = 'en') => {
+  try {
+    const localePath = path.join(__dirname, 'src', 'locales', `${lang}.json`);
+    const localeContent = await fs.readFile(localePath, 'utf8');
+    const locale = JSON.parse(localeContent);
+    menuTranslations = locale.menu || {};
+    currentMenuLanguage = lang;
+    return menuTranslations;
+  } catch (error) {
+    console.error(`[Menu] Failed to load translations for ${lang}:`, error);
+    // Fallback to English if loading fails
+    if (lang !== 'en') {
+      return loadMenuTranslations('en');
+    }
+    return {};
+  }
+};
+
+// Helper function to get translated menu label
+const t = (key) => {
+  return menuTranslations[key] || key;
+};
+
 // Create application menu
-const createMenu = () => {
+const createMenu = async (lang = 'en') => {
+  // Load translations if language changed
+  if (lang !== currentMenuLanguage) {
+    await loadMenuTranslations(lang);
+  }
+  
   const template = [
       {
-        label: 'File',
+        label: t('file'),
         submenu: [
           {
-            label: 'New Note',
+            label: t('newNote'),
             accelerator: 'CmdOrCtrl+N',
             click: () => {
               mainWindow.webContents.send('menu-new-note');
@@ -1852,29 +1897,29 @@ const createMenu = () => {
           },
           { type: 'separator' },
           {
-            label: 'Export',
+            label: t('export'),
             submenu: [
               {
-                label: 'Export as Markdown',
+                label: t('exportMarkdown'),
                 click: () => {
                   mainWindow.webContents.send('menu-export-markdown');
                 }
               },
               {
-                label: 'Export as Text',
+                label: t('exportText'),
                 click: () => {
                   mainWindow.webContents.send('menu-export-text');
                 }
               },
               {
-                label: 'Share as PDF',
+                label: t('sharePDF'),
                 click: () => {
                   mainWindow.webContents.send('menu-export-pdf');
                 }
               },
               { type: 'separator' },
               {
-                label: 'Create Full Backup',
+                label: t('createFullBackup'),
                 click: () => {
                   mainWindow.webContents.send('menu-create-backup');
                 }
@@ -1882,23 +1927,23 @@ const createMenu = () => {
             ]
           },
           {
-            label: 'Import',
+            label: t('import'),
             submenu: [
               {
-                label: 'Import Note',
+                label: t('importNote'),
                 click: () => {
                   mainWindow.webContents.send('menu-import-note');
                 }
               },
               {
-                label: 'Import Multiple Files',
+                label: t('importMultipleFiles'),
                 click: () => {
                   mainWindow.webContents.send('menu-import-multiple');
                 }
               },
               { type: 'separator' },
               {
-                label: 'Restore from Backup',
+                label: t('restoreFromBackup'),
                 click: () => {
                   mainWindow.webContents.send('menu-restore-backup');
                 }
@@ -1907,7 +1952,7 @@ const createMenu = () => {
           },
         { type: 'separator' },
         {
-          label: 'Quit',
+          label: t('quit'),
           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
           click: async () => {
             try {
@@ -1940,43 +1985,43 @@ const createMenu = () => {
       ]
     },
     {
-      label: 'Edit',
+      label: t('edit'),
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { role: 'undo', label: t('undo') },
+        { role: 'redo', label: t('redo') },
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectall' }
+        { role: 'cut', label: t('cut') },
+        { role: 'copy', label: t('copy') },
+        { role: 'paste', label: t('paste') },
+        { role: 'selectall', label: t('selectAll') }
       ]
     },
     {
-      label: 'AI',
+      label: t('ai'),
       submenu: [
         {
-          label: 'Summarize Selection',
+          label: t('summarizeSelection'),
           accelerator: 'CmdOrCtrl+Shift+S',
           click: () => {
             mainWindow.webContents.send('menu-summarize');
           }
         },
         {
-          label: 'Ask AI About Selection',
+          label: t('askAIAboutSelection'),
           accelerator: 'CmdOrCtrl+Shift+A',
           click: () => {
             mainWindow.webContents.send('menu-ask-ai');
           }
         },
         {
-          label: 'Edit Selection with AI',
+          label: t('editSelectionWithAI'),
           accelerator: 'CmdOrCtrl+Shift+E',
           click: () => {
             mainWindow.webContents.send('menu-edit-ai');
           }
         },
         {
-          label: 'Generate Content with AI',
+          label: t('generateContentWithAI'),
           accelerator: 'CmdOrCtrl+Shift+G',
           click: () => {
             mainWindow.webContents.send('menu-generate-ai');
@@ -1984,21 +2029,21 @@ const createMenu = () => {
         },
         { type: 'separator' },
         {
-          label: 'Rewrite Selection',
+          label: t('rewriteSelection'),
           accelerator: 'CmdOrCtrl+Shift+W',
           click: () => {
             mainWindow.webContents.send('menu-rewrite');
           }
         },
         {
-          label: 'Extract Key Points',
+          label: t('extractKeyPoints'),
           accelerator: 'CmdOrCtrl+Shift+K',
           click: () => {
             mainWindow.webContents.send('menu-key-points');
           }
         },
         {
-          label: 'Generate Tags',
+          label: t('generateTags'),
           accelerator: 'CmdOrCtrl+Shift+T',
           click: () => {
             mainWindow.webContents.send('menu-generate-tags');
@@ -2008,43 +2053,43 @@ const createMenu = () => {
       ]
     },
     {
-      label: 'View',
+      label: t('view'),
       submenu: [
-        { role: 'reload' },
-        { role: 'forcereload' },
-        { role: 'toggledevtools' },
+        { role: 'reload', label: t('reload') },
+        { role: 'forcereload', label: t('forceReload') },
+        { role: 'toggledevtools', label: t('toggleDevTools') },
         { type: 'separator' },
-        { role: 'resetzoom' },
-        { role: 'zoomin' },
-        { role: 'zoomout' },
+        { role: 'resetzoom', label: t('resetZoom') },
+        { role: 'zoomin', label: t('zoomIn') },
+        { role: 'zoomout', label: t('zoomOut') },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'togglefullscreen', label: t('toggleFullscreen') }
       ]
     },
     {
-      label: 'Settings',
+      label: t('settings'),
       submenu: [
         {
-          label: 'General Settings',
+          label: t('generalSettings'),
           click: () => {
             mainWindow.webContents.send('menu-general-settings');
           }
         },
         {
-          label: 'Cloud Sync Settings',
+          label: t('cloudSyncSettings'),
           click: () => {
             mainWindow.webContents.send('menu-sync-settings');
           }
         },
         { type: 'separator' },
         {
-          label: 'AI Settings',
+          label: t('aiSettings'),
           click: () => {
             mainWindow.webContents.send('menu-ai-settings');
           }
         },
         {
-          label: 'Advanced Settings',
+          label: t('advancedSettings'),
           click: () => {
             mainWindow.webContents.send('menu-advanced-settings');
           }
@@ -2052,17 +2097,17 @@ const createMenu = () => {
       ]
     },
     {
-      label: 'Help',
+      label: t('help'),
       submenu: [
         {
-          label: 'Check for Updates',
+          label: t('checkForUpdates'),
           click: () => {
             mainWindow.webContents.send('menu-check-updates');
           }
         },
         { type: 'separator' },
         {
-          label: 'About CogNotez',
+          label: t('aboutCogNotez'),
           click: () => {
             mainWindow.webContents.send('menu-about');
           }
@@ -2073,6 +2118,15 @@ const createMenu = () => {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+};
+
+// Update menu when language changes
+const updateMenuLanguage = async (lang) => {
+  try {
+    await createMenu(lang);
+  } catch (error) {
+    console.error('[Menu] Failed to update menu language:', error);
+  }
 };
 
 // Menu is created when app is ready (handled in app.on('ready') callback above)

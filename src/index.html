@@ -141,6 +141,7 @@
                         <select id="language-selector" class="language-selector">
                             <option value="en">English</option>
                             <option value="id">Bahasa Indonesia</option>
+                            <option value="ja">日本語</option>
                         </select>
                     </div>
                     <button id="mobile-theme-toggle" class="header-overflow-item mobile-only-item" title="Toggle Theme" data-i18n-title="header.toggleThemeMenu"><i class="fas fa-adjust"></i> <span data-i18n="header.toggleThemeMenu">Toggle Theme</span></button>
@@ -474,6 +475,17 @@
         // Initialize i18n after DOM is ready
         document.addEventListener('DOMContentLoaded', async () => {
             await window.i18n.initialize();
+            // Notify main process of initial language
+            if (typeof require !== 'undefined') {
+                try {
+                    const { ipcRenderer } = require('electron');
+                    if (ipcRenderer) {
+                        ipcRenderer.send('menu-language-changed', window.i18n.getLanguage());
+                    }
+                } catch (error) {
+                    console.warn('[i18n] Could not notify main process of language:', error);
+                }
+            }
         });
     </script>
 </body>

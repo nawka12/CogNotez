@@ -165,7 +165,7 @@ class NotesManager {
                 </div>
                 <div class="note-item-preview">${this.escapeHtml(note.password_protected ? '' : (note.preview || ''))}</div>
                 ${tagsHtml}
-                <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
+                <div class="note-item-date">${this.app.formatLocalizedDateTime(note.modified, false)}</div>
             </div>
             <button class="note-pin-btn ${note.pinned ? 'pinned' : ''}" data-note-id="${note.id}" title="${pinTitle}"><i class="fas fa-thumbtack"></i></button>
             <button class="note-delete-btn" data-note-id="${note.id}" title="${deleteTitle}"><i class="fas fa-trash"></i></button>
