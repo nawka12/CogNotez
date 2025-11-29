@@ -153,18 +153,22 @@ class NotesManager {
             tagsHtml += '</div>';
         }
 
+        const passwordProtectedTitle = window.i18n ? window.i18n.t('notes.passwordProtected') : 'Password protected';
+        const pinTitle = note.pinned ? (window.i18n ? window.i18n.t('notes.unpinNote') : 'Unpin note') : (window.i18n ? window.i18n.t('notes.pinNote') : 'Pin note');
+        const deleteTitle = window.i18n ? window.i18n.t('notes.deleteNote') : 'Delete note';
+        
         element.innerHTML = `
             <div class="note-item-content">
                 <div class="note-item-title">
-                    ${note.password_protected ? '<i class="fas fa-lock note-lock-icon" title="Password protected"></i>' : ''}
+                    ${note.password_protected ? `<i class="fas fa-lock note-lock-icon" title="${passwordProtectedTitle}"></i>` : ''}
                     ${this.escapeHtml(note.title)}
                 </div>
                 <div class="note-item-preview">${this.escapeHtml(note.password_protected ? '' : (note.preview || ''))}</div>
                 ${tagsHtml}
                 <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
             </div>
-            <button class="note-pin-btn ${note.pinned ? 'pinned' : ''}" data-note-id="${note.id}" title="${note.pinned ? 'Unpin note' : 'Pin note'}"><i class="fas fa-thumbtack"></i></button>
-            <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note"><i class="fas fa-trash"></i></button>
+            <button class="note-pin-btn ${note.pinned ? 'pinned' : ''}" data-note-id="${note.id}" title="${pinTitle}"><i class="fas fa-thumbtack"></i></button>
+            <button class="note-delete-btn" data-note-id="${note.id}" title="${deleteTitle}"><i class="fas fa-trash"></i></button>
         `;
 
         // Note selection is now handled by the app.js delegate event listener

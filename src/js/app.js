@@ -39,9 +39,16 @@ class FindReplaceDialog {
         const dialog = document.createElement('div');
         dialog.id = 'find-replace-dialog';
         dialog.className = 'find-replace-dialog';
+        const findReplaceTitle = window.i18n ? window.i18n.t('findReplace.findReplace') : 'Find & Replace';
+        const findLabel = window.i18n ? window.i18n.t('findReplace.find') : 'Find:';
+        const replaceLabel = window.i18n ? window.i18n.t('findReplace.replace') : 'Replace:';
+        const searchTextPlaceholder = window.i18n ? window.i18n.t('findReplace.searchText') : 'Search text...';
+        const replaceWithPlaceholder = window.i18n ? window.i18n.t('findReplace.replaceWith') : 'Replace with...';
+        const noMatches = window.i18n ? window.i18n.t('notes.noMatches') : 'No matches';
+        
         dialog.innerHTML = `
             <div class="find-replace-header">
-                <h3>Find & Replace</h3>
+                <h3>${findReplaceTitle}</h3>
                 <button id="find-replace-close" class="find-replace-close"><i class="fas fa-times"></i></button>
             </div>
             <div class="find-replace-body">
@@ -50,12 +57,12 @@ class FindReplaceDialog {
                     <span>Find only works in edit mode. Preview mode support coming soon.</span>
                 </div>
                 <div class="find-section">
-                    <label for="find-input">Find:</label>
-                    <input type="text" id="find-input" class="find-input" placeholder="Search text...">
+                    <label for="find-input">${findLabel}</label>
+                    <input type="text" id="find-input" class="find-input" placeholder="${searchTextPlaceholder}">
                 </div>
                 <div class="replace-section">
-                    <label for="replace-input">Replace:</label>
-                    <input type="text" id="replace-input" class="replace-input" placeholder="Replace with...">
+                    <label for="replace-input">${replaceLabel}</label>
+                    <input type="text" id="replace-input" class="replace-input" placeholder="${replaceWithPlaceholder}">
                 </div>
                 <div class="options-section">
                     <label><input type="checkbox" id="case-sensitive"> Case sensitive</label>
@@ -63,7 +70,7 @@ class FindReplaceDialog {
                     <label><input type="checkbox" id="use-regex"> Regular expression</label>
                 </div>
                 <div class="results-section">
-                    <span id="match-count">No matches</span>
+                    <span id="match-count">${noMatches}</span>
                 </div>
                 <div class="buttons-section">
                     <button id="find-prev" class="btn-secondary">Previous</button>
@@ -1064,17 +1071,45 @@ class CogNotezApp {
             this.toggleHeaderOverflowMenu();
         });
         
-        // Close overflow menu when clicking any menu item
+        // Close overflow menu when clicking any menu item (except language selector)
         document.querySelectorAll('.header-overflow-item').forEach(item => {
-            item.addEventListener('click', () => {
-                const menu = document.getElementById('header-overflow-menu');
-                menu.classList.add('hidden');
-            });
+            if (!item.classList.contains('language-selector-item')) {
+                item.addEventListener('click', () => {
+                    const menu = document.getElementById('header-overflow-menu');
+                    menu.classList.add('hidden');
+                });
+            }
         });
+        
+        // Language selector
+        const languageSelector = document.getElementById('language-selector');
+        if (languageSelector) {
+            // Set current language
+            const currentLang = window.i18n ? window.i18n.getLanguage() : 'en';
+            languageSelector.value = currentLang;
+            
+            // Handle language change
+            languageSelector.addEventListener('change', async (e) => {
+                const newLang = e.target.value;
+                if (window.i18n) {
+                    await window.i18n.setLanguage(newLang);
+                }
+            });
+            
+            // Listen for language changes to update selector
+            window.addEventListener('languageChanged', (e) => {
+                languageSelector.value = e.detail.language;
+            });
+        }
         
         // Menu items that were moved to overflow
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('mobile-search-btn').addEventListener('click', () => this.toggleMobileSearch());
+        document.getElementById('advanced-search-btn').addEventListener('click', () => {
+            if (this.advancedSearchManager) {
+                this.advancedSearchManager.togglePanel();
+            }
+        });
         document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
         
         // Mobile-specific overflow menu items
@@ -1990,9 +2025,12 @@ class CogNotezApp {
 
     async promptForNotePassword(note) {
         return new Promise((resolve) => {
+            const title = window.i18n ? window.i18n.t('password.enterPassword') : 'Enter Password';
+            const message = window.i18n ? window.i18n.t('password.unlockNote', { title: note.title }) : `Enter the password to unlock "${note.title}"`;
+            
             this.uiManager.showPasswordDialog({
-                title: 'Enter Password',
-                message: `Enter the password to unlock "${note.title}"`,
+                title: title,
+                message: message,
                 onSubmit: async (password) => {
                     try {
 						const isValid = await this.verifyNotePassword(note, password);
@@ -2077,10 +2115,11 @@ class CogNotezApp {
         }
 
         const isCurrentlyProtected = this.currentNote.password_protected;
-        const title = isCurrentlyProtected ? 'Remove Password Protection' : 'Add Password Protection';
-        const message = isCurrentlyProtected
-            ? 'Enter the current password to remove protection from this note.'
-            : 'Enter a password to protect this note.';
+        const titleKey = isCurrentlyProtected ? 'password.removePasswordProtection' : 'password.addPasswordProtection';
+        const messageKey = isCurrentlyProtected ? 'password.removePasswordMessage' : 'password.protectNote';
+        
+        const title = window.i18n ? window.i18n.t(titleKey) : (isCurrentlyProtected ? 'Remove Password Protection' : 'Add Password Protection');
+        const message = window.i18n ? window.i18n.t(messageKey) : (isCurrentlyProtected ? 'Enter the current password to remove protection from this note.' : 'Enter a password to protect this note.');
 
         this.uiManager.showPasswordDialog({
             title: title,
@@ -3984,6 +4023,7 @@ class CogNotezApp {
     async showAboutDialog() {
         try {
             const version = await ipcRenderer.invoke('get-app-version');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             const content = `
                 <div style="padding: 20px 0; text-align: center;">
                     <div style="margin-bottom: 24px;">
@@ -3991,16 +4031,16 @@ class CogNotezApp {
                             CogNotez
                         </h2>
                         <p style="margin: 0; color: var(--text-secondary); font-size: 16px;">
-                            AI-Powered Note App
+                            ${t('about.subtitle', 'AI-Powered Note App')}
                         </p>
                     </div>
                     <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-secondary, rgba(128, 128, 128, 0.1)); border-radius: 8px;">
                         <p style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 14px;">
-                            <strong>Version:</strong> ${this.escapeHtml(version)}
+                            <strong>${t('about.versionLabel', 'Version:')}</strong> ${this.escapeHtml(version)}
                         </p>
                         <p style="margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
-                            An offline-first note-taking application<br>
-                            with local LLM integration.
+                            ${t('about.descriptionLine1', 'An offline-first note-taking application')}<br>
+                            ${t('about.descriptionLine2', 'with local LLM integration.')}
                         </p>
                     </div>
                     <div style="margin-top: 20px; color: var(--text-secondary); font-size: 12px;">
@@ -4009,8 +4049,8 @@ class CogNotezApp {
                 </div>
             `;
 
-            this.createModal('About CogNotez', content, [
-                { text: 'Close', type: 'primary', action: 'close' }
+            this.createModal(t('about.title', 'About CogNotez'), content, [
+                { text: window.i18n ? window.i18n.t('modals.close') : 'Close', type: 'primary', action: 'close' }
             ]);
         } catch (error) {
             console.error('Error showing about dialog:', error);
@@ -6406,22 +6446,29 @@ Please provide a helpful response based on the note content and conversation his
 
     showAISettings() {
         if (!this.aiManager) {
-            this.showNotification('AI manager not available', 'error');
+            const msg = window.i18n ? window.i18n.t('notifications.error') : 'AI manager not available';
+            this.showNotification(msg, 'error');
             return;
         }
 
-        const backendStatus = this.aiManager.backend === 'ollama' ?
-            `Ollama ${this.aiManager.isConnected ? 'is running and ready' : 'is not available. Please start Ollama service.'}` :
-            `OpenRouter ${this.aiManager.isConnected ? 'API key is valid' : 'API key is invalid or missing.'}`;
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
+        const backendStatus = this.aiManager.backend === 'ollama'
+            ? (this.aiManager.isConnected
+                ? t('settings.ai.ollamaStatusReady', 'Ollama is running and ready')
+                : t('settings.ai.ollamaStatusNotAvailable', 'Ollama is not available. Please start Ollama service.'))
+            : (this.aiManager.isConnected
+                ? t('settings.ai.openRouterStatusValid', 'OpenRouter API key is valid')
+                : t('settings.ai.openRouterStatusInvalid', 'OpenRouter API key is invalid or missing.'));
 
         const content = `
             <div style="max-width: 600px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-robot"></i> AI Configuration</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-robot"></i> ${t('settings.ai.configurationTitle', 'AI Configuration')}</h4>
                     <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <div style="width: 8px; height: 8px; border-radius: 50%; background: ${this.aiManager.isConnected ? '#28a745' : '#dc3545'};"></div>
-                            <span style="font-weight: 500;">Status: ${this.aiManager.isConnected ? 'Connected' : 'Disconnected'}</span>
+                            <span style="font-weight: 500;">${t('settings.ai.statusLabel', 'Status')}: ${this.aiManager.isConnected ? t('settings.ai.statusConnected', 'Connected') : t('settings.ai.statusDisconnected', 'Disconnected')}</span>
                         </div>
                         <div style="font-size: 12px; color: var(--text-secondary);">
                             ${backendStatus}
@@ -6430,22 +6477,22 @@ Please provide a helpful response based on the note content and conversation his
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label for="ai-backend" style="display: block; margin-bottom: 6px; font-weight: 500;">AI Backend:</label>
+                    <label for="ai-backend" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.backendLabel', 'AI Backend')}:</label>
                     <select id="ai-backend" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                        <option value="ollama" ${this.aiManager.backend === 'ollama' ? 'selected' : ''}>Ollama (Local)</option>
-                        <option value="openrouter" ${this.aiManager.backend === 'openrouter' ? 'selected' : ''}>OpenRouter (Cloud)</option>
+                        <option value="ollama" ${this.aiManager.backend === 'ollama' ? 'selected' : ''}>${t('settings.ai.backendOllama', 'Ollama (Local)')}</option>
+                        <option value="openrouter" ${this.aiManager.backend === 'openrouter' ? 'selected' : ''}>${t('settings.ai.backendOpenRouter', 'OpenRouter (Cloud)')}</option>
                     </select>
                 </div>
 
                 <div id="ollama-settings" style="display: ${this.aiManager.backend === 'ollama' ? 'block' : 'none'};">
                     <div style="margin-bottom: 20px;">
-                        <label for="ollama-endpoint" style="display: block; margin-bottom: 6px; font-weight: 500;">Ollama Endpoint:</label>
+                        <label for="ollama-endpoint" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.ollamaEndpoint', 'Ollama Endpoint')}:</label>
                         <input type="text" id="ollama-endpoint" value="${this.aiManager.ollamaEndpoint}"
                                style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-family: monospace; font-size: 13px;">
                     </div>
 
                     <div style="margin-bottom: 20px;">
-                        <label for="ollama-model" style="display: block; margin-bottom: 6px; font-weight: 500;">Ollama Model:</label>
+                        <label for="ollama-model" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.ollamaModel', 'Ollama Model')}:</label>
                         <select id="ollama-model" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
                             ${this.aiManager.availableModels && this.aiManager.backend === 'ollama' ? this.aiManager.availableModels.map(model =>
                                 `<option value="${model.name}" ${model.name === this.aiManager.ollamaModel ? 'selected' : ''}>${model.name}</option>`
@@ -6456,17 +6503,17 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div id="openrouter-settings" style="display: ${this.aiManager.backend === 'openrouter' ? 'block' : 'none'};">
                     <div style="margin-bottom: 20px;">
-                        <label for="openrouter-api-key" style="display: block; margin-bottom: 6px; font-weight: 500;">OpenRouter API Key:</label>
+                        <label for="openrouter-api-key" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.openRouterApiKey', 'OpenRouter API Key')}:</label>
                         <input type="password" id="openrouter-api-key" value="${this.aiManager.openRouterApiKey}"
                                style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-family: monospace; font-size: 13px;"
                                placeholder="sk-or-v1-...">
                     </div>
 
                     <div style="margin-bottom: 20px;">
-                        <label for="openrouter-model-search" style="display: block; margin-bottom: 6px; font-weight: 500;">OpenRouter Model:</label>
+                        <label for="openrouter-model-search" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.openRouterModel', 'OpenRouter Model')}:</label>
                         <div id="openrouter-model-container" style="position: relative;">
                             <input type="text" id="openrouter-model-search" 
-                                   placeholder="Search models..." 
+                                   placeholder="${t('settings.ai.searchModels', 'Search models...')}" 
                                    value="${this.aiManager.availableModels && this.aiManager.backend === 'openrouter' ? (this.aiManager.availableModels.find(m => m.id === this.aiManager.openRouterModel)?.name || this.aiManager.openRouterModel) : this.aiManager.openRouterModel}"
                                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); padding-right: 30px; box-sizing: border-box;">
                             <input type="hidden" id="openrouter-model" value="${this.aiManager.openRouterModel}">
@@ -6478,27 +6525,27 @@ Please provide a helpful response based on the note content and conversation his
                     <div style="margin-bottom: 20px;">
                         <label style="display: flex; align-items: center; gap: 8px; font-weight: 500;">
                             <input type="checkbox" id="searxng-enabled" ${this.aiManager.searxngEnabled ? 'checked' : ''}>
-                            Enable SearXNG Web Search
+                            ${t('settings.ai.enableSearxng', 'Enable SearXNG Web Search')}
                         </label>
                         <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                            Give the AI access to web search for current information. The AI is time-aware and will decide when to search the web (for current events, prices, weather, news, time-sensitive data, etc.) using SearXNG to get accurate, up-to-date results. Requires a self-hosted SearXNG instance.
+                            ${t('settings.ai.searxngDescription', 'Give the AI access to web search for current information using your SearXNG instance.')}
                         </div>
                     </div>
 
                     <div id="searxng-options" style="display: ${this.aiManager.searxngEnabled ? 'block' : 'none'}; margin-left: 20px;">
                         <div style="margin-bottom: 15px;">
-                            <label for="searxng-url" style="display: block; margin-bottom: 6px; font-weight: 500;">SearXNG URL:</label>
+                            <label for="searxng-url" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.searxngUrl', 'SearXNG URL')}:</label>
                             <input type="text" id="searxng-url" value="${this.aiManager.searxngUrl}"
                                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-family: monospace; font-size: 13px;"
                                    placeholder="http://localhost:8080">
                         </div>
 
                         <div style="margin-bottom: 15px;">
-                            <label for="searxng-max-results" style="display: block; margin-bottom: 6px; font-weight: 500;">Max Search Results:</label>
+                            <label for="searxng-max-results" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.searxngMaxResults', 'Max Search Results')}:</label>
                             <select id="searxng-max-results" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                                <option value="3" ${this.aiManager.searxngMaxResults === 3 ? 'selected' : ''}>3 results</option>
-                                <option value="5" ${this.aiManager.searxngMaxResults === 5 ? 'selected' : ''}>5 results</option>
-                                <option value="10" ${this.aiManager.searxngMaxResults === 10 ? 'selected' : ''}>10 results</option>
+                                <option value="3" ${this.aiManager.searxngMaxResults === 3 ? 'selected' : ''}>${t('settings.ai.searxngResultsOption', '3 results', { count: 3 })}</option>
+                                <option value="5" ${this.aiManager.searxngMaxResults === 5 ? 'selected' : ''}>${t('settings.ai.searxngResultsOption', '5 results', { count: 5 })}</option>
+                                <option value="10" ${this.aiManager.searxngMaxResults === 10 ? 'selected' : ''}>${t('settings.ai.searxngResultsOption', '10 results', { count: 10 })}</option>
                             </select>
                         </div>
                     </div>
@@ -6786,47 +6833,49 @@ Please provide a helpful response based on the note content and conversation his
         const currentTheme = localStorage.getItem('theme') || 'light';
         const currentWordCount = localStorage.getItem('showWordCount') === 'true';
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+
         const content = `
             <div style="max-width: 400px;">
                 <div style="margin-bottom: 24px;">
-                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cog"></i> General Settings</h4>
+                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cog"></i> ${t('settings.general.title', 'General Settings')}</h4>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 20px;">
                     <div class="setting-item">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="auto-save-toggle" ${currentAutoSave ? 'checked' : ''} style="margin: 0;">
-                            <span style="color: var(--text-primary); font-weight: 500;">Enable Auto-Save</span>
+                            <span style="color: var(--text-primary); font-weight: 500;">${t('settings.general.autoSaveLabel', 'Enable Auto-Save')}</span>
                         </label>
                         <div style="margin-top: 4px; color: var(--text-secondary); font-size: 12px;">
-                            Automatically save your notes every 30 seconds when changes are detected
+                            ${t('settings.general.autoSaveDescription', 'Automatically save your notes every 30 seconds when changes are detected')}
                         </div>
                     </div>
 
                     <div class="setting-item">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="word-count-toggle" ${currentWordCount ? 'checked' : ''} style="margin: 0;">
-                            <span style="color: var(--text-primary); font-weight: 500;">Show Word Count</span>
+                            <span style="color: var(--text-primary); font-weight: 500;">${t('settings.general.wordCountLabel', 'Show Word Count')}</span>
                         </label>
                         <div style="margin-top: 4px; color: var(--text-secondary); font-size: 12px;">
-                            Display word count in the editor header
+                            ${t('settings.general.wordCountDescription', 'Display word count in the editor header')}
                         </div>
                     </div>
 
                     <div class="setting-item">
-                        <label style="color: var(--text-primary); font-weight: 500;">Theme</label>
+                        <label style="color: var(--text-primary); font-weight: 500;">${t('settings.general.themeLabel', 'Theme')}</label>
                         <select id="theme-select" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                            <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Light</option>
-                            <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>Dark</option>
+                            <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>${t('settings.general.themeLight', 'Light')}</option>
+                            <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>${t('settings.general.themeDark', 'Dark')}</option>
                         </select>
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('General Settings', content, [
-            { text: 'Save Settings', type: 'primary', action: 'save-general-settings' },
-            { text: 'Cancel', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('settings.general.title', 'General Settings'), content, [
+            { text: t('settings.general.saveButton', 'Save Settings'), type: 'primary', action: 'save-general-settings' },
+            { text: window.i18n ? window.i18n.t('modals.cancel') : 'Cancel', type: 'secondary', action: 'cancel' }
         ]);
 
         const saveBtn = modal.querySelector('[data-action="save-general-settings"]');
@@ -6887,30 +6936,32 @@ Please provide a helpful response based on the note content and conversation his
         const allTags = this.notesManager.db ? this.notesManager.db.getAllTags() : [];
         const totalTags = allTags.length;
 
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
         const content = `
             <div style="max-width: 500px;">
                 <div class="settings-section">
                     <h4 style="margin: 0 0 16px 0; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
-                        <i class="fas fa-cog"></i> Advanced Options
+                        <i class="fas fa-cog"></i> ${t('settings.advanced.advancedOptions', 'Advanced Options')}
                     </h4>
 
                     <!-- Tag Management -->
                     <div class="setting-item" style="margin-bottom: 24px;">
                         <div style="margin-bottom: 12px;">
                             <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 4px;">
-                                <i class="fas fa-tags"></i> Tag Management
+                                <i class="fas fa-tags"></i> ${t('settings.advanced.tagManagement', 'Tag Management')}
                             </label>
                             <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
-                                Total tags: <strong>${totalTags}</strong>
+                                ${t('settings.advanced.totalTags', 'Total tags: {{count}}', { count: totalTags })}
                             </div>
                         </div>
                         
                         <button id="clear-unused-tags-btn" class="advanced-action-btn" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; transition: all 0.2s;">
                             <i class="fas fa-broom"></i>
-                            <span>Clear Unused Tags</span>
+                            <span>${t('settings.advanced.clearUnusedTags', 'Clear Unused Tags')}</span>
                         </button>
                         <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
-                            Remove tags that are not associated with any notes. This helps keep your tag list clean and organized.
+                            ${t('settings.advanced.clearUnusedTagsDescription', 'Remove tags that are not associated with any notes. This helps keep your tag list clean and organized.')}
                         </div>
                     </div>
 
@@ -6918,27 +6969,27 @@ Please provide a helpful response based on the note content and conversation his
                     <div class="setting-item" style="margin-bottom: 24px;">
                         <div style="margin-bottom: 12px;">
                             <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 4px;">
-                                <i class="fas fa-robot"></i> AI Data Management
+                                <i class="fas fa-robot"></i> ${t('settings.advanced.aiDataManagement', 'AI Data Management')}
                             </label>
                             <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
-                                Manage AI conversation history and data
+                                ${t('settings.advanced.aiDataDescription', 'Manage AI conversation history and data')}
                             </div>
                         </div>
                         
                         <button id="clear-all-ai-conversations-btn" class="advanced-action-btn" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; transition: all 0.2s;">
                             <i class="fas fa-trash"></i>
-                            <span>Clear All AI Conversations</span>
+                            <span>${t('settings.advanced.clearAllAIConversations', 'Clear All AI Conversations')}</span>
                         </button>
                         <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
-                            Delete all AI conversations for all notes. This action cannot be undone. Note content will not be affected.
+                            ${t('settings.advanced.clearAllAIConversationsDescription', 'Delete all AI conversations for all notes. This action cannot be undone. Note content will not be affected.')}
                         </div>
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('Advanced Settings', content, [
-            { text: 'Close', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('settings.advanced.title', 'Advanced Settings'), content, [
+            { text: t('settings.advanced.close', 'Close'), type: 'secondary', action: 'cancel' }
         ]);
 
         // Handle Clear Unused Tags button
@@ -6951,8 +7002,8 @@ Please provide a helpful response based on the note content and conversation his
 
             // Confirm action
             const confirmClear = await this.showConfirmation(
-                'Clear Unused Tags',
-                'Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.'
+                t('settings.advanced.confirmClearUnusedTitle', 'Clear Unused Tags'),
+                t('settings.advanced.confirmClearUnusedMessage', 'Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.')
             );
             if (!confirmClear) return;
 
@@ -6977,7 +7028,7 @@ Please provide a helpful response based on the note content and conversation his
                 console.error('[Advanced Settings] Error clearing unused tags:', error);
                 this.showNotification('❌ Failed to clear unused tags: ' + error.message, 'error');
                 clearTagsBtn.disabled = false;
-                clearTagsBtn.innerHTML = '<i class="fas fa-broom"></i> <span>Clear Unused Tags</span>';
+                clearTagsBtn.innerHTML = `<i class="fas fa-broom"></i> <span>${t('settings.advanced.clearUnusedTags', 'Clear Unused Tags')}</span>`;
             }
         });
 
@@ -7727,23 +7778,32 @@ Please provide a helpful response based on the note content and conversation his
 
             // If sync failed, show a single error notification and exit
             if (syncResult && syncResult.success === false) {
-                const errorMessage = syncResult.error ? `Sync failed: ${syncResult.error}` : 'Sync failed';
+                const errorMessage = syncResult.error
+                    ? (window.i18n ? window.i18n.t('notifications.syncFailed', { error: syncResult.error }) : `Sync failed: ${syncResult.error}`)
+                    : (window.i18n ? window.i18n.t('notifications.syncFailedGeneric') : 'Sync failed');
                 this.showNotification(errorMessage, 'error');
                 return;
             }
 
             // Show notification about the sync completion
-            let message = 'Sync completed successfully';
+            const baseMessage = window.i18n ? window.i18n.t('notifications.syncCompleted') : 'Sync completed successfully';
+            let message = baseMessage;
             if (syncResult.action) {
                 message += ` - ${syncResult.action}`;
             }
             if (syncResult.stats) {
                 const stats = syncResult.stats;
                 if (stats.downloaded > 0) {
-                    message += ` (${stats.downloaded} downloaded)`;
+                    const dl = window.i18n
+                        ? window.i18n.t('notifications.syncStatsDownloaded', { count: stats.downloaded })
+                        : `${stats.downloaded} downloaded`;
+                    message += ` (${dl})`;
                 }
                 if (stats.uploaded > 0) {
-                    message += ` (${stats.uploaded} uploaded)`;
+                    const ul = window.i18n
+                        ? window.i18n.t('notifications.syncStatsUploaded', { count: stats.uploaded })
+                        : `${stats.uploaded} uploaded`;
+                    message += ` (${ul})`;
                 }
             }
             this.showNotification(message, 'success');
@@ -7751,7 +7811,10 @@ Please provide a helpful response based on the note content and conversation his
             console.log('[Sync] UI refreshed after sync completion');
         } catch (error) {
             console.error('[Sync] Failed to handle sync completion:', error);
-            this.showNotification('Sync completed but UI refresh failed', 'warning');
+            const msg = window.i18n
+                ? window.i18n.t('notifications.syncRefreshFailed')
+                : 'Sync completed but UI refresh failed';
+            this.showNotification(msg, 'warning');
         }
     }
 
@@ -7803,40 +7866,42 @@ Please provide a helpful response based on the note content and conversation his
         // Reset all status classes
         syncBtn.classList.remove('connected', 'disconnected', 'syncing', 'error');
 
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
         // Update sync button based on status
         if (this.syncStatus.inProgress) {
             syncBtn.classList.add('syncing');
             icon.className = 'fas fa-sync-alt';
-            text.textContent = 'Syncing...';
+            text.textContent = t('settings.sync.statusSyncing', 'Syncing...');
             syncBtn.disabled = true;
-            syncBtn.title = 'Sync in progress...';
+            syncBtn.title = t('settings.sync.statusSyncingTooltip', 'Sync in progress...');
         } else if (!isOnline) {
             // Show offline state
             syncBtn.classList.add('disconnected');
             icon.className = 'fas fa-wifi-slash';
-            text.textContent = 'Offline';
+            text.textContent = t('settings.sync.statusOffline', 'Offline');
             syncBtn.disabled = true;
-            syncBtn.title = 'No internet connection';
+            syncBtn.title = t('notifications.noInternet', 'No internet connection');
         } else if (this.syncStatus.isAuthenticated) {
             if (contentInSync) {
                 syncBtn.classList.add('connected');
                 icon.className = 'fas fa-cloud-check';
-                text.textContent = 'Synced';
+                text.textContent = t('settings.sync.statusConnected', 'Synced');
                 syncBtn.disabled = false;
-                syncBtn.title = 'In sync - Click to sync manually';
+                syncBtn.title = t('settings.sync.statusConnectedTooltip', 'In sync - Click to sync manually');
             } else {
                 syncBtn.classList.add('disconnected');
                 icon.className = 'fas fa-cloud-upload-alt';
-                text.textContent = 'Sync';
+                text.textContent = t('settings.sync.statusSyncAvailable', 'Sync');
                 syncBtn.disabled = false;
-                syncBtn.title = 'Click to sync with Google Drive';
+                syncBtn.title = t('settings.sync.statusSyncAvailableTooltip', 'Click to sync with Google Drive');
             }
         } else {
             syncBtn.classList.add('disconnected');
             icon.className = 'fas fa-cloud-slash';
-            text.textContent = 'Not connected';
+            text.textContent = t('settings.sync.statusNotConnected', 'Not connected');
             syncBtn.disabled = true;
-            syncBtn.title = 'Not connected to Google Drive';
+            syncBtn.title = t('settings.sync.statusNotConnectedTooltip', 'Not connected to Google Drive');
         }
 
         // Update last sync time in settings modal if open
@@ -7844,7 +7909,10 @@ Please provide a helpful response based on the note content and conversation his
         if (lastSyncElement && this.syncStatus.lastSync) {
             const lastSyncDate = new Date(this.syncStatus.lastSync);
             const timeAgo = this.getTimeAgo(lastSyncDate);
-            lastSyncElement.textContent = `Last synced: ${timeAgo}`;
+            const label = window.i18n
+                ? window.i18n.t('settings.sync.lastSynced', { timeAgo })
+                : `Last synced: ${timeAgo}`;
+            lastSyncElement.textContent = label;
         }
     }
 
@@ -7855,20 +7923,29 @@ Please provide a helpful response based on the note content and conversation his
         const diffHours = Math.floor(diffMins / 60);
         const diffDays = Math.floor(diffHours / 24);
 
-        if (diffMins < 1) return 'just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMins < 1) {
+            return window.i18n ? window.i18n.t('settings.sync.timeJustNow', 'just now') : 'just now';
+        }
+        if (diffMins < 60) {
+            return window.i18n ? window.i18n.t('settings.sync.timeMinutesAgo', { count: diffMins }) : `${diffMins}m ago`;
+        }
+        if (diffHours < 24) {
+            return window.i18n ? window.i18n.t('settings.sync.timeHoursAgo', { count: diffHours }) : `${diffHours}h ago`;
+        }
+        if (diffDays < 7) {
+            return window.i18n ? window.i18n.t('settings.sync.timeDaysAgo', { count: diffDays }) : `${diffDays}d ago`;
+        }
 
         return date.toLocaleDateString();
     }
 
     showSyncSettings() {
         try {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             const content = `
                 <div style="max-width: 700px;">
                     <div style="margin-bottom: 24px;">
-                        <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cloud"></i> Google Drive Sync Settings</h4>
+                        <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cloud"></i> ${t('settings.sync.title', 'Google Drive Sync Settings')}</h4>
                     </div>
 
                     <div id="sync-settings-content">
@@ -7878,13 +7955,13 @@ Please provide a helpful response based on the note content and conversation his
                                 <div class="sync-status-card" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                                     <div class="sync-status-header" style="display: flex; align-items: center; margin-bottom: 12px;">
                                         <div class="sync-status-indicator" id="modal-sync-indicator" style="width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;"></div>
-                                        <span class="sync-status-text" id="modal-sync-status-text" style="font-weight: 500;">Loading...</span>
+                                        <span class="sync-status-text" id="modal-sync-status-text" style="font-weight: 500;">${t('settings.sync.statusLoading', 'Loading...')}</span>
                                     </div>
                                     <div class="sync-last-sync" id="modal-sync-last-sync" style="font-size: 0.9rem; color: var(--text-secondary);"></div>
                                     <div class="sync-buttons" style="margin-top: 12px;">
-                                        <button id="modal-google-drive-connect-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px;">Connect Google Drive</button>
-                                        <button id="modal-google-drive-disconnect-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px; display: none;">Disconnect</button>
-                                        <button id="modal-google-drive-sync-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;" disabled>Sync Now</button>
+                                        <button id="modal-google-drive-connect-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px;">${t('settings.sync.connectGoogleDrive', 'Connect Google Drive')}</button>
+                                        <button id="modal-google-drive-disconnect-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px; display: none;">${t('settings.sync.disconnect', 'Disconnect')}</button>
+                                        <button id="modal-google-drive-sync-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;" disabled>${t('settings.sync.syncNow', 'Sync Now')}</button>
                                     </div>
                                 </div>
                             </div>
@@ -7892,20 +7969,20 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Options Section -->
                         <div class="sync-section" style="margin-bottom: 24px;">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Options</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">${t('settings.sync.syncOptions', 'Sync Options')}</h5>
                             <div class="sync-options" style="display: grid; gap: 12px;">
                                 <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color);">
                                     <input type="checkbox" id="modal-auto-sync" style="margin-right: 12px;">
                                     <div>
-                                        <label for="modal-auto-sync" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Automatic Sync</label>
-                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Automatically sync changes every 5 minutes when connected</div>
+                                        <label for="modal-auto-sync" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">${t('settings.sync.autoSyncLabel', 'Automatic Sync')}</label>
+                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${t('settings.sync.autoSyncDescription', 'Automatically sync changes every 5 minutes when connected')}</div>
                                     </div>
                                 </div>
                                 <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color);">
                                     <input type="checkbox" id="modal-sync-on-startup" style="margin-right: 12px;">
                                     <div>
-                                        <label for="modal-sync-on-startup" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Sync on Startup</label>
-                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Sync data when the application starts</div>
+                                        <label for="modal-sync-on-startup" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">${t('settings.sync.syncOnStartupLabel', 'Sync on Startup')}</label>
+                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${t('settings.sync.syncOnStartupDescription', 'Sync data when the application starts')}</div>
                                     </div>
                                 </div>
                             </div>
@@ -7913,7 +7990,7 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Encryption Section -->
                         <div class="sync-section" style="margin-bottom: 24px;">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;"><i class="fas fa-lock"></i> End-to-End Encryption</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;"><i class="fas fa-lock"></i> ${t('settings.sync.encryptionSectionTitle', 'End-to-End Encryption')}</h5>
                             <div class="sync-encryption-section" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
                                 <div class="encryption-status" id="encryption-status" style="margin-bottom: 16px;">
                                     <div style="display: flex; align-items: center; margin-bottom: 8px;">
@@ -7927,28 +8004,28 @@ Please provide a helpful response based on the note content and conversation his
                                     <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 12px;">
                                         <input type="checkbox" id="modal-encryption-enabled" style="margin-right: 12px;">
                                         <div>
-                                            <label for="modal-encryption-enabled" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Enable End-to-End Encryption</label>
-                                            <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Encrypt your data before uploading to Google Drive. Your data will only be accessible with your passphrase.</div>
+                                            <label for="modal-encryption-enabled" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">${t('settings.sync.enableEncryption', 'Enable End-to-End Encryption')}</label>
+                                            <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${t('settings.sync.encryptionDescription', 'Encrypt your data before uploading to Google Drive. Your data will only be accessible with your passphrase.')}</div>
                                         </div>
                                     </div>
 
                                     <div class="encryption-passphrase-section" id="encryption-passphrase-section" style="display: none;">
                                         <div style="margin-bottom: 12px;">
-                                            <label for="modal-encryption-passphrase" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
-                                            <input type="password" id="modal-encryption-passphrase" placeholder="Enter your passphrase (min. 8 characters)" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                                            <label for="modal-encryption-passphrase" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">${t('settings.sync.passphraseLabel', 'Passphrase')}</label>
+                                            <input type="password" id="modal-encryption-passphrase" placeholder="${t('settings.sync.passphrasePlaceholder', 'Enter your passphrase (min. 8 characters)')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                                             <div class="encryption-passphrase-help" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                                                Your passphrase is used to encrypt and decrypt your data. Choose a strong passphrase and keep it safe.
+                                                ${t('settings.sync.passphraseHelp', 'Your passphrase is used to encrypt and decrypt your data. Choose a strong passphrase and keep it safe.')}
                                             </div>
                                         </div>
 
                                         <div style="margin-bottom: 12px;">
-                                            <label for="modal-encryption-passphrase-confirm" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">Confirm Passphrase</label>
-                                            <input type="password" id="modal-encryption-passphrase-confirm" placeholder="Confirm your passphrase" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                                            <label for="modal-encryption-passphrase-confirm" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">${t('settings.sync.confirmPassphraseLabel', 'Confirm Passphrase')}</label>
+                                            <input type="password" id="modal-encryption-passphrase-confirm" placeholder="${t('settings.sync.confirmPassphrasePlaceholder', 'Confirm your passphrase')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                                         </div>
 
                                         <div class="encryption-buttons" style="display: flex; gap: 8px;">
-                                            <button id="modal-encryption-save-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Save Encryption Settings</button>
-                                            <button id="modal-encryption-cancel-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Cancel</button>
+                                            <button id="modal-encryption-save-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">${t('settings.sync.saveEncryption', 'Save Encryption Settings')}</button>
+                                            <button id="modal-encryption-cancel-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">${t('settings.sync.cancel', 'Cancel')}</button>
                                         </div>
 
                                         <div id="encryption-validation" style="margin-top: 8px; font-size: 0.8rem;"></div>
@@ -7959,7 +8036,7 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Conflicts Section (hidden by default) -->
                         <div id="modal-conflicts-section" class="sync-section" style="display: none;">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Conflicts</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">${t('settings.sync.conflictsTitle', 'Sync Conflicts')}</h5>
                             <div id="modal-conflicts-list" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px;">
                                 <!-- Conflicts will be populated here -->
                             </div>
@@ -7967,28 +8044,28 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Setup Section -->
                         <div class="sync-section">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Setup Instructions</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">${t('settings.sync.setupInstructions', 'Setup Instructions')}</h5>
                             <div class="sync-setup-section" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
                                 <div class="sync-setup-steps" style="counter-reset: step-counter;">
                                     <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
                                         <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">1</div>
-                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Create Google Cloud Project</h6>
-                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Go to <a href="https://console.cloud.google.com/" target="_blank" style="color: var(--accent-color);">Google Cloud Console</a> and create a new project.</p>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">${t('settings.sync.step1Title', 'Create Google Cloud Project')}</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${t('settings.sync.step1Description', 'Go to Google Cloud Console and create a new project.')}</p>
                                     </div>
                                     <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
                                         <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">2</div>
-                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Enable Google Drive API</h6>
-                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">In the Cloud Console, enable the Google Drive API for your project.</p>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">${t('settings.sync.step2Title', 'Enable Google Drive API')}</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${t('settings.sync.step2Description', 'In the Cloud Console, enable the Google Drive API for your project.')}</p>
                                     </div>
                                     <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
                                         <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">3</div>
-                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Import Credentials</h6>
-                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Use the button below to load your OAuth credentials file.</p>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">${t('settings.sync.step3Title', 'Import Credentials')}</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${t('settings.sync.step3Description', 'Download your OAuth client credentials JSON and import it into CogNotez.')}</p>
                                     </div>
                                 </div>
 
                                 <div style="margin-top: 16px;">
-                                    <button id="modal-import-credentials-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Import Credentials File</button>
+                                    <button id="modal-import-credentials-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">${t('settings.sync.importCredentialsButton', 'Import Credentials File')}</button>
                                 </div>
                             </div>
                         </div>
@@ -7996,8 +8073,10 @@ Please provide a helpful response based on the note content and conversation his
                 </div>
             `;
 
-            const modal = this.createModal('Cloud Sync Settings', content, [
-                { text: 'Close', type: 'secondary', action: 'close-sync-settings' }
+            const modalTitle = t('settings.sync.cloudTitle', 'Cloud Sync Settings');
+            const closeLabel = window.i18n ? window.i18n.t('modals.close') : 'Close';
+            const modal = this.createModal(modalTitle, content, [
+                { text: closeLabel, type: 'secondary', action: 'close-sync-settings' }
             ]);
 
             // Initialize sync status in modal
@@ -8290,9 +8369,13 @@ Please provide a helpful response based on the note content and conversation his
             if (status.lastSync) {
                 const lastSyncDate = new Date(status.lastSync);
                 const timeAgo = this.getTimeAgo(lastSyncDate);
-                lastSync.textContent = `Last synced: ${timeAgo}`;
+                lastSync.textContent = window.i18n
+                    ? window.i18n.t('settings.sync.lastSynced', { timeAgo })
+                    : `Last synced: ${timeAgo}`;
             } else {
-                lastSync.textContent = 'Never synced';
+                lastSync.textContent = window.i18n
+                    ? window.i18n.t('settings.sync.neverSynced')
+                    : 'Never synced';
             }
 
             // Check for and display conflicts
@@ -8342,7 +8425,9 @@ Please provide a helpful response based on the note content and conversation his
                     encryptionPassphraseInput.style.display = '';
                     encryptionPassphraseConfirmInput.style.display = '';
                     encryptionValidation.style.display = '';
-                    encryptionSaveBtn.textContent = 'Save Encryption Settings';
+                    encryptionSaveBtn.textContent = window.i18n
+                        ? window.i18n.t('settings.sync.saveEncryption')
+                        : 'Save Encryption Settings';
                 } else {
                     // Hide inputs when disabling but keep Save button visible
                     encryptionPassphraseInput.style.display = 'none';
@@ -8351,7 +8436,9 @@ Please provide a helpful response based on the note content and conversation his
                     encryptionPassphraseInput.value = '';
                     encryptionPassphraseConfirmInput.value = '';
                     encryptionValidation.textContent = '';
-                    encryptionSaveBtn.textContent = 'Disable Encryption';
+                    encryptionSaveBtn.textContent = window.i18n
+                        ? window.i18n.t('settings.sync.disableEncryption', 'Disable Encryption')
+                        : 'Disable Encryption';
                 }
             };
 
@@ -8480,7 +8567,9 @@ Please provide a helpful response based on the note content and conversation his
                     this.showNotification('Failed to save encryption settings', 'error');
                 } finally {
                     encryptionSaveBtn.disabled = false;
-                    encryptionSaveBtn.textContent = 'Save Encryption Settings';
+                    encryptionSaveBtn.textContent = window.i18n
+                        ? window.i18n.t('settings.sync.saveEncryption')
+                        : 'Save Encryption Settings';
                 }
             });
 
@@ -8510,13 +8599,13 @@ Please provide a helpful response based on the note content and conversation his
 
             if (settings.enabled) {
                 encryptionIndicator.style.backgroundColor = 'var(--success-color)';
-                encryptionStatusText.textContent = 'Encryption Enabled';
-                encryptionDescription.textContent = 'Your data is encrypted before being uploaded to Google Drive.';
+                encryptionStatusText.textContent = window.i18n ? window.i18n.t('encryption.enabledTitle') : 'Encryption Enabled';
+                encryptionDescription.textContent = window.i18n ? window.i18n.t('encryption.enabledDescription') : 'Your data is encrypted before being uploaded to Google Drive.';
                 encryptionEnabledCheckbox.checked = true;
             } else {
                 encryptionIndicator.style.backgroundColor = 'var(--text-secondary)';
-                encryptionStatusText.textContent = 'Encryption Disabled';
-                encryptionDescription.textContent = 'Your data will be uploaded unencrypted to Google Drive.';
+                encryptionStatusText.textContent = window.i18n ? window.i18n.t('encryption.disabledTitle') : 'Encryption Disabled';
+                encryptionDescription.textContent = window.i18n ? window.i18n.t('encryption.disabledDescription') : 'Your data will be uploaded unencrypted to Google Drive.';
                 encryptionEnabledCheckbox.checked = false;
             }
 

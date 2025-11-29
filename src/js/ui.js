@@ -546,14 +546,15 @@ class UIManager {
 
     // Keyboard shortcuts help
     showKeyboardShortcuts() {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const shortcuts = [
-            { key: 'Ctrl+N', description: 'New Note' },
-            { key: 'Ctrl+S', description: 'Save Note' },
-            { key: 'Ctrl+O', description: 'Open Note' },
-            { key: 'Ctrl+/', description: 'Focus Search' },
-            { key: 'Ctrl+Shift+S', description: 'Summarize Selection' },
-            { key: 'Ctrl+Shift+A', description: 'Ask AI About Selection' },
-            { key: 'Ctrl+Shift+E', description: 'Edit Selection with AI' }
+            { key: 'Ctrl+N', description: t('keyboard.newNote', 'New Note') },
+            { key: 'Ctrl+S', description: t('keyboard.saveNote', 'Save Note') },
+            { key: 'Ctrl+O', description: t('keyboard.openNote', 'Open Note') },
+            { key: 'Ctrl+/', description: t('keyboard.focusSearch', 'Focus Search') },
+            { key: 'Ctrl+Shift+S', description: t('keyboard.summarizeSelection', 'Summarize Selection') },
+            { key: 'Ctrl+Shift+A', description: t('keyboard.askAISelection', 'Ask AI About Selection') },
+            { key: 'Ctrl+Shift+E', description: t('keyboard.editSelectionAI', 'Edit Selection with AI') }
         ];
 
         const content = `
@@ -561,8 +562,8 @@ class UIManager {
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Shortcut</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Description</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">${t('keyboard.shortcutHeader', 'Shortcut')}</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">${t('keyboard.descriptionHeader', 'Description')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1201,8 +1202,16 @@ class UIManager {
 
     // Password Dialog Methods
     showPasswordDialog(options = {}) {
+        const defaultTitle = window.i18n ? window.i18n.t('password.enterPassword') : 'Enter Password';
+        const passwordLabel = window.i18n ? window.i18n.t('password.password') : 'Password:';
+        const confirmPasswordLabel = window.i18n ? window.i18n.t('password.confirmPassword') : 'Confirm Password:';
+        const passwordPlaceholder = window.i18n ? window.i18n.t('password.enterPasswordPlaceholder') : 'Enter password';
+        const confirmPasswordPlaceholder = window.i18n ? window.i18n.t('password.confirmPasswordPlaceholder') : 'Confirm password';
+        const cancelText = window.i18n ? window.i18n.t('modals.cancel') : 'Cancel';
+        const submitText = window.i18n ? window.i18n.t('modals.submit') : 'Submit';
+        
         const {
-            title = 'Enter Password',
+            title = defaultTitle,
             message = '',
             requireConfirmation = false,
             showStrength = false,
@@ -1224,20 +1233,20 @@ class UIManager {
                 <div class="password-dialog-body">
                     ${message ? `<p style="margin-bottom: 16px; color: var(--text-secondary);">${message}</p>` : ''}
                     <div class="password-field">
-                        <label for="password-input">Password:</label>
-                        <input type="password" id="password-input" class="password-input" placeholder="Enter password">
+                        <label for="password-input">${passwordLabel}</label>
+                        <input type="password" id="password-input" class="password-input" placeholder="${passwordPlaceholder}">
                         <div class="password-strength" id="password-strength"></div>
                     </div>
                     ${requireConfirmation ? `
                     <div class="password-field">
-                        <label for="confirm-password-input">Confirm Password:</label>
-                        <input type="password" id="confirm-password-input" class="password-input" placeholder="Confirm password">
+                        <label for="confirm-password-input">${confirmPasswordLabel}</label>
+                        <input type="password" id="confirm-password-input" class="password-input" placeholder="${confirmPasswordPlaceholder}">
                     </div>
                     ` : ''}
                 </div>
                 <div class="password-dialog-actions">
-                    <button class="btn-secondary" id="password-cancel">Cancel</button>
-                    <button class="btn-primary" id="password-submit">Submit</button>
+                    <button class="btn-secondary" id="password-cancel">${cancelText}</button>
+                    <button class="btn-primary" id="password-submit">${submitText}</button>
                 </div>
             </div>
         `;
@@ -1260,7 +1269,10 @@ class UIManager {
             strengthIndicator.style.display = 'block';
             passwordInput.addEventListener('input', () => {
                 const strength = this.calculatePasswordStrength(passwordInput.value);
-                strengthIndicator.textContent = `Password strength: ${strength.level}`;
+                const strengthLabel = window.i18n ? window.i18n.t('password.passwordStrength') : 'Password strength';
+                const levelKey = `password.${strength.level.toLowerCase()}`;
+                const levelLabel = window.i18n ? window.i18n.t(levelKey) : strength.level;
+                strengthIndicator.textContent = `${strengthLabel}: ${levelLabel}`;
                 strengthIndicator.className = `password-strength ${strength.level.toLowerCase()}`;
             });
         }
