@@ -607,7 +607,8 @@ Generate the template now:`;
                 previewDiv.textContent = generatedContent;
                 previewSection.classList.remove('hidden');
                 saveBtn.classList.remove('hidden');
-                generateBtn.textContent = 'Regenerate';
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                generateBtn.textContent = t('templates.regenerate');
 
             } catch (error) {
                 console.error('[Templates] Failed to generate AI template:', error);

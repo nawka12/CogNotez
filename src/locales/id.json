@@ -7,6 +7,9 @@
   "splash": {
     "startingUp": "Memulai...",
     "loading": "Memuat",
+    "ready": "Siap",
+    "almostThere": "Hampir selesai",
+    "starting": "Memulai",
     "version": "Versi"
   },
   "header": {
@@ -82,7 +85,8 @@
     "readyToInsert": "Siap untuk disisipkan",
     "generatedContent": "Konten yang Dihasilkan",
     "insertContent": "Sisipkan Konten",
-    "welcomeMessage": "Saya di sini untuk membantu! Pilih teks dan klik kanan untuk fitur AI, atau tanyakan apa saja tentang catatan Anda."
+    "welcomeMessage": "Saya di sini untuk membantu! Pilih teks dan klik kanan untuk fitur AI, atau tanyakan apa saja tentang catatan Anda.",
+    "rewrite": "Tulis Ulang"
   },
   "placeholder": {
     "readyToCapture": "Siap menangkap pikiran Anda?",
@@ -129,7 +133,8 @@
   "templates": {
     "chooseTemplate": "Pilih Template",
     "createCustomTemplate": "Buat Template Kustom",
-    "generateAITemplate": "Buat Template dengan AI"
+    "generateAITemplate": "Buat Template dengan AI",
+    "regenerate": "Buat Ulang"
   },
   "notes": {
     "noNotesYet": "Belum ada catatan",
@@ -156,6 +161,8 @@
     "noTagsCreated": "Belum ada tag yang dibuat",
     "errorLoadingTags": "Kesalahan memuat tag",
     "enterTagName": "Masukkan nama tag...",
+    "enterTagNamePrompt": "Masukkan nama tag baru:",
+    "deleteTagConfirm": "Hapus tag \"{{name}}\"? Ini akan menghapus tag dari semua catatan.",
     "currentTags": "Tag Saat Ini",
     "availableTags": "Tag Tersedia",
     "noTagsAvailable": "Tidak ada tag yang tersedia",
@@ -236,7 +243,13 @@
       "close": "Tutup",
       "confirmClearUnusedTitle": "Bersihkan Tag yang Tidak Digunakan",
       "confirmClearUnusedMessage": "Anda yakin ingin menghapus semua tag yang tidak digunakan?\n\nIni akan menghapus secara permanen tag yang tidak terkait dengan catatan mana pun.",
-      "clearing": "Membersihkan..."
+      "clearing": "Membersihkan...",
+      "noModelsFound": "Tidak ada model yang ditemukan",
+      "clearUnusedTagsSuccess": "Menghapus {{deletedCount}} tag yang tidak digunakan{{plural}}. {{remainingCount}} tag{{pluralRemaining}} tersisa.",
+      "noUnusedTagsFound": "Tidak ada tag yang tidak digunakan. Semua tag sedang digunakan!",
+      "clearAIConversationsConfirmTitle": "Hapus Semua Percakapan AI",
+      "clearAIConversationsConfirmMessage": "Anda yakin ingin menghapus semua percakapan AI?\n\nIni akan menghapus SEMUA percakapan AI untuk SEMUA catatan dan tidak dapat dibatalkan.\n\nCatatan: Konten catatan Anda tidak akan terpengaruh.",
+      "allAIConversationsCleared": "Semua percakapan AI berhasil dihapus"
     },
     "sync": {
       "title": "Pengaturan Sinkronisasi Google Drive",
@@ -290,14 +303,45 @@
       "step2Description": "Di Cloud Console, aktifkan Google Drive API untuk proyek Anda.",
       "step3Title": "Impor Kredensial",
       "step3Description": "Unduh JSON kredensial klien OAuth dan impor ke CogNotez.",
-      "importCredentialsButton": "Impor Berkas Kredensial"
+      "importCredentialsButton": "Impor Berkas Kredensial",
+      "importing": "Mengimpor...",
+      "setupRequired": "Penyiapan Diperlukan",
+      "importCredentialsToStart": "Impor kredensial Google Drive untuk memulai",
+      "credentialsImportedSuccess": "Kredensial berhasil diimpor",
+      "failedToImportCredentials": "Gagal mengimpor kredensial",
+      "failedToDisconnect": "Gagal memutuskan dari Google Drive",
+      "failedToUpdateAutoSync": "Gagal memperbarui pengaturan sinkronisasi otomatis",
+      "failedToUpdateSyncOnStartup": "Gagal memperbarui pengaturan sinkronisasi saat mulai",
+      "passphraseSetRetrying": "Frasa sandi ditetapkan. Mencoba sinkronisasi lagi...",
+      "syncFailedAfterPassphrase": "Sinkronisasi gagal setelah menetapkan frasa sandi",
+      "encryptedDataDetected": "Data cloud terenkripsi terdeteksi. Buka Pengaturan Sinkronisasi untuk memasukkan frasa sandi Anda.",
+      "failedToResolveConflict": "Gagal menyelesaikan konflik",
+      "pleaseConnectGoogleDrive": "Silakan hubungkan ke Google Drive terlebih dahulu",
+      "cannotSyncNoInternet": "Tidak dapat sinkronisasi - tidak ada koneksi internet",
+      "failedToOpenSyncSettings": "Gagal membuka pengaturan sinkronisasi",
+      "failedToUpdateLocalData": "Gagal memperbarui data lokal setelah sinkronisasi",
+      "connectionTestCompleted": "Uji koneksi selesai!",
+      "openRouterApiKeyUpdated": "Kunci API OpenRouter diperbarui. Memulai ulang aplikasi untuk menerapkan perubahan...",
+      "aiSettingsSaved": "Pengaturan AI berhasil disimpan!",
+      "generalSettingsSaved": "Pengaturan umum berhasil disimpan!",
+      "failedToSaveTags": "Gagal menyimpan tag ke catatan"
     }
   },
   "encryption": {
     "enabledTitle": "Enkripsi Diaktifkan",
     "enabledDescription": "Data Anda dienkripsi sebelum diunggah ke Google Drive.",
     "disabledTitle": "Enkripsi Dinonaktifkan",
-    "disabledDescription": "Data Anda akan diunggah ke Google Drive tanpa enkripsi."
+    "disabledDescription": "Data Anda akan diunggah ke Google Drive tanpa enkripsi.",
+    "passphraseMinLength": "Frasa sandi harus minimal 8 karakter",
+    "passphraseMinLengthLong": "Frasa sandi harus minimal 8 karakter",
+    "passphrasesDoNotMatch": "Frasa sandi tidak cocok",
+    "passphrasesMatch": "✓ Frasa sandi cocok",
+    "saving": "Menyimpan...",
+    "passphraseRequired": "Silakan masukkan frasa sandi",
+    "encryptionSettingsSaved": "Pengaturan enkripsi berhasil disimpan",
+    "failedToSaveEncryptionSettings": "Gagal menyimpan pengaturan enkripsi",
+    "failedToDeriveSalt": "Gagal menurunkan salt: {{error}}",
+    "connectionError": "Kesalahan koneksi: {{error}}"
   },
   "password": {
     "enterPassword": "Masukkan Sandi",
@@ -462,7 +506,10 @@
     "noteExportedAsText": "Catatan diekspor sebagai Teks: {{path}}",
     "noteExportedAsPDF": "Catatan diekspor sebagai PDF: {{path}}",
     "failedToShareNote": "Gagal membagikan catatan",
-    "googleDriveSyncNotSetup": "Sinkronisasi Google Drive tidak diatur. Harap hubungkan Google Drive di Pengaturan Sinkronisasi."
+    "googleDriveSyncNotSetup": "Sinkronisasi Google Drive tidak diatur. Harap hubungkan Google Drive di Pengaturan Sinkronisasi.",
+    "failedToCheckForUpdates": "Gagal memeriksa pembaruan",
+    "failedToClearUnusedTags": "Gagal membersihkan tag yang tidak digunakan: {{error}}",
+    "failedToClearAIConversations": "Gagal menghapus percakapan AI: {{error}}"
   },
   "keyboard": {
     "shortcuts": "Pintasan Keyboard",

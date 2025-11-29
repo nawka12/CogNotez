@@ -7,6 +7,9 @@
   "splash": {
     "startingUp": "Starting up...",
     "loading": "Loading",
+    "ready": "Ready",
+    "almostThere": "Almost there",
+    "starting": "Starting",
     "version": "Version"
   },
   "header": {
@@ -82,7 +85,8 @@
     "readyToInsert": "Ready to insert",
     "generatedContent": "Generated Content",
     "insertContent": "Insert Content",
-    "welcomeMessage": "I'm here to help! Select text and right-click for AI features, or ask me anything about your note."
+    "welcomeMessage": "I'm here to help! Select text and right-click for AI features, or ask me anything about your note.",
+    "rewrite": "Rewrite"
   },
   "placeholder": {
     "readyToCapture": "Ready to capture your thoughts?",
@@ -129,7 +133,8 @@
   "templates": {
     "chooseTemplate": "Choose a Template",
     "createCustomTemplate": "Create Custom Template",
-    "generateAITemplate": "Generate Template with AI"
+    "generateAITemplate": "Generate Template with AI",
+    "regenerate": "Regenerate"
   },
   "notes": {
     "noNotesYet": "No notes yet",
@@ -156,6 +161,8 @@
     "noTagsCreated": "No tags created yet",
     "errorLoadingTags": "Error loading tags",
     "enterTagName": "Enter tag name...",
+    "enterTagNamePrompt": "Enter new tag name:",
+    "deleteTagConfirm": "Delete tag \"{{name}}\"? This will remove the tag from all notes.",
     "currentTags": "Current Tags",
     "availableTags": "Available Tags",
     "noTagsAvailable": "No tags available",
@@ -236,7 +243,13 @@
       "close": "Close",
       "confirmClearUnusedTitle": "Clear Unused Tags",
       "confirmClearUnusedMessage": "Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.",
-      "clearing": "Clearing..."
+      "clearing": "Clearing...",
+      "noModelsFound": "No models found",
+      "clearUnusedTagsSuccess": "Cleared {{deletedCount}} unused tag{{plural}}. {{remainingCount}} tag{{pluralRemaining}} remaining.",
+      "noUnusedTagsFound": "No unused tags found. All tags are currently in use!",
+      "clearAIConversationsConfirmTitle": "Clear All AI Conversations",
+      "clearAIConversationsConfirmMessage": "Are you sure you want to clear all AI conversations?\n\nThis will delete ALL AI conversations for ALL notes and cannot be undone.\n\nNote: Your note content will not be affected.",
+      "allAIConversationsCleared": "All AI conversations cleared successfully"
     },
     "sync": {
       "title": "Google Drive Sync Settings",
@@ -290,14 +303,45 @@
       "step2Description": "In the Cloud Console, enable the Google Drive API for your project.",
       "step3Title": "Import Credentials",
       "step3Description": "Download your OAuth client credentials JSON and import it into CogNotez.",
-      "importCredentialsButton": "Import Credentials File"
+      "importCredentialsButton": "Import Credentials File",
+      "importing": "Importing...",
+      "setupRequired": "Setup Required",
+      "importCredentialsToStart": "Import Google Drive credentials to get started",
+      "credentialsImportedSuccess": "Credentials imported successfully",
+      "failedToImportCredentials": "Failed to import credentials",
+      "failedToDisconnect": "Failed to disconnect from Google Drive",
+      "failedToUpdateAutoSync": "Failed to update auto-sync setting",
+      "failedToUpdateSyncOnStartup": "Failed to update sync on startup setting",
+      "passphraseSetRetrying": "Passphrase set. Retrying sync...",
+      "syncFailedAfterPassphrase": "Sync failed after setting passphrase",
+      "encryptedDataDetected": "Encrypted cloud data detected. Open Sync Settings to enter your passphrase.",
+      "failedToResolveConflict": "Failed to resolve conflict",
+      "pleaseConnectGoogleDrive": "Please connect to Google Drive first",
+      "cannotSyncNoInternet": "Cannot sync - no internet connection",
+      "failedToOpenSyncSettings": "Failed to open sync settings",
+      "failedToUpdateLocalData": "Failed to update local data after sync",
+      "connectionTestCompleted": "Connection test completed!",
+      "openRouterApiKeyUpdated": "OpenRouter API key updated. Restarting app to apply changes...",
+      "aiSettingsSaved": "AI settings saved successfully!",
+      "generalSettingsSaved": "General settings saved successfully!",
+      "failedToSaveTags": "Failed to save tags to note"
     }
   },
   "encryption": {
     "enabledTitle": "Encryption Enabled",
     "enabledDescription": "Your data is encrypted before being uploaded to Google Drive.",
     "disabledTitle": "Encryption Disabled",
-    "disabledDescription": "Your data will be uploaded unencrypted to Google Drive."
+    "disabledDescription": "Your data will be uploaded unencrypted to Google Drive.",
+    "passphraseMinLength": "Passphrase must be at least 8 characters",
+    "passphraseMinLengthLong": "Passphrase must be at least 8 characters long",
+    "passphrasesDoNotMatch": "Passphrases do not match",
+    "passphrasesMatch": "✓ Passphrases match",
+    "saving": "Saving...",
+    "passphraseRequired": "Please enter a passphrase",
+    "encryptionSettingsSaved": "Encryption settings saved successfully",
+    "failedToSaveEncryptionSettings": "Failed to save encryption settings",
+    "failedToDeriveSalt": "Failed to derive salt: {{error}}",
+    "connectionError": "Connection error: {{error}}"
   },
   "password": {
     "enterPassword": "Enter Password",
@@ -462,7 +506,10 @@
     "noteExportedAsText": "Note exported as Text: {{path}}",
     "noteExportedAsPDF": "Note exported as PDF: {{path}}",
     "failedToShareNote": "Failed to share note",
-    "googleDriveSyncNotSetup": "Google Drive sync is not set up. Please connect Google Drive in Sync Settings."
+    "googleDriveSyncNotSetup": "Google Drive sync is not set up. Please connect Google Drive in Sync Settings.",
+    "failedToCheckForUpdates": "Failed to check for updates",
+    "failedToClearUnusedTags": "Failed to clear unused tags: {{error}}",
+    "failedToClearAIConversations": "Failed to clear AI conversations: {{error}}"
   },
   "keyboard": {
     "shortcuts": "Keyboard Shortcuts",

@@ -7,6 +7,9 @@
   "splash": {
     "startingUp": "Miwi...",
     "loading": "Ngundhuh",
+    "ready": "Siap",
+    "almostThere": "Meh rampung",
+    "starting": "Miwi",
     "version": "Versi"
   },
   "header": {
@@ -82,7 +85,8 @@
     "readyToInsert": "Siap kanggo disisipaken",
     "generatedContent": "Konten sing Digawe",
     "insertContent": "Sisipaken Konten",
-    "welcomeMessage": "Aku ing kene kanggo mbantu! Pilih teks lan klik tengen kanggo fitur AI, utawa takok apa wae babagan cathetan sampeyan."
+    "welcomeMessage": "Aku ing kene kanggo mbantu! Pilih teks lan klik tengen kanggo fitur AI, utawa takok apa wae babagan cathetan sampeyan.",
+    "rewrite": "Tulis Maneh"
   },
   "placeholder": {
     "readyToCapture": "Siap njupuk pikiran sampeyan?",
@@ -129,7 +133,8 @@
   "templates": {
     "chooseTemplate": "Pilih Templat",
     "createCustomTemplate": "Gawe Templat Kustom",
-    "generateAITemplate": "Gawe Templat nganggo AI"
+    "generateAITemplate": "Gawe Templat nganggo AI",
+    "regenerate": "Gawe Maneh"
   },
   "notes": {
     "noNotesYet": "Durung ana cathetan",
@@ -156,6 +161,8 @@
     "noTagsCreated": "Durung ana tag sing digawe",
     "errorLoadingTags": "Kesalahan ngundhuh tag",
     "enterTagName": "Ketik jeneng tag...",
+    "enterTagNamePrompt": "Ketik jeneng tag anyar:",
+    "deleteTagConfirm": "Busek tag \"{{name}}\"? Iki bakal mbusek tag saka kabeh cathetan.",
     "currentTags": "Tag Saiki",
     "availableTags": "Tag Sing Tersedia",
     "noTagsAvailable": "Ora ana tag sing tersedia",
@@ -236,7 +243,13 @@
       "close": "Tutup",
       "confirmClearUnusedTitle": "Bersihaken Tag sing Ora Digunakaken",
       "confirmClearUnusedMessage": "Sampeyan yakin pengin mbusek kabeh tag sing ora digunakaken?\n\nIki bakal mbusek kanthi permanen tag sing ora gegandhengan karo cathetan apa wae.",
-      "clearing": "Ngresiki..."
+      "clearing": "Ngresiki...",
+      "noModelsFound": "Ora ana model sing ditemokake",
+      "clearUnusedTagsSuccess": "Mbusek {{deletedCount}} tag sing ora digunakaken{{plural}}. {{remainingCount}} tag{{pluralRemaining}} isih ana.",
+      "noUnusedTagsFound": "Ora ana tag sing ora digunakaken. Kabeh tag lagi digunakake!",
+      "clearAIConversationsConfirmTitle": "Busek Kabeh Obrolan AI",
+      "clearAIConversationsConfirmMessage": "Sampeyan yakin pengin mbusek kabeh obrolan AI?\n\nIki bakal mbusek KABEH obrolan AI kanggo KABEH cathetan lan ora bisa dibatalaken.\n\nCathetan: Konten cathetan sampeyan ora bakal kena pengaruh.",
+      "allAIConversationsCleared": "Kabeh obrolan AI sukses dibusek"
     },
     "sync": {
       "title": "Setelan Sinkronisasi Google Drive",
@@ -290,14 +303,45 @@
       "step2Description": "Ing Cloud Console, aktifaken Google Drive API kanggo proyek sampeyan.",
       "step3Title": "Impor Kredensial",
       "step3Description": "Undhuh JSON kredensial klien OAuth lan impor menyang CogNotez.",
-      "importCredentialsButton": "Impor Berkas Kredensial"
+      "importCredentialsButton": "Impor Berkas Kredensial",
+      "importing": "Ngimpor...",
+      "setupRequired": "Penyiapan Diperlokake",
+      "importCredentialsToStart": "Impor kredensial Google Drive kanggo miwiti",
+      "credentialsImportedSuccess": "Kredensial sukses diimpor",
+      "failedToImportCredentials": "Gagal ngimpor kredensial",
+      "failedToDisconnect": "Gagal putus saka Google Drive",
+      "failedToUpdateAutoSync": "Gagal nganyari setelan sinkronisasi otomatis",
+      "failedToUpdateSyncOnStartup": "Gagal nganyari setelan sinkronisasi nalika miwiti",
+      "passphraseSetRetrying": "Frasa sandi ditetepaken. Nyoba sinkronisasi maneh...",
+      "syncFailedAfterPassphrase": "Sinkronisasi gagal sawise ngetepaken frasa sandi",
+      "encryptedDataDetected": "Data cloud sing dienkripsi ketemu. Bukak Setelan Sinkronisasi kanggo ngetik frasa sandi sampeyan.",
+      "failedToResolveConflict": "Gagal nyelesaikan konflik",
+      "pleaseConnectGoogleDrive": "Monggo nyambungake menyang Google Drive dhisik",
+      "cannotSyncNoInternet": "Ora bisa sinkronisasi - ora ana koneksi internet",
+      "failedToOpenSyncSettings": "Gagal mbukak setelan sinkronisasi",
+      "failedToUpdateLocalData": "Gagal nganyari data lokal sawise sinkronisasi",
+      "connectionTestCompleted": "Uji koneksi rampung!",
+      "openRouterApiKeyUpdated": "Kunci API OpenRouter dianyari. Ngawalake ulang aplikasi kanggo nerapaken owahan...",
+      "aiSettingsSaved": "Setelan AI sukses disimpen!",
+      "generalSettingsSaved": "Setelan umum sukses disimpen!",
+      "failedToSaveTags": "Gagal nyimpen tag menyang cathetan"
     }
   },
   "encryption": {
     "enabledTitle": "Enkripsi Diaktifaken",
     "enabledDescription": "Data sampeyan dienkripsi sadurunge diunggah menyang Google Drive.",
     "disabledTitle": "Enkripsi Dinonaktifaken",
-    "disabledDescription": "Data sampeyan bakal diunggah menyang Google Drive tanpa enkripsi."
+    "disabledDescription": "Data sampeyan bakal diunggah menyang Google Drive tanpa enkripsi.",
+    "passphraseMinLength": "Frasa sandi kudu minimal 8 aksara",
+    "passphraseMinLengthLong": "Frasa sandi kudu minimal 8 aksara",
+    "passphrasesDoNotMatch": "Frasa sandi ora cocog",
+    "passphrasesMatch": "✓ Frasa sandi cocog",
+    "saving": "Nyimpen...",
+    "passphraseRequired": "Monggo ketik frasa sandi",
+    "encryptionSettingsSaved": "Setelan enkripsi sukses disimpen",
+    "failedToSaveEncryptionSettings": "Gagal nyimpen setelan enkripsi",
+    "failedToDeriveSalt": "Gagal ngetokake salt: {{error}}",
+    "connectionError": "Kesalahan koneksi: {{error}}"
   },
   "password": {
     "enterPassword": "Ketik Sandi",
@@ -462,7 +506,10 @@
     "noteExportedAsText": "Cathetan diekspor minangka Teks: {{path}}",
     "noteExportedAsPDF": "Cathetan diekspor minangka PDF: {{path}}",
     "failedToShareNote": "Gagal mbagike cathetan",
-    "googleDriveSyncNotSetup": "Sinkronisasi Google Drive ora diatur. Monggo nyambungaken Google Drive ing Setelan Sinkronisasi."
+    "googleDriveSyncNotSetup": "Sinkronisasi Google Drive ora diatur. Monggo nyambungaken Google Drive ing Setelan Sinkronisasi.",
+    "failedToCheckForUpdates": "Gagal mriksa pembaruan",
+    "failedToClearUnusedTags": "Gagal mbusek tag sing ora digunakaken: {{error}}",
+    "failedToClearAIConversations": "Gagal mbusek obrolan AI: {{error}}"
   },
   "keyboard": {
     "shortcuts": "Pintasan Keyboard",

@@ -7,6 +7,9 @@
   "splash": {
     "startingUp": "起動中...",
     "loading": "読み込み中",
+    "ready": "準備完了",
+    "almostThere": "もう少しで完了",
+    "starting": "起動中",
     "version": "バージョン"
   },
   "header": {
@@ -82,7 +85,8 @@
     "readyToInsert": "挿入準備完了",
     "generatedContent": "生成されたコンテンツ",
     "insertContent": "コンテンツを挿入",
-    "welcomeMessage": "お手伝いします！テキストを選択して右クリックでAI機能を使用するか、ノートについて何でも聞いてください。"
+    "welcomeMessage": "お手伝いします！テキストを選択して右クリックでAI機能を使用するか、ノートについて何でも聞いてください。",
+    "rewrite": "書き直す"
   },
   "placeholder": {
     "readyToCapture": "思考を記録する準備はできていますか？",
@@ -129,7 +133,8 @@
   "templates": {
     "chooseTemplate": "テンプレートを選択",
     "createCustomTemplate": "カスタムテンプレートを作成",
-    "generateAITemplate": "AIでテンプレートを生成"
+    "generateAITemplate": "AIでテンプレートを生成",
+    "regenerate": "再生成"
   },
   "notes": {
     "noNotesYet": "ノートがまだありません",
@@ -156,6 +161,8 @@
     "noTagsCreated": "タグがまだ作成されていません",
     "errorLoadingTags": "タグの読み込みエラー",
     "enterTagName": "タグ名を入力...",
+    "enterTagNamePrompt": "新しいタグ名を入力：",
+    "deleteTagConfirm": "タグ「{{name}}」を削除しますか？これはすべてのノートからタグを削除します。",
     "currentTags": "現在のタグ",
     "availableTags": "利用可能なタグ",
     "noTagsAvailable": "利用可能なタグがありません",
@@ -236,7 +243,13 @@
       "close": "閉じる",
       "confirmClearUnusedTitle": "未使用タグをクリア",
       "confirmClearUnusedMessage": "すべての未使用タグを削除してもよろしいですか？\n\nこれにより、ノートに関連付けられていないタグが永続的に削除されます。",
-      "clearing": "クリア中..."
+      "clearing": "クリア中...",
+      "noModelsFound": "モデルが見つかりません",
+      "clearUnusedTagsSuccess": "未使用タグ{{deletedCount}}個を削除しました{{plural}}。{{remainingCount}}個のタグ{{pluralRemaining}}が残っています。",
+      "noUnusedTagsFound": "未使用タグが見つかりません。すべてのタグが現在使用中です！",
+      "clearAIConversationsConfirmTitle": "すべてのAI会話をクリア",
+      "clearAIConversationsConfirmMessage": "すべてのAI会話をクリアしてもよろしいですか？\n\nこれはすべてのノートのすべてのAI会話を削除し、元に戻せません。\n\n注意：ノートのコンテンツは影響を受けません。",
+      "allAIConversationsCleared": "すべてのAI会話が正常にクリアされました"
     },
     "sync": {
       "title": "Google Drive同期設定",
@@ -290,14 +303,45 @@
       "step2Description": "Cloud Consoleで、プロジェクトのGoogle Drive APIを有効にします。",
       "step3Title": "認証情報をインポート",
       "step3Description": "OAuthクライアント認証情報JSONをダウンロードし、CogNotezにインポートします。",
-      "importCredentialsButton": "認証情報ファイルをインポート"
+      "importCredentialsButton": "認証情報ファイルをインポート",
+      "importing": "インポート中...",
+      "setupRequired": "セットアップが必要です",
+      "importCredentialsToStart": "開始するにはGoogle Driveの認証情報をインポートしてください",
+      "credentialsImportedSuccess": "認証情報が正常にインポートされました",
+      "failedToImportCredentials": "認証情報のインポートに失敗しました",
+      "failedToDisconnect": "Google Driveからの切断に失敗しました",
+      "failedToUpdateAutoSync": "自動同期設定の更新に失敗しました",
+      "failedToUpdateSyncOnStartup": "起動時の同期設定の更新に失敗しました",
+      "passphraseSetRetrying": "パスフレーズが設定されました。同期を再試行しています...",
+      "syncFailedAfterPassphrase": "パスフレーズ設定後の同期に失敗しました",
+      "encryptedDataDetected": "暗号化されたクラウドデータが検出されました。同期設定を開いてパスフレーズを入力してください。",
+      "failedToResolveConflict": "競合の解決に失敗しました",
+      "pleaseConnectGoogleDrive": "まずGoogle Driveに接続してください",
+      "cannotSyncNoInternet": "同期できません - インターネット接続がありません",
+      "failedToOpenSyncSettings": "同期設定を開けませんでした",
+      "failedToUpdateLocalData": "同期後のローカルデータの更新に失敗しました",
+      "connectionTestCompleted": "接続テストが完了しました！",
+      "openRouterApiKeyUpdated": "OpenRouter APIキーが更新されました。変更を適用するためにアプリを再起動しています...",
+      "aiSettingsSaved": "AI設定が正常に保存されました！",
+      "generalSettingsSaved": "一般設定が正常に保存されました！",
+      "failedToSaveTags": "ノートへのタグの保存に失敗しました"
     }
   },
   "encryption": {
     "enabledTitle": "暗号化が有効",
     "enabledDescription": "データはGoogle Driveにアップロードされる前に暗号化されます。",
     "disabledTitle": "暗号化が無効",
-    "disabledDescription": "データは暗号化されずにGoogle Driveにアップロードされます。"
+    "disabledDescription": "データは暗号化されずにGoogle Driveにアップロードされます。",
+    "passphraseMinLength": "パスフレーズは最低8文字である必要があります",
+    "passphraseMinLengthLong": "パスフレーズは最低8文字である必要があります",
+    "passphrasesDoNotMatch": "パスフレーズが一致しません",
+    "passphrasesMatch": "✓ パスフレーズが一致します",
+    "saving": "保存中...",
+    "passphraseRequired": "パスフレーズを入力してください",
+    "encryptionSettingsSaved": "暗号化設定が正常に保存されました",
+    "failedToSaveEncryptionSettings": "暗号化設定の保存に失敗しました",
+    "failedToDeriveSalt": "ソルトの導出に失敗しました: {{error}}",
+    "connectionError": "接続エラー: {{error}}"
   },
   "password": {
     "enterPassword": "パスワードを入力",
@@ -462,7 +506,10 @@
     "noteExportedAsText": "ノートがテキストとしてエクスポートされました：{{path}}",
     "noteExportedAsPDF": "ノートがPDFとしてエクスポートされました：{{path}}",
     "failedToShareNote": "ノートの共有に失敗しました",
-    "googleDriveSyncNotSetup": "Google Drive同期が設定されていません。同期設定でGoogle Driveを接続してください。"
+    "googleDriveSyncNotSetup": "Google Drive同期が設定されていません。同期設定でGoogle Driveを接続してください。",
+    "failedToCheckForUpdates": "更新チェックに失敗しました",
+    "failedToClearUnusedTags": "未使用タグのクリアに失敗しました: {{error}}",
+    "failedToClearAIConversations": "AI会話のクリアに失敗しました: {{error}}"
   },
   "keyboard": {
     "shortcuts": "キーボードショートカット",

@@ -80,7 +80,8 @@ class AdvancedSearchManager {
             if (tags.length === 0) {
                 const option = document.createElement('option');
                 option.disabled = true;
-                option.textContent = 'No tags available';
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                option.textContent = t('tags.noTagsAvailable');
                 tagsSelect.appendChild(option);
                 return;
             }
