@@ -232,9 +232,10 @@ class DatabaseManager {
         const wordCount = this.calculateWordCount(noteData.content || '');
         const charCount = (noteData.content || '').length;
 
+		const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
 		const note = {
             id: id,
-            title: noteData.title || 'Untitled Note',
+            title: noteData.title || untitledTitle,
             content: noteData.content || '',
             preview: noteData.preview || '',
             tags: noteData.tags || [],

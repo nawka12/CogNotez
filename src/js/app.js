@@ -232,16 +232,17 @@ class FindReplaceDialog {
 
         this.element.querySelector('#find-input').focus();
 
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         if (findOnly) {
             this.element.querySelector('.replace-section').style.display = 'none';
             this.element.querySelector('#replace-next').style.display = 'none';
             this.element.querySelector('#replace-all').style.display = 'none';
-            this.element.querySelector('h3').textContent = 'Find';
+            this.element.querySelector('h3').textContent = t('findReplace.find');
         } else {
             this.element.querySelector('.replace-section').style.display = 'block';
             this.element.querySelector('#replace-next').style.display = 'inline-block';
             this.element.querySelector('#replace-all').style.display = 'inline-block';
-            this.element.querySelector('h3').textContent = 'Find & Replace';
+            this.element.querySelector('h3').textContent = t('findReplace.findReplace');
         }
 
         // Pre-fill with selected text
@@ -757,11 +758,15 @@ class FindReplaceDialog {
     }
 
     updateMatchCount() {
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
         const countElement = this.element.querySelector('#match-count');
         if (this.matches.length === 0) {
-            countElement.textContent = 'No matches';
+            countElement.textContent = t('findReplace.noMatches');
         } else {
-            countElement.textContent = `${this.currentMatchIndex + 1} of ${this.matches.length} matches`;
+            countElement.textContent = t('findReplace.matchCount', { 
+                current: this.currentMatchIndex + 1, 
+                total: this.matches.length 
+            });
         }
     }
 }
@@ -1152,7 +1157,8 @@ class CogNotezApp {
         // Network online/offline event listeners
         window.addEventListener('online', () => {
             console.log('[Network] Device is now ONLINE');
-            this.showNotification('Connection restored', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.connectionRestored'), 'success');
             this.updateSyncUI();
             // Clear network cache when coming back online
             if (window.networkUtils) {
@@ -1162,7 +1168,8 @@ class CogNotezApp {
 
         window.addEventListener('offline', () => {
             console.log('[Network] Device is now OFFLINE');
-            this.showNotification('No internet connection', 'warning');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noInternet'), 'warning');
             this.updateSyncUI();
         });
 
@@ -1776,7 +1783,8 @@ class CogNotezApp {
         const preview = document.getElementById('markdown-preview');
 
         if (!editor.value.trim()) {
-            preview.innerHTML = '<p style="color: var(--text-tertiary); font-style: italic;">Start writing your note...</p>';
+            const startWritingText = window.i18n ? window.i18n.t('editor.startWriting') : 'Start writing your note...';
+            preview.innerHTML = `<p style="color: var(--text-tertiary); font-style: italic;">${startWritingText}</p>`;
             return;
         }
 
@@ -1986,7 +1994,8 @@ class CogNotezApp {
                     resolve(true);
                 } catch (error) {
                     console.error('Error saving note:', error);
-                    this.showNotification('❌ Failed to save note', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.saveFailed'), 'error');
                     resolve(false);
                 }
             });
@@ -2048,22 +2057,26 @@ class CogNotezApp {
 									this.cacheNotePassword(note.id, password);
 								} catch (e) {
 									console.error('Failed to decrypt note content:', e);
-									this.showNotification('Error decrypting note', 'error');
+									const t = (key) => window.i18n ? window.i18n.t(key) : key;
+									this.showNotification(t('notifications.errorDecryptingNote'), 'error');
 									resolve(false);
 									return;
 								}
 							}
 							this.displayNote(note);
-                            this.showNotification('Note unlocked successfully', 'success');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.noteUnlocked'), 'success');
                             resolve(true);
                         } else {
-                            this.showNotification('Incorrect password', 'error');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.incorrectPassword'), 'error');
                             // Re-prompt for password
                             setTimeout(() => this.promptForNotePassword(note), 500);
                         }
                     } catch (error) {
                         console.error('Error verifying password:', error);
-                        this.showNotification('Error unlocking note', 'error');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.errorUnlockingNote'), 'error');
                         resolve(false);
                     }
                 },
@@ -2114,7 +2127,8 @@ class CogNotezApp {
 
 	async showPasswordProtectionDialog() {
         if (!this.currentNote) {
-            this.showNotification('No note selected', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noNoteSelected'), 'error');
             return;
         }
 
@@ -2137,15 +2151,18 @@ class CogNotezApp {
                         const isValid = await this.verifyNotePassword(this.currentNote, password);
                         if (isValid) {
 							await this.removePasswordProtection(this.currentNote, password);
-                            this.showNotification('Password protection removed', 'success');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.passwordProtectionRemoved'), 'success');
                         } else {
-                            this.showNotification('Incorrect password', 'error');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.incorrectPassword'), 'error');
                             return;
                         }
                     } else {
                         // Add protection - set new password
                         await this.setPasswordProtection(this.currentNote, password);
-                        this.showNotification('Password protection added', 'success');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.passwordProtectionAdded'), 'success');
                     }
 
                     // Update the lock icon in the UI
@@ -2158,7 +2175,8 @@ class CogNotezApp {
                     }
                 } catch (error) {
                     console.error('Error managing password protection:', error);
-                    this.showNotification('Error managing password protection', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.errorManagingPassword'), 'error');
                 }
             }
         });
@@ -2177,7 +2195,8 @@ class CogNotezApp {
 			envelopeString = JSON.stringify(envelope);
 		} catch (e) {
 			console.error('Failed to encrypt note during protection enable:', e);
-			this.showNotification('Failed to enable protection', 'error');
+			const t = (key) => window.i18n ? window.i18n.t(key) : key;
+			this.showNotification(t('notifications.failedToEnableProtection'), 'error');
 			throw e;
 		}
 
@@ -2224,7 +2243,8 @@ class CogNotezApp {
 				plaintext = decrypted.content || '';
 			} catch (e) {
 				console.error('Failed to decrypt while removing protection:', e);
-				this.showNotification('Failed to remove protection', 'error');
+				const t = (key) => window.i18n ? window.i18n.t(key) : key;
+				this.showNotification(t('notifications.failedToRemoveProtection'), 'error');
 				return;
 			}
 		}
@@ -2268,9 +2288,10 @@ class CogNotezApp {
     async createNewNote() {
         if (!this.notesManager) return;
 
+        const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
         const note = {
             id: Date.now().toString(),
-            title: 'Untitled Note',
+            title: untitledTitle,
             content: '',
             preview: '',
             tags: []
@@ -2428,7 +2449,8 @@ class CogNotezApp {
             if (tabToClose) {
                 this.closeTab(tabToClose.noteId, true);
             } else {
-                this.showNotification('Maximum tabs reached. Close some tabs first.', 'warning');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.maxTabsReached'), 'warning');
                 return;
             }
         }
@@ -2462,7 +2484,9 @@ class CogNotezApp {
         // If tab has unsaved changes and not silent, show confirmation
         if (tab.unsaved && !silent) {
             const noteName = tab.title || 'Untitled';
-            if (!confirm(`"${noteName}" has unsaved changes. Close anyway?`)) {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmMessage = t('notes.tabCloseConfirm', { title: noteName });
+            if (!confirm(confirmMessage)) {
                 return;
             }
         }
@@ -2732,7 +2756,9 @@ class CogNotezApp {
         // Check for unsaved changes
         const unsavedTabs = tabsToClose.filter(tab => tab.unsaved);
         if (unsavedTabs.length > 0) {
-            if (!confirm(`${unsavedTabs.length} tab(s) have unsaved changes. Close all anyway?`)) {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmMessage = t('notes.tabsCloseConfirm', { count: unsavedTabs.length });
+            if (!confirm(confirmMessage)) {
                 return;
             }
         }
@@ -2745,7 +2771,9 @@ class CogNotezApp {
     closeAllTabs() {
         const unsavedTabs = this.openTabs.filter(tab => tab.unsaved);
         if (unsavedTabs.length > 0) {
-            if (!confirm(`${unsavedTabs.length} tab(s) have unsaved changes. Close all anyway?`)) {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmMessage = t('notes.tabsCloseConfirm', { count: unsavedTabs.length });
+            if (!confirm(confirmMessage)) {
                 return;
             }
         }
@@ -3071,7 +3099,8 @@ class CogNotezApp {
 
         } catch (error) {
             console.error('Error adding tag:', error);
-            this.showNotification('Failed to add tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('tags.addTagFailed'), 'error');
         }
     }
 
@@ -3155,10 +3184,12 @@ class CogNotezApp {
             this.refreshTagManager();
             await this.renderTagFolders();
 
-            this.showNotification('Tag removed successfully', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.tagRemoved'), 'success');
         } catch (error) {
             console.error('Error removing tag from note:', error);
-            this.showNotification('Failed to remove tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.tagRemoveFailed'), 'error');
         }
     }
 
@@ -3210,8 +3241,9 @@ class CogNotezApp {
         const content = document.getElementById('note-editor').value;
 
         try {
+			const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
 			let updateData = {
-				title: title || 'Untitled Note',
+				title: title || untitledTitle,
 				content: content,
 				preview: this.generatePreview(content)
 			};
@@ -3232,8 +3264,9 @@ class CogNotezApp {
 				}
 				const pass = this.getCachedNotePassword(this.currentNote.id);
 				const envelope = window.encryptionManager.encryptData({ content }, pass);
+				const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
 				updateData = {
-					title: title || 'Untitled Note',
+					title: title || untitledTitle,
 					content: '',
 					preview: '',
 					encrypted_content: JSON.stringify(envelope)
@@ -3287,7 +3320,8 @@ class CogNotezApp {
 
             // Only show notification for manual saves, not auto-saves
             if (!isAutoSave) {
-                this.showNotification('Note saved successfully!');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.noteSavedSuccess'));
             }
 
             // Clear unsaved flag on tab
@@ -3305,7 +3339,8 @@ class CogNotezApp {
             }
         } catch (error) {
             console.error('Error saving note:', error);
-            this.showNotification('Failed to save note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.saveFailed'), 'error');
         }
     }
 
@@ -3412,7 +3447,8 @@ class CogNotezApp {
 
     updateNoteTitle() {
         if (this.currentNote) {
-            this.currentNote.title = document.getElementById('note-title').value || 'Untitled Note';
+            const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+            this.currentNote.title = document.getElementById('note-title').value || untitledTitle;
         }
     }
 
@@ -3680,7 +3716,8 @@ class CogNotezApp {
         const selectedColor = document.querySelector('.color-option.active');
 
         if (!nameInput || !nameInput.value.trim()) {
-            this.showNotification('Please enter a tag name', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.pleaseEnterTagName'), 'error');
             return;
         }
 
@@ -3692,19 +3729,22 @@ class CogNotezApp {
                 // Check if tag with same name exists
                 const existingTags = this.notesManager.db.getAllTags();
                 if (existingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase())) {
-                    this.showNotification('A tag with this name already exists', 'warning');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.tagAlreadyExists'), 'warning');
                     return;
                 }
 
                 this.notesManager.db.createTag({ name: tagName, color: tagColor });
-                this.showNotification(`Tag "${tagName}" created`, 'success');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.tagAdded'), 'success');
                 await this.renderTagFolders();
             } else {
                 this.showNotification('Database not available', 'error');
             }
         } catch (error) {
             console.error('Error creating tag:', error);
-            this.showNotification('Failed to create tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToCreateTag'), 'error');
         }
     }
 
@@ -3768,12 +3808,14 @@ class CogNotezApp {
         try {
             this.notesManager.db.data.tags[tagId].name = newName.trim();
             this.notesManager.db.saveToLocalStorage();
-            this.showNotification(`Tag renamed to "${newName.trim()}"`, 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.tagAdded'), 'success');
             await this.renderTagFolders();
             await this.notesManager.renderNotesList('', this.currentFolder);
         } catch (error) {
             console.error('Error renaming tag:', error);
-            this.showNotification('Failed to rename tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToRenameTag'), 'error');
         }
     }
 
@@ -3827,7 +3869,8 @@ class CogNotezApp {
             }
         } catch (error) {
             console.error('Error deleting tag:', error);
-            this.showNotification('Failed to delete tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToDeleteTag'), 'error');
         }
     }
 
@@ -4149,8 +4192,9 @@ class CogNotezApp {
                 </div>
             `;
 
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
             const modal = this.createModal(title, content, [
-                { text: 'OK', type: 'primary', action: 'ok', callback: () => resolve() }
+                { text: t('modals.ok'), type: 'primary', action: 'ok', callback: () => resolve() }
             ]);
 
             // Also handle clicking outside or pressing Escape
@@ -4198,7 +4242,8 @@ class CogNotezApp {
             this.templatesManager.show();
         } else {
             console.error('[Templates] Templates manager not initialized');
-            this.showNotification('Templates are not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.templatesUnavailable'), 'error');
         }
     }
 
@@ -4393,14 +4438,16 @@ Please provide a helpful response based on the note content and conversation his
             e.stopPropagation();
             const textToCopy = type === 'assistant' ? message : bubble.textContent;
             navigator.clipboard.writeText(textToCopy).then(() => {
-                this.showNotification('Message copied to clipboard', 'success');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.copiedToClipboard'), 'success');
                 copyBtn.innerHTML = '<i class="fas fa-check"></i>';
                 setTimeout(() => {
                     copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
                 }, 2000);
             }).catch(err => {
                 console.error('Failed to copy:', err);
-                this.showNotification('Failed to copy message', 'error');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.copyFailed'), 'error');
             });
         });
 
@@ -4519,9 +4566,9 @@ Please provide a helpful response based on the note content and conversation his
             <div class="ai-messages-empty-icon">
                 <i class="fas fa-robot"></i>
             </div>
-            <div class="ai-messages-empty-title">AI Assistant</div>
+            <div class="ai-messages-empty-title">${window.i18n ? window.i18n.t('ai.assistant') : 'AI Assistant'}</div>
             <div class="ai-messages-empty-description">
-                I'm here to help! Select text and right-click for AI features, or ask me anything about your note.
+                ${window.i18n ? window.i18n.t('ai.welcomeMessage') : "I'm here to help! Select text and right-click for AI features, or ask me anything about your note."}
             </div>
         `;
         
@@ -4751,14 +4798,16 @@ Please provide a helpful response based on the note content and conversation his
                     editor.value = before + after;
                     editor.setSelectionRange(this.selectionStart, this.selectionStart);
                     this.updateNotePreview();
-                    this.showNotification('Text cut to clipboard', 'success');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.textCut'), 'success');
                 }
                 break;
                 
             case 'copy':
                 if (this.selectedText) {
                     await navigator.clipboard.writeText(this.selectedText);
-                    this.showNotification('Text copied to clipboard', 'success');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.textCopied'), 'success');
                 }
                 break;
                 
@@ -4772,9 +4821,11 @@ Please provide a helpful response based on the note content and conversation his
                         const newPos = this.selectionStart + text.length;
                         editor.setSelectionRange(newPos, newPos);
                         this.updateNotePreview();
-                        this.showNotification('Text pasted', 'success');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.textPasted'), 'success');
                     } catch (err) {
-                        this.showNotification('Failed to paste from clipboard', 'error');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.failedToPaste'), 'error');
                     }
                 }
                 break;
@@ -4808,7 +4859,8 @@ Please provide a helpful response based on the note content and conversation his
                         'How would you like to edit this text?',
                         'edit-ai');
                 } else {
-                    this.showNotification('Please select text to edit with AI', 'info');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.selectTextToEditAI'), 'info');
                 }
                 break;
 
@@ -4833,7 +4885,8 @@ Please provide a helpful response based on the note content and conversation his
             const src = mediaElement.src || mediaElement.querySelector('source')?.src;
 
             if (!src) {
-                this.showNotification('Media source not found', 'error');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.mediaSourceNotFound'), 'error');
                 return;
             }
 
@@ -4866,7 +4919,8 @@ Please provide a helpful response based on the note content and conversation his
                             a.download = filename;
                             a.click();
                             URL.revokeObjectURL(url);
-                            this.showNotification('Media downloaded successfully', 'success');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.mediaDownloaded'), 'success');
                             return;
                         }
                     } catch (error) {
@@ -4880,7 +4934,8 @@ Please provide a helpful response based on the note content and conversation his
 
                     this.showNotification(`Media file "${originalName}" not found locally`, 'error');
                 } else {
-                    this.showNotification('Media manager not available', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.mediaManagerNotAvailable'), 'error');
                 }
             } else {
                 // For external URLs, use browser download
@@ -4888,11 +4943,13 @@ Please provide a helpful response based on the note content and conversation his
                 link.href = src;
                 link.download = mediaElement.alt || mediaElement.title || 'media';
                 link.click();
-                this.showNotification('Downloading media...', 'success');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.downloadingMedia'), 'success');
             }
         } catch (error) {
             console.error('[App] Failed to download media:', error);
-            this.showNotification('Failed to download media', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.mediaDownloadFailed'), 'error');
         }
     }
 
@@ -4951,7 +5008,8 @@ Please provide a helpful response based on the note content and conversation his
     // These now redirect to the main methods
     rewriteSelection() {
         if (!this.selectedText) {
-            this.showNotification('No text selected', 'info');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noTextSelected'), 'info');
             return;
         }
         this.preserveSelection = true;
@@ -4962,7 +5020,8 @@ Please provide a helpful response based on the note content and conversation his
 
     extractKeyPoints() {
         if (!this.selectedText) {
-            this.showNotification('No text selected', 'info');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noTextSelected'), 'info');
             return;
         }
         this.preserveSelection = true;
@@ -5002,7 +5061,8 @@ Please provide a helpful response based on the note content and conversation his
         // Reset submit button text
         const submitBtn = document.getElementById('ai-dialog-submit');
         if (submitBtn) {
-            submitBtn.textContent = 'Submit';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            submitBtn.textContent = t('modals.submit');
         }
 
         // Clear selection preservation flag
@@ -5069,13 +5129,15 @@ Please provide a helpful response based on the note content and conversation his
         // Check if AI manager is properly initialized
         if (!this.aiManager.isInitialized) {
             console.error('[DEBUG] handleAIAction: AI manager not fully initialized - edit approval system missing');
-            this.showNotification('AI system is still initializing. Please wait a moment and try again.', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.aiInitializing'), 'error');
             return;
         }
 
         if (!action) {
             console.error('[DEBUG] handleAIAction: No action specified');
-            this.showNotification('No AI action specified', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noAiAction'), 'error');
             return;
         }
 
@@ -5441,14 +5503,16 @@ Please provide a helpful response based on the note content and conversation his
             }
         } catch (error) {
             console.error('Export failed:', error);
-            this.showNotification('Failed to export note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.exportFailed'), 'error');
         }
     }
 
     // Enhanced data portability methods
     async createFullBackup() {
         if (!this.backendAPI) {
-            this.showNotification('Backup functionality not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.backupUnavailable'), 'error');
             return;
         }
 
@@ -5461,7 +5525,8 @@ Please provide a helpful response based on the note content and conversation his
             if (filePath) {
                 this.showNotification(`✅ Full backup created successfully at ${filePath}!`, 'success');
             } else {
-                this.showNotification('Backup cancelled or no location selected', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.backupCancelled'), 'info');
             }
         } catch (error) {
             console.error('Backup creation failed:', error);
@@ -5503,14 +5568,16 @@ Please provide a helpful response based on the note content and conversation his
             this.hideLoading();
         } catch (error) {
             console.error('Import failed:', error);
-            this.showNotification('Failed to import note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.importFailed'), 'error');
             this.hideLoading();
         }
     }
 
     async importMultipleFiles() {
         if (!this.backendAPI) {
-            this.showNotification('Import functionality not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.importUnavailable'), 'error');
             return;
         }
 
@@ -5521,13 +5588,15 @@ Please provide a helpful response based on the note content and conversation his
             const result = await this.backendAPI.importMultipleFiles();
 
             if (!result) {
-                this.showNotification('No files selected for import', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.noFilesForImport'), 'info');
                 this.hideLoading();
                 return;
             }
 
             if (result.notes.length === 0) {
-                this.showNotification('No valid files found to import', 'warning');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.noValidFiles'), 'warning');
                 this.hideLoading();
                 return;
             }
@@ -5622,7 +5691,8 @@ Please provide a helpful response based on the note content and conversation his
 
     async restoreFromBackup() {
         if (!this.backendAPI) {
-            this.showNotification('Backup restore functionality not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.backupRestoreUnavailable'), 'error');
             return;
         }
 
@@ -5640,13 +5710,15 @@ Please provide a helpful response based on the note content and conversation his
 
                 // Reload all data after restore
                 await this.loadNotes();
-                this.showNotification('✅ Backup restored successfully! Application data has been reloaded.', 'success');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.backupRestored'), 'success');
 
                 // Note: In a production app, you might want to restart the app to ensure clean state
                 // For now, just reload the notes list
                 this.renderNotesList();
             } else {
-                this.showNotification('Restore operation was cancelled', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.restoreCancelled'), 'info');
             }
         } catch (error) {
             console.error('Backup restore failed:', error);
@@ -6196,7 +6268,8 @@ Please provide a helpful response based on the note content and conversation his
             selectedText = selection.toString().trim();
 
             if (!selectedText) {
-                this.showNotification('Please select some text in the preview to summarize', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextInPreviewToSummarize'), 'info');
                 return;
             }
         } else {
@@ -6232,7 +6305,8 @@ Please provide a helpful response based on the note content and conversation his
             selectedText = selection.toString().trim();
 
             if (!selectedText) {
-                this.showNotification('Please select some text in the preview to ask about', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextInPreviewToAsk'), 'info');
                 return;
             }
         } else {
@@ -6241,7 +6315,8 @@ Please provide a helpful response based on the note content and conversation his
             selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
 
             if (!selectedText) {
-                this.showNotification('Please select some text to ask about', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextToAsk'), 'info');
                 return;
             }
         }
@@ -8803,8 +8878,9 @@ Please provide a helpful response based on the note content and conversation his
                     background: rgba(245, 158, 11, 0.1);
                 `;
 
+                const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
                 conflictElement.innerHTML = `
-                    <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">${conflict.localTitle || 'Untitled Note'}</div>
+                    <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">${conflict.localTitle || untitledTitle}</div>
                     <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">
                         Local: ${new Date(conflict.localModified).toLocaleString()}<br>
                         Remote: ${new Date(conflict.remoteModified).toLocaleString()}

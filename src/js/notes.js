@@ -401,20 +401,33 @@ class NotesManager {
     // Show delete confirmation using custom modal (avoids native confirm() focus issues)
     showDeleteConfirmation(noteTitle) {
         return new Promise((resolve) => {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const deleteTitle = t('notes.deleteNoteTitle');
+            const deleteWarning = t('notes.deleteNoteWarning');
+            const deleteButtonText = t('notes.deleteButton');
+            const cancelButtonText = t('modals.cancel');
+
+            // Escape title and wrap in strong tags for the message
+            const escapedTitle = this.app.escapeHtml(noteTitle);
+            const formattedTitle = `<strong>${escapedTitle}</strong>`;
+            // Get translated message and replace {{title}} with formatted version
+            const deleteMessageTemplate = t('notes.deleteNoteMessage', { title: noteTitle });
+            const deleteMessage = deleteMessageTemplate.replace(/\{\{title\}\}/g, formattedTitle);
+
             const content = `
                 <div style="padding: 10px 0;">
                     <p style="margin: 0 0 20px 0; color: var(--text-primary);">
-                        Delete "<strong>${this.app.escapeHtml(noteTitle)}</strong>"?
+                        ${deleteMessage}
                     </p>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                        This action cannot be undone.
+                        ${deleteWarning}
                     </p>
                 </div>
             `;
 
-            const modal = this.app.createModal('Delete Note', content, [
-                { text: 'Delete', type: 'primary', action: 'delete', callback: () => resolve(true) },
-                { text: 'Cancel', type: 'secondary', action: 'cancel', callback: () => resolve(false) }
+            const modal = this.app.createModal(deleteTitle, content, [
+                { text: deleteButtonText, type: 'primary', action: 'delete', callback: () => resolve(true) },
+                { text: cancelButtonText, type: 'secondary', action: 'cancel', callback: () => resolve(false) }
             ]);
 
             // Also handle clicking outside or pressing Escape
@@ -521,7 +534,10 @@ class NotesManager {
 
             if (!currentlyPinned && pinnedCount >= 3) {
                 // Cannot pin more than 3 notes
-                await this.app.showAlert('Pin Limit Reached', 'You can only pin up to 3 notes. Please unpin another note first.');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                const pinLimitTitle = t('notes.pinLimitReached');
+                const pinLimitMessage = t('notes.pinLimitMessage');
+                await this.app.showAlert(pinLimitTitle, pinLimitMessage);
                 return;
             }
 
