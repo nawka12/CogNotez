@@ -1735,7 +1735,22 @@ class GoogleDriveSyncManager {
             // Format note as markdown text and replace media URLs
             let noteContent = `# ${note.title}\n\n`;
             if (note.tags && note.tags.length > 0) {
-                noteContent += `**Tags:** ${note.tags.join(', ')}\n\n`;
+                // Convert tag IDs to tag names
+                const tagNames = [];
+                for (const tagId of note.tags) {
+                    let tagName = tagId; // Fallback to ID if name not found
+                    
+                    // Try to get tag name from database (main process)
+                    if (typeof global !== 'undefined' && global.databaseManager && global.databaseManager.data && global.databaseManager.data.tags) {
+                        const tag = global.databaseManager.data.tags[tagId];
+                        if (tag && tag.name) {
+                            tagName = tag.name;
+                        }
+                    }
+                    
+                    tagNames.push(tagName);
+                }
+                noteContent += `**Tags:** ${tagNames.join(', ')}\n\n`;
             }
             noteContent += `**Created:** ${new Date(note.created_at).toLocaleString()}\n`;
             noteContent += `**Last Updated:** ${new Date(note.updated_at).toLocaleString()}\n\n`;

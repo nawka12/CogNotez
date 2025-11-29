@@ -2918,10 +2918,12 @@ class CogNotezApp {
     // Show tag management dialog
     showTagManager() {
         if (!this.currentNote) {
-            this.showNotification('Please select a note first', 'info');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.showNotification(t('notifications.pleaseSelectNote', 'Please select a note first'), 'info');
             return;
         }
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const existingTags = this.currentNote.tags || [];
         const allTags = this.notesManager.db && this.notesManager.db.initialized ?
             this.notesManager.db.getAllTags() : [];
@@ -2931,12 +2933,12 @@ class CogNotezApp {
             <div id="tag-manager-modal" class="modal">
                 <div class="modal-content tag-manager-content">
                     <div class="modal-header">
-                        <h3>Manage Tags</h3>
+                        <h3>${t('editor.manageTags', 'Manage Tags')}</h3>
                         <button id="tag-manager-close" class="modal-close"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="modal-body">
                         <div class="tag-manager-section">
-                            <h4>Current Tags</h4>
+                            <h4>${t('tags.currentTags', 'Current Tags')}</h4>
                             <div id="current-tags" class="current-tags">
                                 ${existingTags.length > 0 ?
                                     existingTags.map(tagId => {
@@ -2946,18 +2948,18 @@ class CogNotezApp {
                                             <button class="tag-remove" data-tag-id="${tagId}">×</button>
                                         </span>`;
                                     }).join('') :
-                                    '<span class="no-tags">No tags assigned</span>'
+                                    `<span class="no-tags">${t('tags.noTagsAssigned', 'No tags assigned')}</span>`
                                 }
                             </div>
                         </div>
                         <div class="tag-manager-section">
-                            <h4>Add Tags</h4>
+                            <h4>${t('tags.addTags', 'Add Tags')}</h4>
                             <div class="tag-input-section">
-                                <input type="text" id="new-tag-input" placeholder="Enter tag name..." class="tag-input">
-                                <button id="add-tag-btn" class="btn-primary">Add Tag</button>
+                                <input type="text" id="new-tag-input" placeholder="${t('tags.enterTagName', 'Enter tag name...')}" class="tag-input">
+                                <button id="add-tag-btn" class="btn-primary">${t('tags.addTag', 'Add Tag')}</button>
                             </div>
                             <div class="available-tags">
-                                <h5>Available Tags</h5>
+                                <h5>${t('tags.availableTags', 'Available Tags')}</h5>
                                 <div id="available-tags-list" class="available-tags-list">
                                     ${allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
                                         `<span class="available-tag" data-tag-id="${tag.id}">
@@ -3016,11 +3018,12 @@ class CogNotezApp {
 
     // Add a new tag to the note
     async addNewTag() {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const input = document.getElementById('new-tag-input');
         const tagName = input.value.trim();
 
         if (!tagName) {
-            this.showNotification('Please enter a tag name', 'warning');
+            this.showNotification(t('notifications.pleaseEnterTagName', 'Please enter a tag name'), 'warning');
             return;
         }
 
@@ -3076,9 +3079,10 @@ class CogNotezApp {
     async addTagToNote(tagId) {
         if (!this.currentNote) return;
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const currentTags = this.currentNote.tags || [];
         if (currentTags.length >= 3) {
-            this.showNotification('Maximum 3 tags per note reached', 'warning');
+            this.showNotification(t('tags.maxTagsReached', 'Maximum 3 tags per note reached'), 'warning');
             return;
         }
 
@@ -3114,10 +3118,10 @@ class CogNotezApp {
             this.refreshTagManager();
             await this.renderTagFolders();
 
-            this.showNotification('Tag added successfully', 'success');
+            this.showNotification(t('notifications.tagAdded', 'Tag added successfully'), 'success');
         } catch (error) {
             console.error('Error adding tag to note:', error);
-            this.showNotification('Failed to add tag', 'error');
+            this.showNotification(t('tags.addTagFailed', 'Failed to add tag'), 'error');
         }
     }
 
@@ -7187,6 +7191,8 @@ Please provide a helpful response based on the note content and conversation his
     showShareOptions() {
         if (!this.currentNote || !this.backendAPI) return;
 
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
         // Always refresh current note from database to get latest collaboration status
         if (this.notesManager && this.notesManager.db) {
             const freshNote = this.notesManager.db.getNote(this.currentNote.id);
@@ -7208,19 +7214,19 @@ Please provide a helpful response based on the note content and conversation his
                 <div style="margin-bottom: 20px; padding: 16px; background: var(--context-menu-bg); border-radius: 8px; border: 1px solid var(--accent-primary);">
                     <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
                         <i class="fas fa-check-circle" style="color: var(--accent-primary);"></i>
-                        <span style="font-weight: 500; color: var(--accent-primary);">Note is currently shared on Google Drive</span>
+                        <span style="font-weight: 500; color: var(--accent-primary);">${t('notifications.noteSharedOnGoogleDrive', 'Note is currently shared on Google Drive')}</span>
                     </div>
                     <div style="margin-bottom: 12px;">
-                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">Share Link:</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">${t('notifications.shareLink', 'Share Link:')}</div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <input type="text" id="current-share-link" readonly value="${shareLink}" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font-family: monospace; font-size: 11px;">
-                            <button id="copy-share-link-btn" class="btn-secondary" style="padding: 8px 12px;" title="Copy link">
+                            <button id="copy-share-link-btn" class="btn-secondary" style="padding: 8px 12px;" title="${t('notifications.copyLink', 'Copy link')}">
                                 <i class="fas fa-copy"></i>
                             </button>
                         </div>
                     </div>
                     <button id="revoke-share-btn" class="btn-secondary" style="width: 100%; padding: 10px; background: var(--error-color); color: white; border: none;">
-                        <i class="fas fa-times-circle"></i> Revoke Share
+                        <i class="fas fa-times-circle"></i> ${t('notifications.revokeShare', 'Revoke Share')}
                     </button>
                 </div>
             `;
@@ -7229,9 +7235,9 @@ Please provide a helpful response based on the note content and conversation his
         const content = `
             <div style="max-width: 500px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-share"></i> Share "${this.currentNote.title}"</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-share"></i> ${t('editor.shareNoteTitle', 'Share "{{title}}"', { title: this.currentNote.title })}</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                        Choose how you want to share this note:
+                        ${t('editor.shareNoteDescription', 'Choose how you want to share this note:')}
                     </p>
                 </div>
 
@@ -7239,57 +7245,57 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div style="display: flex; flex-direction: column; gap: 12px;">
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 8px;">
-                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Collaboration</div>
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">${t('notifications.collaboration', 'Collaboration')}</div>
                         
                         <button class="share-option-btn" data-action="share-google-drive" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
                             <span><i class="fab fa-google-drive" style="color: #4285F4;"></i></span>
                             <div>
-                                <div style="font-weight: 500;">${isShared ? 'Update Google Drive Share' : 'Share via Google Drive'}</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">${isShared ? 'Update existing shared note on Google Drive' : 'Upload and share on Google Drive with permissions'}</div>
+                                <div style="font-weight: 500;">${isShared ? t('notifications.updateGoogleDriveShare', 'Update Google Drive Share') : t('notifications.shareViaGoogleDrive', 'Share via Google Drive')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${isShared ? t('notifications.updateGoogleDriveShareDescription', 'Update existing shared note on Google Drive') : t('notifications.shareViaGoogleDriveDescription', 'Upload and share on Google Drive with permissions')}</div>
                             </div>
                         </button>
                     </div>
 
                     <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 8px;">
-                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">Export</div>
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">${t('notifications.exportSection', 'Export')}</div>
                         
                         <button class="share-option-btn" data-action="clipboard-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
                             <span><i class="fas fa-clipboard"></i></span>
                             <div>
-                                <div style="font-weight: 500;">Copy to Clipboard (Markdown)</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Share formatted content</div>
+                                <div style="font-weight: 500;">${t('notifications.copyToClipboardMarkdown', 'Copy to Clipboard (Markdown)')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.copyToClipboardMarkdownDesc', 'Share formatted content')}</div>
                             </div>
                         </button>
 
                         <button class="share-option-btn" data-action="clipboard-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                             <span>📄</span>
                             <div>
-                                <div style="font-weight: 500;">Copy to Clipboard (Plain Text)</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Share plain text content</div>
+                                <div style="font-weight: 500;">${t('notifications.copyToClipboardText', 'Copy to Clipboard (Plain Text)')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.copyToClipboardTextDesc', 'Share plain text content')}</div>
                             </div>
                         </button>
 
                         <button class="share-option-btn" data-action="export-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                             <span>📁</span>
                             <div>
-                                <div style="font-weight: 500;">Export as Markdown File</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
+                                <div style="font-weight: 500;">${t('notifications.exportAsMarkdownFile', 'Export as Markdown File')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.exportAsMarkdownFileDesc', 'Save to file for sharing')}</div>
                             </div>
                         </button>
 
                         <button class="share-option-btn" data-action="export-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                             <span>📄</span>
                             <div>
-                                <div style="font-weight: 500;">Export as Text File</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
+                                <div style="font-weight: 500;">${t('notifications.exportAsTextFile', 'Export as Text File')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.exportAsTextFileDesc', 'Save to file for sharing')}</div>
                             </div>
                         </button>
 
                         <button class="share-option-btn" data-action="export-pdf" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
                             <span>📋</span>
                             <div>
-                                <div style="font-weight: 500;">Share as PDF</div>
-                                <div style="font-size: 12px; color: var(--text-secondary);">Preserves media and formatting</div>
+                                <div style="font-weight: 500;">${t('notifications.shareAsPDF', 'Share as PDF')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.shareAsPDFDesc', 'Preserves media and formatting')}</div>
                             </div>
                         </button>
                     </div>
@@ -7297,38 +7303,40 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
                     <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tip:</strong> Google Drive sharing enables cloud-based collaboration with permission control. Export options let you share files directly.
+                        ${t('notifications.shareTip', '💡 Tip: Google Drive sharing enables cloud-based collaboration with permission control. Export options let you share files directly.')}
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('Share Note', content, [
-            { text: 'Close', type: 'secondary', action: 'close' }
+        const modal = this.createModal(t('editor.shareNote', 'Share Note'), content, [
+            { text: t('modals.close', 'Close'), type: 'secondary', action: 'close' }
         ]);
 
         // Handle copy link button
         if (isShared && shareLink) {
             const copyBtn = modal.querySelector('#copy-share-link-btn');
             copyBtn?.addEventListener('click', () => {
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
                 const linkInput = modal.querySelector('#current-share-link');
                 linkInput.select();
                 document.execCommand('copy');
-                this.showNotification('Link copied to clipboard!', 'success');
+                this.showNotification(t('notifications.linkCopiedToClipboard', 'Link copied to clipboard!'), 'success');
             });
 
             // Handle revoke share button
             const revokeBtn = modal.querySelector('#revoke-share-btn');
             revokeBtn?.addEventListener('click', async () => {
-                if (confirm('Are you sure you want to revoke this share? The Google Drive file will be deleted.')) {
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                if (confirm(t('notifications.revokeShareConfirm', 'Are you sure you want to revoke this share? The Google Drive file will be deleted.'))) {
                     try {
-                        this.showLoading('Revoking share...');
+                        this.showLoading(t('notifications.revokingShare', 'Revoking share...'));
                         const result = await this.backendAPI.revokeGoogleDriveShare(
                             this.currentNote.collaboration.google_drive_file_id,
                             this.currentNote.id
                         );
                         this.hideLoading();
-                        this.showNotification('Share revoked successfully', 'success');
+                        this.showNotification(t('notifications.shareRevokedSuccessfully', 'Share revoked successfully'), 'success');
                         
                         // Update the note's collaboration data in renderer's database
                         if (result.success && result.updatedCollaboration && this.notesManager && this.notesManager.db) {
@@ -7348,7 +7356,8 @@ Please provide a helpful response based on the note content and conversation his
                         setTimeout(() => this.showShareOptions(), 300);
                     } catch (error) {
                         this.hideLoading();
-                        this.showNotification('Failed to revoke share: ' + error.message, 'error');
+                        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+                        this.showNotification(t('notifications.failedToRevokeShare', 'Failed to revoke share: {{error}}', { error: error.message }), 'error');
                     }
                 }
             });
@@ -7369,6 +7378,8 @@ Please provide a helpful response based on the note content and conversation his
     async handleShareAction(action) {
         if (!this.currentNote || !this.backendAPI) return;
 
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
         try {
             let success = false;
             let message = '';
@@ -7380,18 +7391,18 @@ Please provide a helpful response based on the note content and conversation his
 
                 case 'clipboard-markdown':
                     success = await this.backendAPI.shareNoteToClipboard(this.currentNote, 'markdown');
-                    message = 'Note copied to clipboard as Markdown!';
+                    message = t('notifications.noteCopiedToClipboardMarkdown', 'Note copied to clipboard as Markdown!');
                     break;
 
                 case 'clipboard-text':
                     success = await this.backendAPI.shareNoteToClipboard(this.currentNote, 'text');
-                    message = 'Note copied to clipboard as plain text!';
+                    message = t('notifications.noteCopiedToClipboardText', 'Note copied to clipboard as plain text!');
                     break;
 
                 case 'export-markdown':
                     const mdPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'markdown');
                     if (mdPath) {
-                        message = `Note exported as Markdown: ${mdPath}`;
+                        message = t('notifications.noteExportedAsMarkdown', 'Note exported as Markdown: {{path}}', { path: mdPath });
                         success = true;
                     }
                     break;
@@ -7399,7 +7410,7 @@ Please provide a helpful response based on the note content and conversation his
                 case 'export-text':
                     const txtPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'text');
                     if (txtPath) {
-                        message = `Note exported as Text: ${txtPath}`;
+                        message = t('notifications.noteExportedAsText', 'Note exported as Text: {{path}}', { path: txtPath });
                         success = true;
                     }
                     break;
@@ -7407,7 +7418,7 @@ Please provide a helpful response based on the note content and conversation his
                 case 'export-pdf':
                     const pdfPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'pdf');
                     if (pdfPath) {
-                        message = `Note exported as PDF: ${pdfPath}`;
+                        message = t('notifications.noteExportedAsPDF', 'Note exported as PDF: {{path}}', { path: pdfPath });
                         success = true;
                     }
                     break;
@@ -7416,11 +7427,13 @@ Please provide a helpful response based on the note content and conversation his
             if (success) {
                 this.showNotification(message, 'success');
             } else {
-                this.showNotification('Failed to share note', 'error');
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                this.showNotification(t('notifications.failedToShareNote', 'Failed to share note'), 'error');
             }
         } catch (error) {
             console.error('Share error:', error);
-            this.showNotification('Failed to share note', 'error');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.showNotification(t('notifications.failedToShareNote', 'Failed to share note'), 'error');
         }
     }
 
@@ -7429,20 +7442,23 @@ Please provide a helpful response based on the note content and conversation his
         try {
             const syncStatus = await this.backendAPI.getGoogleDriveSyncStatus();
             if (!syncStatus || !syncStatus.isAuthenticated) {
-                this.showNotification('Please authenticate with Google Drive first. Go to Sync Settings and click "Connect Google Drive".', 'error');
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                this.showNotification(t('notifications.pleaseAuthenticateGoogleDrive', 'Please authenticate with Google Drive first. Go to Sync Settings and click "Connect Google Drive".'), 'error');
                 return;
             }
         } catch (error) {
-            this.showNotification('Google Drive sync is not set up. Please connect Google Drive in Sync Settings.', 'error');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.showNotification(t('notifications.googleDriveSyncNotSetup', 'Google Drive sync is not set up. Please connect Google Drive in Sync Settings.'), 'error');
             return;
         }
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const content = `
             <div style="max-width: 500px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fab fa-google-drive"></i> Share via Google Drive</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fab fa-google-drive"></i> ${t('notifications.shareViaGoogleDriveTitle', 'Share via Google Drive')}</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                        Upload and share this note on Google Drive:
+                        ${t('notifications.shareViaGoogleDriveSubtitle', 'Upload and share this note on Google Drive:')}
                     </p>
                 </div>
 
@@ -7450,36 +7466,36 @@ Please provide a helpful response based on the note content and conversation his
                     <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
                         <input type="radio" name="gd-perm" value="view" checked style="cursor: pointer;">
                         <div>
-                            <div style="font-weight: 500; color: var(--text-primary);">View Only</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Recipients can only view</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t('notifications.viewOnly', 'View Only')}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.viewOnlyDesc', 'Recipients can only view')}</div>
                         </div>
                     </label>
 
                     <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
                         <input type="radio" name="gd-perm" value="comment" style="cursor: pointer;">
                         <div>
-                            <div style="font-weight: 500; color: var(--text-primary);">Comment</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Recipients can view and comment</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t('notifications.comment', 'Comment')}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.commentDesc', 'Recipients can view and comment')}</div>
                         </div>
                     </label>
 
                     <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
                         <input type="radio" name="gd-perm" value="edit" style="cursor: pointer;">
                         <div>
-                            <div style="font-weight: 500; color: var(--text-primary);">Edit</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Recipients can view and edit</div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t('notifications.edit', 'Edit')}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.editDesc', 'Recipients can view and edit')}</div>
                         </div>
                     </label>
                 </div>
 
                 <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Share with email (optional):</label>
-                    <input type="email" id="gd-email" placeholder="user@example.com" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary);">
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">Leave empty to create a public link</div>
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">${t('notifications.shareWithEmail', 'Share with email (optional):')}</label>
+                    <input type="email" id="gd-email" placeholder="${t('notifications.shareWithEmailPlaceholder', 'user@example.com')}" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary);">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${t('notifications.shareWithEmailHint', 'Leave empty to create a public link')}</div>
                 </div>
 
                 <div id="gd-share-result" style="display: none; margin-bottom: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">Google Drive Link:</div>
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">${t('notifications.googleDriveLink', 'Google Drive Link:')}</div>
                     <div style="display: flex; gap: 8px; align-items: center;">
                         <input type="text" id="gd-link-input" readonly style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font-family: monospace; font-size: 12px;">
                         <button id="copy-gd-link-btn" class="btn-secondary" style="padding: 8px 12px;">
@@ -7490,9 +7506,9 @@ Please provide a helpful response based on the note content and conversation his
             </div>
         `;
 
-        const modal = this.createModal('Share via Google Drive', content, [
-            { text: 'Cancel', type: 'secondary', action: 'close' },
-            { text: 'Share', type: 'primary', action: 'share-gd' }
+        const modal = this.createModal(t('notifications.shareViaGoogleDriveTitle', 'Share via Google Drive'), content, [
+            { text: t('modals.cancel', 'Cancel'), type: 'secondary', action: 'close' },
+            { text: t('notifications.shareViaGoogleDrive', 'Share'), type: 'primary', action: 'share-gd' }
         ]);
 
         // Handle share button
@@ -7508,7 +7524,8 @@ Please provide a helpful response based on the note content and conversation his
             };
 
             try {
-                this.showLoading('Sharing note on Google Drive...');
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                this.showLoading(t('notifications.sharingNoteOnGoogleDrive', 'Sharing note on Google Drive...'));
                 const result = await this.backendAPI.shareNoteOnGoogleDrive(
                     this.currentNote,
                     permissions,
@@ -7532,8 +7549,8 @@ Please provide a helpful response based on the note content and conversation his
                     }
 
                     const message = result.isUpdate ? 
-                        'Shared note updated successfully on Google Drive!' : 
-                        'Note shared on Google Drive successfully!';
+                        t('notifications.sharedNoteUpdatedSuccessfully', 'Shared note updated successfully on Google Drive!') : 
+                        t('notifications.noteSharedSuccessfully', 'Note shared on Google Drive successfully!');
                     this.showNotification(message, 'success');
 
                     // Close ALL modals (including parent Share Note dialog) and reopen
@@ -7545,7 +7562,8 @@ Please provide a helpful response based on the note content and conversation his
             } catch (error) {
                 this.hideLoading();
                 console.error('Error sharing on Google Drive:', error);
-                this.showNotification('Failed to share on Google Drive: ' + error.message, 'error');
+                const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+                this.showNotification(t('notifications.failedToShareOnGoogleDrive', 'Failed to share on Google Drive: {{error}}', { error: error.message }), 'error');
             }
         });
     }
@@ -7595,15 +7613,16 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showUpdateAvailable(info) {
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
         const dialog = document.createElement('div');
         dialog.className = 'update-dialog';
         dialog.innerHTML = `
             <div class="update-dialog-content">
-                <h3>Update Available</h3>
-                <p>A new version (${info.version}) is available. Would you like to download it?</p>
+                <h3>${t('notifications.updateAvailable')}</h3>
+                <p>${t('notifications.updateAvailableMessage', { version: info.version })}</p>
                 <div class="update-dialog-buttons">
-                    <button id="download-update" class="btn-primary">Download</button>
-                    <button id="cancel-update" class="btn-secondary">Later</button>
+                    <button id="download-update" class="btn-primary">${t('notifications.downloadUpdate')}</button>
+                    <button id="cancel-update" class="btn-secondary">${t('notifications.updateLater')}</button>
                 </div>
             </div>
         `;
@@ -7651,7 +7670,8 @@ Please provide a helpful response based on the note content and conversation his
                 dialog.remove();
             } catch (error) {
                 console.error('Failed to start download:', error);
-                this.showNotification('Failed to start download', 'error');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.updateDownloadFailed'), 'error');
             }
         });
 
@@ -7661,11 +7681,13 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showUpdateNotAvailable(info) {
-        this.showNotification(`You're running the latest version (${info.version})`, 'success');
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showNotification(t('notifications.updateLatestVersion', { version: info.version }), 'success');
     }
 
     showUpdateError(error) {
-        this.showNotification(`Update check failed: ${error}`, 'error');
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showNotification(t('notifications.updateCheckFailed', { error: error }), 'error');
     }
 
     showDownloadProgress(progress) {
@@ -8173,12 +8195,14 @@ Please provide a helpful response based on the note content and conversation his
             connectBtn.addEventListener('click', async () => {
                 try {
                     connectBtn.disabled = true;
-                    connectBtn.textContent = 'Connecting...';
+                    const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                    connectBtn.textContent = t('settings.sync.statusConnecting', 'Connecting...');
 
                     const result = await this.backendAPI.connectGoogleDrive();
 
                     if (result.success) {
-                        this.showNotification(result.message || 'Successfully connected to Google Drive', 'success');
+                        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                        this.showNotification(result.message || t('settings.sync.connectedSuccessfully', 'Successfully connected to Google Drive'), 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
                         
@@ -8198,7 +8222,7 @@ Please provide a helpful response based on the note content and conversation his
                     console.error('[Sync] Failed to connect Google Drive:', error);
                 } finally {
                     connectBtn.disabled = false;
-                    connectBtn.textContent = 'Connect Google Drive';
+                    connectBtn.textContent = t('settings.sync.connectGoogleDrive', 'Connect Google Drive');
                 }
             });
 
@@ -8206,12 +8230,14 @@ Please provide a helpful response based on the note content and conversation his
             disconnectBtn.addEventListener('click', async () => {
                 try {
                     disconnectBtn.disabled = true;
-                    disconnectBtn.textContent = 'Disconnecting...';
+                    const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                    disconnectBtn.textContent = t('settings.sync.statusDisconnecting', 'Disconnecting...');
 
                     const result = await this.backendAPI.disconnectGoogleDrive();
 
                     if (result.success) {
-                        this.showNotification('Successfully disconnected from Google Drive', 'success');
+                        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                        this.showNotification(t('settings.sync.disconnectedSuccessfully', 'Successfully disconnected from Google Drive'), 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
                         
@@ -8228,7 +8254,7 @@ Please provide a helpful response based on the note content and conversation his
                     this.showNotification('Failed to disconnect from Google Drive', 'error');
                 } finally {
                     disconnectBtn.disabled = false;
-                    disconnectBtn.textContent = 'Disconnect';
+                    disconnectBtn.textContent = t('settings.sync.disconnect', 'Disconnect');
                 }
             });
 
@@ -8236,7 +8262,8 @@ Please provide a helpful response based on the note content and conversation his
             syncBtn.addEventListener('click', async () => {
                 try {
                     syncBtn.disabled = true;
-                    syncBtn.textContent = 'Syncing...';
+                    const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                    syncBtn.textContent = t('settings.sync.statusSyncing', 'Syncing...');
 
                     // Export local data from the renderer process database manager
                     let localData = null;
@@ -8391,21 +8418,22 @@ Please provide a helpful response based on the note content and conversation his
             const rendererSyncEnabled = (this.notesManager && this.notesManager.db) ? this.notesManager.db.isSyncEnabled() : false;
 
             // Update status indicator
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             if (status.isAuthenticated && (status.syncEnabled || rendererSyncEnabled)) {
                 indicator.style.backgroundColor = 'var(--success-color)';
-                statusText.textContent = 'Connected';
+                statusText.textContent = t('settings.sync.statusConnectedLabel', 'Connected');
                 connectBtn.style.display = 'none';
                 disconnectBtn.style.display = 'inline-block';
                 syncBtn.disabled = false;
             } else if (status.isAuthenticated) {
                 indicator.style.backgroundColor = 'var(--warning-color)';
-                statusText.textContent = 'Ready to sync';
+                statusText.textContent = t('settings.sync.statusReadyToSync', 'Ready to sync');
                 connectBtn.style.display = 'none';
                 disconnectBtn.style.display = 'inline-block';
                 syncBtn.disabled = false;
             } else {
                 indicator.style.backgroundColor = 'var(--error-color)';
-                statusText.textContent = 'Not Connected';
+                statusText.textContent = t('settings.sync.statusNotConnected', 'Not connected');
                 connectBtn.style.display = 'inline-block';
                 disconnectBtn.style.display = 'none';
                 syncBtn.disabled = true;
