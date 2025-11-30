@@ -1,6 +1,6 @@
 {
   "name": "cognotez",
-  "version": "0.5.2",
+  "version": "2.1.4",
   "description": "CogNotez - An AI-powered note app with local LLM integration",
   "main": "main.js",
   "scripts": {
@@ -38,6 +38,8 @@
     "express": "^4.18.0",
     "google-auth-library": "^10.3.0",
     "googleapis": "^160.0.0",
+    "html2canvas": "^1.4.1",
+    "jspdf": "^3.0.3",
     "marked": "^12.0.0",
     "uuid": "^9.0.0"
   },
@@ -66,7 +68,7 @@
     "win": {
       "target": "nsis",
       "icon": "assets/icon.ico",
-      "artifactName": "${productName} Setup ${version}.${ext}"
+      "artifactName": "${productName}.Setup.${version}.${ext}"
     },
     "publish": {
       "provider": "github",

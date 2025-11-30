@@ -41,7 +41,7 @@ Ensure you have CogNotez installed and running. The sync feature is available in
 ### Step 1: Import Google Drive Credentials
 
 1. Launch CogNotez
-2. Click the gear icon (⚙️) in the header to open Sync Settings
+2. Click the cloud icon (☁️) in the header to open Sync Settings
 3. In the setup section, click "Import Credentials File"
 4. **Important**: Add your email as a test user:
    - Go to Google Cloud Console → OAuth consent screen → Audience → Test users
@@ -230,7 +230,7 @@ Each CogNotez installation can only connect to one Google account. To use differ
 
 ### Manual Backup
 
-1. Go to Settings > Export
+1. Go to File > Export
 2. Choose "Export All Notes (JSON)" for complete backup
 3. Store the backup file securely
 4. Use "Import" to restore from backup

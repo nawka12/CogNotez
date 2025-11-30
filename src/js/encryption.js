@@ -170,8 +170,59 @@ class EncryptionManager {
             iterations: this.defaultIterations
         };
     }
+
+    /**
+     * Hash a password for note protection using PBKDF2
+     * @param {string} password - Password to hash
+     * @param {string} saltBase64 - Optional salt, will generate if not provided
+     * @returns {Object} - Hash object with salt and hash
+     */
+    hashPassword(password, saltBase64 = null) {
+        if (!password) {
+            throw new Error('Password is required');
+        }
+
+        const salt = saltBase64 ? Buffer.from(saltBase64, 'base64') : crypto.randomBytes(16);
+        const hash = crypto.pbkdf2Sync(password, salt, this.defaultIterations, 32, 'sha256');
+
+        return {
+            hashBase64: hash.toString('base64'),
+            saltBase64: salt.toString('base64'),
+            iterations: this.defaultIterations
+        };
+    }
+
+    /**
+     * Verify a password against a hash
+     * @param {string} password - Password to verify
+     * @param {string} hashBase64 - Stored hash
+     * @param {string} saltBase64 - Salt used for hashing
+     * @param {number} iterations - Iterations used for hashing
+     * @returns {boolean} - True if password matches
+     */
+    verifyPassword(password, hashBase64, saltBase64, iterations = this.defaultIterations) {
+        if (!password || !hashBase64 || !saltBase64) {
+            return false;
+        }
+
+        try {
+            const salt = Buffer.from(saltBase64, 'base64');
+            const storedHash = Buffer.from(hashBase64, 'base64');
+            const computedHash = crypto.pbkdf2Sync(password, salt, iterations, 32, 'sha256');
+
+            return crypto.timingSafeEqual(storedHash, computedHash);
+        } catch (error) {
+            console.error('Error verifying password:', error);
+            return false;
+        }
+    }
 }
 
 // Export singleton instance
 const encryptionManager = new EncryptionManager();
 module.exports = encryptionManager;
+
+// Export to global scope for browser usage
+if (typeof window !== 'undefined') {
+    window.encryptionManager = encryptionManager;
+}

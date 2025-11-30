@@ -107,6 +107,266 @@ class BackendAPI {
         return await this.saveFile(content, filename, format === 'markdown' ? 'md' : 'txt');
     }
 
+    async exportNoteAsPDF(note) {
+        const { ipcRenderer } = require('electron');
+        
+        try {
+            console.log('[PDF] Starting PDF export for note:', note.title);
+            
+            // Process note content to resolve media URLs
+            let processedContent;
+            try {
+                // Add timeout to media processing
+                processedContent = await Promise.race([
+                    this.processContentForPDF(note),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Media processing timeout')), 10000)
+                    )
+                ]);
+            } catch (mediaError) {
+                console.warn('[PDF] Media processing failed, using simplified content:', mediaError);
+                // Fallback: create simplified content without media
+                processedContent = this.simplifyContentForPDF(note.content);
+            }
+            
+            // Create HTML content for PDF generation
+            console.log('[PDF] Creating HTML content...');
+            const htmlContent = this.createHTMLForPDF(note, processedContent);
+            
+            // Generate PDF using Electron's printToPDF
+            console.log('[PDF] Calling PDF generation handler...');
+            const result = await ipcRenderer.invoke('generate-pdf-from-html', {
+                html: htmlContent,
+                filename: `${note.title.replace(/[^a-z0-9]/gi, '_').toLowerCase()}.pdf`
+            });
+            
+            if (result.success) {
+                console.log('[PDF] PDF generation successful:', result.filePath);
+                return result.filePath;
+            } else if (result.canceled) {
+                console.log('[PDF] PDF generation canceled by user');
+                return null; // User canceled
+            } else {
+                console.error('[PDF] PDF generation failed:', result.error);
+                throw new Error(result.error || 'PDF generation failed');
+            }
+        } catch (error) {
+            console.error('[PDF] Error exporting note as PDF:', error);
+            throw error;
+        }
+    }
+
+    async processContentForPDF(note) {
+        console.log('[PDF] Processing content for PDF...');
+        
+        if (!note.content) {
+            console.log('[PDF] No content to process');
+            return note.content;
+        }
+
+        // Find all cognotez-media:// URLs
+        const mediaUrlPattern = /cognotez-media:\/\/[a-z0-9]+/gi;
+        const matches = note.content.match(mediaUrlPattern);
+        
+        if (!matches || matches.length === 0) {
+            console.log('[PDF] No media files found in content');
+            return note.content;
+        }
+
+        console.log(`[PDF] Found ${matches.length} media files to process`);
+        
+        let processedContent = note.content;
+        const { ipcRenderer } = require('electron');
+        
+        // Convert media URLs to temporary file paths for PDF embedding
+        for (const cognotezUrl of matches) {
+            try {
+                console.log(`[PDF] Processing media file: ${cognotezUrl}`);
+                const fileId = cognotezUrl.replace('cognotez-media://', '');
+                
+                // Add timeout for media file processing
+                const mediaData = await Promise.race([
+                    ipcRenderer.invoke('copy-media-file-for-pdf', fileId),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Media processing timeout')), 5000)
+                    )
+                ]);
+                
+                if (mediaData && mediaData.tempPath) {
+                    // Check if it's a video file
+                    if (mediaData.mimeType && mediaData.mimeType.startsWith('video/')) {
+                        console.log(`[PDF] Replacing video with placeholder: ${mediaData.filename}`);
+                        // For videos, create a placeholder with video icon and filename
+                        const fileName = mediaData.filename || `video_${fileId}`;
+                        const videoPlaceholder = `<div style="background-color: #f8f9fa; border: 2px dashed #dee2e6; border-radius: 8px; padding: 20px; text-align: center; margin: 15px 0;">
+                            <div style="font-size: 24px; margin-bottom: 10px;">🎥</div>
+                            <div style="font-weight: bold; color: #495057;">Video File</div>
+                            <div style="color: #6c757d; font-size: 14px; margin-top: 5px;">${fileName}</div>
+                            <div style="color: #6c757d; font-size: 12px; margin-top: 5px;">(Video files are not playable in PDF format)</div>
+                        </div>`;
+                        processedContent = processedContent.replace(cognotezUrl, videoPlaceholder);
+                    } else {
+                        console.log(`[PDF] Replacing image with temp path: ${mediaData.tempPath}`);
+                        // For images, use the temporary file path with file:// protocol
+                        const fileUrl = `file://${mediaData.tempPath}`;
+                        processedContent = processedContent.replace(cognotezUrl, fileUrl);
+                    }
+                } else {
+                    console.warn(`[PDF] No media data returned for: ${cognotezUrl}`);
+                    const placeholder = `<div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; margin: 10px 0; color: #6c757d; font-style: italic;">
+                        Media file data unavailable
+                    </div>`;
+                    processedContent = processedContent.replace(cognotezUrl, placeholder);
+                }
+            } catch (error) {
+                console.warn(`[PDF] Failed to process media file ${cognotezUrl}:`, error);
+                // Replace with placeholder if processing fails
+                const placeholder = `<div style="background-color: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 10px; margin: 10px 0; color: #6c757d; font-style: italic;">
+                    Media file unavailable (${error.message})
+                </div>`;
+                processedContent = processedContent.replace(cognotezUrl, placeholder);
+            }
+        }
+
+        console.log('[PDF] Content processing completed');
+        return processedContent;
+    }
+
+    simplifyContentForPDF(content) {
+        console.log('[PDF] Simplifying content for PDF (removing media)...');
+        
+        if (!content) return content;
+        
+        // Replace all cognotez-media:// URLs with placeholders
+        const mediaUrlPattern = /cognotez-media:\/\/[a-z0-9]+/gi;
+        const simplifiedContent = content.replace(mediaUrlPattern, (match) => {
+            const fileId = match.replace('cognotez-media://', '');
+            return `[Media File: ${fileId}]`;
+        });
+        
+        console.log('[PDF] Content simplified');
+        return simplifiedContent;
+    }
+
+    createHTMLForPDF(note, content) {
+        console.log('[PDF] Creating HTML content...');
+        const html = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+            margin-bottom: 30px;
+        }
+        h2 {
+            color: #34495e;
+            margin-top: 30px;
+            margin-bottom: 15px;
+        }
+        h3 {
+            color: #7f8c8d;
+            margin-top: 25px;
+            margin-bottom: 10px;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        img {
+            max-width: 100%;
+            height: auto;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            margin: 15px 0;
+            display: block;
+        }
+        blockquote {
+            border-left: 4px solid #3498db;
+            margin: 20px 0;
+            padding: 10px 20px;
+            background-color: #f8f9fa;
+            border-radius: 0 4px 4px 0;
+        }
+        code {
+            background-color: #f4f4f4;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-family: 'Monaco', 'Consolas', monospace;
+        }
+        pre {
+            background-color: #f4f4f4;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        ul, ol {
+            margin-bottom: 15px;
+        }
+        li {
+            margin-bottom: 5px;
+        }
+        .metadata {
+            color: #7f8c8d;
+            font-size: 0.9em;
+            margin-bottom: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>${this.escapeHtml(note.title)}</h1>
+    
+    <div class="metadata">
+        <strong>Created:</strong> ${note.created ? new Date(note.created).toLocaleDateString() : 'Unknown'}<br>
+        <strong>Modified:</strong> ${note.modified ? new Date(note.modified).toLocaleDateString() : 'Unknown'}<br>
+        <strong>Exported:</strong> ${new Date().toLocaleDateString()}
+    </div>
+    
+    <div class="content">
+        ${this.markdownToHtml(content)}
+    </div>
+</body>
+</html>`;
+        
+        console.log('[PDF] HTML content created, length:', html.length);
+        return html;
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
+
+    markdownToHtml(markdown) {
+        // Use the marked library for proper markdown parsing
+        const { marked } = require('marked');
+        
+        // Configure marked for better HTML output
+        marked.setOptions({
+            breaks: true,
+            gfm: true,
+            sanitize: false, // We trust our content
+            smartLists: true,
+            smartypants: true
+        });
+
+        return marked.parse(markdown);
+    }
+
     async exportAllNotes(notes, format = 'markdown') {
         let content = '# All Notes Export\n\n';
         const timestamp = new Date().toISOString().split('T')[0];
@@ -124,21 +384,6 @@ class BackendAPI {
     }
 
     // Enhanced export with JSON format for full data portability
-    async exportDatabaseJSON(notes, settings = {}) {
-        // Get data from the database manager
-        if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
-            throw new Error('Database manager not available');
-        }
-
-        const dbManager = this.app.notesManager.db;
-        const jsonData = dbManager.exportDataAsJSON();
-
-        const timestamp = new Date().toISOString().split('T')[0];
-        const filename = `cognotez_backup_${timestamp}.json`;
-
-        return await this.saveFile(jsonData, filename, 'json');
-    }
-
     // Import utilities
     async importNote() {
         try {
@@ -239,7 +484,7 @@ class BackendAPI {
         }
     }
 
-    // Clear orphaned AI conversations (conversations for deleted notes)
+    // Clear all AI conversations
     async clearOrphanedAIConversations() {
         try {
             if (!this.app || !this.app.notesManager || !this.app.notesManager.db) {
@@ -249,15 +494,15 @@ class BackendAPI {
             const db = this.app.notesManager.db;
             const deletedCount = db.clearOrphanedAIConversations();
 
-            console.log(`[Backend] Cleared ${deletedCount} orphaned AI conversations`);
+            console.log(`[Backend] Cleared ${deletedCount} AI conversations`);
             return {
                 success: true,
                 deletedCount: deletedCount,
-                message: `Successfully cleared ${deletedCount} orphaned AI conversations`
+                message: `Successfully cleared ${deletedCount} AI conversations`
             };
 
         } catch (error) {
-            console.error('[Backend] Failed to clear orphaned AI conversations:', error);
+            console.error('[Backend] Failed to clear AI conversations:', error);
             return {
                 success: false,
                 error: error.message
@@ -361,17 +606,64 @@ class BackendAPI {
     }
 
     generatePreview(content) {
-        if (!content) return '';
+        if (!content || !content.trim()) return 'Empty note';
 
-        // Extract first non-empty line or first 100 characters
-        const lines = content.split('\n').filter(line => line.trim());
-        if (lines.length > 0) {
-            const firstLine = lines[0].trim();
-            return firstLine.length > 100 ? firstLine.substring(0, 100) + '...' : firstLine;
+        // Split content into lines
+        const lines = content.split('\n');
+        
+        for (let line of lines) {
+            line = line.trim();
+            
+            // Skip empty lines
+            if (!line) continue;
+            
+            // Skip image markdown: ![alt](url) or ![alt][ref]
+            if (/^!\[.*?\](\(.*?\)|\[.*?\])/.test(line)) continue;
+            
+            // Skip HTML image tags: <img src="..." />
+            if (/^<img\s+.*?>/.test(line)) continue;
+            
+            // Skip standalone HTML tags without content
+            if (/^<[^>]+>$/.test(line)) continue;
+            
+            // Skip video/audio markdown embeds
+            if (/^<(video|audio|iframe)\s+.*?>/.test(line)) continue;
+            
+            // Clean the line for preview
+            let preview = line;
+            
+            // Remove markdown headers (# ## ### etc)
+            preview = preview.replace(/^#+\s*/, '');
+            
+            // Remove HTML tags but keep content
+            preview = preview.replace(/<[^>]+>/g, '');
+            
+            // Convert markdown links [text](url) to just text
+            preview = preview.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+            
+            // Convert markdown bold/italic to plain text
+            preview = preview.replace(/\*\*([^\*]+)\*\*/g, '$1'); // bold
+            preview = preview.replace(/\*([^\*]+)\*/g, '$1'); // italic
+            preview = preview.replace(/__([^_]+)__/g, '$1'); // bold
+            preview = preview.replace(/_([^_]+)_/g, '$1'); // italic
+            
+            // Remove inline code backticks
+            preview = preview.replace(/`([^`]+)`/g, '$1');
+            
+            // Remove remaining markdown image syntax if any
+            preview = preview.replace(/!\[.*?\]\(.*?\)/g, '');
+            
+            // Clean up extra whitespace
+            preview = preview.trim();
+            
+            // If we have actual content after cleaning, use it
+            if (preview) {
+                return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
+            }
         }
-
-        // Fallback to first 100 characters
-        return content.substring(0, 100) + (content.length > 100 ? '...' : '');
+        
+        // If no meaningful content found, return fallback
+        return 'Empty note';
     }
 
     calculateWordCount(content) {
@@ -608,6 +900,9 @@ ${notes.map(note => `- **${note.title}** (${note.word_count || 0} words) - ${new
     }
 
     async shareNoteAsFile(note, format = 'markdown') {
+        if (format === 'pdf') {
+            return await this.exportNoteAsPDF(note);
+        }
         return await this.exportNote(note, format);
     }
 
@@ -632,12 +927,44 @@ ${notes.map(note => `- **${note.title}** (${note.word_count || 0} words) - ${new
         }
     }
 
-    // URL generation for sharing (future feature)
-    generateShareableLink(note) {
-        // This would generate a shareable link for web access
-        // For now, return a placeholder
-        const shareId = btoa(note.id).replace(/[^a-zA-Z0-9]/g, '').substring(0, 10);
-        return `cognotez://share/${shareId}`;
+    async shareNoteOnGoogleDrive(note, permissions = { view: true, comment: false, edit: false }, email = null) {
+        try {
+            // Call IPC handler in main process
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-share-note', {
+                note: note,
+                permissions: permissions,
+                email: email
+            });
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to share note on Google Drive');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error sharing note on Google Drive:', error);
+            throw error;
+        }
+    }
+
+    async revokeGoogleDriveShare(fileId, noteId) {
+        try {
+            const { ipcRenderer } = require('electron');
+            const result = await ipcRenderer.invoke('google-drive-revoke-share', {
+                fileId: fileId,
+                noteId: noteId
+            });
+
+            if (!result.success) {
+                throw new Error(result.error || 'Failed to revoke share');
+            }
+
+            return result;
+        } catch (error) {
+            console.error('Error revoking Google Drive share:', error);
+            throw error;
+        }
     }
 
     // Migration wizard functionality

@@ -225,9 +225,13 @@ class AIEditApproval {
             }
             // Update UI to show this block is accepted
             this.updateBlockVisualState(index, 'accepted');
+            // Remove processed block from the list to minimize scrolling
+            this.removeProcessedBlock(index);
         } else if (action === 'reject') {
             // Update UI to show this block is rejected
             this.updateBlockVisualState(index, 'rejected');
+            // Remove processed block from the list to minimize scrolling
+            this.removeProcessedBlock(index);
         }
 
         // Check if all changeable blocks have been processed
@@ -242,6 +246,16 @@ class AIEditApproval {
         } else {
             // Update the remaining unprocessed blocks
             this.updateRemainingBlocks();
+        }
+    }
+
+    /**
+     * Remove a processed block element from the UI
+     */
+    removeProcessedBlock(blockIndex) {
+        const blockElement = document.querySelector(`[data-index="${blockIndex}"]`);
+        if (blockElement && blockElement.parentElement) {
+            blockElement.parentElement.removeChild(blockElement);
         }
     }
 
@@ -330,9 +344,6 @@ class AIEditApproval {
                 const afterSelection = fullContent.substring(this.selectionStart + oldCurrentText.length);
                 const newContent = beforeSelection + this.currentText + afterSelection;
                 editor.value = newContent;
-                if (this.app && this.app.currentNote) {
-                    this.app.currentNote.content = newContent;
-                }
                 const inputEvent = new Event('input', { bubbles: true });
                 editor.dispatchEvent(inputEvent);
                 this.selectionEnd = this.selectionStart + this.currentText.length;
@@ -373,9 +384,6 @@ class AIEditApproval {
             const afterSelection = fullContent.substring(this.selectionStart + oldCurrentText.length);
             const newContent = beforeSelection + this.currentText + afterSelection;
             editor.value = newContent;
-            if (this.app && this.app.currentNote) {
-                this.app.currentNote.content = newContent;
-            }
             const inputEvent = new Event('input', { bubbles: true });
             editor.dispatchEvent(inputEvent);
             this.selectionEnd = this.selectionStart + this.currentText.length;
@@ -430,6 +438,16 @@ class AIEditApproval {
         // Restore AI panel if it was visible before
         if (aiPanel && this.aiPanelWasVisible) {
             aiPanel.classList.remove('hidden');
+        }
+
+        // Restore focus to the editor if it was visible before
+        if (noteEditor && this.editorWasVisible) {
+            noteEditor.focus();
+        }
+
+        // Reset selection preservation flag since dialog is closed
+        if (this.app && this.app.preserveSelection !== undefined) {
+            this.app.preserveSelection = false;
         }
     }
 
@@ -862,31 +880,15 @@ class AIEditApproval {
                 color: #dc3545;
             }
 
-            .ai-edit-actions {
-                position: absolute;
-                bottom: 0;
-                left: 0;
-                right: 0;
-                z-index: 100; /* Keep above diff content */
-                padding: 10px 12px;
-                border-top: 1px solid var(--border-color);
-                display: flex;
-                justify-content: center;
-                gap: 8px;
-                align-items: center;
-                background: var(--bg-secondary);
-                border-radius: 0 0 8px 8px;
-                flex-shrink: 0; /* Prevent shrinking */
-                backdrop-filter: blur(4px);
-                box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
-            }
-
             .block-actions, .bulk-actions {
                 display: flex;
                 gap: 8px;
+                margin: 12px 0;
+                justify-content: center;
             }
 
-            .btn-success, .btn-secondary {
+            .bulk-actions .btn-success,
+            .bulk-actions .btn-secondary {
                 background: #28a745;
                 color: white;
                 border: none;
@@ -897,14 +899,14 @@ class AIEditApproval {
                 min-width: 110px;
             }
 
-            .btn-success:hover {
+            .bulk-actions .btn-success:hover {
                 background: #218838;
             }
-            .btn-secondary {
+            .bulk-actions .btn-secondary {
                 background: #6c757d;
             }
 
-            .btn-secondary:hover {
+            .bulk-actions .btn-secondary:hover {
                 background: #5a6268;
             }
 
@@ -944,14 +946,6 @@ class AIEditApproval {
                     padding: 12px 16px;
                 }
 
-                .ai-edit-actions {
-                    position: sticky;
-                    bottom: 0;
-                    padding: 10px 12px;
-                    flex-direction: row;
-                    gap: 8px;
-                    margin-top: auto;
-                }
 
                 .diff-controls {
                     flex-direction: column;

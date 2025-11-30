@@ -206,23 +206,121 @@ class UIManager {
         const sidebar = document.querySelector('.sidebar');
         const toggle = document.getElementById('sidebar-toggle');
 
-        // Collapsible sidebar
-        let isCollapsed = false;
-        toggle.addEventListener('click', () => {
-            isCollapsed = !isCollapsed;
-            sidebar.style.width = isCollapsed ? '60px' : '280px';
+        // Track collapsed state as instance property
+        this.sidebarCollapsed = false;
 
-            // Hide/show sidebar content
-            const content = sidebar.querySelectorAll('.sidebar-header h2, .notes-list');
+        // Collapsible sidebar (desktop-only)
+        toggle.addEventListener('click', () => {
+            // Ignore collapse on mobile; the sidebar is a full-screen overlay there
+            if (window.innerWidth <= 768) {
+                return;
+            }
+
+            this.sidebarCollapsed = !this.sidebarCollapsed;
+            sidebar.style.width = this.sidebarCollapsed ? '60px' : '';
+            
+            // Add/remove collapsed class for CSS styling (hides resize handle)
+            sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
+
+            // Hide/show sidebar content (including folders section)
+            const content = sidebar.querySelectorAll('.sidebar-header h2, .sidebar-folders, .notes-list');
             content.forEach(el => {
-                el.style.display = isCollapsed ? 'none' : 'block';
+                el.style.display = this.sidebarCollapsed ? 'none' : '';
             });
 
-            toggle.innerHTML = isCollapsed ? '<i class="fas fa-bars"></i>' : '<i class="fas fa-chevron-left"></i>';
+            toggle.innerHTML = this.sidebarCollapsed ? '<i class="fas fa-bars"></i>' : '<i class="fas fa-chevron-left"></i>';
         });
+
+        // Resizable sidebar (desktop-only)
+        this.setupSidebarResize();
 
         // Note drag and drop (placeholder)
         this.setupDragAndDrop();
+    }
+
+    // Setup sidebar resize functionality
+    setupSidebarResize() {
+        const sidebar = document.getElementById('sidebar');
+        const resizeHandle = document.getElementById('sidebar-resize-handle');
+        
+        if (!sidebar || !resizeHandle) return;
+
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+
+        // Min and max width constraints
+        const MIN_WIDTH = 260;
+        const MAX_WIDTH = 600;
+        const DEFAULT_WIDTH = 320;
+
+        // Restore saved width from localStorage
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth && window.innerWidth > 768) {
+            const width = parseInt(savedWidth, 10);
+            if (width >= MIN_WIDTH && width <= MAX_WIDTH) {
+                sidebar.style.width = `${width}px`;
+            }
+        }
+
+        const startResize = (e) => {
+            // Only allow resize on desktop and when not collapsed
+            if (window.innerWidth <= 768) return;
+            if (this.sidebarCollapsed) return;
+            
+            isResizing = true;
+            startX = e.clientX || e.touches?.[0]?.clientX || 0;
+            startWidth = sidebar.offsetWidth;
+            
+            sidebar.classList.add('resizing');
+            document.body.classList.add('sidebar-resizing');
+            
+            // Prevent text selection during resize
+            e.preventDefault();
+        };
+
+        const doResize = (e) => {
+            if (!isResizing) return;
+            
+            const currentX = e.clientX || e.touches?.[0]?.clientX || 0;
+            const diff = currentX - startX;
+            let newWidth = startWidth + diff;
+            
+            // Clamp to min/max
+            newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
+            
+            sidebar.style.width = `${newWidth}px`;
+        };
+
+        const stopResize = () => {
+            if (!isResizing) return;
+            
+            isResizing = false;
+            sidebar.classList.remove('resizing');
+            document.body.classList.remove('sidebar-resizing');
+            
+            // Save the width to localStorage
+            const currentWidth = sidebar.offsetWidth;
+            localStorage.setItem('sidebarWidth', currentWidth.toString());
+        };
+
+        // Mouse events
+        resizeHandle.addEventListener('mousedown', startResize);
+        document.addEventListener('mousemove', doResize);
+        document.addEventListener('mouseup', stopResize);
+
+        // Touch events for tablet
+        resizeHandle.addEventListener('touchstart', startResize, { passive: false });
+        document.addEventListener('touchmove', doResize, { passive: false });
+        document.addEventListener('touchend', stopResize);
+
+        // Double-click to reset to default width (only when not collapsed)
+        resizeHandle.addEventListener('dblclick', () => {
+            if (window.innerWidth <= 768) return;
+            if (this.sidebarCollapsed) return;
+            sidebar.style.width = `${DEFAULT_WIDTH}px`;
+            localStorage.setItem('sidebarWidth', DEFAULT_WIDTH.toString());
+        });
     }
 
     setupDragAndDrop() {
@@ -257,6 +355,24 @@ class UIManager {
 
         // Handle scrolling properly for textarea
         editor.addEventListener('keydown', (e) => {
+            // Handle Tab key to insert tab character instead of moving focus
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                const start = editor.selectionStart;
+                const end = editor.selectionEnd;
+                const tab = '\t';
+                
+                // Insert tab at cursor position
+                editor.value = editor.value.substring(0, start) + tab + editor.value.substring(end);
+                
+                // Move cursor to after the inserted tab
+                editor.selectionStart = editor.selectionEnd = start + tab.length;
+                
+                // Trigger input event for autosave
+                editor.dispatchEvent(new Event('input', { bubbles: true }));
+                return;
+            }
+            
             // Handle arrow keys for scrolling
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 // Check if content overflows and we're at the boundaries
@@ -373,7 +489,9 @@ class UIManager {
             const text = editor.value;
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
             const chars = text.length;
-            wordCountElement.textContent = `${words} words, ${chars} chars`;
+            const wordsLabel = window.i18n ? window.i18n.t('editor.words') : 'words';
+            const charsLabel = window.i18n ? window.i18n.t('editor.chars') : 'chars';
+            wordCountElement.textContent = `${words} ${wordsLabel}, ${chars} ${charsLabel}`;
             updateWordCountPosition(); // Update position when content changes
         };
 
@@ -430,14 +548,15 @@ class UIManager {
 
     // Keyboard shortcuts help
     showKeyboardShortcuts() {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const shortcuts = [
-            { key: 'Ctrl+N', description: 'New Note' },
-            { key: 'Ctrl+S', description: 'Save Note' },
-            { key: 'Ctrl+O', description: 'Open Note' },
-            { key: 'Ctrl+/', description: 'Focus Search' },
-            { key: 'Ctrl+Shift+S', description: 'Summarize Selection' },
-            { key: 'Ctrl+Shift+A', description: 'Ask AI About Selection' },
-            { key: 'Ctrl+Shift+E', description: 'Edit Selection with AI' }
+            { key: 'Ctrl+N', description: t('keyboard.newNote', 'New Note') },
+            { key: 'Ctrl+S', description: t('keyboard.saveNote', 'Save Note') },
+            { key: 'Ctrl+O', description: t('keyboard.openNote', 'Open Note') },
+            { key: 'Ctrl+/', description: t('keyboard.focusSearch', 'Focus Search') },
+            { key: 'Ctrl+Shift+S', description: t('keyboard.summarizeSelection', 'Summarize Selection') },
+            { key: 'Ctrl+Shift+A', description: t('keyboard.askAISelection', 'Ask AI About Selection') },
+            { key: 'Ctrl+Shift+E', description: t('keyboard.editSelectionAI', 'Edit Selection with AI') }
         ];
 
         const content = `
@@ -445,8 +564,8 @@ class UIManager {
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Shortcut</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">Description</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">${t('keyboard.shortcutHeader', 'Shortcut')}</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color);">${t('keyboard.descriptionHeader', 'Description')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -461,8 +580,10 @@ class UIManager {
             </div>
         `;
 
-        this.createModal('Keyboard Shortcuts', content, [
-            { text: 'Close', type: 'secondary', action: 'close' }
+        const modalTitle = t('keyboard.shortcuts', 'Keyboard Shortcuts');
+        const closeText = t('modals.close', 'Close');
+        this.createModal(modalTitle, content, [
+            { text: closeText, type: 'secondary', action: 'close' }
         ]);
     }
 
@@ -573,9 +694,10 @@ class UIManager {
 
             if (noteEditor) {
                 const viewportHeight = window.innerHeight;
-                const editorHeight = Math.max(300, viewportHeight - 150);
-                const maxEditorHeight = viewportHeight - 120;
-                noteEditor.style.height = `${Math.min(editorHeight, maxEditorHeight)}px`;
+                // Match markdown-preview calculation for consistency, with extra room for bottom padding
+                const editorHeight = Math.max(300, viewportHeight - 200);
+                noteEditor.style.height = `${editorHeight}px`;
+                noteEditor.style.maxHeight = `${editorHeight}px`;
             }
 
             if (markdownPreview) {
@@ -615,6 +737,17 @@ class UIManager {
                     }
                 }
             }
+
+            // Normalize sidebar across breakpoints to avoid overflow from inline widths
+            const sidebar = document.getElementById('sidebar');
+            if (sidebar) {
+                if (window.innerWidth <= 768) {
+                    // Clear desktop inline widths and restore content visibility for mobile overlay
+                    sidebar.style.width = '';
+                    const content = sidebar.querySelectorAll('.sidebar-header h2, .sidebar-folders, .notes-list');
+                    content.forEach(el => { el.style.display = ''; });
+                }
+            }
         };
 
         // Initial call
@@ -628,12 +761,252 @@ class UIManager {
         });
     }
 
+    // Mobile UI Handlers
+    initializeMobileUI() {
+        const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+        const sidebar = document.getElementById('sidebar');
+        const sidebarBackdrop = document.getElementById('sidebar-backdrop');
+        const searchButton = document.getElementById('search-button');
+        const searchContainer = document.getElementById('search-container');
+
+        // Set CSS viewport variable for mobile height accuracy
+        const setViewportHeightVar = () => {
+            const vh = window.innerHeight * 0.01;
+            document.documentElement.style.setProperty('--vh', `${vh}px`);
+        };
+        setViewportHeightVar();
+
+        // Update on resize and orientation changes
+        window.addEventListener('resize', setViewportHeightVar, { passive: true });
+        window.addEventListener('orientationchange', setViewportHeightVar, { passive: true });
+
+        // Mobile menu toggle
+        if (mobileMenuToggle) {
+            mobileMenuToggle.addEventListener('click', () => {
+                this.toggleMobileSidebar();
+            });
+        }
+
+        // Sidebar backdrop click
+        if (sidebarBackdrop) {
+            sidebarBackdrop.addEventListener('click', () => {
+                this.closeMobileSidebar();
+            });
+        }
+
+        // Close sidebar when clicking a note on mobile
+        if (sidebar) {
+            sidebar.addEventListener('click', (e) => {
+                if (e.target.closest('.note-item') && window.innerWidth <= 768) {
+                    this.closeMobileSidebar();
+                }
+            });
+        }
+
+        // Mobile search toggle (if needed)
+        if (searchButton && window.innerWidth <= 768) {
+            // On mobile, search might need special handling
+            // This is handled by the main app, but we can enhance it here if needed
+        }
+
+        // Close mobile search when clicking outside
+        document.addEventListener('click', (e) => {
+            const searchContainer = document.getElementById('search-container');
+            const mobileSearchBtn = document.getElementById('mobile-search-btn');
+            if (searchContainer && searchContainer.classList.contains('mobile-active')) {
+                // Don't close if clicking inside search container or on the mobile search button
+                if (!searchContainer.contains(e.target) && e.target !== mobileSearchBtn) {
+                    searchContainer.classList.remove('mobile-active');
+                }
+            }
+        });
+
+        // Handle orientation changes
+        window.addEventListener('orientationchange', () => {
+            setTimeout(() => {
+                this.handleOrientationChange();
+                setViewportHeightVar();
+            }, 100);
+        });
+
+        // Close mobile overlays on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    this.closeMobileSidebar();
+                }
+                // Close mobile search
+                const searchContainer = document.getElementById('search-container');
+                if (searchContainer && searchContainer.classList.contains('mobile-active')) {
+                    searchContainer.classList.remove('mobile-active');
+                }
+            }
+        });
+
+        // Prevent body scroll when sidebar is open on mobile
+        const preventScroll = (e) => {
+            if (sidebar && sidebar.classList.contains('mobile-open') && window.innerWidth <= 768) {
+                if (!e.target.closest('.sidebar')) {
+                    e.preventDefault();
+                }
+            }
+        };
+
+        document.addEventListener('touchmove', preventScroll, { passive: false });
+
+        // Swipe gestures for mobile
+        this.initializeSwipeGestures();
+    }
+
+    toggleMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (sidebar && backdrop) {
+            const isOpen = sidebar.classList.toggle('mobile-open');
+            backdrop.classList.toggle('active', isOpen);
+            
+            // Prevent body scroll when sidebar is open
+            if (isOpen) {
+                // Ensure mobile overlay uses responsive width (clear any desktop inline width)
+                if (window.innerWidth <= 768) {
+                    sidebar.style.width = '';
+                    const content = sidebar.querySelectorAll('.sidebar-header h2, .sidebar-folders, .notes-list');
+                    content.forEach(el => { el.style.display = ''; });
+                }
+                document.body.style.overflow = 'hidden';
+            } else {
+                document.body.style.overflow = '';
+            }
+        }
+    }
+
+    closeMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (sidebar && backdrop) {
+            sidebar.classList.remove('mobile-open');
+            backdrop.classList.remove('active');
+            document.body.style.overflow = '';
+        }
+    }
+
+    openMobileSidebar() {
+        const sidebar = document.getElementById('sidebar');
+        const backdrop = document.getElementById('sidebar-backdrop');
+        
+        if (sidebar && backdrop) {
+            sidebar.classList.add('mobile-open');
+            backdrop.classList.add('active');
+            document.body.style.overflow = 'hidden';
+        }
+    }
+
+    handleOrientationChange() {
+        // Close any open mobile overlays on orientation change
+        this.closeMobileSidebar();
+        
+        // Update responsive elements
+        if (this.updateWordCountPosition) {
+            this.updateWordCountPosition();
+        }
+
+        // Adjust AI panel if needed
+        const aiPanel = document.getElementById('ai-panel');
+        if (aiPanel && !aiPanel.classList.contains('hidden')) {
+            // Force a reflow to ensure proper positioning
+            aiPanel.style.display = 'none';
+            setTimeout(() => {
+                aiPanel.style.display = '';
+            }, 100);
+        }
+    }
+
+    initializeSwipeGestures() {
+        let touchStartX = 0;
+        let touchStartY = 0;
+        let touchEndX = 0;
+        let touchEndY = 0;
+
+        const mainContent = document.querySelector('.main-content-area');
+        if (!mainContent) return;
+
+        mainContent.addEventListener('touchstart', (e) => {
+            touchStartX = e.changedTouches[0].screenX;
+            touchStartY = e.changedTouches[0].screenY;
+        }, { passive: true });
+
+        mainContent.addEventListener('touchend', (e) => {
+            touchEndX = e.changedTouches[0].screenX;
+            touchEndY = e.changedTouches[0].screenY;
+            this.handleSwipeGesture(touchStartX, touchStartY, touchEndX, touchEndY);
+        }, { passive: true });
+    }
+
+    handleSwipeGesture(startX, startY, endX, endY) {
+        // Only on mobile
+        if (window.innerWidth > 768) return;
+
+        const diffX = endX - startX;
+        const diffY = endY - startY;
+        const minSwipeDistance = 50;
+
+        // Horizontal swipe is dominant
+        if (Math.abs(diffX) > Math.abs(diffY)) {
+            // Swipe right from left edge - open sidebar
+            if (diffX > minSwipeDistance && startX < 50) {
+                this.openMobileSidebar();
+            }
+            // Swipe left - close sidebar
+            else if (diffX < -minSwipeDistance) {
+                const sidebar = document.getElementById('sidebar');
+                if (sidebar && sidebar.classList.contains('mobile-open')) {
+                    this.closeMobileSidebar();
+                }
+            }
+        }
+    }
+
+    // Optimize touch interactions
+    optimizeTouchInteractions() {
+        // Add touch-friendly ripple effect to buttons
+        const buttons = document.querySelectorAll('button, .action-btn, .note-item');
+        
+        buttons.forEach(button => {
+            button.addEventListener('touchstart', function(e) {
+                // Add visual feedback for touch
+                this.style.opacity = '0.7';
+            }, { passive: true });
+
+            button.addEventListener('touchend', function(e) {
+                // Remove visual feedback
+                setTimeout(() => {
+                    this.style.opacity = '';
+                }, 100);
+            }, { passive: true });
+        });
+    }
+
+    // Check if device is mobile
+    isMobile() {
+        return window.innerWidth <= 768 || 
+               /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    }
+
+    // Check if device is tablet
+    isTablet() {
+        return window.innerWidth > 768 && window.innerWidth <= 1024;
+    }
+
     // Initialize all UI enhancements
     initialize() {
         this.enhanceContextMenu();
         this.enhanceSidebar();
         this.enhanceEditor();
         this.handleWindowResize();
+        this.initializeMobileUI();
+        this.optimizeTouchInteractions();
 
         // Add keyboard shortcuts help to menu
         if (typeof ipcRenderer !== 'undefined') {
@@ -642,12 +1015,18 @@ class UIManager {
 
         // Expose test function globally for debugging
         window.testResponsiveDesign = () => this.testResponsiveDesign();
-    }
-}
 
-// Add CSS animations
-const style = document.createElement('style');
-style.textContent = `
+        // Add CSS animations
+        this.injectStyles();
+
+        // Expose mobile helpers
+        window.isMobileDevice = () => this.isMobile();
+        window.isTabletDevice = () => this.isTablet();
+    }
+
+    injectStyles() {
+        const style = document.createElement('style');
+        style.textContent = `
     @keyframes slideInRight {
         from { transform: translateX(100%); opacity: 0; }
         to { transform: translateX(0); opacity: 1; }
@@ -671,8 +1050,346 @@ style.textContent = `
         background: var(--context-menu-hover-bg);
         font-weight: bold;
     }
+
+    /* Password Dialog Styles */
+    .password-dialog {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.7);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 2000;
+        animation: fadeIn 0.3s ease;
+    }
+
+    .password-dialog-content {
+        background: var(--bg-primary);
+        border: 1px solid var(--border-color);
+        border-radius: 8px;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+        padding: 24px;
+        max-width: 400px;
+        width: 90%;
+        animation: slideIn 0.3s ease;
+    }
+
+    .password-dialog-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 16px;
+    }
+
+    .password-dialog-header h3 {
+        margin: 0;
+        color: var(--text-primary);
+        font-size: 18px;
+    }
+
+    .password-dialog-close {
+        background: none;
+        border: none;
+        color: var(--text-secondary);
+        font-size: 20px;
+        cursor: pointer;
+        padding: 4px;
+        border-radius: 4px;
+    }
+
+    .password-dialog-close:hover {
+        background: var(--bg-hover);
+        color: var(--text-primary);
+    }
+
+    .password-dialog-body {
+        margin-bottom: 20px;
+    }
+
+    .password-field {
+        margin-bottom: 16px;
+    }
+
+    .password-field label {
+        display: block;
+        margin-bottom: 6px;
+        font-weight: 500;
+        color: var(--text-primary);
+    }
+
+    .password-input {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid var(--border-color);
+        border-radius: 6px;
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        font-size: 14px;
+        box-sizing: border-box;
+    }
+
+    .password-input:focus {
+        outline: none;
+        border-color: var(--accent-color);
+        box-shadow: 0 0 0 2px rgba(62, 207, 142, 0.2);
+    }
+
+    .password-strength {
+        margin-top: 4px;
+        font-size: 12px;
+        display: none;
+    }
+
+    .password-strength.weak { color: #dc3545; }
+    .password-strength.medium { color: #ffc107; }
+    .password-strength.strong { color: #28a745; }
+
+    .password-dialog-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .btn-secondary, .btn-primary {
+        padding: 8px 16px;
+        border: none;
+        border-radius: 6px;
+        font-size: 14px;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .btn-secondary {
+        background: var(--bg-secondary);
+        color: var(--text-primary);
+        border: 1px solid var(--border-color);
+    }
+
+    .btn-secondary:hover {
+        background: var(--bg-hover);
+    }
+
+    .btn-primary {
+        background: var(--accent-color);
+        color: white;
+    }
+
+    .btn-primary:hover {
+        background: var(--accent-color-dark);
+    }
+
+    .btn-danger {
+        background: #dc3545;
+        color: white;
+    }
+
+    .btn-danger:hover {
+        background: #c82333;
+    }
+
+    @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+        from { transform: translateY(-20px); opacity: 0; }
+        to { transform: translateY(0); opacity: 1; }
+    }
 `;
-document.head.appendChild(style);
+        document.head.appendChild(style);
+    }
+
+    // Password Dialog Methods
+    showPasswordDialog(options = {}) {
+        const defaultTitle = window.i18n ? window.i18n.t('password.enterPassword') : 'Enter Password';
+        const passwordLabel = window.i18n ? window.i18n.t('password.password') : 'Password:';
+        const confirmPasswordLabel = window.i18n ? window.i18n.t('password.confirmPassword') : 'Confirm Password:';
+        const passwordPlaceholder = window.i18n ? window.i18n.t('password.enterPasswordPlaceholder') : 'Enter password';
+        const confirmPasswordPlaceholder = window.i18n ? window.i18n.t('password.confirmPasswordPlaceholder') : 'Confirm password';
+        const cancelText = window.i18n ? window.i18n.t('modals.cancel') : 'Cancel';
+        const submitText = window.i18n ? window.i18n.t('modals.submit') : 'Submit';
+        
+        const {
+            title = defaultTitle,
+            message = '',
+            requireConfirmation = false,
+            showStrength = false,
+            onSubmit,
+            onCancel
+        } = options;
+
+        // Remove existing dialog
+        this.closePasswordDialog();
+
+        const dialog = document.createElement('div');
+        dialog.className = 'password-dialog';
+        dialog.innerHTML = `
+            <div class="password-dialog-content">
+                <div class="password-dialog-header">
+                    <h3>${title}</h3>
+                    <button class="password-dialog-close">×</button>
+                </div>
+                <div class="password-dialog-body">
+                    ${message ? `<p style="margin-bottom: 16px; color: var(--text-secondary);">${message}</p>` : ''}
+                    <div class="password-field">
+                        <label for="password-input">${passwordLabel}</label>
+                        <input type="password" id="password-input" class="password-input" placeholder="${passwordPlaceholder}">
+                        <div class="password-strength" id="password-strength"></div>
+                    </div>
+                    ${requireConfirmation ? `
+                    <div class="password-field">
+                        <label for="confirm-password-input">${confirmPasswordLabel}</label>
+                        <input type="password" id="confirm-password-input" class="password-input" placeholder="${confirmPasswordPlaceholder}">
+                    </div>
+                    ` : ''}
+                </div>
+                <div class="password-dialog-actions">
+                    <button class="btn-secondary" id="password-cancel">${cancelText}</button>
+                    <button class="btn-primary" id="password-submit">${submitText}</button>
+                </div>
+            </div>
+        `;
+
+        document.body.appendChild(dialog);
+        this.currentPasswordDialog = dialog;
+
+        const passwordInput = dialog.querySelector('#password-input');
+        const confirmInput = dialog.querySelector('#confirm-password-input');
+        const strengthIndicator = dialog.querySelector('#password-strength');
+        const submitBtn = dialog.querySelector('#password-submit');
+        const cancelBtn = dialog.querySelector('#password-cancel');
+        const closeBtn = dialog.querySelector('.password-dialog-close');
+
+        // Focus password input
+        setTimeout(() => passwordInput.focus(), 100);
+
+        // Show strength indicator if requested
+        if (showStrength) {
+            strengthIndicator.style.display = 'block';
+            passwordInput.addEventListener('input', () => {
+                const strength = this.calculatePasswordStrength(passwordInput.value);
+                const strengthLabel = window.i18n ? window.i18n.t('password.passwordStrength') : 'Password strength';
+                const levelKey = `password.${strength.level.toLowerCase()}`;
+                const levelLabel = window.i18n ? window.i18n.t(levelKey) : strength.level;
+                strengthIndicator.textContent = `${strengthLabel}: ${levelLabel}`;
+                strengthIndicator.className = `password-strength ${strength.level.toLowerCase()}`;
+            });
+        }
+
+        // Handle submit
+        const handleSubmit = () => {
+            const password = passwordInput.value;
+            const confirmPassword = confirmInput ? confirmInput.value : password;
+
+            if (requireConfirmation && password !== confirmPassword) {
+                const errorMsg = window.i18n ? window.i18n.t('password.passwordsDoNotMatch') : 'Passwords do not match';
+                this.showNotification(errorMsg, 'error');
+                return;
+            }
+
+            if (!password.trim()) {
+                const errorMsg = window.i18n ? window.i18n.t('password.passwordCannotBeEmpty') : 'Password cannot be empty';
+                this.showNotification(errorMsg, 'error');
+                return;
+            }
+
+            if (onSubmit) {
+                onSubmit(password);
+            }
+            this.closePasswordDialog();
+        };
+
+        // Handle cancel
+        const handleCancel = () => {
+            if (onCancel) {
+                onCancel();
+            }
+            this.closePasswordDialog();
+        };
+
+        // Event listeners
+        submitBtn.addEventListener('click', handleSubmit);
+        cancelBtn.addEventListener('click', handleCancel);
+        closeBtn.addEventListener('click', handleCancel);
+
+        // Keyboard events
+        passwordInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                if (requireConfirmation && confirmInput && document.activeElement !== confirmInput) {
+                    confirmInput.focus();
+                } else {
+                    handleSubmit();
+                }
+            } else if (e.key === 'Escape') {
+                handleCancel();
+            }
+        });
+
+        if (confirmInput) {
+            confirmInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    handleSubmit();
+                } else if (e.key === 'Escape') {
+                    handleCancel();
+                }
+            });
+        }
+
+        // Click outside to close
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) {
+                handleCancel();
+            }
+        });
+
+        return dialog;
+    }
+
+    closePasswordDialog() {
+        if (this.currentPasswordDialog) {
+            this.currentPasswordDialog.style.animation = 'fadeOut 0.3s ease';
+            setTimeout(() => {
+                if (this.currentPasswordDialog && this.currentPasswordDialog.parentNode) {
+                    this.currentPasswordDialog.parentNode.removeChild(this.currentPasswordDialog);
+                }
+                this.currentPasswordDialog = null;
+            }, 300);
+        }
+    }
+
+    calculatePasswordStrength(password) {
+        let score = 0;
+        let feedback = [];
+
+        if (password.length >= 8) score++;
+        else feedback.push('At least 8 characters');
+
+        if (/[a-z]/.test(password)) score++;
+        else feedback.push('Lowercase letter');
+
+        if (/[A-Z]/.test(password)) score++;
+        else feedback.push('Uppercase letter');
+
+        if (/\d/.test(password)) score++;
+        else feedback.push('Number');
+
+        if (/[^a-zA-Z\d]/.test(password)) score++;
+        else feedback.push('Special character');
+
+        let level = 'Weak';
+        if (score >= 4) level = 'Strong';
+        else if (score >= 3) level = 'Medium';
+
+        return { level, score, feedback };
+    }
+}
 
 // Export for use in main app
 window.UIManager = UIManager;

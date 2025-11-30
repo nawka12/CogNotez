@@ -39,19 +39,30 @@ class FindReplaceDialog {
         const dialog = document.createElement('div');
         dialog.id = 'find-replace-dialog';
         dialog.className = 'find-replace-dialog';
+        const findReplaceTitle = window.i18n ? window.i18n.t('findReplace.findReplace') : 'Find & Replace';
+        const findLabel = window.i18n ? window.i18n.t('findReplace.find') : 'Find:';
+        const replaceLabel = window.i18n ? window.i18n.t('findReplace.replace') : 'Replace:';
+        const searchTextPlaceholder = window.i18n ? window.i18n.t('findReplace.searchText') : 'Search text...';
+        const replaceWithPlaceholder = window.i18n ? window.i18n.t('findReplace.replaceWith') : 'Replace with...';
+        const noMatches = window.i18n ? window.i18n.t('notes.noMatches') : 'No matches';
+        
         dialog.innerHTML = `
             <div class="find-replace-header">
-                <h3>Find & Replace</h3>
+                <h3>${findReplaceTitle}</h3>
                 <button id="find-replace-close" class="find-replace-close"><i class="fas fa-times"></i></button>
             </div>
             <div class="find-replace-body">
+                <div class="find-disclaimer">
+                    <i class="fas fa-info-circle"></i>
+                    <span>Find only works in edit mode. Preview mode support coming soon.</span>
+                </div>
                 <div class="find-section">
-                    <label for="find-input">Find:</label>
-                    <input type="text" id="find-input" class="find-input" placeholder="Search text...">
+                    <label for="find-input">${findLabel}</label>
+                    <input type="text" id="find-input" class="find-input" placeholder="${searchTextPlaceholder}">
                 </div>
                 <div class="replace-section">
-                    <label for="replace-input">Replace:</label>
-                    <input type="text" id="replace-input" class="replace-input" placeholder="Replace with...">
+                    <label for="replace-input">${replaceLabel}</label>
+                    <input type="text" id="replace-input" class="replace-input" placeholder="${replaceWithPlaceholder}">
                 </div>
                 <div class="options-section">
                     <label><input type="checkbox" id="case-sensitive"> Case sensitive</label>
@@ -59,7 +70,7 @@ class FindReplaceDialog {
                     <label><input type="checkbox" id="use-regex"> Regular expression</label>
                 </div>
                 <div class="results-section">
-                    <span id="match-count">No matches</span>
+                    <span id="match-count">${noMatches}</span>
                 </div>
                 <div class="buttons-section">
                     <button id="find-prev" class="btn-secondary">Previous</button>
@@ -221,16 +232,17 @@ class FindReplaceDialog {
 
         this.element.querySelector('#find-input').focus();
 
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         if (findOnly) {
             this.element.querySelector('.replace-section').style.display = 'none';
             this.element.querySelector('#replace-next').style.display = 'none';
             this.element.querySelector('#replace-all').style.display = 'none';
-            this.element.querySelector('h3').textContent = 'Find';
+            this.element.querySelector('h3').textContent = t('findReplace.find');
         } else {
             this.element.querySelector('.replace-section').style.display = 'block';
             this.element.querySelector('#replace-next').style.display = 'inline-block';
             this.element.querySelector('#replace-all').style.display = 'inline-block';
-            this.element.querySelector('h3').textContent = 'Find & Replace';
+            this.element.querySelector('h3').textContent = t('findReplace.findReplace');
         }
 
         // Pre-fill with selected text
@@ -254,7 +266,20 @@ class FindReplaceDialog {
 
     findMatches() {
         const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+        
         if (!editor || !this.findText) {
+            this.matches = [];
+            this.currentMatchIndex = -1;
+            this.updateMatchCount();
+            this.clearHighlights();
+            return;
+        }
+
+        // Find functionality is currently only supported in edit mode
+        // Preview mode is disabled until next version
+        if (isPreviewMode) {
             this.matches = [];
             this.currentMatchIndex = -1;
             this.updateMatchCount();
@@ -294,65 +319,330 @@ class FindReplaceDialog {
     }
 
     highlightMatches() {
-        this.clearHighlights();
-        if (this.matches.length === 0) return;
-
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
 
-        // Always select the match in the textarea for consistency
+        // If no matches, clear highlights and return
+        if (this.matches.length === 0) {
+            this.clearHighlights();
+            return;
+        }
+
+        // Always select the current match in the textarea for consistency
         if (editor) {
             this.selectCurrentMatch();
         }
 
-        // If in preview mode, also highlight in the markdown preview
-        if (preview && !preview.classList.contains('hidden') && this.currentMatchIndex >= 0) {
-            this.highlightInPreview();
+        // Find functionality is currently only supported in edit mode
+        // Preview mode highlighting is disabled until next version
+        if (isPreviewMode) {
+            // Clear any existing highlights in preview mode
+            this.clearHighlights();
+            // Note: No highlighting in preview mode for now
+        } else if (editor && !isPreviewMode) {
+            // In edit mode, apply visual highlighting wrapper to textarea
+            this.highlightInEditor();
         }
     }
 
-    clearHighlights() {
+    async clearHighlights() {
         // Reset preview to normal content
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
+        
+        if (editor) {
+            // Remove find mode class
+            editor.classList.remove('find-mode-active');
+        }
+        
         if (preview && editor) {
-            preview.innerHTML = marked.parse(editor.value);
+            // Process media URLs before rendering
+            let content = editor.value;
+            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
+                try {
+                    content = await this.app.richMediaManager.processContentForPreview(content);
+                } catch (error) {
+                    console.warn('[Preview] Failed to process media URLs in clearHighlights:', error);
+                }
+            }
+            preview.innerHTML = marked.parse(content);
         }
     }
 
-    highlightInPreview() {
-        if (this.currentMatchIndex < 0 || this.currentMatchIndex >= this.matches.length) return;
+    async highlightInPreview() {
+        if (this.matches.length === 0) return;
 
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
         if (!preview || !editor) return;
 
-        const match = this.matches[this.currentMatchIndex];
         const editorText = editor.value;
 
-        // Find the corresponding text in the rendered HTML
-        // This is a simplified approach - we'll wrap the matched text in a highlight span
         try {
-            const beforeMatch = editorText.substring(0, match.start);
-            const matchText = editorText.substring(match.start, match.end);
-            const afterMatch = editorText.substring(match.end);
+            // Process media URLs before rendering
+            let content = editorText;
+            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
+                try {
+                    content = await this.app.richMediaManager.processContentForPreview(content);
+                } catch (error) {
+                    console.warn('[Preview] Failed to process media URLs in highlightInPreview:', error);
+                }
+            }
 
-            // Render the content with the match highlighted
-            const highlightedText = beforeMatch +
-                `<mark class="find-highlight">${matchText}</mark>` +
-                afterMatch;
+            // Use marker-based approach: Insert unique markers before markdown parsing
+            // This preserves exact match positions even after markdown transformation
+            const markerPrefix = '\u200B\u200C'; // Zero-width non-joiner + Zero-width joiner (safe markers)
+            const markerSuffix = '\u200D\u200E'; // Zero-width joiner + Left-to-right mark
+            
+            let markedContent = content;
+            let offset = 0;
+            
+            // Insert markers in reverse order to preserve positions
+            for (let i = this.matches.length - 1; i >= 0; i--) {
+                const match = this.matches[i];
+                const adjustedStart = match.start + offset;
+                const adjustedEnd = match.end + offset;
+                
+                const beforeMatch = markedContent.substring(0, adjustedStart);
+                const matchText = markedContent.substring(adjustedStart, adjustedEnd);
+                const afterMatch = markedContent.substring(adjustedEnd);
+                
+                // Create unique marker that won't interfere with markdown
+                const marker = `${markerPrefix}${i}_${i === this.currentMatchIndex ? 'C' : 'N'}${markerSuffix}`;
+                markedContent = beforeMatch + marker + matchText + marker + afterMatch;
+                
+                // Update offset for next iteration
+                offset += marker.length * 2;
+            }
+            
+            // Parse markdown with markers
+            let html = marked.parse(markedContent);
+            
+            // Create a temporary container
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            
+            // Get all text nodes
+            const getAllTextNodes = (node) => {
+                const textNodes = [];
+                const walker = document.createTreeWalker(
+                    node,
+                    NodeFilter.SHOW_TEXT,
+                    null
+                );
+                
+                let textNode;
+                while (textNode = walker.nextNode()) {
+                    textNodes.push(textNode);
+                }
+                return textNodes;
+            };
+            
+            const textNodes = getAllTextNodes(tempDiv);
+            const replacements = [];
+            
+            // Find and replace markers in text nodes
+            for (const textNode of textNodes) {
+                if (!textNode.parentNode) continue;
+                
+                const text = textNode.textContent;
+                
+                // Find marker pattern: markerPrefix + matchIndex + C/N + markerSuffix
+                const markerPattern = new RegExp(
+                    markerPrefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + 
+                    '(\\d+)_([CN])' + 
+                    markerSuffix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'),
+                    'g'
+                );
+                
+                let match;
+                const matchesToProcess = [];
+                
+                while ((match = markerPattern.exec(text)) !== null) {
+                    const matchIdx = parseInt(match[1]);
+                    const isCurrentMarker = match[2] === 'C';
+                    matchesToProcess.push({
+                        index: match.index,
+                        matchIdx: matchIdx,
+                        isCurrentMarker: isCurrentMarker,
+                        fullMatch: match[0]
+                    });
+                }
+                
+                // Process matches in reverse order to preserve indices
+                for (let i = matchesToProcess.length - 1; i >= 0; i--) {
+                    const markerMatch = matchesToProcess[i];
+                    const markerStart = markerMatch.index;
+                    const markerEnd = markerStart + markerMatch.fullMatch.length;
+                    
+                    // Find the corresponding closing marker right after the match text
+                    // The closing marker has the same format: prefix + matchIdx + C/N + suffix
+                    const afterMarker = text.substring(markerEnd);
+                    const closingMarkerStr = markerPrefix + markerMatch.matchIdx + '_' + (markerMatch.isCurrentMarker ? 'C' : 'N') + markerSuffix;
+                    const closingMarkerIndex = afterMarker.indexOf(closingMarkerStr);
+                    
+                    if (closingMarkerIndex >= 0) {
+                        const textStart = markerEnd;
+                        const textEnd = markerEnd + closingMarkerIndex;
+                        const beforeMatch = text.substring(0, markerStart);
+                        const matched = text.substring(textStart, textEnd);
+                        const afterMatch = text.substring(textEnd + closingMarkerStr.length);
+                        
+                        const isCurrent = markerMatch.matchIdx === this.currentMatchIndex;
+                        
+                        replacements.push({
+                            textNode: textNode,
+                            start: markerStart,
+                            end: textEnd + closingMarkerStr.length,
+                            matchIndex: markerMatch.matchIdx,
+                            isCurrent: isCurrent,
+                            before: beforeMatch,
+                            matched: matched,
+                            after: afterMatch
+                        });
+                    }
+                }
+            }
 
-            preview.innerHTML = marked.parse(highlightedText);
+            // Sort replacements in reverse order (end to start) to preserve indices
+            replacements.sort((a, b) => {
+                if (a.textNode !== b.textNode) {
+                    const position = a.textNode.compareDocumentPosition(b.textNode);
+                    if (position & Node.DOCUMENT_POSITION_FOLLOWING) return 1;
+                    if (position & Node.DOCUMENT_POSITION_PRECEDING) return -1;
+                }
+                return b.end - a.end;
+            });
 
-            // Scroll the highlight into view
-            const highlightElement = preview.querySelector('.find-highlight');
-            if (highlightElement) {
-                highlightElement.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            // Apply replacements
+            for (const replacement of replacements) {
+                if (!replacement.textNode.parentNode) continue; // Already processed
+
+                const highlightClass = replacement.isCurrent ? 'find-highlight find-highlight-current' : 'find-highlight';
+                const highlightSpan = document.createElement('mark');
+                highlightSpan.className = highlightClass;
+                highlightSpan.textContent = replacement.matched;
+
+                const fragment = document.createDocumentFragment();
+                if (replacement.before) fragment.appendChild(document.createTextNode(replacement.before));
+                fragment.appendChild(highlightSpan);
+                if (replacement.after) fragment.appendChild(document.createTextNode(replacement.after));
+
+                replacement.textNode.parentNode.replaceChild(fragment, replacement.textNode);
+            }
+
+            preview.innerHTML = tempDiv.innerHTML;
+
+            // Scroll the current highlight into view with better positioning
+            const currentHighlight = preview.querySelector('.find-highlight-current');
+            if (currentHighlight) {
+                // Use better scroll options for smaller screens
+                const rect = currentHighlight.getBoundingClientRect();
+                const previewRect = preview.getBoundingClientRect();
+                const headerHeight = 64; // Approximate header height
+                
+                // Calculate if highlight is visible
+                const isVisible = rect.top >= previewRect.top + headerHeight && 
+                                 rect.bottom <= previewRect.bottom;
+                
+                if (!isVisible) {
+                    // Scroll with offset to account for header
+                    const scrollTop = preview.scrollTop + rect.top - previewRect.top - (window.innerHeight / 3);
+                    preview.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
+                }
+            } else {
+                // Fallback: try to find any highlight
+                const firstHighlight = preview.querySelector('.find-highlight');
+                if (firstHighlight) {
+                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+                }
             }
         } catch (error) {
             console.warn('Error highlighting in preview:', error);
             // Fallback to normal rendering
-            preview.innerHTML = marked.parse(editor.value);
+            let content = editor.value;
+            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
+                try {
+                    content = await this.app.richMediaManager.processContentForPreview(content);
+                } catch (e) {
+                    // Ignore
+                }
+            }
+            preview.innerHTML = marked.parse(content);
+        }
+    }
+
+    highlightInEditor() {
+        // For textarea, we can't directly add HTML highlights, but we can:
+        // 1. Ensure the selection is visible (handled by selectCurrentMatch)
+        // 2. Add a wrapper element with visual indicator
+        // Since textarea doesn't support HTML, we rely on the selection being visible
+        // The CSS will make the selection more prominent
+        const editor = document.getElementById('note-editor');
+        if (!editor) return;
+
+        // Add a class to indicate find mode is active
+        editor.classList.add('find-mode-active');
+        
+        // Scroll to the current match with better calculation for smaller screens
+        if (this.currentMatchIndex >= 0 && this.currentMatchIndex < this.matches.length) {
+            const match = this.matches[this.currentMatchIndex];
+            
+            // Use a more accurate scroll calculation
+            const textBeforeMatch = editor.value.substring(0, match.start);
+            const lines = textBeforeMatch.split('\n').length;
+            
+            // Get actual line height
+            const style = getComputedStyle(editor);
+            const lineHeight = parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.5 || 20;
+            const paddingTop = parseInt(style.paddingTop) || 0;
+            
+            // Calculate the target scroll position
+            // Account for viewport height and header on smaller screens
+            const editorRect = editor.getBoundingClientRect();
+            const viewportHeight = window.innerHeight;
+            const headerHeight = 64; // Approximate header + editor header height
+            const availableHeight = viewportHeight - headerHeight;
+            
+            // Calculate line position of match
+            const targetLinePosition = (lines - 1) * lineHeight;
+            
+            // Ideal scroll position: center the match in the visible area
+            // But on smaller screens, we want it closer to the top
+            const idealScrollTop = targetLinePosition - (availableHeight / 2) + paddingTop;
+            
+            // Ensure we don't scroll past the top
+            const minScrollTop = 0;
+            // Calculate max scroll (content height - visible height)
+            const contentHeight = editor.scrollHeight;
+            const visibleHeight = editorRect.height;
+            const maxScrollTop = Math.max(0, contentHeight - visibleHeight);
+            
+            // For smaller screens, prefer showing match near top
+            const isSmallScreen = viewportHeight < 800;
+            const scrollOffset = isSmallScreen ? availableHeight * 0.2 : availableHeight * 0.4;
+            const finalScrollTop = Math.max(minScrollTop, Math.min(maxScrollTop, targetLinePosition - scrollOffset + paddingTop));
+            
+            editor.scrollTop = finalScrollTop;
+            
+            // Ensure cursor/selection is visible after scroll
+            // Small delay to let scroll complete
+            setTimeout(() => {
+                const selectionStart = editor.selectionStart;
+                const selectionEnd = editor.selectionEnd;
+                
+                // Check if selection is visible
+                const textBeforeStart = editor.value.substring(0, selectionStart);
+                const startLine = textBeforeStart.split('\n').length;
+                const startLineTop = (startLine - 1) * lineHeight;
+                const startLineBottom = startLineTop + lineHeight;
+                
+                if (startLineTop < editor.scrollTop || startLineBottom > editor.scrollTop + visibleHeight) {
+                    // Selection not visible, adjust scroll
+                    editor.scrollTop = Math.max(0, startLineTop - scrollOffset);
+                }
+            }, 50);
         }
     }
 
@@ -377,6 +667,7 @@ class FindReplaceDialog {
         if (this.matches.length === 0) return;
 
         this.currentMatchIndex = (this.currentMatchIndex + 1) % this.matches.length;
+        this.updateMatchCount();
         this.highlightMatches();
         this.selectCurrentMatch(true); // Focus editor when navigating
     }
@@ -386,6 +677,7 @@ class FindReplaceDialog {
 
         this.currentMatchIndex = this.currentMatchIndex <= 0 ?
             this.matches.length - 1 : this.currentMatchIndex - 1;
+        this.updateMatchCount();
         this.highlightMatches();
         this.selectCurrentMatch(true); // Focus editor when navigating
     }
@@ -466,11 +758,15 @@ class FindReplaceDialog {
     }
 
     updateMatchCount() {
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
         const countElement = this.element.querySelector('#match-count');
         if (this.matches.length === 0) {
-            countElement.textContent = 'No matches';
+            countElement.textContent = t('findReplace.noMatches');
         } else {
-            countElement.textContent = `${this.currentMatchIndex + 1} of ${this.matches.length} matches`;
+            countElement.textContent = t('findReplace.matchCount', { 
+                current: this.currentMatchIndex + 1, 
+                total: this.matches.length 
+            });
         }
     }
 }
@@ -583,86 +879,135 @@ class CogNotezApp {
             inProgress: false
         };
 
+		// Cache of passwords for unlocked notes (noteId -> password)
+		this.notePasswordCache = {};
+
+		// Interval for updating note date in real-time
+		this.noteDateUpdateInterval = null;
+
+        // Phase 5 managers
+        this.advancedSearchManager = null;
+        this.templatesManager = null;
+        this.richMediaManager = null;
+
+        // Debounced history tracking
+        this.historyDebounceTimer = null;
+        this.historyDebounceDelay = 500; // 500ms delay for batching history updates
+
+        // Live preview state
+        this.previewMode = 'preview'; // 'edit', 'preview', or 'split'
+        this.livePreviewDebounce = null;
+        this.livePreviewListener = null;
+        this.syncScrollEnabled = true;
+        this.syncScrollTimeout = null;
+        this.syncScrollSource = null; // Track which pane initiated scroll
+
+        // AI operation cancellation
+        this.currentAIAbortController = null;
+        this.isAIOperationCancelled = false;
+
+        // Multi-tab system
+        this.openTabs = []; // Array of { noteId, title, unsaved } objects
+        this.maxTabs = 10; // Maximum number of tabs allowed
+        this._ignoreNextInputForUnsaved = false; // Flag to prevent marking tab unsaved during note load
+        this._draggedTabIndex = null; // Index of tab being dragged for reordering
+
+        // Folder/Category navigation
+        this.currentFolder = localStorage.getItem('currentFolder') || 'all'; // Current active folder: 'all', 'untagged', or a tag ID
+
         this.init();
     }
 
     async init() {
         console.log('[DEBUG] Starting CogNotez application initialization...');
+        const startTime = performance.now();
 
         // Show splash screen immediately
         this.showSplashScreen();
         this.updateSplashVersion();
-        this.updateSplashProgress('Starting CogNotez...', 5);
+        this.updateSplashProgress('splash.startingUp', 5);
 
         try {
-            // Initialize database and managers
+            // Phase 1: Core initialization (required before app can function)
             console.log('[DEBUG] Initializing backend API...');
-            this.updateSplashProgress('Initializing backend services...', 15);
+            this.updateSplashProgress('splash.connectingServices', 15);
             this.backendAPI = new BackendAPI();
             this.backendAPI.setAppReference(this);
-            await this.backendAPI.initialize();
 
+            // Run backend and notes manager init in parallel
+            const [, ] = await Promise.all([
+                this.backendAPI.initialize(),
+                (async () => {
             console.log('[DEBUG] Initializing notes manager...');
-            this.updateSplashProgress('Loading notes database...', 30);
             this.notesManager = new NotesManager(this);
             await this.notesManager.initialize();
+                })()
+            ]);
+            this.updateSplashProgress('splash.loadingNotes', 40);
 
             // Start auto-save if enabled in settings
             this.initializeAutoSave();
 
-            console.log('[DEBUG] Initializing AI manager...');
-            this.updateSplashProgress('Setting up AI features...', 50);
+            // Phase 2: UI and features (can run in parallel)
+            console.log('[DEBUG] Initializing managers...');
+            this.updateSplashProgress('splash.preparingInterface', 55);
+            
+            // Initialize AI manager, UI manager, and Phase 5 features in parallel
+            await Promise.all([
+                (async () => {
             this.aiManager = new AIManager(this);
             await this.aiManager.initialize();
-
-            console.log('[DEBUG] Initializing UI manager...');
-            this.updateSplashProgress('Preparing user interface...', 70);
+                })(),
+                (async () => {
             this.uiManager = new UIManager(this);
             this.uiManager.initialize();
+                })(),
+                this.initializePhase5Features()
+            ]);
 
-            // Register IPC listeners before any sync to ensure we catch startup sync events
+            // Register IPC listeners before any sync
             this.setupIPC();
 
-            console.log('[DEBUG] Initializing sync manager...');
-            this.updateSplashProgress('Setting up cloud sync...', 80);
+            // Phase 3: Sync setup (quick, just registers - doesn't sync yet)
+            console.log('[DEBUG] Setting up sync...');
+            this.updateSplashProgress('splash.settingUpSync', 75);
             await this.initializeSync();
 
-            // Setup UI and event listeners
+            // Phase 4: Final UI setup
             console.log('[DEBUG] Setting up event listeners and UI...');
-            this.updateSplashProgress('Finalizing setup...', 85);
+            this.updateSplashProgress('splash.almostReady', 90);
             this.setupEventListeners();
             this.loadTheme();
+            this.syncPreviewModeUI();
             await this.loadNotes();
-            // After UI loads notes, run startup sync if enabled
-            try {
-                const syncMeta = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
-                if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
-                    console.log('[Sync] Running startup sync after initial note load...');
-                    await this.manualSync();
-                }
-            } catch (e) {
-                console.warn('[Sync] Post-load startup sync failed:', e.message);
-            }
 
             // Show welcome message in AI panel
-            this.showAIMessage('Hello! I\'m your AI assistant. Select some text and right-click to use AI features.', 'assistant');
-
-            this.updateSplashProgress('Ready!', 100);
-            console.log('[DEBUG] CogNotez application initialized successfully');
+            const messagesContainer = document.getElementById('ai-messages');
+            if (messagesContainer.children.length === 0 || messagesContainer.querySelector('.ai-messages-empty')) {
+                this.showWelcomeMessage();
+            }
 
             // Setup external link handling
             this.setupExternalLinkHandling();
 
-            // Hide splash screen with a small delay to show completion
+            // Mark as ready and hide splash quickly
+            this.updateSplashProgress('splash.ready', 100);
+            const elapsed = Math.round(performance.now() - startTime);
+            console.log(`[DEBUG] CogNotez initialized in ${elapsed}ms`);
+
+            // Short delay to show completion, then hide
             setTimeout(() => {
                 this.hideSplashScreen();
-            }, 800);
+                
+                // Run startup sync in BACKGROUND after app is visible
+                this.runBackgroundStartupSync();
+            }, 300);
 
         } catch (error) {
             console.error('[DEBUG] Failed to initialize application:', error);
             // Continue with basic functionality even if database fails
             console.log('[DEBUG] Continuing with basic functionality...');
-            this.updateSplashProgress('Loading basic features...', 60);
+            this.updateSplashProgress('splash.loadingBasics', 60);
             this.setupEventListeners();
             this.setupIPC();
             this.loadTheme();
@@ -671,14 +1016,34 @@ class CogNotezApp {
             // Start auto-save if enabled in settings (fallback mode)
             this.initializeAutoSave();
 
-            this.updateSplashProgress('Ready!', 100);
-
-            // Setup external link handling even in fallback mode
+            this.updateSplashProgress('splash.ready', 100);
             this.setupExternalLinkHandling();
 
             setTimeout(() => {
                 this.hideSplashScreen();
-            }, 800);
+            }, 300);
+        }
+    }
+
+    // Run startup sync in background after app is visible
+    async runBackgroundStartupSync() {
+        try {
+            const syncMeta = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
+            if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
+                // Small delay to ensure app is fully interactive first
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                // Check if we're online before attempting startup sync
+                const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
+                if (isOnline) {
+                    console.log('[Sync] Running background startup sync...');
+                    await this.manualSync();
+                } else {
+                    console.log('[Sync] Skipping startup sync - device is offline');
+                }
+            }
+        } catch (e) {
+            console.warn('[Sync] Background startup sync failed:', e.message);
         }
     }
 
@@ -703,17 +1068,131 @@ class CogNotezApp {
     setupEventListeners() {
         // Header buttons
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
-        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
-        document.getElementById('sync-settings-btn').addEventListener('click', () => this.showSyncSettings());
-        document.getElementById('sync-manual-btn').addEventListener('click', () => this.manualSync());
-        document.getElementById('search-button').addEventListener('click', () => this.searchNotes());
+        
+        // Header overflow menu toggle
+        document.getElementById('header-overflow-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleHeaderOverflowMenu();
+        });
+        
+        // Close overflow menu when clicking any menu item (except language selector)
+        document.querySelectorAll('.header-overflow-item').forEach(item => {
+            if (!item.classList.contains('language-selector-item')) {
+                item.addEventListener('click', () => {
+                    const menu = document.getElementById('header-overflow-menu');
+                    menu.classList.add('hidden');
+                });
+            }
+        });
+        
+        // Language selector
+        const languageSelector = document.getElementById('language-selector');
+        if (languageSelector) {
+            // Set current language
+            const currentLang = window.i18n ? window.i18n.getLanguage() : 'en';
+            languageSelector.value = currentLang;
+            
+            // Handle language change
+            languageSelector.addEventListener('change', async (e) => {
+                const newLang = e.target.value;
+                if (window.i18n) {
+                    await window.i18n.setLanguage(newLang);
+                }
+            });
+            
+            // Listen for language changes to update selector and notify main process
+            window.addEventListener('languageChanged', (e) => {
+                languageSelector.value = e.detail.language;
+                // Notify main process to update menu language
+                if (ipcRenderer) {
+                    ipcRenderer.send('menu-language-changed', e.detail.language);
+                }
+            });
+        }
+        
+        // Menu items that were moved to overflow
+        document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
+        document.getElementById('mobile-search-btn').addEventListener('click', () => this.toggleMobileSearch());
+        document.getElementById('advanced-search-btn').addEventListener('click', () => {
+            if (this.advancedSearchManager) {
+                this.advancedSearchManager.togglePanel();
+            }
+        });
+        document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
+        
+        // Mobile-specific overflow menu items
+        const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
+        if (mobileThemeToggle) {
+            mobileThemeToggle.addEventListener('click', () => this.toggleTheme());
+        }
+        const mobileAIToggle = document.getElementById('mobile-ai-toggle');
+        if (mobileAIToggle) {
+            mobileAIToggle.addEventListener('click', () => this.toggleAIPanel());
+        }
+        const syncSettingsBtn = document.getElementById('sync-settings-btn');
+        if (syncSettingsBtn) {
+            syncSettingsBtn.addEventListener('click', () => this.showSyncSettings());
+        }
+        
+        // Simplified sync button
+        const syncBtn = document.getElementById('sync-btn');
+        if (syncBtn) {
+            syncBtn.addEventListener('click', () => this.manualSync());
+        }
+        
+        // Initialize tabs system
+        this.initializeTabsEventListeners();
+        
+        // Initialize folder navigation
+        this.setupFolderNavigation();
+        
+        // Update search shortcut for platform
+        const searchShortcut = document.getElementById('search-shortcut');
+        if (searchShortcut) {
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            searchShortcut.textContent = isMac ? '⌘K' : 'Ctrl+K';
+        }
+
+        // Network online/offline event listeners
+        window.addEventListener('online', () => {
+            console.log('[Network] Device is now ONLINE');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.connectionRestored'), 'success');
+            this.updateSyncUI();
+            // Clear network cache when coming back online
+            if (window.networkUtils) {
+                window.networkUtils.clearCache();
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            console.log('[Network] Device is now OFFLINE');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noInternet'), 'warning');
+            this.updateSyncUI();
+        });
 
         // Search input
-        document.getElementById('search-input').addEventListener('input', (e) => this.searchNotes(e.target.value));
-        document.getElementById('search-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this.searchNotes();
-        });
+        const searchInputEl = document.getElementById('search-input');
+        const searchClearBtn = document.getElementById('search-clear-btn');
+
+        if (searchInputEl) {
+            searchInputEl.addEventListener('input', (e) => {
+                this.searchNotes(e.target.value);
+            });
+            searchInputEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') this.searchNotes();
+            });
+        }
+
+        if (searchClearBtn && searchInputEl) {
+            searchClearBtn.addEventListener('click', () => {
+                searchInputEl.value = '';
+                this.searchNotes('');
+                searchInputEl.focus();
+            });
+        }
 
         // Note list click handler (delegate to notes manager)
         document.getElementById('notes-list').addEventListener('click', async (e) => {
@@ -758,20 +1237,49 @@ class CogNotezApp {
         document.getElementById('replace-btn').addEventListener('click', () => this.showReplaceDialog());
         document.getElementById('preview-toggle-btn').addEventListener('click', () => this.togglePreview());
         document.getElementById('save-btn').addEventListener('click', () => this.saveCurrentNote());
+        
+        // Editor overflow menu toggle
+        document.getElementById('editor-overflow-btn').addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleEditorOverflowMenu();
+        });
+        
+        // Close overflow menu when clicking any menu item
+        document.querySelectorAll('.overflow-menu-item').forEach(item => {
+            item.addEventListener('click', () => {
+                const menu = document.getElementById('editor-overflow-menu');
+                menu.classList.add('hidden');
+            });
+        });
         document.getElementById('ai-summary-btn').addEventListener('click', () => this.summarizeNote());
         document.getElementById('generate-tags-btn').addEventListener('click', () => this.generateTags());
         document.getElementById('manage-tags-btn').addEventListener('click', () => this.showTagManager());
         document.getElementById('export-btn').addEventListener('click', () => this.exportNote());
         document.getElementById('share-btn').addEventListener('click', () => this.showShareOptions());
+        document.getElementById('password-lock-btn').addEventListener('click', () => this.showPasswordProtectionDialog());
 
         // Placeholder actions
         document.getElementById('create-first-note-btn').addEventListener('click', () => this.createNewNote());
 
-        // Editor input for real-time preview updates
+        // Editor input for real-time preview updates and unsaved tracking
         document.getElementById('note-editor').addEventListener('input', () => {
             const preview = document.getElementById('markdown-preview');
             if (!preview.classList.contains('hidden')) {
                 this.renderMarkdownPreview();
+            }
+            // Mark tab as unsaved when content changes (skip if loading note)
+            if (this.currentNote && !this._ignoreNextInputForUnsaved) {
+                this.markTabUnsaved(this.currentNote.id, true);
+            }
+            this._ignoreNextInputForUnsaved = false;
+        });
+        
+        // Also track title changes for unsaved indicator and update tab title
+        document.getElementById('note-title').addEventListener('input', (e) => {
+            if (this.currentNote && !this._ignoreNextInputForUnsaved) {
+                this.markTabUnsaved(this.currentNote.id, true);
+                // Update tab title live
+                this.updateTabTitle(this.currentNote.id, e.target.value || 'Untitled');
             }
         });
 
@@ -785,46 +1293,67 @@ class CogNotezApp {
             this.resetAIConversation();
         });
         document.getElementById('ai-send-btn').addEventListener('click', () => this.sendAIMessage());
-        document.getElementById('ai-input').addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') this.sendAIMessage();
+        const aiInput = document.getElementById('ai-input');
+        aiInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                this.sendAIMessage();
+            }
+        });
+        aiInput.addEventListener('input', () => {
+            this.autoResizeTextarea(aiInput);
         });
 
-        // Context menu
-        document.addEventListener('contextmenu', (e) => {
-            console.log('[DEBUG] Context menu event triggered');
-            this.showContextMenu(e);
+        // Global context menu closer
+        document.addEventListener('click', (e) => {
+            const menu = document.getElementById('context-menu');
+            if (menu && !menu.contains(e.target)) {
+                this.hideContextMenu();
+            }
         });
-        document.addEventListener('click', () => this.hideContextMenu());
 
-        // Note editor
+        // Note editor context menu
         const editor = document.getElementById('note-editor');
         editor.addEventListener('contextmenu', (e) => {
-            console.log('[DEBUG] Editor context menu event triggered');
-            // Use textarea selection properties instead of window.getSelection()
+            e.preventDefault();
             const start = editor.selectionStart;
             const end = editor.selectionEnd;
-            const selectedText = editor.value.substring(start, end).trim();
-            console.log('[DEBUG] Selected text:', selectedText ? `"${selectedText.substring(0, 50)}..."` : 'none');
-            console.log('[DEBUG] Selection range: start =', start, 'end =', end);
-            if (selectedText) {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('[DEBUG] Preventing default context menu and showing AI menu');
-                // Store selection range for later use in replaceSelection
-                this.selectionStart = start;
-                this.selectionEnd = end;
-                this.selectedText = selectedText; // Also store the selected text
-                console.log('[DEBUG] Stored selection: start =', this.selectionStart, 'end =', this.selectionEnd);
-                console.log('[DEBUG] Stored selected text:', this.selectedText.substring(0, 50) + '...');
-                this.showAIContextMenu(e, selectedText);
+            const selectedText = editor.value.substring(start, end);
+            
+            // Store selection range for operations
+            this.selectionStart = start;
+            this.selectionEnd = end;
+            this.selectedText = selectedText;
+            this.contextElement = editor;
+            
+            this.showContextMenu(e, selectedText);
+        });
+
+        // Preview mode context menu
+        const preview = document.getElementById('markdown-preview');
+        preview.addEventListener('contextmenu', (e) => {
+            e.preventDefault();
+            const selection = window.getSelection();
+            const selectedText = selection.toString();
+
+            this.selectedText = selectedText;
+            this.contextElement = preview;
+
+            // Check if right-clicked on media element
+            const target = e.target.closest('img, video, audio');
+            if (target) {
+                this.contextMediaElement = target;
+            } else {
+                this.contextMediaElement = null;
             }
+
+            this.showContextMenu(e, selectedText);
         });
         editor.addEventListener('input', () => {
             this.updateNotePreview();
-            // Track history for undo/redo functionality
+            // Track history for undo/redo functionality with debouncing
             if (!this.ignoreHistoryUpdate) {
-                const cursorPos = editor.selectionStart;
-                this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+                this.debouncedPushHistory(editor);
             }
             // Clear stored selection when user types
             this.selectionStart = -1;
@@ -855,20 +1384,19 @@ class CogNotezApp {
     setupIPC() {
         // Menu actions from main process
         ipcRenderer.on('menu-new-note', () => this.createNewNote());
-        ipcRenderer.on('menu-open-note', () => this.openNoteDialog());
         ipcRenderer.on('menu-summarize', () => this.summarizeSelection());
         ipcRenderer.on('menu-ask-ai', () => this.askAIAboutSelection());
         ipcRenderer.on('menu-edit-ai', () => this.editSelectionWithAI());
+        ipcRenderer.on('menu-generate-ai', () => this.generateContentWithAI());
         ipcRenderer.on('menu-export-markdown', () => this.exportNote('markdown'));
         ipcRenderer.on('menu-export-text', () => this.exportNote('text'));
-        ipcRenderer.on('menu-export-json', () => this.exportAllNotesJSON());
+        ipcRenderer.on('menu-export-pdf', () => this.exportNote('pdf'));
         ipcRenderer.on('menu-create-backup', () => this.createFullBackup());
 
         // Import menu actions
         ipcRenderer.on('menu-import-note', () => this.importNote());
         ipcRenderer.on('menu-import-multiple', () => this.importMultipleFiles());
         ipcRenderer.on('menu-restore-backup', () => this.restoreFromBackup());
-        ipcRenderer.on('menu-migration-wizard', () => this.showMigrationWizard());
 
         // New AI menu actions
         ipcRenderer.on('menu-rewrite', () => this.rewriteSelection());
@@ -876,12 +1404,18 @@ class CogNotezApp {
         ipcRenderer.on('menu-generate-tags', () => this.generateTags());
         ipcRenderer.on('menu-ai-settings', () => this.showAISettings());
         ipcRenderer.on('menu-general-settings', () => this.showGeneralSettings());
+        ipcRenderer.on('menu-sync-settings', () => this.showSyncSettings());
+        ipcRenderer.on('menu-advanced-settings', () => this.showAdvancedSettings());
 
         // Update-related menu actions
         ipcRenderer.on('menu-check-updates', () => this.checkForUpdates());
+        ipcRenderer.on('menu-about', () => this.showAboutDialog());
 
         // Update-related IPC events
-        ipcRenderer.on('update-checking', () => this.showUpdateStatus('Checking for updates...'));
+        ipcRenderer.on('update-checking', () => {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showUpdateStatus(t('notifications.checkingForUpdates'));
+        });
         ipcRenderer.on('update-available', (event, info) => this.showUpdateAvailable(info));
         ipcRenderer.on('update-not-available', (event, info) => this.showUpdateNotAvailable(info));
         ipcRenderer.on('update-error', (event, error) => this.showUpdateError(error));
@@ -892,26 +1426,30 @@ class CogNotezApp {
         ipcRenderer.on('sync-data-updated', (event, syncData) => this.handleSyncDataUpdated(syncData));
         ipcRenderer.on('sync-completed', (event, syncResult) => this.handleSyncCompleted(syncResult));
         ipcRenderer.on('sync-requires-passphrase', (event, payload) => this.promptForDecryptionPassphrase(payload));
+        ipcRenderer.on('sync-closing-show', () => this.showSyncClosingOverlay());
+        ipcRenderer.on('sync-closing-hide', () => this.hideSyncClosingOverlay());
 
         // Encryption-related IPC events
         ipcRenderer.on('encryption-settings-updated', (event, settings) => this.handleEncryptionSettingsUpdated(settings));
 
         // Google Drive authentication IPC handlers
         ipcRenderer.on('google-drive-auth-success', (event, data) => {
-            this.showNotification(data.message || 'Google Drive authentication successful', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(data.message || t('notifications.googleDriveAuthSuccess'), 'success');
             // Refresh sync status to show connected state
             this.updateSyncStatus();
         });
 
         ipcRenderer.on('google-drive-auth-error', (event, data) => {
-            let errorMessage = 'Google Drive authentication failed';
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            let errorMessage = t('notifications.googleDriveAuthFailed');
             if (data.error) {
                 if (data.error.includes('credentials not found') || data.error.includes('Google Drive credentials')) {
-                    errorMessage = 'Google Drive credentials file not found. Please upload your Google Drive credentials JSON file first by clicking "Import Credentials" in the sync settings.';
+                    errorMessage = t('notifications.googleDriveCredentialsNotFound');
                 } else if (data.error.includes('access_denied') || data.error.includes('403')) {
-                    errorMessage = 'Google Drive access denied. Your email needs to be added as a test user in Google Cloud Console → OAuth consent screen → Audience → Test users → ADD USERS.';
+                    errorMessage = t('notifications.googleDriveAccessDenied');
                 } else {
-                    errorMessage = `Google Drive authentication failed: ${data.error}`;
+                    errorMessage = t('notifications.googleDriveAuthFailedError', { error: data.error });
                 }
             }
             this.showNotification(errorMessage, 'error');
@@ -924,7 +1462,7 @@ class CogNotezApp {
     // Theme management
     loadTheme() {
         document.documentElement.setAttribute('data-theme', this.theme);
-        this.updateThemeToggleButton();
+        // CSS automatically handles button appearance through data-theme attribute
     }
 
     toggleTheme() {
@@ -933,33 +1471,102 @@ class CogNotezApp {
         this.loadTheme();
     }
 
-    updateThemeToggleButton() {
-        const button = document.getElementById('theme-toggle');
-        button.innerHTML = this.theme === 'light' ? '<i class="fas fa-moon"></i>' : '<i class="fas fa-sun"></i>';
+    // Update preview toggle button icon to reflect current mode
+    updatePreviewToggleIcon() {
+        const toggleBtn = document.getElementById('preview-toggle-btn');
+        if (!toggleBtn) return;
+
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+
+        switch (this.previewMode) {
+            case 'edit':
+                toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                toggleBtn.title = t('editor.editMode');
+                break;
+            case 'preview':
+                toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
+                toggleBtn.title = t('editor.previewMode');
+                break;
+            case 'split':
+                toggleBtn.innerHTML = '<i class="fas fa-columns"></i>';
+                toggleBtn.title = t('editor.splitMode');
+                break;
+        }
     }
 
-    // Preview/Edit mode toggle
+    // Sync UI visibility with current preview mode
+    syncPreviewModeUI() {
+        const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        const wrapper = document.querySelector('.editor-wrapper');
+        
+        if (!editor || !preview || !wrapper) return;
+
+        switch (this.previewMode) {
+            case 'edit':
+                editor.classList.remove('hidden');
+                preview.classList.add('hidden');
+                wrapper.classList.remove('split-mode');
+                this.removeLivePreview();
+                this.removeSyncScroll();
+                break;
+            case 'preview':
+                editor.classList.add('hidden');
+                preview.classList.remove('hidden');
+                wrapper.classList.remove('split-mode');
+                this.removeLivePreview();
+                this.removeSyncScroll();
+                break;
+            case 'split':
+                editor.classList.remove('hidden');
+                preview.classList.remove('hidden');
+                wrapper.classList.add('split-mode');
+                this.setupLivePreview();
+                this.setupSyncScroll();
+                break;
+        }
+        
+        this.updatePreviewToggleIcon();
+    }
+
+    // Preview/Edit mode toggle - cycles through three states: edit → preview → split
     togglePreview() {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
         const toggleBtn = document.getElementById('preview-toggle-btn');
+        const wrapper = document.querySelector('.editor-wrapper');
 
-        const isPreviewMode = !preview.classList.contains('hidden');
-
-        if (isPreviewMode) {
-            // Switch to edit mode
-            preview.classList.add('hidden');
-            editor.classList.remove('hidden');
-            toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-            toggleBtn.title = 'Toggle Preview/Edit';
-        } else {
-            // Switch to preview mode
+        // Cycle through three states: edit → preview → split → edit
+        if (this.previewMode === 'edit') {
+            // State 1 → State 2: Switch to preview only
+            this.previewMode = 'preview';
             editor.classList.add('hidden');
             preview.classList.remove('hidden');
+            wrapper.classList.remove('split-mode');
+            this.removeLivePreview();
             this.renderMarkdownPreview();
-            toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
-            toggleBtn.title = 'Toggle Preview/Edit';
+        } else if (this.previewMode === 'preview') {
+            // State 2 → State 3: Switch to live split
+            this.previewMode = 'split';
+            editor.classList.remove('hidden');
+            preview.classList.remove('hidden');
+            wrapper.classList.add('split-mode');
+            this.renderMarkdownPreview();
+            this.setupLivePreview();
+            this.setupSyncScroll();
+        } else {
+            // State 3 → State 1: Switch to edit only
+            this.previewMode = 'edit';
+            editor.classList.remove('hidden');
+            preview.classList.add('hidden');
+            wrapper.classList.remove('split-mode');
+            this.removeLivePreview();
+            this.removeSyncScroll();
+            toggleBtn.classList.remove('active');
         }
+
+        // Update button icon to reflect current mode
+        this.updatePreviewToggleIcon();
 
         // Update find highlighting after mode switch
         if (this.findReplaceDialog && this.findReplaceDialog.isVisible && this.findReplaceDialog.findText) {
@@ -967,24 +1574,364 @@ class CogNotezApp {
         }
     }
 
-    renderMarkdownPreview() {
+    // Setup live preview with debouncing for performance
+    setupLivePreview() {
+        const editor = document.getElementById('note-editor');
+        
+        // Remove old listener if exists
+        if (this.livePreviewListener) {
+            editor.removeEventListener('input', this.livePreviewListener);
+        }
+        
+        // Create new listener with debouncing
+        this.livePreviewListener = () => {
+            clearTimeout(this.livePreviewDebounce);
+            this.livePreviewDebounce = setTimeout(() => {
+                this.renderMarkdownPreview();
+            }, 300); // 300ms debounce for smooth typing experience
+        };
+        
+        editor.addEventListener('input', this.livePreviewListener);
+        console.log('[DEBUG] Live preview enabled');
+    }
+
+    // Remove live preview listener
+    removeLivePreview() {
+        const editor = document.getElementById('note-editor');
+        if (this.livePreviewListener) {
+            editor.removeEventListener('input', this.livePreviewListener);
+            this.livePreviewListener = null;
+        }
+        clearTimeout(this.livePreviewDebounce);
+        console.log('[DEBUG] Live preview disabled');
+    }
+
+    // Setup synchronized scrolling between editor and preview
+    setupSyncScroll() {
+        const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        
+        if (!editor || !preview) return;
+
+        // Track which element is being scrolled to prevent feedback loops
+        this.syncScrollSource = null;
+        this.syncScrollTimeout = null;
+
+        // Editor scroll handler
+        this.editorScrollHandler = () => {
+            if (!this.syncScrollEnabled) return;
+            
+            // If preview initiated the scroll, ignore
+            if (this.syncScrollSource === 'preview') return;
+            
+            // Mark editor as the scroll source
+            this.syncScrollSource = 'editor';
+            
+            // Clear any existing timeout
+            if (this.syncScrollTimeout) {
+                clearTimeout(this.syncScrollTimeout);
+            }
+            
+            // Calculate scroll percentage
+            const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
+            
+            // Apply to preview (with bounds check)
+            if (isFinite(scrollPercentage) && scrollPercentage >= 0) {
+                preview.scrollTop = scrollPercentage * (preview.scrollHeight - preview.clientHeight);
+            }
+            
+            // Reset source after smooth scroll animation completes (300ms for smooth behavior)
+            this.syncScrollTimeout = setTimeout(() => {
+                this.syncScrollSource = null;
+            }, 350);
+        };
+
+        // Preview scroll handler
+        this.previewScrollHandler = () => {
+            if (!this.syncScrollEnabled) return;
+            
+            // If editor initiated the scroll, ignore
+            if (this.syncScrollSource === 'editor') return;
+            
+            // Mark preview as the scroll source
+            this.syncScrollSource = 'preview';
+            
+            // Clear any existing timeout
+            if (this.syncScrollTimeout) {
+                clearTimeout(this.syncScrollTimeout);
+            }
+            
+            // Calculate scroll percentage
+            const scrollPercentage = preview.scrollTop / (preview.scrollHeight - preview.clientHeight);
+            
+            // Apply to editor (with bounds check)
+            if (isFinite(scrollPercentage) && scrollPercentage >= 0) {
+                editor.scrollTop = scrollPercentage * (editor.scrollHeight - editor.clientHeight);
+            }
+            
+            // Reset source after smooth scroll animation completes (300ms for smooth behavior)
+            this.syncScrollTimeout = setTimeout(() => {
+                this.syncScrollSource = null;
+            }, 350);
+        };
+
+        // Attach listeners
+        editor.addEventListener('scroll', this.editorScrollHandler, { passive: true });
+        preview.addEventListener('scroll', this.previewScrollHandler, { passive: true });
+        
+        console.log('[DEBUG] Synchronized scrolling enabled');
+    }
+
+    // Remove synchronized scrolling
+    removeSyncScroll() {
+        const editor = document.getElementById('note-editor');
+        const preview = document.getElementById('markdown-preview');
+        
+        if (editor && this.editorScrollHandler) {
+            editor.removeEventListener('scroll', this.editorScrollHandler);
+            this.editorScrollHandler = null;
+        }
+        
+        if (preview && this.previewScrollHandler) {
+            preview.removeEventListener('scroll', this.previewScrollHandler);
+            this.previewScrollHandler = null;
+        }
+        
+        // Clear sync scroll timeout and source
+        if (this.syncScrollTimeout) {
+            clearTimeout(this.syncScrollTimeout);
+            this.syncScrollTimeout = null;
+        }
+        this.syncScrollSource = null;
+        
+        console.log('[DEBUG] Synchronized scrolling disabled');
+    }
+
+    // Toggle editor overflow menu
+    toggleEditorOverflowMenu() {
+        const menu = document.getElementById('editor-overflow-menu');
+        const isHidden = menu.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show menu
+            menu.classList.remove('hidden');
+            
+            // Add click listener to close menu when clicking outside
+            setTimeout(() => {
+                document.addEventListener('click', this.closeEditorOverflowMenu.bind(this), { once: true });
+            }, 0);
+        } else {
+            // Hide menu
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Close editor overflow menu
+    closeEditorOverflowMenu(e) {
+        const menu = document.getElementById('editor-overflow-menu');
+        const overflowBtn = document.getElementById('editor-overflow-btn');
+        
+        // Don't close if clicking inside the menu or on the overflow button
+        if (menu && !menu.contains(e?.target) && e?.target !== overflowBtn) {
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Toggle header overflow menu
+    toggleHeaderOverflowMenu() {
+        const menu = document.getElementById('header-overflow-menu');
+        const isHidden = menu.classList.contains('hidden');
+
+        if (isHidden) {
+            // Show menu
+            menu.classList.remove('hidden');
+            
+            // Add click listener to close menu when clicking outside
+            setTimeout(() => {
+                document.addEventListener('click', this.closeHeaderOverflowMenu.bind(this), { once: true });
+            }, 0);
+        } else {
+            // Hide menu
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Close header overflow menu
+    closeHeaderOverflowMenu(e) {
+        const menu = document.getElementById('header-overflow-menu');
+        const overflowBtn = document.getElementById('header-overflow-btn');
+
+        // Don't close if clicking inside the menu or on the overflow button
+        if (menu && !menu.contains(e?.target) && e?.target !== overflowBtn) {
+            menu.classList.add('hidden');
+        }
+    }
+
+    // Toggle mobile search
+    toggleMobileSearch() {
+        const searchContainer = document.getElementById('search-container');
+        const isActive = searchContainer.classList.contains('mobile-active');
+
+        if (isActive) {
+            // Hide search
+            searchContainer.classList.remove('mobile-active');
+        } else {
+            // Show search and focus input
+            searchContainer.classList.add('mobile-active');
+            setTimeout(() => {
+                const searchInput = document.getElementById('search-input');
+                if (searchInput) {
+                    searchInput.focus();
+                }
+            }, 300); // Wait for animation to complete
+        }
+    }
+
+    async renderMarkdownPreview() {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
 
         if (!editor.value.trim()) {
-            preview.innerHTML = '<p style="color: var(--text-tertiary); font-style: italic;">Start writing your note...</p>';
+            const startWritingText = window.i18n ? window.i18n.t('editor.startWriting') : 'Start writing your note...';
+            preview.innerHTML = `<p style="color: var(--text-tertiary); font-style: italic;">${startWritingText}</p>`;
             return;
         }
 
+        // Process content to resolve media URLs if needed
+        let content = editor.value;
+        if (this.richMediaManager && this.richMediaManager.processContentForPreview) {
+            try {
+                content = await this.richMediaManager.processContentForPreview(content);
+            } catch (error) {
+                console.warn('[Preview] Failed to process media URLs:', error);
+                // Continue with original content if processing fails
+            }
+        }
+
         // Render markdown and sanitize for security
-        const renderedHTML = renderMarkdown(editor.value);
+        const renderedHTML = renderMarkdown(content);
         preview.innerHTML = renderedHTML;
+        
+        // Setup horizontal scroll functionality
+        this.setupHorizontalScroll(preview);
+        
+        // Ensure external links open in default browser (renderer-side handling)
+        this.setupExternalLinkHandling(preview);
+    }
+
+    // Setup horizontal scroll functionality for markdown preview
+    setupHorizontalScroll(container) {
+        if (!container) return;
+        
+        // Wrap tables in scrollable containers
+        const tables = container.querySelectorAll('table');
+        tables.forEach(table => {
+            if (!table.parentElement.classList.contains('table-container')) {
+                const wrapper = document.createElement('div');
+                wrapper.className = 'table-container';
+                table.parentNode.insertBefore(wrapper, table);
+                wrapper.appendChild(table);
+            }
+        });
+        
+        // Check for horizontal scroll and add visual indicators
+        const checkHorizontalScroll = () => {
+            const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
+            container.classList.toggle('scrollable-x', hasHorizontalScroll);
+        };
+        
+        // Initial check
+        checkHorizontalScroll();
+        
+        // Check on resize
+        const resizeObserver = new ResizeObserver(checkHorizontalScroll);
+        resizeObserver.observe(container);
+        
+        // Check on content changes
+        const mutationObserver = new MutationObserver(checkHorizontalScroll);
+        mutationObserver.observe(container, { 
+            childList: true, 
+            subtree: true, 
+            attributes: true 
+        });
+        
+        // Add keyboard navigation for horizontal scrolling
+        container.addEventListener('keydown', (e) => {
+            if (e.ctrlKey || e.metaKey) {
+                switch(e.key) {
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        container.scrollBy({ left: -100, behavior: 'smooth' });
+                        break;
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        container.scrollBy({ left: 100, behavior: 'smooth' });
+                        break;
+                }
+            }
+        });
+        
+        // Store observers for cleanup
+        container._horizontalScrollObservers = { resizeObserver, mutationObserver };
+    }
+
+    // Setup link handling to open external links in default browser
+    setupExternalLinkHandling(container) {
+        if (!container) return;
+        
+        // Remove any existing listeners to avoid duplicates
+        const oldHandler = container._linkClickHandler;
+        if (oldHandler) {
+            container.removeEventListener('click', oldHandler);
+        }
+        
+        // Create new handler
+        const linkClickHandler = (event) => {
+            const target = event.target;
+            
+            // Check if the clicked element is a link or is inside a link
+            const link = target.closest('a');
+            if (!link) return;
+            
+            const href = link.getAttribute('href');
+            if (!href) return;
+            
+            // Only handle external links (http/https)
+            if (href.startsWith('http://') || href.startsWith('https://')) {
+                event.preventDefault();
+                
+                // Use Electron's shell to open in default browser
+                if (typeof require !== 'undefined') {
+                    try {
+                        const { shell } = require('electron');
+                        shell.openExternal(href);
+                    } catch (error) {
+                        console.error('Failed to open external link:', error);
+                        // Fallback: try window.open as last resort
+                        window.open(href, '_blank');
+                    }
+                }
+            }
+            // Allow internal links (anchors, etc.) to work normally
+        };
+        
+        // Store handler reference for cleanup
+        container._linkClickHandler = linkClickHandler;
+        
+        // Add event listener
+        container.addEventListener('click', linkClickHandler);
     }
 
     // Note management
     async loadNotes() {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList();
+            // Respect current search query and folder when loading notes
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? (searchInput.value || '') : '';
+            await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
+            
+            // Render tag folders in sidebar
+            await this.renderTagFolders();
 
             // Check if there are any notes and show placeholder if none exist
             let totalNotes = 0;
@@ -1028,21 +1975,21 @@ class CogNotezApp {
     // Show warning dialog for unsaved changes
     async showUnsavedChangesWarning() {
         return new Promise((resolve) => {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
             const content = `
                 <div style="padding: 10px 0;">
                     <p style="margin: 0 0 20px 0; color: var(--text-primary);">
                         You have unsaved changes in the current note.
                     </p>
                     <p style="margin: 0 0 20px 0; color: var(--text-secondary); font-size: 14px;">
-                        What would you like to do?
+                        ${t('modals.unsavedChangesMessage')}
                     </p>
                 </div>
             `;
-
-            const modal = this.createModal('Unsaved Changes', content, [
-                { text: 'Save and Switch', type: 'primary', action: 'save-switch' },
-                { text: 'Discard Changes', type: 'secondary', action: 'discard-switch' },
-                { text: 'Cancel', type: 'secondary', action: 'cancel' }
+            const modal = this.createModal(t('modals.unsavedChanges'), content, [
+                { text: t('modals.saveAndSwitch'), type: 'primary', action: 'save-switch' },
+                { text: t('modals.discardChanges'), type: 'secondary', action: 'discard-switch' },
+                { text: t('modals.cancel'), type: 'secondary', action: 'cancel' }
             ]);
 
             const saveBtn = modal.querySelector('[data-action="save-switch"]');
@@ -1056,7 +2003,8 @@ class CogNotezApp {
                     resolve(true);
                 } catch (error) {
                     console.error('Error saving note:', error);
-                    this.showNotification('❌ Failed to save note', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.saveFailed'), 'error');
                     resolve(false);
                 }
             });
@@ -1085,19 +2033,276 @@ class CogNotezApp {
             }
 
             if (note) {
-                this.displayNote(note);
+                // Check if note is password protected
+                if (note.password_protected) {
+                    await this.promptForNotePassword(note);
+                } else {
+                    this.displayNote(note);
+                }
             }
         } catch (error) {
             console.error('Error loading note:', error);
         }
     }
 
+    async promptForNotePassword(note) {
+        return new Promise((resolve) => {
+            const title = window.i18n ? window.i18n.t('password.enterPassword') : 'Enter Password';
+            const message = window.i18n ? window.i18n.t('password.unlockNote', { title: note.title }) : `Enter the password to unlock "${note.title}"`;
+            
+            this.uiManager.showPasswordDialog({
+                title: title,
+                message: message,
+                onSubmit: async (password) => {
+                    try {
+						const isValid = await this.verifyNotePassword(note, password);
+                        if (isValid) {
+							// Decrypt content for this session and cache password
+							if (note.encrypted_content && window.encryptionManager) {
+								try {
+									const envelope = JSON.parse(note.encrypted_content);
+									const decrypted = window.encryptionManager.decryptData(envelope, password);
+									note.content = decrypted.content || '';
+									this.cacheNotePassword(note.id, password);
+								} catch (e) {
+									console.error('Failed to decrypt note content:', e);
+									const t = (key) => window.i18n ? window.i18n.t(key) : key;
+									this.showNotification(t('notifications.errorDecryptingNote'), 'error');
+									resolve(false);
+									return;
+								}
+							}
+							this.displayNote(note);
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.noteUnlocked'), 'success');
+                            resolve(true);
+                        } else {
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.incorrectPassword'), 'error');
+                            // Re-prompt for password
+                            setTimeout(() => this.promptForNotePassword(note), 500);
+                        }
+                    } catch (error) {
+                        console.error('Error verifying password:', error);
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.errorUnlockingNote'), 'error');
+                        resolve(false);
+                    }
+                },
+                onCancel: () => {
+                    resolve(false);
+                }
+            });
+        });
+    }
+
+	// Password cache helpers
+	cacheNotePassword(noteId, password) {
+		this.notePasswordCache[noteId] = password;
+	}
+
+	getCachedNotePassword(noteId) {
+		return this.notePasswordCache[noteId] || null;
+	}
+
+	clearCachedNotePassword(noteId) {
+		if (this.notePasswordCache[noteId]) {
+			delete this.notePasswordCache[noteId];
+		}
+	}
+
+    async verifyNotePassword(note, password) {
+        if (!note.password_protected || !note.password_hash) {
+            return true; // Not password protected
+        }
+
+        try {
+            if (!window.encryptionManager) {
+                throw new Error('Encryption manager not available');
+            }
+            const hashParts = JSON.parse(note.password_hash);
+
+            return window.encryptionManager.verifyPassword(
+                password,
+                hashParts.hashBase64,
+                hashParts.saltBase64,
+                hashParts.iterations
+            );
+        } catch (error) {
+            console.error('Error verifying note password:', error);
+            return false;
+        }
+    }
+
+	async showPasswordProtectionDialog() {
+        if (!this.currentNote) {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noNoteSelected'), 'error');
+            return;
+        }
+
+        const isCurrentlyProtected = this.currentNote.password_protected;
+        const titleKey = isCurrentlyProtected ? 'password.removePasswordProtection' : 'password.addPasswordProtection';
+        const messageKey = isCurrentlyProtected ? 'password.removePasswordMessage' : 'password.protectNote';
+        
+        const title = window.i18n ? window.i18n.t(titleKey) : (isCurrentlyProtected ? 'Remove Password Protection' : 'Add Password Protection');
+        const message = window.i18n ? window.i18n.t(messageKey) : (isCurrentlyProtected ? 'Enter the current password to remove protection from this note.' : 'Enter a password to protect this note.');
+
+        this.uiManager.showPasswordDialog({
+            title: title,
+            message: message,
+            requireConfirmation: !isCurrentlyProtected,
+            showStrength: !isCurrentlyProtected,
+            onSubmit: async (password) => {
+                try {
+                    if (isCurrentlyProtected) {
+                        // Remove protection - verify current password
+                        const isValid = await this.verifyNotePassword(this.currentNote, password);
+                        if (isValid) {
+							await this.removePasswordProtection(this.currentNote, password);
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.passwordProtectionRemoved'), 'success');
+                        } else {
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.incorrectPassword'), 'error');
+                            return;
+                        }
+                    } else {
+                        // Add protection - set new password
+                        await this.setPasswordProtection(this.currentNote, password);
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.passwordProtectionAdded'), 'success');
+                    }
+
+                    // Update the lock icon in the UI
+                    this.updatePasswordLockIcon();
+                    // Refresh notes list to show lock icon without clearing filters
+                    if (this.notesManager) {
+                        const searchInput = document.getElementById('search-input');
+                        const searchQuery = searchInput ? (searchInput.value || '') : '';
+                        await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
+                    }
+                } catch (error) {
+                    console.error('Error managing password protection:', error);
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.errorManagingPassword'), 'error');
+                }
+            }
+        });
+    }
+
+	async setPasswordProtection(note, password) {
+        if (!window.encryptionManager) {
+            throw new Error('Encryption manager not available');
+        }
+        const hashResult = window.encryptionManager.hashPassword(password);
+
+		// Encrypt current content and clear plaintext
+		let envelopeString = null;
+		try {
+			const envelope = window.encryptionManager.encryptData({ content: note.content || '' }, password);
+			envelopeString = JSON.stringify(envelope);
+		} catch (e) {
+			console.error('Failed to encrypt note during protection enable:', e);
+			const t = (key) => window.i18n ? window.i18n.t(key) : key;
+			this.showNotification(t('notifications.failedToEnableProtection'), 'error');
+			throw e;
+		}
+
+		const updateData = {
+            password_protected: true,
+			password_hash: JSON.stringify(hashResult),
+			encrypted_content: envelopeString,
+			content: '',
+			preview: ''
+        };
+
+        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+            await this.notesManager.db.updateNote(note.id, updateData);
+            // Update the current note object
+			Object.assign(note, updateData);
+			// Keep decrypted content in memory for current session
+			note.content = note.content || '';
+        } else {
+            // Fallback to localStorage
+            Object.assign(note, updateData);
+            this.saveNotes();
+        }
+
+		// Cache the password for future saves in this session
+		this.cacheNotePassword(note.id, password);
+    }
+
+	async removePasswordProtection(note, password = null) {
+		// If a password isn't provided, try cached
+		let passToUse = password || this.getCachedNotePassword(note.id);
+		if (!passToUse) {
+			// Ask user for password
+			const unlocked = await this.promptForNotePassword(note);
+			if (!unlocked) return;
+			passToUse = this.getCachedNotePassword(note.id);
+		}
+
+		// Decrypt existing content
+		let plaintext = note.content || '';
+		if (!plaintext && note.encrypted_content && window.encryptionManager) {
+			try {
+				const envelope = JSON.parse(note.encrypted_content);
+				const decrypted = window.encryptionManager.decryptData(envelope, passToUse);
+				plaintext = decrypted.content || '';
+			} catch (e) {
+				console.error('Failed to decrypt while removing protection:', e);
+				const t = (key) => window.i18n ? window.i18n.t(key) : key;
+				this.showNotification(t('notifications.failedToRemoveProtection'), 'error');
+				return;
+			}
+		}
+
+		const updateData = {
+			password_protected: false,
+			password_hash: null,
+			encrypted_content: null,
+			content: plaintext,
+			preview: this.generatePreview(plaintext)
+		};
+
+		if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+			await this.notesManager.db.updateNote(note.id, updateData);
+			// Update the current note object
+			Object.assign(note, updateData);
+		} else {
+			// Fallback to localStorage
+			Object.assign(note, updateData);
+			this.saveNotes();
+		}
+
+		// Clear cached password
+		this.clearCachedNotePassword(note.id);
+	}
+
+    updatePasswordLockIcon() {
+        const lockBtn = document.getElementById('password-lock-btn');
+        if (!lockBtn || !this.currentNote) return;
+
+        const icon = lockBtn.querySelector('i');
+        if (this.currentNote.password_protected) {
+            icon.className = 'fas fa-lock-open';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            lockBtn.title = t('tooltips.removePasswordProtection');
+        } else {
+            icon.className = 'fas fa-lock';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            lockBtn.title = t('tooltips.addPasswordProtection');
+        }
+    }
+
     async createNewNote() {
         if (!this.notesManager) return;
 
+        const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
         const note = {
             id: Date.now().toString(),
-            title: 'Untitled Note',
+            title: untitledTitle,
             content: '',
             preview: '',
             tags: []
@@ -1106,7 +2311,7 @@ class CogNotezApp {
         try {
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 await this.notesManager.db.createNote(note);
-                await this.notesManager.renderNotesList();
+                await this.notesManager.renderNotesList('', this.currentFolder);
                 const createdNote = await this.notesManager.db.getNote(note.id);
                 this.displayNote(createdNote);
             } else {
@@ -1118,6 +2323,9 @@ class CogNotezApp {
                 this.renderNotesList();
                 this.displayNote(note);
             }
+            
+            // Update folder counts
+            await this.renderTagFolders();
         } catch (error) {
             console.error('Error creating note:', error);
         }
@@ -1132,16 +2340,21 @@ class CogNotezApp {
         this.currentNote = note;
         this.showNoteEditor();
 
+        // Add to tabs if not already open
+        this.addNoteToTabs(note.id);
+
         document.getElementById('note-title').value = note.title;
         document.getElementById('note-editor').value = note.content;
-        document.getElementById('note-date').textContent =
-            `Modified: ${new Date(note.modified).toLocaleDateString()} ${new Date(note.modified).toLocaleTimeString()}`;
+        this.updateNoteDate();
 
         // Initialize history for undo/redo functionality
         this.initializeHistoryForNote(note.content);
 
-        // Display tags in the editor header
+        // Display tags in the editor header (this will also handle wrapping tags+date)
         this.displayNoteTags(note);
+
+        // Update password lock icon
+        this.updatePasswordLockIcon();
 
         // Update active note in sidebar
         document.querySelectorAll('.note-item').forEach(item => {
@@ -1149,12 +2362,25 @@ class CogNotezApp {
         });
 
         // Trigger word count update since we set content programmatically
+        // Use a flag to prevent this from marking the tab as unsaved
+        this._ignoreNextInputForUnsaved = true;
         const editor = document.getElementById('note-editor');
         const inputEvent = new Event('input', { bubbles: true });
         editor.dispatchEvent(inputEvent);
 
         // Load conversation history for this note
         this.loadConversationHistory(note.id);
+
+        // Start real-time date updates
+        this.startNoteDateUpdates();
+
+        // Update preview if we're in preview or split mode
+        if (this.previewMode === 'preview' || this.previewMode === 'split') {
+            this.renderMarkdownPreview();
+        }
+        
+        // Ensure tab is marked as saved after loading (not unsaved)
+        this.markTabUnsaved(note.id, false);
     }
 
     // Show the note editor interface
@@ -1189,18 +2415,418 @@ class CogNotezApp {
         // Clear current note
         this.currentNote = null;
 
+        // Stop date updates
+        this.stopNoteDateUpdates();
+
+        // Clear date display
+        const noteDateElement = document.getElementById('note-date');
+        if (noteDateElement) {
+            noteDateElement.textContent = '';
+        }
+
         // Update sidebar to show no active note
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.remove('active');
         });
     }
 
+    // =====================================================
+    // MULTI-TAB SYSTEM
+    // =====================================================
+
+    // Add a note to the tabs bar
+    addNoteToTabs(noteId) {
+        // Normalize ID to string for consistent comparison
+        const normalizedId = String(noteId);
+        
+        // Check if tab already exists
+        const existingTab = this.openTabs.find(tab => String(tab.noteId) === normalizedId);
+        if (existingTab) {
+            // Update tab title from currentNote if available
+            if (this.currentNote && String(this.currentNote.id) === normalizedId) {
+                existingTab.title = this.currentNote.title || 'Untitled';
+            }
+            this.setActiveTab(normalizedId);
+            return;
+        }
+
+        // Check max tabs limit
+        if (this.openTabs.length >= this.maxTabs) {
+            // Close the oldest non-active tab that isn't unsaved
+            const currentId = this.currentNote ? String(this.currentNote.id) : null;
+            const tabToClose = this.openTabs.find(tab => 
+                String(tab.noteId) !== currentId && !tab.unsaved
+            );
+            if (tabToClose) {
+                this.closeTab(tabToClose.noteId, true);
+            } else {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.maxTabsReached'), 'warning');
+                return;
+            }
+        }
+
+        // Get title from currentNote if it matches
+        let title = 'Untitled';
+        if (this.currentNote && String(this.currentNote.id) === normalizedId) {
+            title = this.currentNote.title || 'Untitled';
+        } else {
+            // Try to find in notes array
+            const note = this.notes.find(n => String(n.id) === normalizedId);
+            if (note) {
+                title = note.title || 'Untitled';
+            }
+        }
+
+        // Add new tab with normalized ID and title
+        this.openTabs.push({ noteId: normalizedId, title: title, unsaved: false });
+        this.renderTabs();
+        this.setActiveTab(normalizedId);
+    }
+
+    // Remove a note from tabs
+    closeTab(noteId, silent = false) {
+        const noteIdStr = String(noteId);
+        const tabIndex = this.openTabs.findIndex(tab => String(tab.noteId) === noteIdStr);
+        if (tabIndex === -1) return;
+
+        const tab = this.openTabs[tabIndex];
+        
+        // If tab has unsaved changes and not silent, show confirmation
+        if (tab.unsaved && !silent) {
+            const noteName = tab.title || 'Untitled';
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmMessage = t('notes.tabCloseConfirm', { title: noteName });
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+        }
+
+        // Remove from openTabs array
+        this.openTabs.splice(tabIndex, 1);
+
+        // If we're closing the active tab, switch to another tab
+        if (this.currentNote && String(this.currentNote.id) === noteIdStr) {
+            if (this.openTabs.length > 0) {
+                // Switch to the nearest tab
+                const newIndex = Math.min(tabIndex, this.openTabs.length - 1);
+                const newTab = this.openTabs[newIndex];
+                this.switchToTab(newTab.noteId);
+                return; // switchToTab will call renderTabs via displayNote
+            } else {
+                // No tabs left, show placeholder
+                this.showNoNotePlaceholder();
+            }
+        }
+
+        this.renderTabs();
+    }
+
+    // Set a tab as active
+    setActiveTab(noteId) {
+        this.renderTabs();
+    }
+
+    // Mark a tab as having unsaved changes
+    markTabUnsaved(noteId, unsaved = true) {
+        const noteIdStr = String(noteId);
+        const tab = this.openTabs.find(tab => String(tab.noteId) === noteIdStr);
+        if (tab && tab.unsaved !== unsaved) {
+            tab.unsaved = unsaved;
+            this.renderTabs();
+        }
+    }
+
+    // Update tab title
+    updateTabTitle(noteId, title) {
+        const noteIdStr = String(noteId);
+        const tab = this.openTabs.find(tab => String(tab.noteId) === noteIdStr);
+        if (tab && tab.title !== title) {
+            tab.title = title || 'Untitled';
+            this.renderTabs();
+        }
+    }
+
+    // Render all tabs
+    renderTabs() {
+        const tabsBar = document.getElementById('note-tabs-bar');
+        const tabsContainer = document.getElementById('note-tabs-container');
+        
+        if (!tabsBar || !tabsContainer) return;
+
+        // Show/hide tabs bar based on whether we have tabs
+        if (this.openTabs.length > 0) {
+            tabsBar.classList.add('has-tabs');
+        } else {
+            tabsBar.classList.remove('has-tabs');
+            tabsContainer.innerHTML = '';
+            return;
+        }
+
+        // Build tabs HTML
+        let tabsHtml = '';
+        this.openTabs.forEach(tab => {
+            const tabIdStr = String(tab.noteId);
+            const isActive = this.currentNote && String(this.currentNote.id) === tabIdStr;
+            
+            // For active tab, use currentNote title and update stored title
+            // For inactive tabs, use stored title
+            let title;
+            if (isActive && this.currentNote) {
+                title = this.currentNote.title || 'Untitled';
+                // Update stored title
+                tab.title = title;
+            } else {
+                // Use stored title from tab
+                title = tab.title || 'Untitled';
+            }
+            
+            const unsavedClass = tab.unsaved ? 'unsaved' : '';
+            const activeClass = isActive ? 'active' : '';
+
+            tabsHtml += `
+                <div class="note-tab ${activeClass} ${unsavedClass}" data-note-id="${tab.noteId}">
+                    <span class="note-tab-title" title="${this.escapeHtml(title)}">${this.escapeHtml(title)}</span>
+                    <button class="note-tab-close" data-note-id="${tab.noteId}" title="Close tab">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+            `;
+        });
+
+        tabsContainer.innerHTML = tabsHtml;
+
+        // Add event listeners to tabs
+        tabsContainer.querySelectorAll('.note-tab').forEach((tabEl, index) => {
+            const noteId = tabEl.dataset.noteId;
+            
+            // Make tab draggable
+            tabEl.setAttribute('draggable', 'true');
+            
+            // Click on tab to switch
+            tabEl.addEventListener('click', (e) => {
+                if (!e.target.closest('.note-tab-close')) {
+                    this.switchToTab(noteId);
+                }
+            });
+
+            // Middle click to close
+            tabEl.addEventListener('auxclick', (e) => {
+                if (e.button === 1) { // Middle click
+                    e.preventDefault();
+                    this.closeTab(noteId);
+                }
+            });
+            
+            // Drag start
+            tabEl.addEventListener('dragstart', (e) => {
+                e.dataTransfer.effectAllowed = 'move';
+                e.dataTransfer.setData('text/plain', noteId);
+                tabEl.classList.add('dragging');
+                this._draggedTabIndex = index;
+            });
+            
+            // Drag end
+            tabEl.addEventListener('dragend', () => {
+                tabEl.classList.remove('dragging');
+                // Clear all drag-over states
+                tabsContainer.querySelectorAll('.note-tab').forEach(t => {
+                    t.classList.remove('drag-over', 'drag-over-right');
+                });
+                this._draggedTabIndex = null;
+            });
+            
+            // Drag over
+            tabEl.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                e.dataTransfer.dropEffect = 'move';
+                
+                if (this._draggedTabIndex === null || this._draggedTabIndex === index) return;
+                
+                // Determine if dropping before or after this tab
+                const rect = tabEl.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+                
+                // Clear previous states
+                tabEl.classList.remove('drag-over', 'drag-over-right');
+                
+                if (e.clientX < midpoint) {
+                    tabEl.classList.add('drag-over');
+                } else {
+                    tabEl.classList.add('drag-over-right');
+                }
+            });
+            
+            // Drag leave
+            tabEl.addEventListener('dragleave', () => {
+                tabEl.classList.remove('drag-over', 'drag-over-right');
+            });
+            
+            // Drop
+            tabEl.addEventListener('drop', (e) => {
+                e.preventDefault();
+                tabEl.classList.remove('drag-over', 'drag-over-right');
+                
+                if (this._draggedTabIndex === null || this._draggedTabIndex === index) return;
+                
+                // Determine drop position
+                const rect = tabEl.getBoundingClientRect();
+                const midpoint = rect.left + rect.width / 2;
+                let targetIndex = e.clientX < midpoint ? index : index + 1;
+                
+                // Adjust if dragging from before the target
+                if (this._draggedTabIndex < targetIndex) {
+                    targetIndex--;
+                }
+                
+                this.reorderTab(this._draggedTabIndex, targetIndex);
+            });
+        });
+
+        // Add event listeners to close buttons
+        tabsContainer.querySelectorAll('.note-tab-close').forEach(closeBtn => {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const noteId = closeBtn.dataset.noteId;
+                this.closeTab(noteId);
+            });
+        });
+    }
+    
+    // Reorder a tab from one position to another
+    reorderTab(fromIndex, toIndex) {
+        if (fromIndex === toIndex) return;
+        if (fromIndex < 0 || fromIndex >= this.openTabs.length) return;
+        if (toIndex < 0 || toIndex >= this.openTabs.length) return;
+        
+        // Remove tab from old position and insert at new position
+        const [movedTab] = this.openTabs.splice(fromIndex, 1);
+        this.openTabs.splice(toIndex, 0, movedTab);
+        
+        this.renderTabs();
+    }
+
+    // Switch to a specific tab
+    async switchToTab(noteId) {
+        const noteIdStr = String(noteId);
+        if (this.currentNote && String(this.currentNote.id) === noteIdStr) return;
+
+        // Only save current note if there are unsaved changes
+        if (this.currentNote && this.notesManager && this.notesManager.hasUnsavedChanges()) {
+            await this.saveCurrentNote(true); // Pass true to indicate it's an auto-save (no notification)
+        }
+
+        // Try to find note in array first
+        let note = this.notes.find(n => String(n.id) === noteIdStr);
+        
+        // If not found in array, try to fetch from database
+        if (!note && this.notesManager && this.notesManager.db) {
+            try {
+                note = await this.notesManager.db.getNote(noteId);
+            } catch (e) {
+                console.warn('[switchToTab] Failed to get note from database:', e);
+            }
+        }
+        
+        if (note) {
+            // Handle password-protected notes
+            if (note.password_protected) {
+                const cachedPassword = this.getCachedNotePassword(note.id);
+                if (cachedPassword && note.encrypted_content && window.encryptionManager) {
+                    // Try to decrypt with cached password
+                    try {
+                        const envelope = JSON.parse(note.encrypted_content);
+                        const decrypted = window.encryptionManager.decryptData(envelope, cachedPassword);
+                        note.content = decrypted.content || '';
+                        this.displayNote(note);
+                    } catch (e) {
+                        console.warn('[switchToTab] Failed to decrypt with cached password:', e);
+                        // Password might have changed, clear cache and prompt
+                        this.clearCachedNotePassword(note.id);
+                        await this.promptForNotePassword(note);
+                    }
+                } else {
+                    // No cached password, prompt for it
+                    await this.promptForNotePassword(note);
+                }
+            } else {
+                this.displayNote(note);
+            }
+        } else {
+            console.warn('[switchToTab] Note not found:', noteId);
+            // Remove the tab if note doesn't exist
+            this.closeTab(noteId, true);
+        }
+    }
+
+    // Close all tabs except the current one
+    closeOtherTabs() {
+        const currentId = this.currentNote ? String(this.currentNote.id) : null;
+        const tabsToClose = this.openTabs.filter(tab => String(tab.noteId) !== currentId);
+        
+        // Check for unsaved changes
+        const unsavedTabs = tabsToClose.filter(tab => tab.unsaved);
+        if (unsavedTabs.length > 0) {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmMessage = t('notes.tabsCloseConfirm', { count: unsavedTabs.length });
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+        }
+
+        this.openTabs = this.openTabs.filter(tab => String(tab.noteId) === currentId);
+        this.renderTabs();
+    }
+
+    // Close all tabs
+    closeAllTabs() {
+        const unsavedTabs = this.openTabs.filter(tab => tab.unsaved);
+        if (unsavedTabs.length > 0) {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmMessage = t('notes.tabsCloseConfirm', { count: unsavedTabs.length });
+            if (!confirm(confirmMessage)) {
+                return;
+            }
+        }
+
+        this.openTabs = [];
+        this.showNoNotePlaceholder();
+        this.renderTabs();
+    }
+
+    // Initialize tabs event listeners (called during setup)
+    initializeTabsEventListeners() {
+        // Initial render
+        this.renderTabs();
+    }
+
     // Helper method to display tags in the note editor header
     displayNoteTags(note) {
         const tagsDisplay = document.getElementById('note-tags-display');
+        const noteDate = document.getElementById('note-date');
+        const noteInfo = document.querySelector('.note-info');
+
+        // Defensive check: ensure required elements exist
+        if (!tagsDisplay) {
+            console.warn('[displayNoteTags] note-tags-display element not found');
+            return;
+        }
 
         if (!note.tags || note.tags.length === 0) {
             tagsDisplay.innerHTML = '';
+            // Unwrap tags and date if they were wrapped
+            const wrapper = document.querySelector('.tags-date-wrapper');
+            if (wrapper && noteInfo) {
+                // Move tagsDisplay back to noteInfo before removing wrapper
+                if (tagsDisplay.parentElement === wrapper) {
+                    noteInfo.appendChild(tagsDisplay);
+                }
+                // Move noteDate back to noteInfo before removing wrapper
+                if (noteDate && noteDate.parentElement === wrapper) {
+                    noteInfo.appendChild(noteDate);
+                }
+                wrapper.remove();
+            }
             return;
         }
 
@@ -1212,6 +2838,16 @@ class CogNotezApp {
         tagsHtml += '</div>';
 
         tagsDisplay.innerHTML = tagsHtml;
+
+        // Wrap tags and date in a flex container for inline layout when tags exist
+        const existingWrapper = document.querySelector('.tags-date-wrapper');
+        if (!existingWrapper && noteDate && noteInfo && noteDate.parentElement === noteInfo) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'tags-date-wrapper';
+            noteInfo.insertBefore(wrapper, tagsDisplay.nextSibling);
+            wrapper.appendChild(tagsDisplay);
+            wrapper.appendChild(noteDate);
+        }
     }
 
     // Helper method to escape HTML
@@ -1221,13 +2857,112 @@ class CogNotezApp {
         return div.innerHTML;
     }
 
+    /**
+     * Format date and time according to current language
+     * @param {Date} date - Date object to format
+     * @param {boolean} includeTime - Whether to include time
+     * @returns {string} Formatted date string
+     */
+    formatLocalizedDateTime(date, includeTime = true) {
+        if (!date) return '';
+        
+        const lang = window.i18n ? window.i18n.getLanguage() : 'en';
+        const d = new Date(date);
+        
+        // Get date components
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = d.getFullYear();
+        const hours = d.getHours();
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        
+        let dateStr, timeStr;
+        
+        switch (lang) {
+            case 'id': // Indonesian: DD/MM/YYYY, 24-hour
+                dateStr = `${day}/${month}/${year}`;
+                if (includeTime) {
+                    timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+                }
+                break;
+            case 'ja': // Japanese: YYYY/MM/DD, 24-hour
+                dateStr = `${year}/${month}/${day}`;
+                if (includeTime) {
+                    timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+                }
+                break;
+            default: // English: MM/DD/YYYY, 12-hour with AM/PM
+                dateStr = `${month}/${day}/${year}`;
+                if (includeTime) {
+                    const hours12 = hours % 12 || 12;
+                    const ampm = hours >= 12 ? 'PM' : 'AM';
+                    timeStr = `${hours12}:${minutes} ${ampm}`;
+                }
+                break;
+        }
+        
+        return includeTime ? `${dateStr} ${timeStr}` : dateStr;
+    }
+
+    // Update note date display
+    updateNoteDate() {
+        if (!this.currentNote) return;
+
+        const noteDateElement = document.getElementById('note-date');
+        if (!noteDateElement) return;
+
+        // Try to get the latest note data from database if available
+        let modifiedDate;
+        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+            const latestNote = this.notesManager.db.getNote(this.currentNote.id);
+            if (latestNote && latestNote.modified) {
+                modifiedDate = new Date(latestNote.modified);
+                // Update currentNote with latest modified date
+                this.currentNote.modified = latestNote.modified;
+            } else {
+                modifiedDate = this.currentNote.modified ? new Date(this.currentNote.modified) : new Date();
+            }
+        } else {
+            modifiedDate = this.currentNote.modified ? new Date(this.currentNote.modified) : new Date();
+        }
+        
+        // Format the date according to current language
+        const formattedDateTime = this.formatLocalizedDateTime(modifiedDate, true);
+        const modifiedLabel = window.i18n ? window.i18n.t('editor.modified') : 'Modified';
+        noteDateElement.textContent = `${modifiedLabel}: ${formattedDateTime}`;
+    }
+
+    // Start real-time date updates
+    startNoteDateUpdates() {
+        // Clear any existing interval
+        this.stopNoteDateUpdates();
+
+        // Update immediately
+        this.updateNoteDate();
+
+        // Update every 30 seconds to feel more real-time
+        this.noteDateUpdateInterval = setInterval(() => {
+            this.updateNoteDate();
+        }, 30000);
+    }
+
+    // Stop real-time date updates
+    stopNoteDateUpdates() {
+        if (this.noteDateUpdateInterval) {
+            clearInterval(this.noteDateUpdateInterval);
+            this.noteDateUpdateInterval = null;
+        }
+    }
+
     // Show tag management dialog
     showTagManager() {
         if (!this.currentNote) {
-            this.showNotification('Please select a note first', 'info');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.showNotification(t('notifications.pleaseSelectNote', 'Please select a note first'), 'info');
             return;
         }
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const existingTags = this.currentNote.tags || [];
         const allTags = this.notesManager.db && this.notesManager.db.initialized ?
             this.notesManager.db.getAllTags() : [];
@@ -1237,12 +2972,12 @@ class CogNotezApp {
             <div id="tag-manager-modal" class="modal">
                 <div class="modal-content tag-manager-content">
                     <div class="modal-header">
-                        <h3>Manage Tags</h3>
+                        <h3>${t('editor.manageTags', 'Manage Tags')}</h3>
                         <button id="tag-manager-close" class="modal-close"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="modal-body">
                         <div class="tag-manager-section">
-                            <h4>Current Tags</h4>
+                            <h4>${t('tags.currentTags', 'Current Tags')}</h4>
                             <div id="current-tags" class="current-tags">
                                 ${existingTags.length > 0 ?
                                     existingTags.map(tagId => {
@@ -1252,18 +2987,18 @@ class CogNotezApp {
                                             <button class="tag-remove" data-tag-id="${tagId}">×</button>
                                         </span>`;
                                     }).join('') :
-                                    '<span class="no-tags">No tags assigned</span>'
+                                    `<span class="no-tags">${t('tags.noTagsAssigned', 'No tags assigned')}</span>`
                                 }
                             </div>
                         </div>
                         <div class="tag-manager-section">
-                            <h4>Add Tags</h4>
+                            <h4>${t('tags.addTags', 'Add Tags')}</h4>
                             <div class="tag-input-section">
-                                <input type="text" id="new-tag-input" placeholder="Enter tag name..." class="tag-input">
-                                <button id="add-tag-btn" class="btn-primary">Add Tag</button>
+                                <input type="text" id="new-tag-input" placeholder="${t('tags.enterTagName', 'Enter tag name...')}" class="tag-input">
+                                <button id="add-tag-btn" class="btn-primary">${t('tags.addTag', 'Add Tag')}</button>
                             </div>
                             <div class="available-tags">
-                                <h5>Available Tags</h5>
+                                <h5>${t('tags.availableTags', 'Available Tags')}</h5>
                                 <div id="available-tags-list" class="available-tags-list">
                                     ${allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
                                         `<span class="available-tag" data-tag-id="${tag.id}">
@@ -1322,11 +3057,12 @@ class CogNotezApp {
 
     // Add a new tag to the note
     async addNewTag() {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const input = document.getElementById('new-tag-input');
         const tagName = input.value.trim();
 
         if (!tagName) {
-            this.showNotification('Please enter a tag name', 'warning');
+            this.showNotification(t('notifications.pleaseEnterTagName', 'Please enter a tag name'), 'warning');
             return;
         }
 
@@ -1346,16 +3082,36 @@ class CogNotezApp {
                 if (this.notesManager.db && this.notesManager.db.initialized) {
                     tagId = this.notesManager.db.createTag({ name: tagName });
                 } else {
+                    // Fallback: create tag ID and save tag definition
                     tagId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+                    // Initialize fallback tag data structure if needed
+                    if (this.notesManager.db) {
+                        this.notesManager.db.data = this.notesManager.db.data || {};
+                        this.notesManager.db.data.tags = this.notesManager.db.data.tags || {};
+                        this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
+
+                        // Save tag definition
+                        this.notesManager.db.data.tags[tagId] = {
+                            id: tagId,
+                            name: tagName,
+                            color: '#BDABE3',
+                            created_at: new Date().toISOString()
+                        };
+                    }
                 }
             }
 
             await this.addTagToNote(tagId);
             input.value = '';
+            
+            // Refresh folder navigation to show new tag
+            await this.renderTagFolders();
 
         } catch (error) {
             console.error('Error adding tag:', error);
-            this.showNotification('Failed to add tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('tags.addTagFailed'), 'error');
         }
     }
 
@@ -1363,9 +3119,10 @@ class CogNotezApp {
     async addTagToNote(tagId) {
         if (!this.currentNote) return;
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const currentTags = this.currentNote.tags || [];
         if (currentTags.length >= 3) {
-            this.showNotification('Maximum 3 tags per note reached', 'warning');
+            this.showNotification(t('tags.maxTagsReached', 'Maximum 3 tags per note reached'), 'warning');
             return;
         }
 
@@ -1377,20 +3134,34 @@ class CogNotezApp {
                 this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
             } else {
                 this.currentNote.tags = updatedTags;
+
+                // Also update note_tags relationship in fallback mode
+                if (this.notesManager.db) {
+                    this.notesManager.db.data = this.notesManager.db.data || {};
+                    this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
+
+                    const noteTagKey = `${this.currentNote.id}_${tagId}`;
+                    this.notesManager.db.data.note_tags[noteTagKey] = {
+                        note_id: this.currentNote.id,
+                        tag_id: tagId
+                    };
+                }
+
                 this.saveNotes();
             }
 
             // Update UI
             this.displayNoteTags(this.currentNote);
-            await this.notesManager.renderNotesList();
+            await this.notesManager.renderNotesList('', this.currentFolder);
 
-            // Refresh the tag manager
+            // Refresh the tag manager and folder navigation
             this.refreshTagManager();
+            await this.renderTagFolders();
 
-            this.showNotification('Tag added successfully', 'success');
+            this.showNotification(t('notifications.tagAdded', 'Tag added successfully'), 'success');
         } catch (error) {
             console.error('Error adding tag to note:', error);
-            this.showNotification('Failed to add tag', 'error');
+            this.showNotification(t('tags.addTagFailed', 'Failed to add tag'), 'error');
         }
     }
 
@@ -1406,20 +3177,30 @@ class CogNotezApp {
                 this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
             } else {
                 this.currentNote.tags = updatedTags;
+
+                // Also remove note_tags relationship in fallback mode
+                if (this.notesManager.db && this.notesManager.db.data && this.notesManager.db.data.note_tags) {
+                    const noteTagKey = `${this.currentNote.id}_${tagId}`;
+                    delete this.notesManager.db.data.note_tags[noteTagKey];
+                }
+
                 this.saveNotes();
             }
 
             // Update UI
             this.displayNoteTags(this.currentNote);
-            await this.notesManager.renderNotesList();
+            await this.notesManager.renderNotesList('', this.currentFolder);
 
-            // Refresh the tag manager
+            // Refresh the tag manager and folder navigation
             this.refreshTagManager();
+            await this.renderTagFolders();
 
-            this.showNotification('Tag removed successfully', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.tagRemoved'), 'success');
         } catch (error) {
             console.error('Error removing tag from note:', error);
-            this.showNotification('Failed to remove tag', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.tagRemoveFailed'), 'error');
         }
     }
 
@@ -1453,23 +3234,67 @@ class CogNotezApp {
         ).join('');
     }
 
-    async saveCurrentNote(isAutoSave = false) {
+	async saveCurrentNote(isAutoSave = false) {
         if (!this.currentNote || !this.notesManager) return;
+
+        // Flush any pending debounced history before saving
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+            const editor = document.getElementById('note-editor');
+            if (editor && !this.ignoreHistoryUpdate) {
+                const cursorPos = editor.selectionStart;
+                this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+            }
+        }
 
         const title = document.getElementById('note-title').value.trim();
         const content = document.getElementById('note-editor').value;
 
         try {
-            const updateData = {
-                title: title || 'Untitled Note',
-                content: content,
-                preview: this.generatePreview(content)
-            };
+			const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+			let updateData = {
+				title: title || untitledTitle,
+				content: content,
+				preview: this.generatePreview(content)
+			};
+
+			// If note is protected, encrypt content and avoid persisting plaintext
+			if (this.currentNote.password_protected) {
+				if (!window.encryptionManager) {
+					throw new Error('Encryption manager not available');
+				}
+				const cached = this.getCachedNotePassword(this.currentNote.id);
+				if (!cached) {
+					// For auto-save without password, skip encrypting to avoid prompts
+					if (isAutoSave) {
+						return; // silently skip auto-save to prevent plaintext leak
+					}
+					const ok = await this.promptForNotePassword(this.currentNote);
+					if (!ok) return;
+				}
+				const pass = this.getCachedNotePassword(this.currentNote.id);
+				const envelope = window.encryptionManager.encryptData({ content }, pass);
+				const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+				updateData = {
+					title: title || untitledTitle,
+					content: '',
+					preview: '',
+					encrypted_content: JSON.stringify(envelope)
+				};
+			}
 
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 await this.notesManager.db.updateNote(this.currentNote.id, updateData);
-                // Refresh the current note data
-                this.currentNote = await this.notesManager.db.getNote(this.currentNote.id);
+				// Refresh the current note data
+				const updatedFromDb = await this.notesManager.db.getNote(this.currentNote.id);
+				// Preserve decrypted content in memory for protected notes
+				if (updatedFromDb && this.currentNote.password_protected) {
+					const plaintext = content;
+					this.currentNote = { ...updatedFromDb, content: plaintext };
+				} else {
+					this.currentNote = updatedFromDb;
+				}
             } else {
                 // Fallback to localStorage
                 this.currentNote.title = updateData.title;
@@ -1479,7 +3304,13 @@ class CogNotezApp {
                 this.saveNotes();
             }
 
-            await this.notesManager.renderNotesList();
+            // Preserve current search and folder filters when refreshing the list
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? (searchInput.value || '') : '';
+            await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
+
+            // Update note date display after saving
+            this.updateNoteDate();
 
             // After saving, recompute local checksum and update UI readiness if remote differs
             try {
@@ -1500,22 +3331,123 @@ class CogNotezApp {
 
             // Only show notification for manual saves, not auto-saves
             if (!isAutoSave) {
-                this.showNotification('Note saved successfully!');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.noteSavedSuccess'));
+            }
+
+            // Clear unsaved flag on tab
+            if (this.currentNote) {
+                this.markTabUnsaved(this.currentNote.id, false);
+            }
+
+            // Auto-update shared notes on Google Drive
+            if (this.currentNote.collaboration?.is_shared && 
+                this.currentNote.collaboration?.google_drive_file_id) {
+                this.updateSharedNoteOnDrive(this.currentNote).catch(error => {
+                    console.error('[Google Drive] Failed to auto-update shared note:', error);
+                    // Don't show notification for auto-update failures to avoid spam
+                });
             }
         } catch (error) {
             console.error('Error saving note:', error);
-            this.showNotification('Failed to save note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.saveFailed'), 'error');
+        }
+    }
+
+    async updateSharedNoteOnDrive(note) {
+        // Silent update of shared note on Google Drive
+        try {
+            if (!this.backendAPI) return;
+            
+            // Check if Google Drive is authenticated
+            const syncStatus = await this.backendAPI.getGoogleDriveSyncStatus();
+            if (!syncStatus || !syncStatus.isAuthenticated) {
+                return; // Silently skip if not authenticated
+            }
+
+            // Update the shared note
+            await this.backendAPI.shareNoteOnGoogleDrive(
+                note,
+                { view: true, comment: false, edit: false }, // Maintain existing permissions
+                null // No email, just update existing share
+            );
+            
+            console.log('[Google Drive] Shared note auto-updated:', note.title);
+        } catch (error) {
+            console.error('[Google Drive] Failed to auto-update shared note:', error);
+            // Don't throw, just log the error
         }
     }
 
     async renderNotesList() {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList();
+            const searchInput = document.getElementById('search-input');
+            const searchQuery = searchInput ? (searchInput.value || '') : '';
+            await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
         }
     }
 
     generatePreview(content) {
-        return content.split('\n')[0].substring(0, 100) || 'Empty note';
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        if (!content || !content.trim()) return t('notes.emptyNote');
+
+        // Split content into lines
+        const lines = content.split('\n');
+        
+        for (let line of lines) {
+            line = line.trim();
+            
+            // Skip empty lines
+            if (!line) continue;
+            
+            // Skip image markdown: ![alt](url) or ![alt][ref]
+            if (/^!\[.*?\](\(.*?\)|\[.*?\])/.test(line)) continue;
+            
+            // Skip HTML image tags: <img src="..." />
+            if (/^<img\s+.*?>/.test(line)) continue;
+            
+            // Skip standalone HTML tags without content
+            if (/^<[^>]+>$/.test(line)) continue;
+            
+            // Skip video/audio markdown embeds
+            if (/^<(video|audio|iframe)\s+.*?>/.test(line)) continue;
+            
+            // Clean the line for preview
+            let preview = line;
+            
+            // Remove markdown headers (# ## ### etc)
+            preview = preview.replace(/^#+\s*/, '');
+            
+            // Remove HTML tags but keep content
+            preview = preview.replace(/<[^>]+>/g, '');
+            
+            // Convert markdown links [text](url) to just text
+            preview = preview.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
+            
+            // Convert markdown bold/italic to plain text
+            preview = preview.replace(/\*\*([^\*]+)\*\*/g, '$1'); // bold
+            preview = preview.replace(/\*([^\*]+)\*/g, '$1'); // italic
+            preview = preview.replace(/__([^_]+)__/g, '$1'); // bold
+            preview = preview.replace(/_([^_]+)_/g, '$1'); // italic
+            
+            // Remove inline code backticks
+            preview = preview.replace(/`([^`]+)`/g, '$1');
+            
+            // Remove remaining markdown image syntax if any
+            preview = preview.replace(/!\[.*?\]\(.*?\)/g, '');
+            
+            // Clean up extra whitespace
+            preview = preview.trim();
+            
+            // If we have actual content after cleaning, use it
+            if (preview) {
+                return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
+            }
+        }
+        
+        // If no meaningful content found, return fallback
+        return t('notes.emptyNote');
     }
 
     updateNotePreview() {
@@ -1527,14 +3459,439 @@ class CogNotezApp {
 
     updateNoteTitle() {
         if (this.currentNote) {
-            this.currentNote.title = document.getElementById('note-title').value || 'Untitled Note';
+            const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+            this.currentNote.title = document.getElementById('note-title').value || untitledTitle;
         }
     }
 
     // Search functionality
     async searchNotes(query = '') {
         if (this.notesManager) {
-            await this.notesManager.renderNotesList(query);
+            await this.notesManager.renderNotesList(query, this.currentFolder);
+        }
+    }
+
+    // Folder/Category Navigation
+    setupFolderNavigation() {
+        const foldersContainer = document.getElementById('sidebar-folders');
+        if (!foldersContainer) return;
+
+        // Handle folder item clicks (All Notes, Untagged)
+        foldersContainer.addEventListener('click', async (e) => {
+            const folderItem = e.target.closest('.folder-item');
+            const tagFolderItem = e.target.closest('.tag-folder-item');
+            const createFolderBtn = e.target.closest('#create-folder-btn');
+
+            if (createFolderBtn) {
+                this.showCreateTagDialog();
+                return;
+            }
+
+            if (folderItem) {
+                const folder = folderItem.dataset.folder;
+                await this.switchFolder(folder);
+            } else if (tagFolderItem) {
+                const tagId = tagFolderItem.dataset.tagId;
+                await this.switchFolder(tagId);
+            }
+        });
+
+        // Right-click context menu for tag folders
+        foldersContainer.addEventListener('contextmenu', (e) => {
+            const tagFolderItem = e.target.closest('.tag-folder-item');
+            if (tagFolderItem) {
+                e.preventDefault();
+                const tagId = tagFolderItem.dataset.tagId;
+                this.showTagFolderContextMenu(tagId, e.clientX, e.clientY);
+            }
+        });
+
+        // Setup tags list toggle (collapsible)
+        this.setupTagsListToggle();
+
+        // Set initial active state based on saved folder
+        this.updateFolderActiveState();
+
+        // Render tag folders on load
+        this.renderTagFolders();
+    }
+
+    // Setup collapsible tags list toggle
+    setupTagsListToggle() {
+        const toggleBtn = document.getElementById('tags-toggle-btn');
+        const tagFoldersList = document.getElementById('tag-folders-list');
+        const tagsDivider = document.getElementById('tags-divider');
+        
+        if (!toggleBtn || !tagFoldersList) return;
+
+        // Restore collapsed state from localStorage
+        const isCollapsed = localStorage.getItem('tagsListCollapsed') === 'true';
+        if (isCollapsed) {
+            toggleBtn.classList.add('collapsed');
+            tagFoldersList.classList.add('collapsed');
+        }
+
+        // Toggle button click
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            this.toggleTagsList();
+        });
+
+        // Also allow clicking the "Tags" text to toggle
+        tagsDivider.addEventListener('click', (e) => {
+            // Don't toggle if clicking on the create button
+            if (e.target.closest('#create-folder-btn')) return;
+            this.toggleTagsList();
+        });
+    }
+
+    toggleTagsList() {
+        const toggleBtn = document.getElementById('tags-toggle-btn');
+        const tagFoldersList = document.getElementById('tag-folders-list');
+        
+        if (!toggleBtn || !tagFoldersList) return;
+
+        const isCollapsed = toggleBtn.classList.toggle('collapsed');
+        tagFoldersList.classList.toggle('collapsed', isCollapsed);
+        
+        // Save state to localStorage
+        localStorage.setItem('tagsListCollapsed', isCollapsed.toString());
+    }
+
+    // Update folder active state in UI
+    updateFolderActiveState() {
+        document.querySelectorAll('.folder-item, .tag-folder-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        const activeItem = document.querySelector(`.folder-item[data-folder="${this.currentFolder}"]`) ||
+                          document.querySelector(`.tag-folder-item[data-tag-id="${this.currentFolder}"]`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        } else {
+            // If saved folder no longer exists (e.g., deleted tag), default to "all"
+            this.currentFolder = 'all';
+            localStorage.setItem('currentFolder', 'all');
+            const allItem = document.querySelector('.folder-item[data-folder="all"]');
+            if (allItem) allItem.classList.add('active');
+        }
+    }
+
+    async switchFolder(folder) {
+        this.currentFolder = folder;
+        
+        // Save to localStorage for persistence
+        localStorage.setItem('currentFolder', folder);
+
+        // Update active state in UI
+        document.querySelectorAll('.folder-item, .tag-folder-item').forEach(item => {
+            item.classList.remove('active');
+        });
+
+        const activeItem = document.querySelector(`.folder-item[data-folder="${folder}"]`) ||
+                          document.querySelector(`.tag-folder-item[data-tag-id="${folder}"]`);
+        if (activeItem) {
+            activeItem.classList.add('active');
+        }
+
+        // Re-render notes list with folder filter
+        const searchQuery = document.getElementById('search-input').value || '';
+        if (this.notesManager) {
+            await this.notesManager.renderNotesList(searchQuery, folder);
+        }
+
+        // Close mobile sidebar after selecting folder
+        if (window.innerWidth <= 768 && this.uiManager) {
+            this.uiManager.closeMobileSidebar();
+        }
+    }
+
+    async renderTagFolders() {
+        const tagFoldersList = document.getElementById('tag-folders-list');
+        if (!tagFoldersList) return;
+
+        try {
+            let tags = [];
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                tags = this.notesManager.db.getAllTags();
+            }
+
+            if (tags.length === 0) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                tagFoldersList.innerHTML = `<div class="tag-folders-empty">${t('tags.noTagsCreated')}</div>`;
+                return;
+            }
+
+            // Get note counts for each tag
+            let allNotes = [];
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                allNotes = await this.notesManager.db.getAllNotes();
+            }
+
+            const tagCounts = {};
+            allNotes.forEach(note => {
+                if (note.tags && note.tags.length > 0) {
+                    note.tags.forEach(tagId => {
+                        tagCounts[tagId] = (tagCounts[tagId] || 0) + 1;
+                    });
+                }
+            });
+
+            tagFoldersList.innerHTML = tags.map(tag => {
+                const count = tagCounts[tag.id] || 0;
+                const isActive = this.currentFolder === tag.id;
+                return `
+                    <div class="tag-folder-item${isActive ? ' active' : ''}" data-tag-id="${tag.id}">
+                        <div class="tag-folder-color" style="background: ${tag.color || '#BDABE3'}"></div>
+                        <span class="tag-folder-name">${this.escapeHtml(tag.name)}</span>
+                        <span class="tag-folder-count">${count}</span>
+                    </div>
+                `;
+            }).join('');
+
+            // Update main folder counts
+            if (this.notesManager) {
+                this.notesManager.updateFolderCounts();
+            }
+            
+            // Ensure active state is properly set (handles case where saved folder was a tag)
+            this.updateFolderActiveState();
+        } catch (error) {
+            console.error('Error rendering tag folders:', error);
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            tagFoldersList.innerHTML = `<div class="tag-folders-empty">${t('tags.errorLoadingTags')}</div>`;
+        }
+    }
+
+    showCreateTagDialog() {
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        const content = `
+            <div class="create-tag-form">
+                <div class="form-group" style="margin-bottom: 16px;">
+                    <label for="new-folder-tag-name" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('tags.tagName')}</label>
+                    <input type="text" id="new-folder-tag-name" placeholder="${t('placeholder.enterTagName')}" 
+                           class="filter-input" style="width: 100%; padding: 10px 12px; border-radius: 6px;">
+                </div>
+                <div class="form-group">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">Tag Color</label>
+                    <div class="color-options" style="display: flex; gap: 8px; flex-wrap: wrap;">
+                        <button class="color-option active" data-color="#BDABE3" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #BDABE3; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#3ECF8E" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #3ECF8E; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#F59E0B" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #F59E0B; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#EF4444" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #EF4444; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#3B82F6" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #3B82F6; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#8B5CF6" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #8B5CF6; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#EC4899" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #EC4899; cursor: pointer;"></button>
+                        <button class="color-option" data-color="#06B6D4" style="width: 28px; height: 28px; border-radius: 50%; border: 2px solid transparent; background: #06B6D4; cursor: pointer;"></button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = this.createModal(t('modals.createNewTag'), content, [
+            { text: t('modals.create'), type: 'primary', action: 'create', callback: () => this.createTagFromDialog() },
+            { text: t('modals.cancel'), type: 'secondary', action: 'cancel' }
+        ]);
+
+        // Setup color selection
+        const colorOptions = modal.querySelectorAll('.color-option');
+        colorOptions.forEach(option => {
+            option.addEventListener('click', (e) => {
+                e.preventDefault();
+                colorOptions.forEach(o => {
+                    o.classList.remove('active');
+                    o.style.borderColor = 'transparent';
+                });
+                option.classList.add('active');
+                option.style.borderColor = 'var(--text-primary)';
+            });
+        });
+
+        // Focus the input
+        setTimeout(() => {
+            const input = document.getElementById('new-folder-tag-name');
+            if (input) input.focus();
+        }, 100);
+
+        // Handle Enter key to create
+        const input = document.getElementById('new-folder-tag-name');
+        if (input) {
+            input.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.createTagFromDialog();
+                    modal.remove();
+                }
+            });
+        }
+    }
+
+    async createTagFromDialog() {
+        const nameInput = document.getElementById('new-folder-tag-name');
+        const selectedColor = document.querySelector('.color-option.active');
+
+        if (!nameInput || !nameInput.value.trim()) {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.pleaseEnterTagName'), 'error');
+            return;
+        }
+
+        const tagName = nameInput.value.trim();
+        const tagColor = selectedColor ? selectedColor.dataset.color : '#BDABE3';
+
+        try {
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+                // Check if tag with same name exists
+                const existingTags = this.notesManager.db.getAllTags();
+                if (existingTags.some(t => t.name.toLowerCase() === tagName.toLowerCase())) {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.tagAlreadyExists'), 'warning');
+                    return;
+                }
+
+                this.notesManager.db.createTag({ name: tagName, color: tagColor });
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.tagAdded'), 'success');
+                await this.renderTagFolders();
+            } else {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.databaseNotAvailable'), 'error');
+            }
+        } catch (error) {
+            console.error('Error creating tag:', error);
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToCreateTag'), 'error');
+        }
+    }
+
+    showTagFolderContextMenu(tagId, x, y) {
+        // Remove existing context menu
+        const existingMenu = document.querySelector('.tag-folder-context-menu');
+        if (existingMenu) existingMenu.remove();
+
+        const menu = document.createElement('div');
+        menu.className = 'tag-folder-context-menu context-menu';
+        menu.style.cssText = `
+            position: fixed;
+            left: ${x}px;
+            top: ${y}px;
+            z-index: 1000;
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+            padding: 4px;
+            min-width: 150px;
+        `;
+
+        menu.innerHTML = `
+            <div class="context-menu-item" data-action="rename"><i class="fas fa-edit"></i> Rename</div>
+            <div class="context-menu-item" data-action="delete" style="color: #dc3545;"><i class="fas fa-trash"></i> Delete</div>
+        `;
+
+        document.body.appendChild(menu);
+
+        // Handle menu item clicks
+        menu.addEventListener('click', async (e) => {
+            const action = e.target.closest('.context-menu-item')?.dataset.action;
+            if (action === 'rename') {
+                await this.renameTagFolder(tagId);
+            } else if (action === 'delete') {
+                await this.deleteTagFolder(tagId);
+            }
+            menu.remove();
+        });
+
+        // Close on click outside
+        const closeMenu = (e) => {
+            if (!menu.contains(e.target)) {
+                menu.remove();
+                document.removeEventListener('click', closeMenu);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', closeMenu), 0);
+    }
+
+    async renameTagFolder(tagId) {
+        if (!this.notesManager || !this.notesManager.db) return;
+
+        const tag = this.notesManager.db.data.tags[tagId];
+        if (!tag) return;
+
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        const promptText = t('tags.enterTagNamePrompt');
+        const newName = prompt(promptText, tag.name);
+        if (!newName || newName.trim() === '' || newName.trim() === tag.name) return;
+
+        try {
+            this.notesManager.db.data.tags[tagId].name = newName.trim();
+            this.notesManager.db.saveToLocalStorage();
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.tagAdded'), 'success');
+            await this.renderTagFolders();
+            await this.notesManager.renderNotesList('', this.currentFolder);
+        } catch (error) {
+            console.error('Error renaming tag:', error);
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToRenameTag'), 'error');
+        }
+    }
+
+    async deleteTagFolder(tagId) {
+        if (!this.notesManager || !this.notesManager.db) return;
+
+        const tag = this.notesManager.db.data.tags[tagId];
+        if (!tag) return;
+
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        const confirmText = t('tags.deleteTagConfirm', { name: tag.name });
+        const confirmDelete = confirm(confirmText);
+        if (!confirmDelete) return;
+
+        try {
+            // Remove tag from all notes
+            const notes = await this.notesManager.db.getAllNotes();
+            for (const note of notes) {
+                if (note.tags && note.tags.includes(tagId)) {
+                    const updatedTags = note.tags.filter(t => t !== tagId);
+                    await this.notesManager.db.updateNote(note.id, { tags: updatedTags });
+                }
+            }
+
+            // Delete the tag itself
+            delete this.notesManager.db.data.tags[tagId];
+
+            // Remove from note_tags associations
+            const noteTagsToDelete = [];
+            Object.keys(this.notesManager.db.data.note_tags || {}).forEach(key => {
+                if (this.notesManager.db.data.note_tags[key].tag_id === tagId) {
+                    noteTagsToDelete.push(key);
+                }
+            });
+            noteTagsToDelete.forEach(key => {
+                delete this.notesManager.db.data.note_tags[key];
+            });
+
+            this.notesManager.db.saveToLocalStorage();
+
+            // If we were viewing this tag, switch back to all notes
+            if (this.currentFolder === tagId) {
+                await this.switchFolder('all');
+            }
+
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            this.showNotification(t('notifications.tagDeleted', { name: tag.name }), 'success');
+            await this.renderTagFolders();
+            await this.notesManager.renderNotesList('', this.currentFolder);
+
+            // Update current note's tag display if open
+            if (this.currentNote) {
+                this.displayNoteTags(this.currentNote);
+            }
+        } catch (error) {
+            console.error('Error deleting tag:', error);
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToDeleteTag'), 'error');
         }
     }
 
@@ -1546,8 +3903,20 @@ class CogNotezApp {
                 console.warn('Notes array is not valid, resetting to empty array');
                 this.notes = [];
             }
+
+            // Save notes to localStorage
             localStorage.setItem('notes', JSON.stringify(this.notes));
             console.log(`[DEBUG] Saved ${this.notes.length} notes to localStorage`);
+
+            // Also save tag data if available (for fallback compatibility)
+            if (this.notesManager && this.notesManager.db && this.notesManager.db.data) {
+                const tagData = {
+                    tags: this.notesManager.db.data.tags || {},
+                    note_tags: this.notesManager.db.data.note_tags || {}
+                };
+                localStorage.setItem('cognotez_fallback_tags', JSON.stringify(tagData));
+                console.log(`[DEBUG] Saved tag data to localStorage fallback`);
+            }
         } catch (error) {
             console.error('Error saving notes to localStorage:', error);
             // Try to save with error handling
@@ -1592,7 +3961,7 @@ class CogNotezApp {
             element.innerHTML = `
                 <div class="note-item-title">${this.escapeHtml(note.title)}</div>
                 <div class="note-item-preview">${this.escapeHtml(note.preview || '')}</div>
-                <div class="note-item-date">${new Date(note.modified || note.created).toLocaleDateString()}</div>
+                <div class="note-item-date">${this.formatLocalizedDateTime(note.modified || note.created, false)}</div>
             `;
 
             element.addEventListener('click', () => this.switchToNoteWithWarning(note.id));
@@ -1662,6 +4031,220 @@ class CogNotezApp {
         }, 300);
     }
 
+    closeAllModals() {
+        const modals = document.querySelectorAll('.modal');
+        modals.forEach(modal => {
+            if (modal.parentNode) {
+                modal.parentNode.removeChild(modal);
+            }
+        });
+    }
+
+    // Show confirmation dialog (replaces native confirm())
+    showConfirmation(title, message) {
+        return new Promise((resolve) => {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const cancelText = t('modals.cancel', 'Cancel');
+            const confirmText = t('modals.confirm', 'Confirm');
+            
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0; color: var(--text-primary); white-space: pre-line;">
+                        ${this.escapeHtml(message)}
+                    </p>
+                </div>
+            `;
+
+            const modal = this.createModal(title, content, [
+                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(false) },
+                { text: confirmText, type: 'primary', action: 'confirm', callback: () => resolve(true) }
+            ]);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve(false);
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    // Show input prompt dialog (replaces native prompt())
+    showInputPrompt(title, message, defaultValue = '', placeholder = '') {
+        return new Promise((resolve) => {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const cancelText = t('modals.cancel', 'Cancel');
+            const okText = t('modals.ok', 'OK');
+            
+            const inputId = 'prompt-input-' + Date.now();
+            const content = `
+                <div style="padding: 10px 0;">
+                    ${message ? `<p style="margin: 0 0 16px 0; color: var(--text-primary);">${this.escapeHtml(message)}</p>` : ''}
+                    <input type="text" 
+                           id="${inputId}" 
+                           class="ai-dialog-input" 
+                           placeholder="${this.escapeHtml(placeholder)}" 
+                           value="${this.escapeHtml(defaultValue)}"
+                           style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-size: 14px;">
+                </div>
+            `;
+
+            const modal = this.createModal(title, content, [
+                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(null) },
+                { text: okText, type: 'primary', action: 'confirm', callback: () => {
+                    const input = modal.querySelector(`#${inputId}`);
+                    resolve(input ? input.value.trim() : null);
+                }}
+            ]);
+
+            // Focus input on mount
+            setTimeout(() => {
+                const input = modal.querySelector(`#${inputId}`);
+                if (input) {
+                    input.focus();
+                    input.select();
+                }
+            }, 100);
+
+            // Handle Enter key
+            const handleEnter = (e) => {
+                if (e.key === 'Enter') {
+                    const input = modal.querySelector(`#${inputId}`);
+                    const okBtn = modal.querySelector('[data-action="confirm"]');
+                    if (okBtn && input) {
+                        e.preventDefault();
+                        okBtn.click();
+                    }
+                }
+            };
+            modal.addEventListener('keydown', handleEnter);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve(null);
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(null);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    // Show About dialog
+    async showAboutDialog() {
+        try {
+            const version = await ipcRenderer.invoke('get-app-version');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const content = `
+                <div style="padding: 20px 0; text-align: center;">
+                    <div style="margin-bottom: 24px;">
+                        <h2 style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 24px; font-weight: 600;">
+                            CogNotez
+                        </h2>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 16px;">
+                            ${t('about.subtitle', 'AI-Powered Note App')}
+                        </p>
+                    </div>
+                    <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-secondary, rgba(128, 128, 128, 0.1)); border-radius: 8px;">
+                        <p style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 14px;">
+                            <strong>${t('about.versionLabel', 'Version:')}</strong> ${this.escapeHtml(version)}
+                        </p>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            ${t('about.descriptionLine1', 'An offline-first note-taking application')}<br>
+                            ${t('about.descriptionLine2', 'with local LLM integration.')}
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px; color: var(--text-secondary); font-size: 12px;">
+                        <p style="margin: 0;">© 2025 KayfaHaarukku/nawka12</p>
+                    </div>
+                </div>
+            `;
+
+            this.createModal(t('about.title', 'About CogNotez'), content, [
+                { text: window.i18n ? window.i18n.t('modals.close') : 'Close', type: 'primary', action: 'close' }
+            ]);
+        } catch (error) {
+            console.error('Error showing about dialog:', error);
+            // Fallback if version retrieval fails
+            const content = `
+                <div style="padding: 20px 0; text-align: center;">
+                    <div style="margin-bottom: 24px;">
+                        <h2 style="margin: 0 0 8px 0; color: var(--text-primary); font-size: 24px; font-weight: 600;">
+                            CogNotez
+                        </h2>
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 16px;">
+                            AI-Powered Note App
+                        </p>
+                    </div>
+                    <div style="margin-bottom: 24px; padding: 16px; background: var(--bg-secondary, rgba(128, 128, 128, 0.1)); border-radius: 8px;">
+                        <p style="margin: 0; color: var(--text-secondary); font-size: 13px; line-height: 1.6;">
+                            An offline-first note-taking application<br>
+                            with local LLM integration.
+                        </p>
+                    </div>
+                    <div style="margin-top: 20px; color: var(--text-secondary); font-size: 12px;">
+                        <p style="margin: 0;">© 2025 KayfaHaarukku/nawka12</p>
+                    </div>
+                </div>
+            `;
+
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.createModal(t('about.title'), content, [
+                { text: t('modals.close'), type: 'primary', action: 'close' }
+            ]);
+        }
+    }
+
+    // Show alert dialog (replaces native alert())
+    showAlert(title, message) {
+        return new Promise((resolve) => {
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0; color: var(--text-primary); white-space: pre-line;">
+                        ${this.escapeHtml(message)}
+                    </p>
+                </div>
+            `;
+
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const modal = this.createModal(title, content, [
+                { text: t('modals.ok'), type: 'primary', action: 'ok', callback: () => resolve() }
+            ]);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve();
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve();
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
     // AI functionality
     toggleAIPanel() {
         const panel = document.getElementById('ai-panel');
@@ -1684,6 +4267,16 @@ class CogNotezApp {
         }
     }
 
+    showTemplateChooser() {
+        if (this.templatesManager) {
+            this.templatesManager.show();
+        } else {
+            console.error('[Templates] Templates manager not initialized');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.templatesUnavailable'), 'error');
+        }
+    }
+
     async sendAIMessage() {
         const input = document.getElementById('ai-input');
         const message = input.value.trim();
@@ -1693,9 +4286,10 @@ class CogNotezApp {
         console.log('[DEBUG] Current note state - title:', this.currentNote?.title, 'content length:', this.currentNote?.content?.length);
         this.showAIMessage(message, 'user');
         input.value = '';
+        this.autoResizeTextarea(input);
 
-        // Show typing indicator
-        this.showAIMessage('🤔 Thinking...', 'assistant');
+        // Show typing indicator instead of "Thinking..." message
+        this.showTypingIndicator();
 
         try {
             // Prepare the AI prompt with note context and conversation history
@@ -1765,12 +4359,24 @@ Please provide a helpful response based on the note content and conversation his
                 console.log('[DEBUG] AI response received:', response.substring(0, 200) + '...');
             } else {
                 console.log('[DEBUG] AI Manager not connected, showing offline message');
-                response = '<i class="fas fa-robot"></i> AI features are currently offline. Please ensure Ollama is running locally.';
+                const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+                if (backend === 'ollama') {
+                    response = `<i class="fas fa-robot"></i> AI features are currently offline.
+
+**To enable Ollama:**
+• Start Ollama: Run "ollama serve" in terminal
+• Pull a model: "ollama pull llama2"
+• Or switch to OpenRouter in AI Settings`;
+                } else {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    response = `<i class="fas fa-robot"></i> ${t('notifications.aiFeaturesOffline')}`;
+                }
             }
 
             // Remove typing indicator and show actual response
-            this.removeLastAIMessage();
-            this.showAIMessage(response, 'assistant');
+                this.hideTypingIndicator();
+                this.removeLastAIMessage();
+                this.showAIMessage(response, 'assistant');
 
             // Save conversation to database
             if (this.aiManager && this.currentNote) {
@@ -1786,30 +4392,226 @@ Please provide a helpful response based on the note content and conversation his
         } catch (error) {
             console.error('[DEBUG] Error sending AI message:', error);
             // Remove typing indicator and show error
-            this.removeLastAIMessage();
-            this.showAIMessage('❌ Sorry, I encountered an error. Please check your AI connection.', 'assistant');
+            this.hideTypingIndicator();
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            let errorMsg = '❌ Sorry, I encountered an error. ';
+            if (backend === 'ollama') {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                errorMsg += t('notifications.checkOllamaRunning');
+            } else {
+                errorMsg += t('notifications.checkInternetAndOpenRouter');
+            }
+            this.showAIMessage(errorMsg, 'assistant');
         }
     }
 
-    showAIMessage(message, type) {
+    showAIMessage(message, type, options = {}) {
         const messagesContainer = document.getElementById('ai-messages');
+        
+        // Remove empty state if it exists
+        const emptyState = messagesContainer.querySelector('.ai-messages-empty');
+        if (emptyState) {
+            emptyState.remove();
+        }
+
         const messageElement = document.createElement('div');
         messageElement.className = `ai-message ${type}`;
 
-        // Render markdown for assistant messages, use plain text for user messages
-        if (type === 'assistant') {
-            messageElement.innerHTML = renderMarkdown(message);
+        // Create avatar
+        const avatar = document.createElement('div');
+        avatar.className = 'ai-message-avatar';
+        if (type === 'user') {
+            avatar.innerHTML = '<i class="fas fa-user"></i>';
         } else {
-            messageElement.textContent = message;
+            avatar.innerHTML = '<i class="fas fa-robot"></i>';
         }
 
+        // Create message content wrapper
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'ai-message-content';
+
+        // Create message bubble
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-message-bubble';
+
+        // Render markdown for assistant messages, use plain text for user messages
+        if (type === 'assistant') {
+            bubble.innerHTML = renderMarkdown(message);
+        } else {
+            bubble.textContent = message;
+        }
+
+        // Create message meta (timestamp and actions)
+        const meta = document.createElement('div');
+        meta.className = 'ai-message-meta';
+
+        const timestamp = document.createElement('div');
+        timestamp.className = 'ai-message-timestamp';
+        const now = new Date();
+        timestamp.textContent = now.toLocaleTimeString('en-US', { 
+            hour: '2-digit', 
+            minute: '2-digit' 
+        });
+
+        const actions = document.createElement('div');
+        actions.className = 'ai-message-actions';
+
+        // Copy button
+        const copyBtn = document.createElement('button');
+        copyBtn.className = 'ai-message-action';
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        copyBtn.title = t('tooltips.copyMessage');
+        copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+        copyBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const textToCopy = type === 'assistant' ? message : bubble.textContent;
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.copiedToClipboard'), 'success');
+                copyBtn.innerHTML = '<i class="fas fa-check"></i>';
+                setTimeout(() => {
+                    copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy:', err);
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.copyFailed'), 'error');
+            });
+        });
+
+        actions.appendChild(copyBtn);
+
+        // Add regenerate button for assistant messages (if not a welcome message)
+        if (type === 'assistant' && !options.isWelcome && !message.includes('Hello! I\'m your AI assistant')) {
+            const regenerateBtn = document.createElement('button');
+            regenerateBtn.className = 'ai-message-action';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            regenerateBtn.title = t('tooltips.regenerateResponse');
+            regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
+            
+            // Capture app instance for use in event listener
+            const appInstance = this;
+            
+            regenerateBtn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                // Find the user message that prompted this response
+                const messages = Array.from(messagesContainer.querySelectorAll('.ai-message'));
+                const currentIndex = messages.indexOf(messageElement);
+                let userMessage = null;
+                
+                // Look backwards for the user message
+                for (let i = currentIndex - 1; i >= 0; i--) {
+                    if (messages[i].classList.contains('user')) {
+                        userMessage = messages[i].querySelector('.ai-message-bubble').textContent;
+                        break;
+                    }
+                }
+
+                if (userMessage) {
+                    // Remove current assistant message
+                    messageElement.remove();
+                    // Show typing indicator
+                    appInstance.showTypingIndicator();
+                    // Regenerate response
+                    try {
+                        const response = await appInstance.aiManager.askQuestion(userMessage, appInstance.currentNote?.content || '');
+                        appInstance.hideTypingIndicator();
+                        appInstance.showAIMessage(response, 'assistant');
+                    } catch (error) {
+                        appInstance.hideTypingIndicator();
+                        appInstance.showAIMessage(`❌ Failed to regenerate: ${error.message}`, 'assistant');
+                    }
+                }
+            });
+            actions.appendChild(regenerateBtn);
+        }
+
+        meta.appendChild(timestamp);
+        meta.appendChild(actions);
+
+        // Assemble message structure
+        contentWrapper.appendChild(bubble);
+        contentWrapper.appendChild(meta);
+        messageElement.appendChild(avatar);
+        messageElement.appendChild(contentWrapper);
+
         messagesContainer.appendChild(messageElement);
-        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        
+        // Smooth scroll to bottom
+        setTimeout(() => {
+            messagesContainer.scrollTo({
+                top: messagesContainer.scrollHeight,
+                behavior: 'smooth'
+            });
+        }, 100);
+    }
+
+    showTypingIndicator() {
+        const messagesContainer = document.getElementById('ai-messages');
+        const typingElement = document.createElement('div');
+        typingElement.className = 'ai-message assistant';
+        typingElement.id = 'ai-typing-indicator';
+        
+        const avatar = document.createElement('div');
+        avatar.className = 'ai-message-avatar';
+        avatar.innerHTML = '<i class="fas fa-robot"></i>';
+        
+        const contentWrapper = document.createElement('div');
+        contentWrapper.className = 'ai-message-content';
+        
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-message-bubble';
+        
+        const typingIndicator = document.createElement('div');
+        typingIndicator.className = 'ai-typing-indicator';
+        typingIndicator.innerHTML = '<div class="ai-typing-dot"></div><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div>';
+        
+        bubble.appendChild(typingIndicator);
+        contentWrapper.appendChild(bubble);
+        typingElement.appendChild(avatar);
+        typingElement.appendChild(contentWrapper);
+        
+        messagesContainer.appendChild(typingElement);
+        messagesContainer.scrollTo({
+            top: messagesContainer.scrollHeight,
+            behavior: 'smooth'
+        });
+    }
+
+    hideTypingIndicator() {
+        const typingIndicator = document.getElementById('ai-typing-indicator');
+        if (typingIndicator) {
+            typingIndicator.remove();
+        }
+    }
+
+    showWelcomeMessage() {
+        const messagesContainer = document.getElementById('ai-messages');
+        messagesContainer.innerHTML = '';
+        
+        const emptyState = document.createElement('div');
+        emptyState.className = 'ai-messages-empty';
+        emptyState.innerHTML = `
+            <div class="ai-messages-empty-icon">
+                <i class="fas fa-robot"></i>
+            </div>
+            <div class="ai-messages-empty-title">${window.i18n ? window.i18n.t('ai.assistant') : 'AI Assistant'}</div>
+            <div class="ai-messages-empty-description">
+                ${window.i18n ? window.i18n.t('ai.welcomeMessage') : "I'm here to help! Select text and right-click for AI features, or ask me anything about your note."}
+            </div>
+        `;
+        
+        messagesContainer.appendChild(emptyState);
+    }
+
+    autoResizeTextarea(textarea) {
+        textarea.style.height = 'auto';
+        textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
     }
 
     removeLastAIMessage() {
         const messagesContainer = document.getElementById('ai-messages');
-        const messages = messagesContainer.querySelectorAll('.ai-message');
+        const messages = messagesContainer.querySelectorAll('.ai-message:not(#ai-typing-indicator)');
         if (messages.length > 0) {
             messages[messages.length - 1].remove();
         }
@@ -1828,8 +4630,8 @@ Please provide a helpful response based on the note content and conversation his
         const messagesContainer = document.getElementById('ai-messages');
         messagesContainer.innerHTML = '';
 
-        // Show welcome message
-        this.showAIMessage('Hello! I\'m your AI assistant. Select some text and right-click to use AI features, or ask me anything about your note.', 'assistant');
+        // Show welcome message with empty state
+        this.showWelcomeMessage();
     }
 
     async loadConversationHistory(noteId) {
@@ -1845,42 +4647,25 @@ Please provide a helpful response based on the note content and conversation his
             if (conversations.length > 0) {
                 const messagesContainer = document.getElementById('ai-messages');
 
-                // Clear existing messages (keep welcome message if any)
-                const welcomeMessages = messagesContainer.querySelectorAll('.ai-message');
-                if (welcomeMessages.length === 1 && welcomeMessages[0].textContent.includes('Hello! I\'m your AI assistant')) {
-                    // Keep the welcome message and add history below it
-                } else {
-                    messagesContainer.innerHTML = '';
-                }
-
-                // Add a separator for conversation history
-                const separator = document.createElement('div');
-                separator.className = 'ai-message history-separator';
-                separator.textContent = `--- Previous Conversations (${conversations.length} messages) ---`;
-                separator.style.fontStyle = 'italic';
-                separator.style.color = 'var(--text-secondary)';
-                separator.style.fontSize = '12px';
-                separator.style.textAlign = 'center';
-                separator.style.margin = '8px 0';
-                messagesContainer.appendChild(separator);
+                // Clear existing messages and empty state
+                messagesContainer.innerHTML = '';
 
                 // Display conversations in chronological order (oldest first)
                 conversations.reverse().forEach(conv => {
-                    // Add user message (plain text)
-                    const userMessage = document.createElement('div');
-                    userMessage.className = 'ai-message user';
-                    userMessage.textContent = conv.user_message;
-                    messagesContainer.appendChild(userMessage);
-
-                    // Add AI response (with markdown rendering)
-                    const aiMessage = document.createElement('div');
-                    aiMessage.className = 'ai-message assistant';
-                    aiMessage.innerHTML = renderMarkdown(conv.ai_response);
-                    messagesContainer.appendChild(aiMessage);
+                    // Add user message
+                    this.showAIMessage(conv.user_message, 'user');
+                    
+                    // Add AI response
+                    this.showAIMessage(conv.ai_response, 'assistant');
                 });
 
                 // Scroll to bottom to show latest messages
-                messagesContainer.scrollTop = messagesContainer.scrollHeight;
+                setTimeout(() => {
+                    messagesContainer.scrollTo({
+                        top: messagesContainer.scrollHeight,
+                        behavior: 'smooth'
+                    });
+                }, 100);
 
                 console.log('[DEBUG] Loaded', conversations.length, 'conversation messages');
             }
@@ -1889,45 +4674,130 @@ Please provide a helpful response based on the note content and conversation his
         }
     }
 
-    // Context menu
-    showContextMenu(e) {
-        // Hide any existing context menus
-        this.hideAIContextMenu();
+    // Unified Context Menu
+    showContextMenu(e, selectedText = '') {
         this.hideContextMenu();
-
-        // Show regular context menu with basic options
+        
         const menu = document.getElementById('context-menu');
-        const x = e.pageX || (e.clientX + window.scrollX);
-        const y = e.pageY || (e.clientY + window.scrollY);
+        const hasSelection = selectedText.length > 0;
+        
+        // Show/hide menu items based on context
+        const aiItems = menu.querySelectorAll('.context-menu-ai');
+        const generateItem = menu.querySelector('[data-action="generate-ai"]');
+        const editItem = menu.querySelector('[data-action="edit-ai"]');
+        const summarizeItem = menu.querySelector('[data-action="summarize"]');
+        const askItem = menu.querySelector('[data-action="ask-ai"]');
+        const cutItem = menu.querySelector('[data-action="cut"]');
+        const copyItem = menu.querySelector('[data-action="copy"]');
+        const pasteItem = menu.querySelector('[data-action="paste"]');
+        const downloadItem = menu.querySelector('[data-action="download-media"]');
+        const separator = menu.querySelector('.context-menu-separator');
 
+        // Check if context menu was triggered from editor (textarea)
+        // Content-modifying operations (edit, generate) only work when right-clicking on the editor
+        const isEditorContext = this.contextElement && this.contextElement.tagName === 'TEXTAREA';
+        
+        // AI items that modify content (edit, generate) only work when clicking on editor
+        // AI items that don't modify content (summarize, ask) work everywhere
+
+        // Edit AI: only when text selected AND clicking on editor (textarea)
+        if (editItem) {
+            const shouldShow = hasSelection && isEditorContext;
+            editItem.style.display = shouldShow ? 'flex' : 'none';
+            if (!isEditorContext) {
+                editItem.classList.add('disabled');
+            } else {
+                editItem.classList.remove('disabled');
+            }
+        }
+
+        // Generate AI: only when NO text selected AND clicking on editor (textarea)
+        if (generateItem) {
+            const shouldShow = !hasSelection && isEditorContext;
+            generateItem.style.display = shouldShow ? 'flex' : 'none';
+            if (!isEditorContext) {
+                generateItem.classList.add('disabled');
+            } else {
+                generateItem.classList.remove('disabled');
+            }
+        }
+
+        // Summarize and Ask AI work in both edit and preview modes when text is selected
+        if (summarizeItem) {
+            const shouldShow = hasSelection;
+            summarizeItem.style.display = shouldShow ? 'flex' : 'none';
+            // These don't modify content, so they work in preview mode
+        }
+
+        if (askItem) {
+            const shouldShow = hasSelection;
+            askItem.style.display = shouldShow ? 'flex' : 'none';
+            // These don't modify content, so they work in preview mode
+        }
+
+        separator.style.display = hasSelection ? 'block' : 'none';
+        
+        // Cut/Copy enabled only when text is selected
+        if (cutItem) {
+            if (hasSelection && this.contextElement && this.contextElement.tagName === 'TEXTAREA') {
+                cutItem.classList.remove('disabled');
+            } else {
+                cutItem.classList.add('disabled');
+            }
+        }
+        
+        if (copyItem) {
+            copyItem.classList.toggle('disabled', !hasSelection);
+        }
+        
+        // Paste only works in editor mode (textarea)
+        if (pasteItem) {
+            if (this.contextElement && this.contextElement.tagName === 'TEXTAREA') {
+                pasteItem.classList.remove('disabled');
+            } else {
+                pasteItem.classList.add('disabled');
+            }
+        }
+
+        // Show download option when right-clicking on media elements in preview pane
+        if (downloadItem) {
+            const hasMediaElement = this.contextMediaElement && !isEditorContext;
+            downloadItem.style.display = hasMediaElement ? 'flex' : 'none';
+
+            if (hasMediaElement) {
+                // Enable download item if we have a media element
+                downloadItem.classList.remove('disabled');
+            }
+        }
+        
         // Position the menu
-        const menuWidth = 200;
-        const menuHeight = 120;
-
+        const x = e.clientX;
+        const y = e.clientY;
+        const menuWidth = 250;
+        const menuHeight = hasSelection ? 300 : 150;
+        
         let finalX = x;
         let finalY = y;
-
+        
         if (x + menuWidth > window.innerWidth) {
             finalX = x - menuWidth;
         }
-
+        
         if (y + menuHeight > window.innerHeight) {
             finalY = y - menuHeight;
         }
-
+        
         finalX = Math.max(10, finalX);
         finalY = Math.max(10, finalY);
-
-        menu.style.position = 'fixed';
+        
         menu.style.left = finalX + 'px';
         menu.style.top = finalY + 'px';
-        menu.style.zIndex = '9999';
         menu.classList.remove('hidden');
-
+        
         // Handle menu item clicks
         const handleClick = (e) => {
             const target = e.target.closest('.context-menu-item');
-            if (target) {
+            if (target && !target.classList.contains('disabled')) {
                 const action = target.dataset.action;
                 if (action) {
                     this.handleContextAction(action);
@@ -1935,14 +4805,8 @@ Please provide a helpful response based on the note content and conversation his
                 }
             }
         };
-
+        
         menu.addEventListener('click', handleClick, { once: true });
-
-        // Close menu when clicking elsewhere
-        setTimeout(() => {
-            document.addEventListener('click', () => this.hideContextMenu(), { once: true });
-            document.addEventListener('contextmenu', () => this.hideContextMenu(), { once: true });
-        }, 10);
     }
 
     hideContextMenu() {
@@ -1950,211 +4814,255 @@ Please provide a helpful response based on the note content and conversation his
         if (menu) menu.classList.add('hidden');
     }
 
-    handleContextAction(action) {
-        switch (action) {
-            case 'summarize':
-                this.summarizeNote();
-                break;
-            case 'ask-ai':
-                // Show AI dialog for asking questions about the current note
-                this.showAIDialog('Ask AI About Current Note',
-                    `Ask a question about the current note: "${this.currentNote ? this.currentNote.title : 'Untitled'}"`,
-                    'ask-ai');
-                break;
-            case 'edit-ai':
-                // This would need the full note content, maybe show a dialog
-                this.showNotification('Please select text to edit with AI', 'info');
-                break;
-        }
-    }
-
-    // AI Context Menu
-    showAIContextMenu(e, selectedText) {
-        console.log('[DEBUG] Showing AI context menu for selected text:', selectedText);
-        this.hideAIContextMenu(); // Hide any existing AI context menu
-        this.selectedText = selectedText;
-        // Preserve selection during AI context menu operations
-        this.preserveSelection = true;
-        console.log('[DEBUG] Set this.selectedText to:', this.selectedText);
-        console.log('[DEBUG] Set preserveSelection to true');
-
-        const menu = document.createElement('div');
-        menu.id = 'ai-context-menu';
-        menu.className = 'context-menu ai-context-menu';
-
-        menu.innerHTML = `
-            <div class="context-menu-item" data-action="summarize">
-                <i class="fas fa-file-alt"></i> Summarize Selection
-            </div>
-            <div class="context-menu-item" data-action="ask-ai">
-                <i class="fas fa-robot"></i> Ask AI About Selection
-            </div>
-            <div class="context-menu-item" data-action="edit-ai">
-                <i class="fas fa-edit"></i> Edit Selection with AI
-            </div>
-            <div class="context-menu-item" data-action="rewrite">
-                <i class="fas fa-palette"></i> Rewrite Selection
-            </div>
-            <div class="context-menu-item" data-action="key-points">
-                <i class="fas fa-clipboard-list"></i> Extract Key Points
-            </div>
-            <div class="context-menu-item" data-action="generate-tags">
-                <i class="fas fa-tags"></i> Generate Tags
-            </div>
-        `;
-
-        // Position the menu at the mouse cursor with viewport bounds checking
-        const x = e.pageX || (e.clientX + window.scrollX);
-        const y = e.pageY || (e.clientY + window.scrollY);
-
-        // Get menu dimensions (approximate)
-        const menuWidth = 220;
-        const menuHeight = 280;
-
-        // Adjust position if menu would go off-screen
-        let finalX = x;
-        let finalY = y;
-
-        if (x + menuWidth > window.innerWidth) {
-            finalX = x - menuWidth;
-        }
-
-        if (y + menuHeight > window.innerHeight) {
-            finalY = y - menuHeight;
-        }
-
-        // Ensure minimum positions
-        finalX = Math.max(10, finalX);
-        finalY = Math.max(10, finalY);
-
-        menu.style.position = 'fixed'; // Use fixed positioning for better control
-        menu.style.left = finalX + 'px';
-        menu.style.top = finalY + 'px';
-        menu.style.zIndex = '9999';
-
-        console.log('[DEBUG] AI context menu positioned at:', x, y);
-
-        // Handle menu item clicks
-        menu.addEventListener('click', (e) => {
-            const target = e.target.closest('.context-menu-item');
-            if (target) {
-                const action = target.dataset.action;
-                console.log('[DEBUG] AI context menu action clicked:', action);
-                if (action) {
-                    this.handleAIContextAction(action);
-                    this.hideAIContextMenu();
-                }
-            }
-        });
-
-        document.body.appendChild(menu);
-
-        // Force layout and ensure menu is visible
-        menu.offsetHeight; // Force reflow
-
-        // Debug: Check if element was added and is visible
-        console.log('[DEBUG] Context menu element added to DOM:', menu);
-        console.log('[DEBUG] Context menu visibility:', getComputedStyle(menu).visibility);
-        console.log('[DEBUG] Context menu display:', getComputedStyle(menu).display);
-        console.log('[DEBUG] Context menu position:', menu.style.left, menu.style.top);
-
-        // Ensure menu is visible with forced styles
-        menu.style.display = 'block';
-        menu.style.visibility = 'visible';
-        menu.style.opacity = '1';
-
-        // Additional debug after a short delay
-        setTimeout(() => {
-            console.log('[DEBUG] Context menu after delay - visibility:', getComputedStyle(menu).visibility);
-            console.log('[DEBUG] Context menu after delay - display:', getComputedStyle(menu).display);
-            console.log('[DEBUG] Context menu still in DOM:', document.body.contains(menu));
-        }, 100);
-
-        // Close menu when clicking elsewhere
-        const closeMenu = () => {
-            console.log('[DEBUG] Closing context menu');
-            this.hideAIContextMenu();
-        };
-
-        // Use setTimeout to avoid immediate closing
-        setTimeout(() => {
-            document.addEventListener('click', closeMenu, { once: true });
-            document.addEventListener('contextmenu', closeMenu, { once: true });
-        }, 10);
-    }
-
-    hideAIContextMenu() {
-        const menu = document.getElementById('ai-context-menu');
-        if (menu) {
-            menu.remove();
-        }
-        // Reset preserve selection flag when context menu is hidden
-        // But only if we're not in an AI dialog
-        if (!document.getElementById('ai-dialog').classList.contains('hidden')) {
-            console.log('[DEBUG] AI dialog is open, keeping preserveSelection = true');
-        } else {
-            console.log('[DEBUG] Resetting preserveSelection to false');
-            this.preserveSelection = false;
-        }
-    }
-
-    handleOutsideClick(e) {
-        const menu = document.getElementById('ai-context-menu');
-        if (menu && !menu.contains(e.target)) {
-            this.hideAIContextMenu();
-        }
-    }
-
-    handleAIContextAction(action) {
-        console.log('[DEBUG] handleAIContextAction called with action:', action);
-        console.log('[DEBUG] handleAIContextAction: selectedText =', this.selectedText ? this.selectedText.substring(0, 50) + '...' : 'none');
-        console.log('[DEBUG] handleAIContextAction: selectionStart =', this.selectionStart, 'selectionEnd =', this.selectionEnd);
+    async handleContextAction(action) {
+        const editor = document.getElementById('note-editor');
         
-        if (!this.aiManager) {
-            console.error('[DEBUG] handleAIContextAction: AI manager not available');
-            this.showNotification('AI manager not available', 'error');
-            return;
-        }
+        switch (action) {
+            case 'cut':
+                if (this.selectedText && this.contextElement === editor) {
+                    await navigator.clipboard.writeText(this.selectedText);
+                    // Replace selection with empty string
+                    const before = editor.value.substring(0, this.selectionStart);
+                    const after = editor.value.substring(this.selectionEnd);
+                    editor.value = before + after;
+                    editor.setSelectionRange(this.selectionStart, this.selectionStart);
+                    this.updateNotePreview();
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.textCut'), 'success');
+                }
+                break;
+                
+            case 'copy':
+                if (this.selectedText) {
+                    await navigator.clipboard.writeText(this.selectedText);
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.textCopied'), 'success');
+                }
+                break;
+                
+            case 'paste':
+                if (this.contextElement === editor) {
+                    try {
+                        const text = await navigator.clipboard.readText();
+                        const before = editor.value.substring(0, this.selectionStart);
+                        const after = editor.value.substring(this.selectionEnd);
+                        editor.value = before + text + after;
+                        const newPos = this.selectionStart + text.length;
+                        editor.setSelectionRange(newPos, newPos);
+                        this.updateNotePreview();
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.textPasted'), 'success');
+                    } catch (err) {
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('notifications.failedToPaste'), 'error');
+                    }
+                }
+                break;
+                
+            case 'summarize':
+                if (this.selectedText) {
+                    this.preserveSelection = true;
+                    await this.summarizeSelection();
+                } else {
+                    await this.summarizeNote();
+                }
+                break;
+                
+            case 'ask-ai':
+                this.preserveSelection = true;
+                if (this.selectedText) {
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    this.showAIDialog(t('ai.askAboutSelection'),
+                        t('ai.askAboutSelectionMessage', { text: this.selectedText.substring(0, 50) + (this.selectedText.length > 50 ? '...' : '') }),
+                        'ask-ai');
+                } else {
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    this.showAIDialog(t('ai.askAboutNote'),
+                        t('ai.askAboutNoteMessage', { title: this.currentNote ? this.currentNote.title : 'Untitled' }),
+                        'ask-ai');
+                }
+                break;
+                
+            case 'edit-ai':
+                if (this.selectedText) {
+                    this.preserveSelection = true;
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showAIDialog(t('ai.editSelectionWithAI'),
+                        t('ai.howToEditText'),
+                        'edit-ai');
+                } else {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.selectTextToEditAI'), 'info');
+                }
+                break;
 
-        if (!this.selectedText) {
-            console.error('[DEBUG] handleAIContextAction: No selected text available');
-            this.showNotification('No text selected', 'error');
-            return;
-        }
+            case 'generate-ai':
+                this.generateContentWithAI();
+                break;
 
+            case 'download-media':
+                if (this.contextMediaElement) {
+                    await this.downloadMediaFromElement(this.contextMediaElement);
+                }
+                break;
+        }
+    }
+
+    /**
+     * Download media file from a media element (img, video, audio)
+     * @param {HTMLElement} mediaElement - The media element to download from
+     */
+    async downloadMediaFromElement(mediaElement) {
         try {
-            switch (action) {
-                case 'summarize':
-                    console.log('[DEBUG] handleAIContextAction: calling summarizeSelection');
-                    this.summarizeSelection();
-                    break;
-                case 'ask-ai':
-                    console.log('[DEBUG] handleAIContextAction: calling askAIAboutSelection');
-                    this.askAIAboutSelection();
-                    break;
-                case 'edit-ai':
-                    console.log('[DEBUG] handleAIContextAction: calling editSelectionWithAI');
-                    this.editSelectionWithAI();
-                    break;
-                case 'rewrite':
-                    console.log('[DEBUG] handleAIContextAction: calling rewriteSelection');
-                    this.rewriteSelection();
-                    break;
-                case 'key-points':
-                    console.log('[DEBUG] handleAIContextAction: calling extractKeyPoints');
-                    this.extractKeyPoints();
-                    break;
-                case 'generate-tags':
-                    console.log('[DEBUG] handleAIContextAction: calling generateTags');
-                    this.generateTags();
-                    break;
-                default:
-                    console.error('[DEBUG] handleAIContextAction: Unknown action:', action);
+            const src = mediaElement.src || mediaElement.querySelector('source')?.src;
+
+            if (!src) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.mediaSourceNotFound'), 'error');
+                return;
+            }
+
+            // Extract file ID from cognotez-media:// URL
+            if (src.startsWith('cognotez-media://')) {
+                const fileId = src.replace('cognotez-media://', '');
+
+                if (this.richMediaManager) {
+                    // First try to get media reference from RichMediaManager (for local files)
+                    let mediaRef = await this.richMediaManager.getMediaReference(fileId);
+
+                    if (mediaRef) {
+                        // Use the existing downloadAttachment method for tracked files
+                        await this.richMediaManager.downloadAttachment(mediaRef);
+                        return;
+                    }
+
+                    // If not found in RichMediaManager, try direct filesystem access for synced files
+                    try {
+                        const fileResult = await this.downloadMediaFromFilesystem(fileId);
+                        if (fileResult) {
+                            // Get filename from the result (includes extension)
+                            const filename = fileResult.filename || fileId;
+
+                            // Create a blob and trigger download
+                            const blob = new Blob([fileResult.buffer]);
+                            const url = URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = filename;
+                            a.click();
+                            URL.revokeObjectURL(url);
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('notifications.mediaDownloaded'), 'success');
+                            return;
+                        }
+                    } catch (error) {
+                        console.warn('[App] Filesystem download failed, trying alternative methods:', error);
+                    }
+
+                    // Fallback: try to get original filename from attachments or use fileId
+                    const attachments = this.richMediaManager.getAttachmentsForNote ? this.richMediaManager.getAttachmentsForNote('downloaded_media') : [];
+                    const attachment = attachments.find(att => att.id === fileId);
+                    const originalName = attachment?.name || fileId;
+
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    this.showNotification(t('notifications.mediaFileNotFound', { name: originalName }), 'error');
+                } else {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('notifications.mediaManagerNotAvailable'), 'error');
+                }
+            } else {
+                // For external URLs, use browser download
+                const link = document.createElement('a');
+                link.href = src;
+                link.download = mediaElement.alt || mediaElement.title || 'media';
+                link.click();
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.downloadingMedia'), 'success');
             }
         } catch (error) {
-            console.error('[DEBUG] handleAIContextAction error:', error);
-            this.showNotification(`Failed to execute AI action: ${error.message}`, 'error');
+            console.error('[App] Failed to download media:', error);
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.mediaDownloadFailed'), 'error');
         }
+    }
+
+    /**
+     * Download media file directly from filesystem for synced files
+     * @param {string} fileId - The media file ID
+     * @returns {Promise<Object|null>} - Object with buffer and filename, or null if not found
+     */
+    async downloadMediaFromFilesystem(fileId) {
+        try {
+            // First try to get the original filename from RichMediaManager
+            if (this.richMediaManager) {
+                try {
+                    const mediaRef = await this.richMediaManager.getMediaReference(fileId);
+                    if (mediaRef && mediaRef.name) {
+                        // Use the original filename from the media reference
+                        const electron = require('electron');
+                        const mediaDir = await electron.ipcRenderer.invoke('get-media-directory');
+                        const filePath = `${mediaDir}/${mediaRef.name}`;
+
+                        try {
+                            const fileData = await electron.ipcRenderer.invoke('read-media-file', filePath);
+                            if (fileData) {
+                                console.log(`[App] Successfully read media file using original filename: ${mediaRef.name}`);
+                                return {
+                                    buffer: fileData,
+                                    filename: mediaRef.name
+                                };
+                            }
+                        } catch (error) {
+                            console.warn(`[App] Failed to read file with original filename: ${mediaRef.name}`, error);
+                        }
+                    }
+                } catch (error) {
+                    console.warn(`[App] Failed to get media reference for: ${fileId}`, error);
+                }
+            }
+
+            // Fallback: Use intelligent file discovery
+            const electron = require('electron');
+            const result = await electron.ipcRenderer.invoke('find-and-read-media-file', fileId);
+
+            if (result && result.buffer) {
+                console.log(`[App] Successfully read media file from filesystem: ${result.filename}`);
+                return result;
+            }
+
+            return null;
+        } catch (error) {
+            console.warn(`[App] Failed to read media file from filesystem: ${fileId}`, error);
+            return null;
+        }
+    }
+
+    // Legacy methods kept for backward compatibility with keyboard shortcuts
+    // These now redirect to the main methods
+    rewriteSelection() {
+        if (!this.selectedText) {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noTextSelected'), 'info');
+            return;
+        }
+        this.preserveSelection = true;
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showAIDialog(t('ai.rewriteSelection'),
+            t('ai.howToRewriteText'),
+            'rewrite');
+    }
+
+    extractKeyPoints() {
+        if (!this.selectedText) {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noTextSelected'), 'info');
+            return;
+        }
+        this.preserveSelection = true;
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showAIDialog(t('ai.extractKeyPoints'),
+            t('ai.extractingKeyPoints'),
+            'key-points');
     }
 
     // AI Dialog
@@ -2188,7 +5096,8 @@ Please provide a helpful response based on the note content and conversation his
         // Reset submit button text
         const submitBtn = document.getElementById('ai-dialog-submit');
         if (submitBtn) {
-            submitBtn.textContent = 'Submit';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            submitBtn.textContent = t('modals.submit');
         }
 
         // Clear selection preservation flag
@@ -2216,41 +5125,57 @@ Please provide a helpful response based on the note content and conversation his
         }
         
         this.hideAIDialog();
-        this.showLoading();
+        // Create abort controller for this AI operation
+        this.currentAIAbortController = new AbortController();
+        this.isAIOperationCancelled = false; // Reset cancellation flag
+        this.showLoading(null, true); // Show cancel button for AI operations
 
         try {
             console.log('[DEBUG] processAIDialog: calling handleAIAction with action =', actionToProcess, 'input =', input);
             await this.handleAIAction(actionToProcess, input, customData);
             console.log('[DEBUG] processAIDialog: handleAIAction completed');
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || this.isAIOperationCancelled) {
+                console.log('[DEBUG] processAIDialog: AI operation was cancelled');
+                return;
+            }
             console.error('[DEBUG] processAIDialog: AI action failed:', error);
-            this.showNotification('AI action failed. Please check your connection.', 'error');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const connectionType = backend === 'ollama' ? t('notifications.ollamaService') : t('notifications.internetConnectionAndApiKey');
+            this.showNotification(t('notifications.aiActionFailed', { connectionType }), 'error');
         } finally {
             this.hideLoading();
+            this.isAIOperationCancelled = false; // Reset flag
         }
     }
 
     async handleAIAction(action, input, customData = {}) {
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
         console.log('[DEBUG] handleAIAction called with action:', action, 'input:', input);
         console.log('[DEBUG] handleAIAction: selectedText =', this.selectedText ? this.selectedText.substring(0, 50) + '...' : 'none');
         console.log('[DEBUG] handleAIAction: selectionStart =', this.selectionStart, 'selectionEnd =', this.selectionEnd);
         
         if (!this.aiManager) {
             console.error('[DEBUG] handleAIAction: AI manager not available');
-            this.showNotification('AI manager not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.aiNotAvailable'), 'error');
             return;
         }
 
         // Check if AI manager is properly initialized
         if (!this.aiManager.isInitialized) {
             console.error('[DEBUG] handleAIAction: AI manager not fully initialized - edit approval system missing');
-            this.showNotification('AI system is still initializing. Please wait a moment and try again.', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.aiInitializing'), 'error');
             return;
         }
 
         if (!action) {
             console.error('[DEBUG] handleAIAction: No action specified');
-            this.showNotification('No AI action specified', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noAiAction'), 'error');
             return;
         }
 
@@ -2271,7 +5196,18 @@ Please provide a helpful response based on the note content and conversation his
 
                 case 'edit-ai':
                     console.log('[DEBUG] handleAIAction: Processing edit-ai action');
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
                     await this.aiManager.handleEditText(this.selectedText, input);
+                    break;
+
+                case 'generate-ai':
+                    console.log('[DEBUG] handleAIAction: Processing generate-ai action');
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
+                    await this.aiManager.handleGenerateContent(input);
                     break;
 
                 case 'rewrite':
@@ -2279,22 +5215,35 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
-                    this.updateLoadingText('Rewriting text...');
-                    this.showLoading();
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
+                    this.updateLoadingText(t('ai.rewritingText'));
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         console.log('[DEBUG] handleAIAction rewrite: starting with selectedText:', this.selectedText.substring(0, 50) + '...');
                         const style = input || customData.style || 'professional';
                         console.log('[DEBUG] handleAIAction rewrite: using style:', style);
                         const response = await this.aiManager.rewriteText(this.selectedText, style);
+                        
+                        // Check if operation was cancelled before applying result
+                        if (this.isAIOperationCancelled) {
+                            console.log('[DEBUG] handleAIAction rewrite: Operation was cancelled, not applying result');
+                            return;
+                        }
+                        
                         console.log('[DEBUG] handleAIAction rewrite: got response:', response.substring(0, 50) + '...');
                         await this.aiManager.saveConversation(noteId, `Rewrite "${this.selectedText.substring(0, 50)}..." in ${style} style`, response, this.selectedText, 'rewrite');
                         this.replaceSelection(response);
-                        this.showAIMessage('✅ Text rewritten successfully!', 'assistant');
+                        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                        this.showAIMessage(`✅ ${t('notifications.textRewrittenSuccess')}`, 'assistant');
                     } catch (error) {
                         console.error('[DEBUG] handleAIAction rewrite error:', error);
-                        this.showAIMessage(`❌ Failed to rewrite text: ${error.message}`, 'assistant');
+                        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                        this.showAIMessage(`❌ ${t('notifications.textRewriteFailed', { error: error.message })}`, 'assistant');
                     } finally {
                         this.hideLoading();
+                        this.isAIOperationCancelled = false; // Reset flag
                     }
                     break;
 
@@ -2303,14 +5252,25 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
-                    this.updateLoadingText('Extracting key points...');
-                    this.showLoading();
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
+                    this.updateLoadingText(t('ai.extractingKeyPointsLoading'));
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         const keyPointsResponse = await this.aiManager.extractKeyPoints(this.selectedText);
+                        
+                        // Check if operation was cancelled before applying result
+                        if (this.isAIOperationCancelled) {
+                            console.log('[DEBUG] handleAIAction key-points: Operation was cancelled, not applying result');
+                            return;
+                        }
+                        
                         await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, keyPointsResponse, this.selectedText, 'key-points');
                         this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${keyPointsResponse}`, 'assistant');
                     } finally {
                         this.hideLoading();
+                        this.isAIOperationCancelled = false; // Reset flag
                     }
                     break;
 
@@ -2319,33 +5279,80 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
-                    this.updateLoadingText('Generating tags...');
-                    this.showLoading();
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
+                    this.updateLoadingText(t('ai.generatingTags'));
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     try {
-                        const tagsResponse = await this.aiManager.generateTags(this.selectedText);
+                        // Include note title for better tag generation context
+                        const noteTitle = this.currentNote ? this.currentNote.title : document.getElementById('note-title').value;
+                        const tagsResponse = await this.aiManager.generateTags(this.selectedText, { noteTitle });
+                        
+                        // Check if operation was cancelled before applying result
+                        if (this.isAIOperationCancelled) {
+                            console.log('[DEBUG] handleAIAction generate-tags: Operation was cancelled, not applying result');
+                            return;
+                        }
+                        
                         await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, tagsResponse, this.selectedText, 'tags');
                         this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${tagsResponse}`, 'assistant');
                     } finally {
                         this.hideLoading();
+                        this.isAIOperationCancelled = false; // Reset flag
                     }
                     break;
 
             }
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('cancelled') || this.isAIOperationCancelled) {
+                console.log('[AI] Operation was cancelled');
+                return;
+            }
             console.error('AI action error:', error);
             // Ensure AI panel is visible for error message
             if (!this.aiPanelVisible) {
                 this.toggleAIPanel();
             }
-            this.showAIMessage('❌ AI action failed. Please check your Ollama connection.', 'assistant');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            let errorMsg = '❌ AI action failed. ';
+            if (backend === 'ollama') {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                errorMsg += t('notifications.ensureOllamaRunning');
+            } else {
+                errorMsg += t('notifications.checkInternetAndApiKey');
+            }
+            this.showAIMessage(errorMsg, 'assistant');
             this.hideLoading();
         }
+    }
+
+    // Debounced history push to prevent bloat from rapid typing
+    debouncedPushHistory(editor) {
+        // Clear any existing timer
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+        }
+
+        // Set a new timer
+        this.historyDebounceTimer = setTimeout(() => {
+            const cursorPos = editor.selectionStart;
+            this.historyManager.pushState(editor.value, cursorPos, cursorPos, cursorPos);
+            console.log('[DEBUG] History state saved (debounced)');
+        }, this.historyDebounceDelay);
     }
 
     // Undo/Redo functionality
     undo() {
         const editor = document.getElementById('note-editor');
         if (!editor) return;
+
+        // Clear any pending debounced history push
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+        }
 
         const previousState = this.historyManager.undo();
         if (previousState) {
@@ -2362,6 +5369,13 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             this.updateNotePreview();
+            
+            // Update markdown preview if visible (preview or split mode)
+            const preview = document.getElementById('markdown-preview');
+            if (preview && !preview.classList.contains('hidden')) {
+                this.renderMarkdownPreview();
+            }
+            
             this.ignoreHistoryUpdate = false;
 
             console.log('[DEBUG] Undo operation completed');
@@ -2371,6 +5385,12 @@ Please provide a helpful response based on the note content and conversation his
     redo() {
         const editor = document.getElementById('note-editor');
         if (!editor) return;
+
+        // Clear any pending debounced history push
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+        }
 
         const nextState = this.historyManager.redo();
         if (nextState) {
@@ -2387,6 +5407,13 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             this.updateNotePreview();
+            
+            // Update markdown preview if visible (preview or split mode)
+            const preview = document.getElementById('markdown-preview');
+            if (preview && !preview.classList.contains('hidden')) {
+                this.renderMarkdownPreview();
+            }
+            
             this.ignoreHistoryUpdate = false;
 
             console.log('[DEBUG] Redo operation completed');
@@ -2468,6 +5495,44 @@ Please provide a helpful response based on the note content and conversation his
         console.log('[DEBUG] replaceSelection: completed successfully, preserveSelection reset to false');
     }
 
+    insertTextAtCursor(text) {
+        console.log('[DEBUG] insertTextAtCursor called with:', text.substring(0, 100) + '...');
+
+        const editor = document.getElementById('note-editor');
+        if (!editor) {
+            console.error('[DEBUG] insertTextAtCursor: note-editor element not found');
+            return;
+        }
+
+        const start = editor.selectionStart;
+        const end = editor.selectionEnd;
+
+        console.log('[DEBUG] insertTextAtCursor: start =', start, 'end =', end);
+        console.log('[DEBUG] insertTextAtCursor: current editor content length =', editor.value.length);
+
+        // Insert the text at the cursor position
+        const before = editor.value.substring(0, start);
+        const after = editor.value.substring(end);
+        editor.value = before + text + after;
+
+        // Update the cursor position to after the inserted text
+        const newCursorPosition = start + text.length;
+        editor.setSelectionRange(newCursorPosition, newCursorPosition);
+
+        // Ensure editor maintains focus after insertion
+        editor.focus();
+
+        console.log('[DEBUG] insertTextAtCursor: updated editor content length =', editor.value.length);
+
+        // Dispatch input event to trigger autosave and word count update
+        // Note: We intentionally do NOT update this.currentNote.content here
+        // to allow the autosave mechanism to detect the change properly
+        const inputEvent = new Event('input', { bubbles: true });
+        editor.dispatchEvent(inputEvent);
+
+        console.log('[DEBUG] insertTextAtCursor: completed successfully');
+    }
+
     // Export functionality
     async exportNote(format = 'markdown') {
         if (!this.currentNote || !this.backendAPI) return;
@@ -2475,89 +5540,52 @@ Please provide a helpful response based on the note content and conversation his
         try {
             const filePath = await this.backendAPI.exportNote(this.currentNote, format);
             if (filePath) {
-                this.showNotification(`Note exported successfully to ${filePath}!`);
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.noteExportedSuccess', { path: filePath }));
             }
         } catch (error) {
             console.error('Export failed:', error);
-            this.showNotification('Failed to export note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.exportFailed'), 'error');
         }
     }
 
     // Enhanced data portability methods
-    async exportAllNotesJSON() {
-        if (!this.notes || !this.backendAPI) {
-            this.showNotification('No notes available to export', 'warning');
-            return;
-        }
-
-        if (this.notes.length === 0) {
-            this.showNotification('No notes to export. Create some notes first!', 'info');
-            return;
-        }
-
-        try {
-            this.showLoading();
-            this.updateLoadingText('Preparing notes for export...');
-
-            this.updateLoadingText(`Exporting ${this.notes.length} notes...`);
-            const filePath = await this.backendAPI.exportDatabaseJSON(this.notes, {});
-
-            if (filePath) {
-                const stats = this.notes.length > 1 ?
-                    `${this.notes.length} notes (${this.notes.reduce((sum, n) => sum + (n.word_count || 0), 0)} words)` :
-                    '1 note';
-                this.showNotification(`✅ Successfully exported ${stats} to ${filePath}!`, 'success');
-            } else {
-                throw new Error('Export returned no file path');
-            }
-            this.hideLoading();
-        } catch (error) {
-            console.error('JSON export failed:', error);
-            let errorMessage = 'Failed to export notes as JSON';
-
-            if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please choose a different location.';
-            } else if (error.message.includes('disk')) {
-                errorMessage = 'Not enough disk space for export.';
-            } else if (error.message) {
-                errorMessage = `Export failed: ${error.message}`;
-            }
-
-            this.showNotification(errorMessage, 'error');
-            this.hideLoading();
-        }
-    }
-
     async createFullBackup() {
         if (!this.backendAPI) {
-            this.showNotification('Backup functionality not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.backupUnavailable'), 'error');
             return;
         }
 
         try {
             this.showLoading();
-            this.updateLoadingText('Preparing backup...');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.updateLoadingText(t('loading.preparingBackup'));
 
             const filePath = await this.backendAPI.createBackup();
 
             if (filePath) {
-                this.showNotification(`✅ Full backup created successfully at ${filePath}!`, 'success');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.backupCreatedSuccess', { path: filePath }), 'success');
             } else {
-                this.showNotification('Backup cancelled or no location selected', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.backupCancelled'), 'info');
             }
         } catch (error) {
             console.error('Backup creation failed:', error);
 
             // Provide user-friendly error messages based on error content
-            let errorMessage = 'Failed to create backup';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            let errorMessage = t('notifications.failedToCreateBackup');
             if (error.message.includes('database file not found')) {
-                errorMessage = 'Database file not found. Please ensure the application has been used to create notes.';
+                errorMessage = t('notifications.databaseFileNotFound');
             } else if (error.message.includes('not writable')) {
-                errorMessage = 'Cannot write to the selected location. Please choose a different directory.';
+                errorMessage = t('notifications.cannotWriteToLocation');
             } else if (error.message.includes('permission denied')) {
-                errorMessage = 'Permission denied. Please check file permissions or run as administrator.';
+                errorMessage = t('notifications.permissionDeniedCheckPermissions');
             } else if (error.message.includes('disk space')) {
-                errorMessage = 'Not enough disk space to create backup.';
+                errorMessage = t('notifications.notEnoughDiskSpace');
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -2580,41 +5608,44 @@ Please provide a helpful response based on the note content and conversation his
                 await this.saveNotes();
                 this.renderNotesList();
                 this.displayNote(importedNote);
-                this.showNotification(`Note "${importedNote.title}" imported successfully!`);
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.noteImportedSuccess', { title: importedNote.title }));
             }
             this.hideLoading();
         } catch (error) {
             console.error('Import failed:', error);
-            this.showNotification('Failed to import note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.importFailed'), 'error');
             this.hideLoading();
         }
     }
 
     async importMultipleFiles() {
         if (!this.backendAPI) {
-            this.showNotification('Import functionality not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.importUnavailable'), 'error');
             return;
         }
 
         try {
             this.showLoading();
-            this.updateLoadingText('Preparing file selection...');
+            this.updateLoadingText(t('loading.preparingFileSelection'));
 
             const result = await this.backendAPI.importMultipleFiles();
 
             if (!result) {
-                this.showNotification('No files selected for import', 'info');
+                this.showNotification(t('notifications.noFilesForImport'), 'info');
                 this.hideLoading();
                 return;
             }
 
             if (result.notes.length === 0) {
-                this.showNotification('No valid files found to import', 'warning');
+                this.showNotification(t('notifications.noValidFiles'), 'warning');
                 this.hideLoading();
                 return;
             }
 
-            this.updateLoadingText(`Processing ${result.notes.length} files...`);
+                this.updateLoadingText(t('loading.processingFiles', { count: result.notes.length }));
 
             // Add imported notes
             this.notes.unshift(...result.notes);
@@ -2625,26 +5656,29 @@ Please provide a helpful response based on the note content and conversation his
             const failed = result.metadata.failedImports;
             const totalWords = result.notes.reduce((sum, note) => sum + (note.word_count || 0), 0);
 
-            let message = `✅ Successfully imported ${successful} file${successful !== 1 ? 's' : ''}`;
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            let message = `✅ ${t('notifications.filesImportedSuccess', { count: successful, plural: successful !== 1 ? 's' : '' })}`;
             if (totalWords > 0) {
-                message += ` (${totalWords} words)`;
+                const wordsLabel = window.i18n ? window.i18n.t('editor.words') : 'words';
+                message += ` (${totalWords} ${wordsLabel})`;
             }
             if (failed > 0) {
-                message += `. ${failed} file${failed !== 1 ? 's' : ''} failed to import.`;
+                message += `. ${t('notifications.filesImportFailed', { count: failed, plural: failed !== 1 ? 's' : '' })}`;
             }
 
             this.showNotification(message, failed > 0 ? 'warning' : 'success');
 
         } catch (error) {
             console.error('Bulk import failed:', error);
-            let errorMessage = 'Failed to import files';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            let errorMessage = t('notifications.failedToImportFiles');
 
             if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please check file permissions.';
+                errorMessage = t('notifications.permissionDeniedCheckFilePermissions');
             } else if (error.message.includes('not found')) {
-                errorMessage = 'Some files could not be found or accessed.';
+                errorMessage = t('notifications.someFilesNotFound');
             } else if (error.message.includes('format')) {
-                errorMessage = 'Unsupported file format. Please select supported file types.';
+                errorMessage = t('notifications.unsupportedFileFormat');
             } else if (error.message) {
                 errorMessage = `Import failed: ${error.message}`;
             }
@@ -2703,45 +5737,49 @@ Please provide a helpful response based on the note content and conversation his
 
     async restoreFromBackup() {
         if (!this.backendAPI) {
-            this.showNotification('Backup restore functionality not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.backupRestoreUnavailable'), 'error');
             return;
         }
 
         try {
             this.showLoading();
-            this.updateLoadingText('Preparing to restore backup...');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.updateLoadingText(t('loading.preparingToRestore'));
 
             const success = await this.backendAPI.restoreBackup();
 
             if (success) {
-                this.updateLoadingText('Reloading application data...');
+                this.updateLoadingText(t('loading.reloadingApplicationData'));
 
                 // Refresh the legacy notes array from the restored database data
                 await this.refreshLegacyNotesArray();
 
                 // Reload all data after restore
                 await this.loadNotes();
-                this.showNotification('✅ Backup restored successfully! Application data has been reloaded.', 'success');
+                this.showNotification(t('notifications.backupRestored'), 'success');
 
                 // Note: In a production app, you might want to restart the app to ensure clean state
                 // For now, just reload the notes list
                 this.renderNotesList();
             } else {
-                this.showNotification('Restore operation was cancelled', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.restoreCancelled'), 'info');
             }
         } catch (error) {
             console.error('Backup restore failed:', error);
 
             // Provide user-friendly error messages
-            let errorMessage = 'Failed to restore backup';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            let errorMessage = t('notifications.failedToRestoreBackup');
             if (error.message.includes('not a valid database backup')) {
-                errorMessage = 'Invalid backup file. Please select a valid CogNotez database backup (.db file).';
+                errorMessage = t('notifications.invalidBackupFile');
             } else if (error.message.includes('not found or database location not writable')) {
-                errorMessage = 'Cannot restore to the database location. Please check file permissions.';
+                errorMessage = t('notifications.cannotRestoreToLocation');
             } else if (error.message.includes('empty or corrupted')) {
-                errorMessage = 'The backup file appears to be corrupted or empty. Please select a different backup.';
+                errorMessage = t('notifications.backupFileCorrupted');
             } else if (error.message.includes('permission denied')) {
-                errorMessage = 'Permission denied. Please check file permissions or run as administrator.';
+                errorMessage = t('notifications.permissionDeniedRestore');
             } else if (error.message.includes('disk space')) {
                 errorMessage = 'Not enough disk space to restore backup.';
             } else if (error.message) {
@@ -2752,171 +5790,6 @@ Please provide a helpful response based on the note content and conversation his
         } finally {
             this.hideLoading();
         }
-    }
-
-    async showMigrationWizard() {
-        if (!this.backendAPI) return;
-
-        const content = `
-            <div style="max-width: 600px;">
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-exchange-alt"></i> Migration Wizard</h4>
-                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                        Migrate your notes from another CogNotez installation or supported format.
-                    </p>
-                </div>
-
-                <div style="display: flex; flex-direction: column; gap: 16px;">
-                    <div style="background: var(--context-menu-bg); padding: 16px; border-radius: 8px; border: 1px solid var(--border-color);">
-                        <h5 style="margin: 0 0 8px 0; color: var(--text-primary);">📁 From CogNotez JSON Export</h5>
-                        <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 13px;">
-                            Select a JSON file exported from another CogNotez installation.
-                        </p>
-                        <button class="migration-option-btn" data-action="migrate-json" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer;">
-                            Choose JSON File
-                        </button>
-                    </div>
-
-                </div>
-
-                <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tips:</strong><br>
-                        • Always create a backup before migrating<br>
-                        • Migration will merge notes with existing data<br>
-                        • Settings can be migrated along with notes<br>
-                        • Check the migration report for any issues
-                    </div>
-                </div>
-            </div>
-        `;
-
-        const modal = this.createModal('Migration Wizard', content);
-
-        // Add event listeners for migration options
-        const migrationButtons = modal.querySelectorAll('.migration-option-btn');
-        migrationButtons.forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const action = e.target.dataset.action;
-                this.handleMigrationAction(action);
-                this.closeModal(modal);
-            });
-        });
-    }
-
-    async handleMigrationAction(action) {
-        switch (action) {
-            case 'migrate-json':
-                await this.performJSONMigration();
-                break;
-
-
-            default:
-                console.warn('Unknown migration action:', action);
-                this.showNotification('Unknown migration action', 'error');
-        }
-    }
-
-    async performJSONMigration() {
-        try {
-            this.showLoading();
-            this.updateLoadingText('Starting JSON migration...');
-
-            this.updateLoadingText('Importing data from JSON file...');
-            const importedData = await this.backendAPI.importDatabaseJSON();
-
-            if (!importedData || !importedData.notes) {
-                throw new Error('No valid data found in the selected file');
-            }
-
-            if (importedData.notes.length === 0) {
-                this.showNotification('No notes found in the imported file', 'warning');
-                this.hideLoading();
-                return;
-            }
-
-            this.updateLoadingText(`Processing ${importedData.notes.length} notes...`);
-
-            // Reload notes from the database since importDatabaseJSON already saved them
-            await this.loadNotes();
-            this.renderNotesList();
-
-            // Show detailed results
-            const successful = importedData.metadata?.totalNotesImported || importedData.notes.length;
-            const warnings = importedData.metadata?.warnings || [];
-
-            let message = `✅ Successfully migrated ${successful} note${successful !== 1 ? 's' : ''}`;
-            const totalWords = importedData.notes.reduce((sum, n) => sum + (n.word_count || 0), 0);
-            if (totalWords > 0) {
-                message += ` (${totalWords} words)`;
-            }
-
-            if (warnings.length > 0) {
-                message += ` Some notes had validation warnings (${warnings.length}).`;
-                this.showNotification(message, 'warning');
-            } else {
-                this.showNotification(message, 'success');
-            }
-
-            // Show migration summary if there were issues
-            if (warnings.length > 0) {
-                setTimeout(() => {
-                    this.showMigrationSummary(importedData, [], warnings);
-                }, 3000);
-            }
-
-        } catch (error) {
-            console.error('JSON migration failed:', error);
-
-            let errorMessage = 'Migration failed';
-            if (error.message.includes('No file selected')) {
-                errorMessage = 'Please select a JSON file to migrate from.';
-            } else if (error.message.includes('Invalid JSON')) {
-                errorMessage = 'The selected file is not a valid CogNotez export. Please check the file format.';
-            } else if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please check file permissions or choose a different location.';
-            } else if (error.message) {
-                errorMessage = `Migration failed: ${error.message}`;
-            }
-
-            this.showNotification(errorMessage, 'error');
-        } finally {
-            this.hideLoading();
-        }
-    }
-
-    showMigrationSummary(importData, conflicts, warnings) {
-        const content = `
-            <div style="max-width: 500px;">
-                <h4 style="margin: 0 0 16px 0; color: var(--text-primary);">📊 Migration Summary</h4>
-
-                <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; margin-bottom: 12px;">
-                    <strong>Successfully migrated:</strong> ${importData.metadata?.totalNotesImported || 0} notes<br>
-                    <strong>Total words:</strong> ${importData.notes.reduce((sum, n) => sum + (n.word_count || 0), 0)}<br>
-                    <strong>Settings migrated:</strong> ${importData.settings ? 'Yes' : 'No'}
-                </div>
-
-                ${conflicts.length > 0 ? `
-                    <div style="background: #fff3cd; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #ffeaa7;">
-                        <strong><i class="fas fa-exclamation-triangle"></i> ID Conflicts:</strong> ${conflicts.length} notes had conflicting IDs and were assigned new IDs.
-                    </div>
-                ` : ''}
-
-                ${warnings.length > 0 ? `
-                    <div style="background: #f8d7da; color: #721c24; padding: 12px; border-radius: 6px; margin-bottom: 12px; border: 1px solid #f5c6cb;">
-                        <strong><i class="fas fa-exclamation-triangle"></i> Validation Warnings:</strong><br>
-                        <small>${warnings.slice(0, 5).join('<br>')}${warnings.length > 5 ? `<br>... and ${warnings.length - 5} more` : ''}</small>
-                    </div>
-                ` : ''}
-
-                <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px;">
-                    <strong>💡 Tips:</strong><br>
-                    <small>• Check your notes to ensure everything migrated correctly<br>• You can find backups in your user data directory<br>• Settings have been merged with your existing preferences</small>
-                </div>
-            </div>
-        `;
-
-        this.createModal('Migration Complete', content);
     }
 
     generateId() {
@@ -2931,6 +5804,7 @@ Please provide a helpful response based on the note content and conversation his
             splash.style.display = 'flex';
             splash.style.opacity = '1';
             splash.style.visibility = 'visible';
+            splash.classList.remove('hiding', 'ready');
         }
         if (app) {
             app.classList.add('app-hidden');
@@ -2941,13 +5815,26 @@ Please provide a helpful response based on the note content and conversation his
     hideSplashScreen() {
         const splash = document.getElementById('splash-screen');
         const app = document.getElementById('app');
+        
         if (splash) {
-            splash.style.opacity = '0';
-            splash.style.visibility = 'hidden';
+            // Add ready state first
+            splash.classList.add('ready');
+            
+            // Update status to show completion
+            const statusText = splash.querySelector('.status-text');
+            if (statusText) statusText.textContent = window.i18n ? window.i18n.t('splash.ready') : 'Ready';
+            
+            // Short delay to show ready state, then animate out
+            setTimeout(() => {
+                splash.classList.add('hiding');
+                
+                // Remove from DOM after animation
             setTimeout(() => {
                 splash.style.display = 'none';
-            }, 500);
+                }, 400);
+            }, 100);
         }
+        
         if (app) {
             app.classList.remove('app-hidden');
             app.classList.add('app-visible');
@@ -2959,7 +5846,8 @@ Please provide a helpful response based on the note content and conversation his
             const version = await ipcRenderer.invoke('get-app-version');
             const versionElement = document.getElementById('splash-version');
             if (versionElement) {
-                versionElement.textContent = `Version ${version}`;
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                versionElement.textContent = t('splash.version', { version });
             }
         } catch (error) {
             console.warn('Failed to get app version for splash screen:', error);
@@ -2969,23 +5857,124 @@ Please provide a helpful response based on the note content and conversation his
     updateSplashProgress(text, percentage = null) {
         const progressText = document.getElementById('progress-text');
         const progressFill = document.getElementById('progress-fill');
+        const progressPercent = document.getElementById('progress-percent');
+        const progressGlow = document.querySelector('.progress-glow');
+        const statusText = document.querySelector('.status-text');
 
         if (progressText && text) {
-            progressText.textContent = text;
+            // Translate if it's a translation key (starts with "splash.") or use text directly
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const translatedText = text.startsWith('splash.') ? t(text) : text;
+            progressText.textContent = translatedText;
         }
 
-        if (progressFill && percentage !== null) {
-            progressFill.style.width = `${Math.min(100, Math.max(0, percentage))}%`;
+        if (percentage !== null) {
+            const percent = Math.min(100, Math.max(0, percentage));
+            
+            if (progressFill) {
+                progressFill.style.width = `${percent}%`;
+            }
+            
+            if (progressGlow) {
+                progressGlow.style.width = `${percent}%`;
+            }
+            
+            if (progressPercent) {
+                progressPercent.textContent = `${Math.round(percent)}%`;
+            }
+            
+            // Update status text based on progress
+            if (statusText) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                if (percent >= 100) {
+                    statusText.textContent = t('splash.ready');
+                } else if (percent >= 75) {
+                    statusText.textContent = t('splash.almostThere');
+                } else if (percent >= 50) {
+                    statusText.textContent = t('splash.loading');
+                } else {
+                    statusText.textContent = t('splash.starting');
+                }
+            }
         }
     }
 
     // Utility methods
-    showLoading() {
-        document.getElementById('loading-overlay').classList.remove('hidden');
+    showLoading(text = null, showCancel = false) {
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const cancelBtn = document.getElementById('loading-cancel-btn');
+        
+        loadingOverlay.classList.remove('hidden');
+        
+        if (text) {
+            this.updateLoadingText(text);
+        }
+        
+        // Show/hide cancel button for AI operations
+        if (showCancel) {
+            cancelBtn.classList.remove('hidden');
+            // Set up cancel handler if not already set
+            if (!cancelBtn.hasAttribute('data-handler-attached')) {
+                cancelBtn.addEventListener('click', () => this.cancelAIOperation());
+                cancelBtn.setAttribute('data-handler-attached', 'true');
+            }
+        } else {
+            cancelBtn.classList.add('hidden');
+        }
     }
 
     hideLoading() {
-        document.getElementById('loading-overlay').classList.add('hidden');
+        const loadingOverlay = document.getElementById('loading-overlay');
+        const cancelBtn = document.getElementById('loading-cancel-btn');
+        
+        loadingOverlay.classList.add('hidden');
+        cancelBtn.classList.add('hidden');
+        
+        // Clear abort controller when hiding loading (but keep cancellation flag until operation completes)
+        // The flag will be cleared when the operation finishes or is cancelled
+    }
+
+    showSyncClosingOverlay() {
+        const syncClosingOverlay = document.getElementById('sync-closing-overlay');
+        if (syncClosingOverlay) {
+            // Ensure translation is applied (i18n system handles data-i18n automatically, but update manually as backup)
+            if (window.i18n) {
+                const textElement = syncClosingOverlay.querySelector('.loading-text');
+                if (textElement && textElement.hasAttribute('data-i18n')) {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    textElement.textContent = t('settings.sync.syncClosingMessage');
+                }
+            }
+            syncClosingOverlay.classList.remove('hidden');
+        }
+    }
+
+    hideSyncClosingOverlay() {
+        const syncClosingOverlay = document.getElementById('sync-closing-overlay');
+        if (syncClosingOverlay) {
+            syncClosingOverlay.classList.add('hidden');
+        }
+    }
+
+    cancelAIOperation() {
+        console.log('[AI] Cancelling current AI operation...');
+        
+        // Set cancellation flag
+        this.isAIOperationCancelled = true;
+        
+        if (this.currentAIAbortController) {
+            this.currentAIAbortController.abort();
+            this.currentAIAbortController = null;
+        }
+        
+        this.hideLoading();
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showNotification(t('notifications.aiOperationCancelled'), 'info');
+        
+        // Clear any pending AI operations
+        if (this.aiManager) {
+            // Reset any AI manager state if needed
+        }
     }
 
     updateLoadingText(text) {
@@ -3101,6 +6090,7 @@ Please provide a helpful response based on the note content and conversation his
                     this.createNewNote();
                     break;
                 case '/':
+                case 'k':
                     e.preventDefault();
                     document.getElementById('search-input').focus();
                     break;
@@ -3115,6 +6105,10 @@ Please provide a helpful response based on the note content and conversation his
                 case 'h':
                     e.preventDefault();
                     this.showReplaceDialog();
+                    break;
+                case 'p':
+                    e.preventDefault();
+                    this.togglePreview();
                     break;
 
                 // AI shortcuts (with Shift)
@@ -3134,6 +6128,12 @@ Please provide a helpful response based on the note content and conversation his
                     if (e.shiftKey) {
                         e.preventDefault();
                         this.editSelectionWithAI();
+                    }
+                    break;
+                case 'G': // Ctrl+Shift+G
+                    if (e.shiftKey) {
+                        e.preventDefault();
+                        this.generateContentWithAI();
                     }
                     break;
                 case 'W': // Ctrl+Shift+W
@@ -3172,46 +6172,49 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showKeyboardShortcutsHelp() {
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         const shortcuts = [
             // Basic operations
-            { key: 'Ctrl+N', description: 'Create new note' },
-            { key: 'Ctrl+S', description: 'Save current note' },
-            { key: 'Ctrl+O', description: 'Open note' },
-            { key: 'Ctrl+/', description: 'Focus search' },
+            { key: 'Ctrl+N', description: t('keyboard.createNewNote') },
+            { key: 'Ctrl+S', description: t('keyboard.saveCurrentNote') },
+            { key: 'Ctrl+O', description: t('keyboard.openNoteDesc') },
+            { key: 'Ctrl+/', description: t('keyboard.focusSearchDesc') },
 
             // Text editing operations
-            { key: 'Ctrl+Z', description: 'Undo last change' },
-            { key: 'Ctrl+Y', description: 'Redo last undone change' },
-            { key: 'Ctrl+F', description: 'Find text in current note' },
-            { key: 'Ctrl+H', description: 'Find and replace text' },
+            { key: 'Ctrl+Z', description: t('keyboard.undoLastChange') },
+            { key: 'Ctrl+Y', description: t('keyboard.redoLastUndoneChange') },
+            { key: 'Ctrl+F', description: t('keyboard.findTextInNote') },
+            { key: 'Ctrl+H', description: t('keyboard.findAndReplaceText') },
+            { key: 'Ctrl+P', description: t('keyboard.togglePreviewMode') },
 
             // AI operations (all require text selection)
-            { key: 'Ctrl+Shift+S', description: 'Summarize selected text' },
-            { key: 'Ctrl+Shift+A', description: 'Ask AI about selected text' },
-            { key: 'Ctrl+Shift+E', description: 'Edit selected text with AI' },
-            { key: 'Ctrl+Shift+W', description: 'Rewrite selected text' },
-            { key: 'Ctrl+Shift+K', description: 'Extract key points' },
-            { key: 'Ctrl+Shift+T', description: 'Generate tags for selection' },
+            { key: 'Ctrl+Shift+S', description: t('keyboard.summarizeSelectedText') },
+            { key: 'Ctrl+Shift+A', description: t('keyboard.askAIAboutSelectedText') },
+            { key: 'Ctrl+Shift+E', description: t('keyboard.editSelectedTextWithAI') },
+            { key: 'Ctrl+Shift+G', description: t('keyboard.generateContentWithAI') },
+            { key: 'Ctrl+Shift+W', description: t('keyboard.rewriteSelectedText') },
+            { key: 'Ctrl+Shift+K', description: t('keyboard.extractKeyPoints') },
+            { key: 'Ctrl+Shift+T', description: t('keyboard.generateTagsForSelection') },
 
             // Other shortcuts
-            { key: 'F1', description: 'Show this help dialog' },
-            { key: 'Escape', description: 'Close menus/dialogs' },
-            { key: 'Right-click', description: 'Show AI context menu on selected text' }
+            { key: 'F1', description: t('keyboard.showThisHelpDialog') },
+            { key: 'Escape', description: t('keyboard.closeMenusDialogs') },
+            { key: 'Right-click', description: t('keyboard.showAIContextMenu') }
         ];
 
         const content = `
             <div style="max-height: 400px; overflow-y: auto;">
                 <div style="margin-bottom: 16px;">
-                    <h4 style="margin: 0 0 8px 0; color: var(--text-primary);">💡 Pro tip:</h4>
+                    <h4 style="margin: 0 0 8px 0; color: var(--text-primary);">${t('keyboard.proTip')}</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 13px;">
-                        Select any text in your notes and use the keyboard shortcuts above, or right-click for a context menu.
+                        ${t('keyboard.proTipDescription')}
                     </p>
                 </div>
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">Shortcut</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">Description</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">${t('keyboard.shortcutHeader')}</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">${t('keyboard.descriptionHeader')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -3226,20 +6229,16 @@ Please provide a helpful response based on the note content and conversation his
             </div>
         `;
 
-        this.createModal('Keyboard Shortcuts & AI Features', content, [
-            { text: 'Got it!', type: 'primary', action: 'close' }
+        this.createModal(t('keyboard.shortcutsAndAIFeatures'), content, [
+            { text: t('keyboard.gotIt'), type: 'primary', action: 'close' }
         ]);
     }
 
     // Menu actions
-    openNoteDialog() {
-        // Placeholder for opening existing notes
-        console.log('Open note dialog - to be implemented');
-    }
-
     summarizeNote() {
         if (!this.currentNote || !this.currentNote.content) {
-            this.showNotification('No note content to summarize', 'info');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.noContentToSummarize'), 'info');
             return;
         }
         this.selectedText = this.currentNote.content;
@@ -3262,12 +6261,23 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
-                    this.updateLoadingText('Extracting key points...');
-                    this.showLoading();
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
+                    this.updateLoadingText(t('ai.extractingKeyPointsLoading'));
+                    this.showLoading(null, true); // Show cancel button for AI operations
                     response = await this.aiManager.extractKeyPoints(this.selectedText);
+                    
+                    // Check if operation was cancelled before applying result
+                    if (this.isAIOperationCancelled) {
+                        console.log('[DEBUG] processAIActionWithoutDialog key-points: Operation was cancelled, not applying result');
+                        return;
+                    }
+                    
                     await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'key-points');
                     this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${response}`, 'assistant');
                     this.hideLoading();
+                    this.isAIOperationCancelled = false; // Reset flag
                     break;
 
                 case 'generate-tags':
@@ -3275,9 +6285,20 @@ Please provide a helpful response based on the note content and conversation his
                     if (!this.aiPanelVisible) {
                         this.toggleAIPanel();
                     }
-                    this.updateLoadingText('Generating tags...');
-                    this.showLoading();
-                    response = await this.aiManager.generateTags(this.selectedText);
+                    // Create abort controller for this AI operation
+                    this.currentAIAbortController = new AbortController();
+                    this.isAIOperationCancelled = false; // Reset cancellation flag
+                    this.updateLoadingText(t('ai.generatingTags'));
+                    this.showLoading(null, true); // Show cancel button for AI operations
+                    // Include note title for better tag generation context
+                    response = await this.aiManager.generateTags(this.selectedText, { noteTitle: this.noteTitle });
+                    
+                    // Check if operation was cancelled before applying result
+                    if (this.isAIOperationCancelled) {
+                        console.log('[DEBUG] processAIActionWithoutDialog generate-tags: Operation was cancelled, not applying result');
+                        return;
+                    }
+                    
                     await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'tags');
 
                     // Parse and save tags to the current note
@@ -3286,6 +6307,7 @@ Please provide a helpful response based on the note content and conversation his
 
                     this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${response}\n\n*Tags have been saved to this note*`, 'assistant');
                     this.hideLoading();
+                    this.isAIOperationCancelled = false; // Reset flag
                     break;
 
                 case 'summarize-note':
@@ -3298,42 +6320,107 @@ Please provide a helpful response based on the note content and conversation his
             if (!this.aiPanelVisible) {
                 this.toggleAIPanel();
             }
-            this.showAIMessage('❌ AI action failed. Please check your Ollama connection.', 'assistant');
+            const backend = this.aiManager ? this.aiManager.backend : 'ollama';
+            let errorMsg = '❌ AI action failed. ';
+            if (backend === 'ollama') {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                errorMsg += t('notifications.ensureOllamaRunning');
+            } else {
+                errorMsg += t('notifications.checkInternetAndApiKey');
+            }
+            this.showAIMessage(errorMsg, 'assistant');
             this.hideLoading();
         }
     }
 
     summarizeSelection() {
-        const editor = document.getElementById('note-editor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+        let selectedText = '';
 
-        if (!selectedText) {
-            this.showNotification('Please select some text to summarize', 'info');
-            return;
+        // Check if in preview mode
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            // In preview mode, try to get selected text from preview element
+            const selection = window.getSelection();
+            selectedText = selection.toString().trim();
+
+            if (!selectedText) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextInPreviewToSummarize'), 'info');
+                return;
+            }
+        } else {
+            // In edit mode, get selected text from editor
+            const editor = document.getElementById('note-editor');
+            selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+
+            if (!selectedText) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextToSummarize'), 'info');
+                return;
+            }
         }
 
         this.selectedText = selectedText;
-        this.showAIDialog('Summarize Selection', `Selected text: ${selectedText.substring(0, 100)}...`, 'summarize');
+        // Directly summarize without requiring user interaction
+        if (this.aiManager) {
+            this.aiManager.handleSummarize(selectedText);
+        } else {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.aiNotAvailable'), 'error');
+        }
     }
 
     askAIAboutSelection() {
-        const editor = document.getElementById('note-editor');
-        const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+        let selectedText = '';
 
-        if (!selectedText) {
-            this.showNotification('Please select some text to ask about', 'info');
-            return;
+        // Check if in preview mode
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            // In preview mode, try to get selected text from preview element
+            const selection = window.getSelection();
+            selectedText = selection.toString().trim();
+
+            if (!selectedText) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextInPreviewToAsk'), 'info');
+                return;
+            }
+        } else {
+            // In edit mode, get selected text from editor
+            const editor = document.getElementById('note-editor');
+            selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
+
+            if (!selectedText) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.selectTextToAsk'), 'info');
+                return;
+            }
         }
 
         this.selectedText = selectedText;
-        this.showAIDialog('Ask AI About Selection',
-            `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showAIDialog(t('ai.askAboutSelection'),
+            t('ai.selectedText', { text: selectedText.substring(0, 150) + (selectedText.length > 150 ? '...' : '') }),
             'ask-ai');
     }
 
     editSelectionWithAI() {
         console.log('[DEBUG] editSelectionWithAI called');
-        
+
+        // Check if in preview mode - Edit AI modifies content so it shouldn't work in preview
+        const preview = document.getElementById('markdown-preview');
+        const isPreviewMode = preview && !preview.classList.contains('hidden');
+
+        if (isPreviewMode) {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.editInPreviewNotAvailable'), 'info');
+            return;
+        }
+
         // Use stored selection if available, otherwise get current selection
         let selectedText = this.selectedText;
         let start = this.selectionStart;
@@ -3349,7 +6436,8 @@ Please provide a helpful response based on the note content and conversation his
 
         if (!selectedText) {
             console.log('[DEBUG] editSelectionWithAI: No text selected');
-            this.showNotification('Please select some text to edit', 'info');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.selectTextToEdit'), 'info');
             return;
         }
 
@@ -3360,9 +6448,32 @@ Please provide a helpful response based on the note content and conversation his
         this.selectionStart = start;
         this.selectionEnd = end;
 
-        this.showAIDialog('Edit Selection with AI',
-            `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showAIDialog(t('ai.editSelectionWithAI'),
+            t('ai.selectedText', { text: selectedText.substring(0, 150) + (selectedText.length > 150 ? '...' : '') }),
             'edit-ai');
+    }
+
+    generateContentWithAI() {
+        console.log('[DEBUG] generateContentWithAI called');
+
+        // Check if in preview-only mode (preview visible AND editor hidden)
+        const preview = document.getElementById('markdown-preview');
+        const editor = document.getElementById('note-editor');
+        const isPreviewOnlyMode = preview && !preview.classList.contains('hidden') && 
+                                  editor && editor.classList.contains('hidden');
+
+        if (isPreviewOnlyMode) {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.generateInPreviewNotAvailable'), 'info');
+            return;
+        }
+
+        // For generate with AI, we don't need selected text - we're generating new content
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showAIDialog(t('ai.generateContentWithAI'),
+            t('ai.whatToGenerate'),
+            'generate-ai');
     }
 
     rewriteSelection() {
@@ -3383,7 +6494,8 @@ Please provide a helpful response based on the note content and conversation his
 
         if (!selectedText) {
             console.log('[DEBUG] rewriteSelection: No text selected');
-            this.showNotification('Please select some text to rewrite', 'info');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.selectTextToRewrite'), 'info');
             return;
         }
 
@@ -3397,8 +6509,9 @@ Please provide a helpful response based on the note content and conversation his
         const styles = ['professional', 'casual', 'academic', 'simple', 'creative'];
         const styleOptions = styles.map(style => `<option value="${style}">${style.charAt(0).toUpperCase() + style.slice(1)}</option>`).join('');
 
-        this.showCustomAIDialog('Rewrite Selection',
-            `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showCustomAIDialog(t('ai.rewriteSelection'),
+            t('ai.selectedText', { text: selectedText.substring(0, 150) + (selectedText.length > 150 ? '...' : '') }),
             'rewrite',
             `
             <div style="margin-bottom: 12px;">
@@ -3416,7 +6529,8 @@ Please provide a helpful response based on the note content and conversation his
         const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd).trim();
 
         if (!selectedText) {
-            this.showNotification('Please select some text to extract key points from', 'info');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.selectTextToExtract'), 'info');
             return;
         }
 
@@ -3434,13 +6548,17 @@ Please provide a helpful response based on the note content and conversation his
             // Use the entire note content
             const noteContent = editor.value.trim();
             if (!noteContent) {
-                this.showNotification('Please write some content or select text to generate tags for', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.writeContentOrSelectText'), 'info');
                 return;
             }
             this.selectedText = noteContent;
         } else {
             this.selectedText = selectedText;
         }
+
+        // Store the note title for tag generation context
+        this.noteTitle = this.currentNote ? this.currentNote.title : document.getElementById('note-title').value;
 
         // Process immediately without dialog
         this.processAIActionWithoutDialog('generate-tags');
@@ -3503,8 +6621,23 @@ Please provide a helpful response based on the note content and conversation his
                     if (this.notesManager.db && this.notesManager.db.initialized) {
                         tagId = await this.notesManager.db.createTag({ name: tagName });
                     } else {
-                        // Fallback: create simple tag ID
+                        // Fallback: create tag ID and save tag definition
                         tagId = Date.now().toString() + Math.random().toString(36).substr(2, 9);
+
+                        // Initialize fallback tag data structure if needed
+                        if (this.notesManager.db) {
+                            this.notesManager.db.data = this.notesManager.db.data || {};
+                            this.notesManager.db.data.tags = this.notesManager.db.data.tags || {};
+                            this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
+
+                            // Save tag definition
+                            this.notesManager.db.data.tags[tagId] = {
+                                id: tagId,
+                                name: tagName,
+                                color: '#BDABE3',
+                                created_at: new Date().toISOString()
+                            };
+                        }
                     }
                 }
                 tagIds.push(tagId);
@@ -3525,31 +6658,41 @@ Please provide a helpful response based on the note content and conversation his
             // Re-render notes list to show updated tags
             await this.notesManager.renderNotesList();
 
-            this.showNotification(`Saved ${Math.min(tags.length, 3)} tag(s) to note (max 3)`, 'success');
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            this.showNotification(t('notifications.tagsSavedToNote', { count: Math.min(tags.length, 3) }), 'success');
         } catch (error) {
             console.error('Error saving tags to note:', error);
-            this.showNotification('Failed to save tags to note', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('settings.sync.failedToSaveTags'), 'error');
         }
     }
 
     showAISettings() {
         if (!this.aiManager) {
-            this.showNotification('AI manager not available', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const msg = t('notifications.aiNotAvailable');
+            this.showNotification(msg, 'error');
             return;
         }
 
-        const backendStatus = this.aiManager.backend === 'ollama' ?
-            `Ollama ${this.aiManager.isConnected ? 'is running and ready' : 'is not available. Please start Ollama service.'}` :
-            `OpenRouter ${this.aiManager.isConnected ? 'API key is valid' : 'API key is invalid or missing.'}`;
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
+        const backendStatus = this.aiManager.backend === 'ollama'
+            ? (this.aiManager.isConnected
+                ? t('settings.ai.ollamaStatusReady', 'Ollama is running and ready')
+                : t('settings.ai.ollamaStatusNotAvailable', 'Ollama is not available. Please start Ollama service.'))
+            : (this.aiManager.isConnected
+                ? t('settings.ai.openRouterStatusValid', 'OpenRouter API key is valid')
+                : t('settings.ai.openRouterStatusInvalid', 'OpenRouter API key is invalid or missing.'));
 
         const content = `
             <div style="max-width: 600px;">
                 <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-robot"></i> AI Configuration</h4>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-robot"></i> ${t('settings.ai.configurationTitle', 'AI Configuration')}</h4>
                     <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px;">
                             <div style="width: 8px; height: 8px; border-radius: 50%; background: ${this.aiManager.isConnected ? '#28a745' : '#dc3545'};"></div>
-                            <span style="font-weight: 500;">Status: ${this.aiManager.isConnected ? 'Connected' : 'Disconnected'}</span>
+                            <span style="font-weight: 500;">${t('settings.ai.statusLabel', 'Status')}: ${this.aiManager.isConnected ? t('settings.ai.statusConnected', 'Connected') : t('settings.ai.statusDisconnected', 'Disconnected')}</span>
                         </div>
                         <div style="font-size: 12px; color: var(--text-secondary);">
                             ${backendStatus}
@@ -3558,22 +6701,22 @@ Please provide a helpful response based on the note content and conversation his
                 </div>
 
                 <div style="margin-bottom: 20px;">
-                    <label for="ai-backend" style="display: block; margin-bottom: 6px; font-weight: 500;">AI Backend:</label>
+                    <label for="ai-backend" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.backendLabel', 'AI Backend')}:</label>
                     <select id="ai-backend" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                        <option value="ollama" ${this.aiManager.backend === 'ollama' ? 'selected' : ''}>Ollama (Local)</option>
-                        <option value="openrouter" ${this.aiManager.backend === 'openrouter' ? 'selected' : ''}>OpenRouter (Cloud)</option>
+                        <option value="ollama" ${this.aiManager.backend === 'ollama' ? 'selected' : ''}>${t('settings.ai.backendOllama', 'Ollama (Local)')}</option>
+                        <option value="openrouter" ${this.aiManager.backend === 'openrouter' ? 'selected' : ''}>${t('settings.ai.backendOpenRouter', 'OpenRouter (Cloud)')}</option>
                     </select>
                 </div>
 
                 <div id="ollama-settings" style="display: ${this.aiManager.backend === 'ollama' ? 'block' : 'none'};">
                     <div style="margin-bottom: 20px;">
-                        <label for="ollama-endpoint" style="display: block; margin-bottom: 6px; font-weight: 500;">Ollama Endpoint:</label>
+                        <label for="ollama-endpoint" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.ollamaEndpoint', 'Ollama Endpoint')}:</label>
                         <input type="text" id="ollama-endpoint" value="${this.aiManager.ollamaEndpoint}"
                                style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-family: monospace; font-size: 13px;">
                     </div>
 
                     <div style="margin-bottom: 20px;">
-                        <label for="ollama-model" style="display: block; margin-bottom: 6px; font-weight: 500;">Ollama Model:</label>
+                        <label for="ollama-model" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.ollamaModel', 'Ollama Model')}:</label>
                         <select id="ollama-model" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
                             ${this.aiManager.availableModels && this.aiManager.backend === 'ollama' ? this.aiManager.availableModels.map(model =>
                                 `<option value="${model.name}" ${model.name === this.aiManager.ollamaModel ? 'selected' : ''}>${model.name}</option>`
@@ -3584,45 +6727,49 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div id="openrouter-settings" style="display: ${this.aiManager.backend === 'openrouter' ? 'block' : 'none'};">
                     <div style="margin-bottom: 20px;">
-                        <label for="openrouter-api-key" style="display: block; margin-bottom: 6px; font-weight: 500;">OpenRouter API Key:</label>
+                        <label for="openrouter-api-key" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.openRouterApiKey', 'OpenRouter API Key')}:</label>
                         <input type="password" id="openrouter-api-key" value="${this.aiManager.openRouterApiKey}"
                                style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-family: monospace; font-size: 13px;"
                                placeholder="sk-or-v1-...">
                     </div>
 
                     <div style="margin-bottom: 20px;">
-                        <label for="openrouter-model" style="display: block; margin-bottom: 6px; font-weight: 500;">OpenRouter Model:</label>
-                        <select id="openrouter-model" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                            ${this.aiManager.availableModels && this.aiManager.backend === 'openrouter' ? this.aiManager.availableModels.map(model =>
-                                `<option value="${model.id}" ${model.id === this.aiManager.openRouterModel ? 'selected' : ''}>${model.name || model.id}</option>`
-                            ).join('') : `<option value="${this.aiManager.openRouterModel}" selected>${this.aiManager.openRouterModel}</option>`}
-                        </select>
+                        <label for="openrouter-model-search" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.openRouterModel', 'OpenRouter Model')}:</label>
+                        <div id="openrouter-model-container" style="position: relative;">
+                            <input type="text" id="openrouter-model-search" 
+                                   placeholder="${t('settings.ai.searchModels', 'Search models...')}" 
+                                   value="${this.aiManager.availableModels && this.aiManager.backend === 'openrouter' ? (this.aiManager.availableModels.find(m => m.id === this.aiManager.openRouterModel)?.name || this.aiManager.openRouterModel) : this.aiManager.openRouterModel}"
+                                   style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); padding-right: 30px; box-sizing: border-box;">
+                            <input type="hidden" id="openrouter-model" value="${this.aiManager.openRouterModel}">
+                            <div id="openrouter-model-dropdown" style="display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 300px; overflow-y: auto; background: var(--bg-primary); border: 1px solid var(--border-color); border-radius: 4px; margin-top: 4px; z-index: 1000; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);">
+                            </div>
+                        </div>
                     </div>
 
                     <div style="margin-bottom: 20px;">
                         <label style="display: flex; align-items: center; gap: 8px; font-weight: 500;">
                             <input type="checkbox" id="searxng-enabled" ${this.aiManager.searxngEnabled ? 'checked' : ''}>
-                            Enable SearXNG Web Search
+                            ${t('settings.ai.enableSearxng', 'Enable SearXNG Web Search')}
                         </label>
                         <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">
-                            Give the AI access to web search for current information. The AI is time-aware and will decide when to search the web (for current events, prices, weather, news, time-sensitive data, etc.) using SearXNG to get accurate, up-to-date results. Requires a self-hosted SearXNG instance.
+                            ${t('settings.ai.searxngDescription', 'Give the AI access to web search for current information using your SearXNG instance.')}
                         </div>
                     </div>
 
                     <div id="searxng-options" style="display: ${this.aiManager.searxngEnabled ? 'block' : 'none'}; margin-left: 20px;">
                         <div style="margin-bottom: 15px;">
-                            <label for="searxng-url" style="display: block; margin-bottom: 6px; font-weight: 500;">SearXNG URL:</label>
+                            <label for="searxng-url" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.searxngUrl', 'SearXNG URL')}:</label>
                             <input type="text" id="searxng-url" value="${this.aiManager.searxngUrl}"
                                    style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary); font-family: monospace; font-size: 13px;"
                                    placeholder="http://localhost:8080">
                         </div>
 
                         <div style="margin-bottom: 15px;">
-                            <label for="searxng-max-results" style="display: block; margin-bottom: 6px; font-weight: 500;">Max Search Results:</label>
+                            <label for="searxng-max-results" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.searxngMaxResults', 'Max Search Results')}:</label>
                             <select id="searxng-max-results" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                                <option value="3" ${this.aiManager.searxngMaxResults === 3 ? 'selected' : ''}>3 results</option>
-                                <option value="5" ${this.aiManager.searxngMaxResults === 5 ? 'selected' : ''}>5 results</option>
-                                <option value="10" ${this.aiManager.searxngMaxResults === 10 ? 'selected' : ''}>10 results</option>
+                                <option value="3" ${this.aiManager.searxngMaxResults === 3 ? 'selected' : ''}>${t('settings.ai.searxngResultsOption', '3 results', { count: 3 })}</option>
+                                <option value="5" ${this.aiManager.searxngMaxResults === 5 ? 'selected' : ''}>${t('settings.ai.searxngResultsOption', '5 results', { count: 5 })}</option>
+                                <option value="10" ${this.aiManager.searxngMaxResults === 10 ? 'selected' : ''}>${t('settings.ai.searxngResultsOption', '10 results', { count: 10 })}</option>
                             </select>
                         </div>
                     </div>
@@ -3630,31 +6777,32 @@ Please provide a helpful response based on the note content and conversation his
 
                 <div style="background: var(--context-menu-bg); padding: 12px; border-radius: 6px; border: 1px solid var(--border-color);">
                     <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tips:</strong><br>
+                        <strong>${t('settings.ai.tips', '💡 Tips:')}</strong><br>
                         <div id="ollama-tips" style="display: ${this.aiManager.backend === 'ollama' ? 'block' : 'none'}">
-                            • Default Ollama endpoint is usually <code>http://localhost:11434</code><br>
-                            • Popular models: llama2, codellama, mistral<br>
-                            • Use <code>ollama pull model_name</code> to download models<br>
+                            • ${t('settings.ai.ollamaTipEndpoint', 'Default Ollama endpoint is usually')} <code>http://localhost:11434</code><br>
+                            • ${t('settings.ai.ollamaTipPopularModels', 'Popular models: llama2, codellama, mistral')}<br>
+                            • ${t('settings.ai.ollamaTipDownload', 'Use')} <code>ollama pull model_name</code> ${t('settings.ai.ollamaTipDownloadCommand', 'to download models')}<br>
                         </div>
                         <div id="openrouter-tips" style="display: ${this.aiManager.backend === 'openrouter' ? 'block' : 'none'}">
-                            • Get your API key from <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">OpenRouter</a><br>
-                            • Popular models: GPT-4, Claude, Gemini<br>
-                            • API key starts with <code>sk-or-v1-</code><br>
+                            • ${t('settings.ai.openRouterTipGetKey', 'Get your API key from')} <a href="https://openrouter.ai/keys" target="_blank" style="color: var(--accent-color);">OpenRouter</a><br>
+                            • ${t('settings.ai.openRouterTipPopularModels', 'Popular models: GPT-4, Claude, Gemini')}<br>
+                            • ${t('settings.ai.openRouterTipKeyFormat', 'API key starts with')} <code>sk-or-v1-</code><br>
                             <div id="searxng-tip" style="display: ${this.aiManager.searxngEnabled ? 'block' : 'none'}">
-                                • SearXNG provides privacy-focused web search<br>
-                                • Install SearXNG: <code>pip install searxng</code><br>
+                                • ${t('settings.ai.searxngTipPrivacy', 'SearXNG provides privacy-focused web search')}<br>
+                                • ${t('settings.ai.searxngTipInstall', 'Install SearXNG:')} <code>pip install searxng</code><br>
+                                ${this.aiManager.backend === 'ollama' ? `• <strong>${t('settings.ai.note', 'Note:')}</strong> ${t('settings.ai.ollamaToolCallingNote', 'Ollama tool calling may not work with all models. If you experience issues, try a different model or use OpenRouter.')}` : ''}
                             </div>
                         </div>
-                        • Right-click selected text for quick AI actions
+                        • ${t('settings.ai.tipRightClick', 'Right-click selected text for quick AI actions')}
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('AI Settings', content, [
-            { text: 'Test Connection', type: 'secondary', action: 'test-connection' },
-            { text: 'Save Settings', type: 'primary', action: 'save-settings' },
-            { text: 'Cancel', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('settings.ai.title', 'AI Settings'), content, [
+            { text: t('settings.ai.testConnection', 'Test Connection'), type: 'secondary', action: 'test-connection' },
+            { text: t('settings.general.saveButton', 'Save Settings'), type: 'primary', action: 'save-settings' },
+            { text: window.i18n ? window.i18n.t('modals.cancel') : 'Cancel', type: 'secondary', action: 'cancel' }
         ]);
 
         // Add backend switching handler
@@ -3694,6 +6842,146 @@ Please provide a helpful response based on the note content and conversation his
             }
         });
 
+        // Initialize searchable OpenRouter model dropdown
+        if (this.aiManager.backend === 'openrouter' && this.aiManager.availableModels && this.aiManager.availableModels.length > 0) {
+            const modelSearchInput = modal.querySelector('#openrouter-model-search');
+            const modelDropdown = modal.querySelector('#openrouter-model-dropdown');
+            const modelHiddenInput = modal.querySelector('#openrouter-model');
+            const modelContainer = modal.querySelector('#openrouter-model-container');
+            
+            let filteredModels = [...this.aiManager.availableModels];
+            
+            // Function to render dropdown items
+            const renderDropdown = (models) => {
+                if (models.length === 0) {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    const noModelsText = t('settings.advanced.noModelsFound');
+                    modelDropdown.innerHTML = `<div style="padding: 12px; color: var(--text-secondary); text-align: center;">${noModelsText}</div>`;
+                    return;
+                }
+                
+                modelDropdown.innerHTML = models.map(model => {
+                    const displayName = model.name || model.id;
+                    const isSelected = model.id === this.aiManager.openRouterModel;
+                    return `
+                        <div class="model-dropdown-item" data-model-id="${model.id}" data-model-name="${displayName}" 
+                             style="padding: 10px 12px; cursor: pointer; border-bottom: 1px solid var(--border-color); 
+                                    ${isSelected ? 'background: var(--accent-color); color: white;' : 'background: var(--bg-primary); color: var(--text-primary);'}
+                                    transition: background 0.2s;">
+                            <div style="font-weight: ${isSelected ? '600' : '500'}; font-size: 14px;">${displayName}</div>
+                            ${model.id !== displayName ? `<div style="font-size: 12px; opacity: 0.7; margin-top: 2px;">${model.id}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Add click handlers
+                modelDropdown.querySelectorAll('.model-dropdown-item').forEach(item => {
+                    item.addEventListener('click', () => {
+                        const modelId = item.dataset.modelId;
+                        const modelName = item.dataset.modelName;
+                        modelHiddenInput.value = modelId;
+                        modelSearchInput.value = modelName;
+                        modelDropdown.style.display = 'none';
+                        
+                        // Update selected state
+                        modelDropdown.querySelectorAll('.model-dropdown-item').forEach(i => {
+                            i.style.background = i.dataset.modelId === modelId ? 'var(--accent-color)' : 'var(--bg-primary)';
+                            i.style.color = i.dataset.modelId === modelId ? 'white' : 'var(--text-primary)';
+                        });
+                    });
+                    
+                    item.addEventListener('mouseenter', function() {
+                        if (this.dataset.modelId !== modelHiddenInput.value) {
+                            this.style.background = 'var(--bg-hover)';
+                        }
+                    });
+                    
+                    item.addEventListener('mouseleave', function() {
+                        if (this.dataset.modelId !== modelHiddenInput.value) {
+                            this.style.background = 'var(--bg-primary)';
+                        }
+                    });
+                });
+            };
+            
+            // Initial render
+            renderDropdown(filteredModels);
+            
+            // Search functionality
+            modelSearchInput.addEventListener('input', (e) => {
+                const searchTerm = e.target.value.toLowerCase().trim();
+                
+                if (searchTerm === '') {
+                    filteredModels = [...this.aiManager.availableModels];
+                } else {
+                    filteredModels = this.aiManager.availableModels.filter(model => {
+                        const name = (model.name || model.id).toLowerCase();
+                        const id = model.id.toLowerCase();
+                        return name.includes(searchTerm) || id.includes(searchTerm);
+                    });
+                }
+                
+                renderDropdown(filteredModels);
+                modelDropdown.style.display = filteredModels.length > 0 ? 'block' : 'none';
+            });
+            
+            // Show dropdown on focus
+            modelSearchInput.addEventListener('focus', () => {
+                if (filteredModels.length > 0) {
+                    modelDropdown.style.display = 'block';
+                }
+            });
+            
+            // Hide dropdown when clicking outside
+            document.addEventListener('click', (e) => {
+                if (!modelContainer.contains(e.target)) {
+                    modelDropdown.style.display = 'none';
+                }
+            });
+            
+            // Handle keyboard navigation
+            let selectedIndex = -1;
+            modelSearchInput.addEventListener('keydown', (e) => {
+                const items = modelDropdown.querySelectorAll('.model-dropdown-item');
+                
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    // Reset previous selection
+                    if (selectedIndex >= 0 && items[selectedIndex]) {
+                        const prevModelId = items[selectedIndex].dataset.modelId;
+                        items[selectedIndex].style.background = prevModelId === modelHiddenInput.value ? 'var(--accent-color)' : 'var(--bg-primary)';
+                    }
+                    selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+                    if (items[selectedIndex]) {
+                        items[selectedIndex].scrollIntoView({ block: 'nearest' });
+                        items[selectedIndex].style.background = 'var(--bg-hover)';
+                    }
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    // Reset previous selection
+                    if (selectedIndex >= 0 && items[selectedIndex]) {
+                        const prevModelId = items[selectedIndex].dataset.modelId;
+                        items[selectedIndex].style.background = prevModelId === modelHiddenInput.value ? 'var(--accent-color)' : 'var(--bg-primary)';
+                    }
+                    selectedIndex = Math.max(selectedIndex - 1, 0);
+                    if (items[selectedIndex]) {
+                        items[selectedIndex].scrollIntoView({ block: 'nearest' });
+                        items[selectedIndex].style.background = 'var(--bg-hover)';
+                    }
+                } else if (e.key === 'Enter' && selectedIndex >= 0 && items[selectedIndex]) {
+                    e.preventDefault();
+                    items[selectedIndex].click();
+                    selectedIndex = -1;
+                } else if (e.key === 'Escape') {
+                    modelDropdown.style.display = 'none';
+                    selectedIndex = -1;
+                } else {
+                    // Reset selection when typing
+                    selectedIndex = -1;
+                }
+            });
+        }
+
         // Add custom button handlers
         const testBtn = modal.querySelector('[data-action="test-connection"]');
         const saveBtn = modal.querySelector('[data-action="save-settings"]');
@@ -3701,17 +6989,23 @@ Please provide a helpful response based on the note content and conversation his
         testBtn.addEventListener('click', async () => {
             const backend = modal.querySelector('#ai-backend').value;
 
-            this.updateLoadingText('Testing AI connection...');
-            this.showLoading();
+            // Create abort controller for this AI operation
+            this.currentAIAbortController = new AbortController();
+            this.isAIOperationCancelled = false; // Reset cancellation flag
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.updateLoadingText(t('loading.testingAIConnection'));
+            this.showLoading(null, true); // Show cancel button for AI operations
             try {
                 await this.aiManager.switchBackend(backend);
                 await this.aiManager.loadAvailableModels();
-                this.showNotification('✅ Connection test completed!', 'success');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(`✅ ${t('settings.sync.connectionTestCompleted')}`, 'success');
                 // Refresh the modal with updated model list
                 this.closeModal(modal);
                 setTimeout(() => this.showAISettings(), 100);
             } catch (error) {
-                this.showNotification(`❌ Connection error: ${error.message}`, 'error');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(`❌ ${t('encryption.connectionError', { error: error.message })}`, 'error');
             } finally {
                 this.hideLoading();
             }
@@ -3734,20 +7028,34 @@ Please provide a helpful response based on the note content and conversation his
                     const searxngUrl = modal.querySelector('#searxng-url').value.trim();
                     const searxngMaxResults = modal.querySelector('#searxng-max-results').value;
 
-                    await this.aiManager.updateOpenRouterApiKey(apiKey);
+                    const restartTriggered = await this.aiManager.updateOpenRouterApiKey(apiKey);
                     await this.aiManager.updateOpenRouterModel(model);
                     await this.aiManager.updateSearxngEnabled(searxngEnabled);
                     await this.aiManager.updateSearxngUrl(searxngUrl);
                     await this.aiManager.updateSearxngMaxResults(searxngMaxResults);
+
+                    // If API key changed and restart was triggered, show message and return early
+                    if (restartTriggered) {
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(`✅ ${t('settings.sync.openRouterApiKeyUpdated')}`, 'success');
+                        this.closeModal(modal);
+                        // Small delay before restart to allow notification to show
+                        setTimeout(() => {
+                            ipcRenderer.send('restart-app');
+                        }, 1000);
+                        return;
+                    }
                 }
 
                 // Now switch backend (which will validate connection with the updated settings)
                 await this.aiManager.switchBackend(backend);
 
-                this.showNotification('✅ AI settings saved successfully!', 'success');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(`✅ ${t('settings.sync.aiSettingsSaved')}`, 'success');
                 this.closeModal(modal);
             } catch (error) {
-                this.showNotification(`❌ Failed to save settings: ${error.message}`, 'error');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.failedToSaveSettings', { error: error.message }), 'error');
             }
         });
     }
@@ -3757,47 +7065,49 @@ Please provide a helpful response based on the note content and conversation his
         const currentTheme = localStorage.getItem('theme') || 'light';
         const currentWordCount = localStorage.getItem('showWordCount') === 'true';
 
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+
         const content = `
             <div style="max-width: 400px;">
                 <div style="margin-bottom: 24px;">
-                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cog"></i> General Settings</h4>
+                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cog"></i> ${t('settings.general.title', 'General Settings')}</h4>
                 </div>
 
                 <div style="display: flex; flex-direction: column; gap: 20px;">
                     <div class="setting-item">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="auto-save-toggle" ${currentAutoSave ? 'checked' : ''} style="margin: 0;">
-                            <span style="color: var(--text-primary); font-weight: 500;">Enable Auto-Save</span>
+                            <span style="color: var(--text-primary); font-weight: 500;">${t('settings.general.autoSaveLabel', 'Enable Auto-Save')}</span>
                         </label>
                         <div style="margin-top: 4px; color: var(--text-secondary); font-size: 12px;">
-                            Automatically save your notes every 30 seconds when changes are detected
+                            ${t('settings.general.autoSaveDescription', 'Automatically save your notes every 30 seconds when changes are detected')}
                         </div>
                     </div>
 
                     <div class="setting-item">
                         <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
                             <input type="checkbox" id="word-count-toggle" ${currentWordCount ? 'checked' : ''} style="margin: 0;">
-                            <span style="color: var(--text-primary); font-weight: 500;">Show Word Count</span>
+                            <span style="color: var(--text-primary); font-weight: 500;">${t('settings.general.wordCountLabel', 'Show Word Count')}</span>
                         </label>
                         <div style="margin-top: 4px; color: var(--text-secondary); font-size: 12px;">
-                            Display word count in the editor header
+                            ${t('settings.general.wordCountDescription', 'Display word count in the editor header')}
                         </div>
                     </div>
 
                     <div class="setting-item">
-                        <label style="color: var(--text-primary); font-weight: 500;">Theme</label>
+                        <label style="color: var(--text-primary); font-weight: 500;">${t('settings.general.themeLabel', 'Theme')}</label>
                         <select id="theme-select" style="width: 100%; padding: 8px; margin-top: 4px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
-                            <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>Light</option>
-                            <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>Dark</option>
+                            <option value="light" ${currentTheme === 'light' ? 'selected' : ''}>${t('settings.general.themeLight', 'Light')}</option>
+                            <option value="dark" ${currentTheme === 'dark' ? 'selected' : ''}>${t('settings.general.themeDark', 'Dark')}</option>
                         </select>
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('General Settings', content, [
-            { text: 'Save Settings', type: 'primary', action: 'save-general-settings' },
-            { text: 'Cancel', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('settings.general.title', 'General Settings'), content, [
+            { text: t('settings.general.saveButton', 'Save Settings'), type: 'primary', action: 'save-general-settings' },
+            { text: window.i18n ? window.i18n.t('modals.cancel') : 'Cancel', type: 'secondary', action: 'cancel' }
         ]);
 
         const saveBtn = modal.querySelector('[data-action="save-general-settings"]');
@@ -3805,6 +7115,10 @@ Please provide a helpful response based on the note content and conversation his
             const autoSaveEnabled = modal.querySelector('#auto-save-toggle').checked;
             const wordCountEnabled = modal.querySelector('#word-count-toggle').checked;
             const theme = modal.querySelector('#theme-select').value;
+
+            // Track if auto-save setting changed
+            const previousAutoSave = localStorage.getItem('autoSave') === 'true';
+            const autoSaveChanged = previousAutoSave !== autoSaveEnabled;
 
             // Save settings
             localStorage.setItem('autoSave', autoSaveEnabled.toString());
@@ -3837,75 +7151,423 @@ Please provide a helpful response based on the note content and conversation his
                 }
             }
 
-            this.showNotification('✅ General settings saved successfully!', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(`✅ ${t('settings.sync.generalSettingsSaved')}`, 'success');
             this.closeModal(modal);
+
+            // Show restart dialog if auto-save setting changed
+            if (autoSaveChanged) {
+                setTimeout(() => {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showRestartDialog(t('modals.restartAutoSave'));
+                }, 500);
+            }
         });
     }
 
-    showShareOptions() {
-        if (!this.currentNote || !this.backendAPI) return;
+    showAdvancedSettings() {
+        // Get current tag statistics
+        const allTags = this.notesManager.db ? this.notesManager.db.getAllTags() : [];
+        const totalTags = allTags.length;
+
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
 
         const content = `
-            <div style="max-width: 400px;">
-                <div style="margin-bottom: 20px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-share"></i> Share "${this.currentNote.title}"</h4>
-                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                        Choose how you want to share this note:
-                    </p>
-                </div>
+            <div style="max-width: 500px;">
+                <div class="settings-section">
+                    <h4 style="margin: 0 0 16px 0; color: var(--text-primary); border-bottom: 1px solid var(--border-color); padding-bottom: 8px;">
+                        <i class="fas fa-cog"></i> ${t('settings.advanced.advancedOptions', 'Advanced Options')}
+                    </h4>
 
-                <div style="display: flex; flex-direction: column; gap: 12px;">
-                    <button class="share-option-btn" data-action="clipboard-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span><i class="fas fa-clipboard"></i></span>
-                        <div>
-                            <div style="font-weight: 500;">Copy to Clipboard (Markdown)</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Share formatted content</div>
+                    <!-- Tag Management -->
+                    <div class="setting-item" style="margin-bottom: 24px;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 4px;">
+                                <i class="fas fa-tags"></i> ${t('settings.advanced.tagManagement', 'Tag Management')}
+                            </label>
+                            <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                                ${t('settings.advanced.totalTags', 'Total tags: {{count}}', { count: totalTags })}
+                            </div>
                         </div>
-                    </button>
-
-                    <button class="share-option-btn" data-action="clipboard-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📄</span>
-                        <div>
-                            <div style="font-weight: 500;">Copy to Clipboard (Plain Text)</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Share plain text content</div>
+                        
+                        <button id="clear-unused-tags-btn" class="advanced-action-btn" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; transition: all 0.2s;">
+                            <i class="fas fa-broom"></i>
+                            <span>${t('settings.advanced.clearUnusedTags', 'Clear Unused Tags')}</span>
+                        </button>
+                        <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
+                            ${t('settings.advanced.clearUnusedTagsDescription', 'Remove tags that are not associated with any notes. This helps keep your tag list clean and organized.')}
                         </div>
-                    </button>
+                    </div>
 
-                    <button class="share-option-btn" data-action="export-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📁</span>
-                        <div>
-                            <div style="font-weight: 500;">Export as Markdown File</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
+                    <!-- AI Data Management -->
+                    <div class="setting-item" style="margin-bottom: 24px;">
+                        <div style="margin-bottom: 12px;">
+                            <label style="color: var(--text-primary); font-weight: 500; display: block; margin-bottom: 4px;">
+                                <i class="fas fa-robot"></i> ${t('settings.advanced.aiDataManagement', 'AI Data Management')}
+                            </label>
+                            <div style="color: var(--text-secondary); font-size: 12px; margin-bottom: 12px;">
+                                ${t('settings.advanced.aiDataDescription', 'Manage AI conversation history and data')}
+                            </div>
                         </div>
-                    </button>
-
-                    <button class="share-option-btn" data-action="export-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
-                        <span>📄</span>
-                        <div>
-                            <div style="font-weight: 500;">Export as Text File</div>
-                            <div style="font-size: 12px; color: var(--text-secondary);">Save to file for sharing</div>
+                        
+                        <button id="clear-all-ai-conversations-btn" class="advanced-action-btn" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; display: flex; align-items: center; gap: 8px; justify-content: center; transition: all 0.2s;">
+                            <i class="fas fa-trash"></i>
+                            <span>${t('settings.advanced.clearAllAIConversations', 'Clear All AI Conversations')}</span>
+                        </button>
+                        <div style="margin-top: 6px; color: var(--text-secondary); font-size: 11px; line-height: 1.4;">
+                            ${t('settings.advanced.clearAllAIConversationsDescription', 'Delete all AI conversations for all notes. This action cannot be undone. Note content will not be affected.')}
                         </div>
-                    </button>
-                </div>
-
-                <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
-                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
-                        <strong>💡 Tip:</strong> You can also right-click on selected text for quick AI-powered sharing options.
                     </div>
                 </div>
             </div>
         `;
 
-        const modal = this.createModal('Share Note', content, [
-            { text: 'Close', type: 'secondary', action: 'close' }
+        const modal = this.createModal(t('settings.advanced.title', 'Advanced Settings'), content, [
+            { text: t('settings.advanced.close', 'Close'), type: 'secondary', action: 'cancel' }
         ]);
+
+        // Handle Clear Unused Tags button
+        const clearTagsBtn = modal.querySelector('#clear-unused-tags-btn');
+        clearTagsBtn.addEventListener('click', async () => {
+            if (!this.notesManager.db || !this.notesManager.db.initialized) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.databaseNotInitialized'), 'error');
+                return;
+            }
+
+            // Confirm action
+            const confirmClear = await this.showConfirmation(
+                t('settings.advanced.confirmClearUnusedTitle', 'Clear Unused Tags'),
+                t('settings.advanced.confirmClearUnusedMessage', 'Are you sure you want to remove all unused tags?\n\nThis will permanently delete tags that are not associated with any notes.')
+            );
+            if (!confirmClear) return;
+
+            try {
+                clearTagsBtn.disabled = true;
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                clearTagsBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <span>${t('settings.advanced.clearing')}</span>`;
+
+                const result = this.notesManager.db.clearUnusedTags();
+
+                if (result.deletedCount > 0) {
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    const plural = result.deletedCount > 1 ? 's' : '';
+                    const pluralRemaining = result.remainingCount !== 1 ? 's' : '';
+                    const message = `✅ ${t('settings.advanced.clearUnusedTagsSuccess', { 
+                        deletedCount: result.deletedCount, 
+                        plural,
+                        remainingCount: result.remainingCount,
+                        pluralRemaining
+                    })}`;
+                    this.showNotification(message, 'success');
+                    console.log('[Advanced Settings] Cleared unused tags:', result);
+                    
+                    // Close modal and refresh if needed
+                    this.closeModal(modal);
+                } else {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(`ℹ️ ${t('settings.advanced.noUnusedTagsFound')}`, 'info');
+                    clearTagsBtn.disabled = false;
+                    clearTagsBtn.innerHTML = `<i class="fas fa-broom"></i> <span>${t('settings.advanced.clearUnusedTags')}</span>`;
+                }
+            } catch (error) {
+                console.error('[Advanced Settings] Error clearing unused tags:', error);
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                const errorMsg = t('notifications.failedToClearUnusedTags', { error: error.message });
+                this.showNotification(`❌ ${errorMsg}`, 'error');
+                clearTagsBtn.disabled = false;
+                clearTagsBtn.innerHTML = `<i class="fas fa-broom"></i> <span>${t('settings.advanced.clearUnusedTags')}</span>`;
+            }
+        });
+
+        // Handle Clear All AI Conversations button
+        const clearAIConversationsBtn = modal.querySelector('#clear-all-ai-conversations-btn');
+        clearAIConversationsBtn.addEventListener('click', async () => {
+            // Confirm action
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const confirmed = await this.showConfirmation(
+                t('settings.advanced.clearAIConversationsConfirmTitle'),
+                t('settings.advanced.clearAIConversationsConfirmMessage')
+            );
+            if (!confirmed) return;
+
+            try {
+                clearAIConversationsBtn.disabled = true;
+                clearAIConversationsBtn.innerHTML = `<i class="fas fa-spinner fa-spin"></i> <span>${t('settings.advanced.clearing')}</span>`;
+
+                const result = await this.backendAPI.clearOrphanedAIConversations();
+
+                if (result.success) {
+                    const message = result.message || `✅ ${t('settings.advanced.allAIConversationsCleared')}`;
+                    this.showNotification(message, 'success');
+                    console.log('[Advanced Settings] Cleared AI conversations:', result);
+                    
+                    // Close modal
+                    this.closeModal(modal);
+                } else {
+                    const errorMsg = result.error || `❌ ${t('notifications.failedToClearAIConversations', { error: '' })}`;
+                    this.showNotification(errorMsg, 'error');
+                    clearAIConversationsBtn.disabled = false;
+                    clearAIConversationsBtn.innerHTML = `<i class="fas fa-trash"></i> <span>${t('settings.advanced.clearAllAIConversations')}</span>`;
+                }
+            } catch (error) {
+                console.error('[Advanced Settings] Error clearing AI conversations:', error);
+                const errorMsg = t('notifications.failedToClearAIConversations', { error: error.message });
+                this.showNotification(`❌ ${errorMsg}`, 'error');
+                clearAIConversationsBtn.disabled = false;
+                clearAIConversationsBtn.innerHTML = `<i class="fas fa-trash"></i> <span>${t('settings.advanced.clearAllAIConversations')}</span>`;
+            }
+        });
+
+        // Add hover effect for the button
+        const style = document.createElement('style');
+        style.textContent = `
+            .advanced-action-btn:hover:not(:disabled) {
+                background: var(--accent-color, #3ECF8E) !important;
+                color: white !important;
+                border-color: var(--accent-color, #3ECF8E) !important;
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            }
+            .advanced-action-btn:disabled {
+                opacity: 0.6;
+                cursor: not-allowed;
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    showRestartDialog(message = null) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+        // Default message if none provided
+        const defaultMessage = t('modals.restartMessage', 'This change requires an app restart to take full effect.');
+        const displayMessage = message || defaultMessage;
+        
+        const content = `
+            <div style="padding: 10px 0;">
+                <p style="margin: 0 0 20px 0; color: var(--text-primary);">
+                    <i class="fas fa-exclamation-circle" style="color: var(--warning-color, #ff9800); margin-right: 8px;"></i>
+                    ${this.escapeHtml(displayMessage)}
+                </p>
+                <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                    ${this.escapeHtml(t('modals.restartQuestion', 'Would you like to restart CogNotez now?'))}
+                </p>
+            </div>
+        `;
+
+        const modal = this.createModal(t('modals.restartRequired', 'Restart Required'), content, [
+            { text: t('modals.restartNow', 'Restart Now'), type: 'primary', action: 'restart', callback: () => this.restartApp() },
+            { text: t('modals.later', 'Later'), type: 'secondary', action: 'cancel' }
+        ]);
+    }
+
+    restartApp() {
+        console.log('[DEBUG] Restarting application...');
+        
+        // Try to use Electron's app.relaunch if available
+        try {
+            if (typeof ipcRenderer !== 'undefined') {
+                // Request main process to relaunch the app
+                ipcRenderer.send('restart-app');
+                
+                // Fallback to reload if restart message doesn't work after 1 second
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+            } else {
+                // Not in Electron, just reload the page
+                window.location.reload();
+            }
+        } catch (error) {
+            console.error('[DEBUG] Failed to restart via IPC, falling back to reload:', error);
+            // Fallback: Simple page reload
+            window.location.reload();
+        }
+    }
+
+    showShareOptions() {
+        if (!this.currentNote || !this.backendAPI) return;
+
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
+        // Always refresh current note from database to get latest collaboration status
+        if (this.notesManager && this.notesManager.db) {
+            const freshNote = this.notesManager.db.getNote(this.currentNote.id);
+            if (freshNote) {
+                // Preserve decrypted content if note is password protected
+                if (this.currentNote.password_protected && this.currentNote.content) {
+                    freshNote.content = this.currentNote.content;
+                }
+                this.currentNote = freshNote;
+            }
+        }
+
+        const isShared = this.currentNote.collaboration?.is_shared;
+        const shareLink = this.currentNote.collaboration?.google_drive_share_link;
+
+        let sharedStatusHtml = '';
+        if (isShared && shareLink) {
+            sharedStatusHtml = `
+                <div style="margin-bottom: 20px; padding: 16px; background: var(--context-menu-bg); border-radius: 8px; border: 1px solid var(--accent-primary);">
+                    <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 12px;">
+                        <i class="fas fa-check-circle" style="color: var(--accent-primary);"></i>
+                        <span style="font-weight: 500; color: var(--accent-primary);">${t('notifications.noteSharedOnGoogleDrive', 'Note is currently shared on Google Drive')}</span>
+                    </div>
+                    <div style="margin-bottom: 12px;">
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px;">${t('notifications.shareLink', 'Share Link:')}</div>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <input type="text" id="current-share-link" readonly value="${shareLink}" style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font-family: monospace; font-size: 11px;">
+                            <button id="copy-share-link-btn" class="btn-secondary" style="padding: 8px 12px;" title="${t('notifications.copyLink', 'Copy link')}">
+                                <i class="fas fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <button id="revoke-share-btn" class="btn-secondary" style="width: 100%; padding: 10px; background: var(--error-color); color: white; border: none;">
+                        <i class="fas fa-times-circle"></i> ${t('notifications.revokeShare', 'Revoke Share')}
+                    </button>
+                </div>
+            `;
+        }
+
+        const content = `
+            <div style="max-width: 500px;">
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-share"></i> ${t('editor.shareNoteTitle', 'Share "{{title}}"', { title: this.currentNote.title })}</h4>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                        ${t('editor.shareNoteDescription', 'Choose how you want to share this note:')}
+                    </p>
+                </div>
+
+                ${sharedStatusHtml}
+
+                <div style="display: flex; flex-direction: column; gap: 12px;">
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 8px;">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">${t('notifications.collaboration', 'Collaboration')}</div>
+                        
+                        <button class="share-option-btn" data-action="share-google-drive" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
+                            <span><i class="fab fa-google-drive" style="color: #4285F4;"></i></span>
+                            <div>
+                                <div style="font-weight: 500;">${isShared ? t('notifications.updateGoogleDriveShare', 'Update Google Drive Share') : t('notifications.shareViaGoogleDrive', 'Share via Google Drive')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${isShared ? t('notifications.updateGoogleDriveShareDescription', 'Update existing shared note on Google Drive') : t('notifications.shareViaGoogleDriveDescription', 'Upload and share on Google Drive with permissions')}</div>
+                            </div>
+                        </button>
+                    </div>
+
+                    <div style="border-bottom: 1px solid var(--border-color); padding-bottom: 12px; margin-bottom: 8px;">
+                        <div style="font-size: 12px; font-weight: 600; color: var(--text-secondary); text-transform: uppercase; margin-bottom: 8px;">${t('notifications.exportSection', 'Export')}</div>
+                        
+                        <button class="share-option-btn" data-action="clipboard-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px;">
+                            <span><i class="fas fa-clipboard"></i></span>
+                            <div>
+                                <div style="font-weight: 500;">${t('notifications.copyToClipboardMarkdown', 'Copy to Clipboard (Markdown)')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.copyToClipboardMarkdownDesc', 'Share formatted content')}</div>
+                            </div>
+                        </button>
+
+                        <button class="share-option-btn" data-action="clipboard-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📄</span>
+                            <div>
+                                <div style="font-weight: 500;">${t('notifications.copyToClipboardText', 'Copy to Clipboard (Plain Text)')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.copyToClipboardTextDesc', 'Share plain text content')}</div>
+                            </div>
+                        </button>
+
+                        <button class="share-option-btn" data-action="export-markdown" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📁</span>
+                            <div>
+                                <div style="font-weight: 500;">${t('notifications.exportAsMarkdownFile', 'Export as Markdown File')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.exportAsMarkdownFileDesc', 'Save to file for sharing')}</div>
+                            </div>
+                        </button>
+
+                        <button class="share-option-btn" data-action="export-text" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📄</span>
+                            <div>
+                                <div style="font-weight: 500;">${t('notifications.exportAsTextFile', 'Export as Text File')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.exportAsTextFileDesc', 'Save to file for sharing')}</div>
+                            </div>
+                        </button>
+
+                        <button class="share-option-btn" data-action="export-pdf" style="width: 100%; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary); cursor: pointer; text-align: left; display: flex; align-items: center; gap: 8px; margin-top: 8px;">
+                            <span>📋</span>
+                            <div>
+                                <div style="font-weight: 500;">${t('notifications.shareAsPDF', 'Share as PDF')}</div>
+                                <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.shareAsPDFDesc', 'Preserves media and formatting')}</div>
+                            </div>
+                        </button>
+                    </div>
+                </div>
+
+                <div style="margin-top: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4;">
+                        ${t('notifications.shareTip', '💡 Tip: Google Drive sharing enables cloud-based collaboration with permission control. Export options let you share files directly.')}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = this.createModal(t('editor.shareNote', 'Share Note'), content, [
+            { text: t('modals.close', 'Close'), type: 'secondary', action: 'close' }
+        ]);
+
+        // Handle copy link button
+        if (isShared && shareLink) {
+            const copyBtn = modal.querySelector('#copy-share-link-btn');
+            copyBtn?.addEventListener('click', () => {
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                const linkInput = modal.querySelector('#current-share-link');
+                linkInput.select();
+                document.execCommand('copy');
+                this.showNotification(t('notifications.linkCopiedToClipboard', 'Link copied to clipboard!'), 'success');
+            });
+
+            // Handle revoke share button
+            const revokeBtn = modal.querySelector('#revoke-share-btn');
+            revokeBtn?.addEventListener('click', async () => {
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                if (confirm(t('notifications.revokeShareConfirm', 'Are you sure you want to revoke this share? The Google Drive file will be deleted.'))) {
+                    try {
+                        this.showLoading(t('notifications.revokingShare', 'Revoking share...'));
+                        const result = await this.backendAPI.revokeGoogleDriveShare(
+                            this.currentNote.collaboration.google_drive_file_id,
+                            this.currentNote.id
+                        );
+                        this.hideLoading();
+                        this.showNotification(t('notifications.shareRevokedSuccessfully', 'Share revoked successfully'), 'success');
+                        
+                        // Update the note's collaboration data in renderer's database
+                        if (result.success && result.updatedCollaboration && this.notesManager && this.notesManager.db) {
+                            const noteData = this.notesManager.db.data.notes[this.currentNote.id];
+                            if (noteData) {
+                                noteData.collaboration = result.updatedCollaboration;
+                                // Update timestamp so sync knows this version is newer
+                                noteData.updated_at = new Date().toISOString();
+                                this.notesManager.db.saveToLocalStorage();
+                                this.currentNote = this.notesManager.db.getNote(this.currentNote.id);
+                            }
+                        }
+                        // Close ALL modals (in case there are multiple stacked)
+                        this.closeAllModals();
+                        
+                        // Reload the share options to reflect updated state
+                        setTimeout(() => this.showShareOptions(), 300);
+                    } catch (error) {
+                        this.hideLoading();
+                        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+                        this.showNotification(t('notifications.failedToRevokeShare', 'Failed to revoke share: {{error}}', { error: error.message }), 'error');
+                    }
+                }
+            });
+        }
 
         // Add click handlers for share options
         modal.querySelectorAll('.share-option-btn').forEach(btn => {
             btn.addEventListener('click', async (e) => {
                 const action = e.currentTarget.dataset.action;
                 await this.handleShareAction(action);
-                this.closeModal(modal);
+                if (action !== 'share-google-drive') {
+                    this.closeModal(modal);
+                }
             });
         });
     }
@@ -3913,25 +7575,31 @@ Please provide a helpful response based on the note content and conversation his
     async handleShareAction(action) {
         if (!this.currentNote || !this.backendAPI) return;
 
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
         try {
             let success = false;
             let message = '';
 
             switch (action) {
+                case 'share-google-drive':
+                    await this.showGoogleDriveShareDialog();
+                    return; // Don't close modal yet
+
                 case 'clipboard-markdown':
                     success = await this.backendAPI.shareNoteToClipboard(this.currentNote, 'markdown');
-                    message = 'Note copied to clipboard as Markdown!';
+                    message = t('notifications.noteCopiedToClipboardMarkdown', 'Note copied to clipboard as Markdown!');
                     break;
 
                 case 'clipboard-text':
                     success = await this.backendAPI.shareNoteToClipboard(this.currentNote, 'text');
-                    message = 'Note copied to clipboard as plain text!';
+                    message = t('notifications.noteCopiedToClipboardText', 'Note copied to clipboard as plain text!');
                     break;
 
                 case 'export-markdown':
                     const mdPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'markdown');
                     if (mdPath) {
-                        message = `Note exported as Markdown: ${mdPath}`;
+                        message = t('notifications.noteExportedAsMarkdown', 'Note exported as Markdown: {{path}}', { path: mdPath });
                         success = true;
                     }
                     break;
@@ -3939,7 +7607,15 @@ Please provide a helpful response based on the note content and conversation his
                 case 'export-text':
                     const txtPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'text');
                     if (txtPath) {
-                        message = `Note exported as Text: ${txtPath}`;
+                        message = t('notifications.noteExportedAsText', 'Note exported as Text: {{path}}', { path: txtPath });
+                        success = true;
+                    }
+                    break;
+
+                case 'export-pdf':
+                    const pdfPath = await this.backendAPI.shareNoteAsFile(this.currentNote, 'pdf');
+                    if (pdfPath) {
+                        message = t('notifications.noteExportedAsPDF', 'Note exported as PDF: {{path}}', { path: pdfPath });
                         success = true;
                     }
                     break;
@@ -3948,13 +7624,148 @@ Please provide a helpful response based on the note content and conversation his
             if (success) {
                 this.showNotification(message, 'success');
             } else {
-                this.showNotification('Failed to share note', 'error');
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                this.showNotification(t('notifications.failedToShareNote', 'Failed to share note'), 'error');
             }
         } catch (error) {
             console.error('Share error:', error);
-            this.showNotification('Failed to share note', 'error');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.showNotification(t('notifications.failedToShareNote', 'Failed to share note'), 'error');
         }
     }
+
+    async showGoogleDriveShareDialog() {
+        // Check if user is authenticated with Google Drive
+        try {
+            const syncStatus = await this.backendAPI.getGoogleDriveSyncStatus();
+            if (!syncStatus || !syncStatus.isAuthenticated) {
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                this.showNotification(t('notifications.pleaseAuthenticateGoogleDrive', 'Please authenticate with Google Drive first. Go to Sync Settings and click "Connect Google Drive".'), 'error');
+                return;
+            }
+        } catch (error) {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.showNotification(t('notifications.googleDriveSyncNotSetup', 'Google Drive sync is not set up. Please connect Google Drive in Sync Settings.'), 'error');
+            return;
+        }
+
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+        const content = `
+            <div style="max-width: 500px;">
+                <div style="margin-bottom: 20px;">
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fab fa-google-drive"></i> ${t('notifications.shareViaGoogleDriveTitle', 'Share via Google Drive')}</h4>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                        ${t('notifications.shareViaGoogleDriveSubtitle', 'Upload and share this note on Google Drive:')}
+                    </p>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
+                        <input type="radio" name="gd-perm" value="view" checked style="cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t('notifications.viewOnly', 'View Only')}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.viewOnlyDesc', 'Recipients can only view')}</div>
+                        </div>
+                    </label>
+
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
+                        <input type="radio" name="gd-perm" value="comment" style="cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t('notifications.comment', 'Comment')}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.commentDesc', 'Recipients can view and comment')}</div>
+                        </div>
+                    </label>
+
+                    <label style="display: flex; align-items: center; gap: 8px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); cursor: pointer;">
+                        <input type="radio" name="gd-perm" value="edit" style="cursor: pointer;">
+                        <div>
+                            <div style="font-weight: 500; color: var(--text-primary);">${t('notifications.edit', 'Edit')}</div>
+                            <div style="font-size: 12px; color: var(--text-secondary);">${t('notifications.editDesc', 'Recipients can view and edit')}</div>
+                        </div>
+                    </label>
+                </div>
+
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">${t('notifications.shareWithEmail', 'Share with email (optional):')}</label>
+                    <input type="email" id="gd-email" placeholder="${t('notifications.shareWithEmailPlaceholder', 'user@example.com')}" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--input-bg); color: var(--text-primary);">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-top: 4px;">${t('notifications.shareWithEmailHint', 'Leave empty to create a public link')}</div>
+                </div>
+
+                <div id="gd-share-result" style="display: none; margin-bottom: 20px; padding: 12px; background: var(--context-menu-bg); border-radius: 6px; border: 1px solid var(--border-color);">
+                    <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">${t('notifications.googleDriveLink', 'Google Drive Link:')}</div>
+                    <div style="display: flex; gap: 8px; align-items: center;">
+                        <input type="text" id="gd-link-input" readonly style="flex: 1; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--bg-primary); color: var(--text-primary); font-family: monospace; font-size: 12px;">
+                        <button id="copy-gd-link-btn" class="btn-secondary" style="padding: 8px 12px;">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = this.createModal(t('notifications.shareViaGoogleDriveTitle', 'Share via Google Drive'), content, [
+            { text: t('modals.cancel', 'Cancel'), type: 'secondary', action: 'close' },
+            { text: t('notifications.shareViaGoogleDrive', 'Share'), type: 'primary', action: 'share-gd' }
+        ]);
+
+        // Handle share button
+        const shareBtn = modal.querySelector('[data-action="share-gd"]');
+        shareBtn.addEventListener('click', async () => {
+            const permValue = modal.querySelector('input[name="gd-perm"]:checked').value;
+            const email = modal.querySelector('#gd-email').value.trim();
+
+            const permissions = {
+                view: true,
+                comment: permValue === 'comment' || permValue === 'edit',
+                edit: permValue === 'edit'
+            };
+
+            try {
+                const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                this.showLoading(t('notifications.sharingNoteOnGoogleDrive', 'Sharing note on Google Drive...'));
+                const result = await this.backendAPI.shareNoteOnGoogleDrive(
+                    this.currentNote,
+                    permissions,
+                    email || null
+                );
+
+                this.hideLoading();
+
+                if (result.success) {
+                    // Update the note's collaboration data in renderer's database
+                    if (result.success && result.updatedCollaboration && this.notesManager && this.notesManager.db) {
+                        const noteData = this.notesManager.db.data.notes[this.currentNote.id];
+                        if (noteData) {
+                            noteData.collaboration = result.updatedCollaboration;
+                            // Update timestamp so sync knows this version is newer
+                            noteData.updated_at = new Date().toISOString();
+                            this.notesManager.db.saveToLocalStorage();
+                            this.currentNote = this.notesManager.db.getNote(this.currentNote.id);
+                            console.log('[Share] Updated note collaboration data:', this.currentNote.collaboration);
+                        }
+                    }
+
+                    const message = result.isUpdate ? 
+                        t('notifications.sharedNoteUpdatedSuccessfully', 'Shared note updated successfully on Google Drive!') : 
+                        t('notifications.noteSharedSuccessfully', 'Note shared on Google Drive successfully!');
+                    this.showNotification(message, 'success');
+
+                    // Close ALL modals (including parent Share Note dialog) and reopen
+                    this.closeAllModals();
+                    
+                    // Reload the share options to reflect updated state
+                    setTimeout(() => this.showShareOptions(), 300);
+                }
+            } catch (error) {
+                this.hideLoading();
+                console.error('Error sharing on Google Drive:', error);
+                const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+                this.showNotification(t('notifications.failedToShareOnGoogleDrive', 'Failed to share on Google Drive: {{error}}', { error: error.message }), 'error');
+            }
+        });
+    }
+
+
 
 
     showCustomAIDialog(title, context, action, customContent) {
@@ -3977,7 +7788,8 @@ Please provide a helpful response based on the note content and conversation his
 
         // Update submit button text
         const submitBtn = document.getElementById('ai-dialog-submit');
-        submitBtn.textContent = 'Rewrite';
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        submitBtn.textContent = t('ai.rewrite');
 
         document.getElementById('ai-dialog').classList.remove('hidden');
         this.currentAIAction = action;
@@ -3990,7 +7802,8 @@ Please provide a helpful response based on the note content and conversation his
             await ipcRenderer.invoke('check-for-updates');
         } catch (error) {
             console.error('Failed to check for updates:', error);
-            this.showNotification('Failed to check for updates', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToCheckForUpdates'), 'error');
         }
     }
 
@@ -3999,15 +7812,16 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showUpdateAvailable(info) {
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
         const dialog = document.createElement('div');
         dialog.className = 'update-dialog';
         dialog.innerHTML = `
             <div class="update-dialog-content">
-                <h3>Update Available</h3>
-                <p>A new version (${info.version}) is available. Would you like to download it?</p>
+                <h3>${t('notifications.updateAvailable')}</h3>
+                <p>${t('notifications.updateAvailableMessage', { version: info.version })}</p>
                 <div class="update-dialog-buttons">
-                    <button id="download-update" class="btn-primary">Download</button>
-                    <button id="cancel-update" class="btn-secondary">Later</button>
+                    <button id="download-update" class="btn-primary">${t('notifications.downloadUpdate')}</button>
+                    <button id="cancel-update" class="btn-secondary">${t('notifications.updateLater')}</button>
                 </div>
             </div>
         `;
@@ -4055,7 +7869,8 @@ Please provide a helpful response based on the note content and conversation his
                 dialog.remove();
             } catch (error) {
                 console.error('Failed to start download:', error);
-                this.showNotification('Failed to start download', 'error');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.updateDownloadFailed'), 'error');
             }
         });
 
@@ -4065,16 +7880,19 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showUpdateNotAvailable(info) {
-        this.showNotification(`You're running the latest version (${info.version})`, 'success');
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showNotification(t('notifications.updateLatestVersion', { version: info.version }), 'success');
     }
 
     showUpdateError(error) {
-        this.showNotification(`Update check failed: ${error}`, 'error');
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showNotification(t('notifications.updateCheckFailed', { error: error }), 'error');
     }
 
     showDownloadProgress(progress) {
         const percent = Math.round(progress.percent);
-        this.showNotification(`Downloading update: ${percent}%`, 'info');
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showNotification(t('notifications.downloadingUpdate', { percent }), 'info');
     }
 
     showUpdateDownloaded(info) {
@@ -4083,19 +7901,63 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     // Sync-related methods
+    async initializePhase5Features() {
+        try {
+            console.log('[Phase5] Initializing advanced features...');
+
+            // Initialize Advanced Search Manager
+            if (window.AdvancedSearchManager) {
+                this.advancedSearchManager = new window.AdvancedSearchManager(this);
+                await this.advancedSearchManager.initialize();
+                console.log('[Phase5] Advanced Search initialized');
+            }
+
+            // Initialize Templates Manager
+            if (window.TemplatesManager) {
+                this.templatesManager = new window.TemplatesManager(this);
+                await this.templatesManager.initialize();
+                console.log('[Phase5] Templates initialized');
+            }
+
+            // Initialize Rich Media Manager
+            if (window.RichMediaManager) {
+                this.richMediaManager = new window.RichMediaManager(this);
+                await this.richMediaManager.initialize();
+                console.log('[Phase5] Rich Media initialized');
+            }
+
+            console.log('[Phase5] All Phase 5 features initialized successfully');
+
+        } catch (error) {
+            console.error('[Phase5] Failed to initialize Phase 5 features:', error);
+            // Continue even if Phase 5 features fail
+        }
+    }
+
     async initializeSync() {
         try {
+            // Quick offline check to avoid slow sync initialization when offline
+            if (!navigator.onLine) {
+                console.log('[Sync] Device is offline, skipping sync initialization');
+                return;
+            }
+
             // Check if sync is enabled
             if (this.notesManager && this.notesManager.db) {
                 const syncEnabled = this.notesManager.db.isSyncEnabled();
                 if (syncEnabled) {
-                    // Initialize sync status
-                    await this.updateSyncStatus();
+                    // Initialize sync status with timeout to prevent blocking startup
+                    const timeoutPromise = new Promise((resolve) => setTimeout(resolve, 2000));
+                    await Promise.race([this.updateSyncStatus(), timeoutPromise]);
 
-                    // Show sync status container
-                    const syncContainer = document.getElementById('sync-status-container');
-                    if (syncContainer) {
-                        syncContainer.style.display = 'flex';
+                    // Show sync button and divider
+                    const syncBtn = document.getElementById('sync-btn');
+                    const syncDivider = document.querySelector('.sync-divider');
+                    if (syncBtn) {
+                        syncBtn.classList.remove('hidden');
+                    }
+                    if (syncDivider) {
+                        syncDivider.classList.remove('hidden');
                     }
 
                     // Set up auto-sync if enabled
@@ -4174,7 +8036,8 @@ Please provide a helpful response based on the note content and conversation his
 
         } catch (error) {
             console.error('[Sync] Failed to handle sync data update:', error);
-            this.showNotification('Failed to update local data after sync', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('settings.sync.failedToUpdateLocalData'), 'error');
         }
     }
 
@@ -4190,23 +8053,32 @@ Please provide a helpful response based on the note content and conversation his
 
             // If sync failed, show a single error notification and exit
             if (syncResult && syncResult.success === false) {
-                const errorMessage = syncResult.error ? `Sync failed: ${syncResult.error}` : 'Sync failed';
+                const errorMessage = syncResult.error
+                    ? (window.i18n ? window.i18n.t('notifications.syncFailed', { error: syncResult.error }) : `Sync failed: ${syncResult.error}`)
+                    : (window.i18n ? window.i18n.t('notifications.syncFailedGeneric') : 'Sync failed');
                 this.showNotification(errorMessage, 'error');
                 return;
             }
 
             // Show notification about the sync completion
-            let message = 'Sync completed successfully';
+            const baseMessage = window.i18n ? window.i18n.t('notifications.syncCompleted') : 'Sync completed successfully';
+            let message = baseMessage;
             if (syncResult.action) {
                 message += ` - ${syncResult.action}`;
             }
             if (syncResult.stats) {
                 const stats = syncResult.stats;
                 if (stats.downloaded > 0) {
-                    message += ` (${stats.downloaded} downloaded)`;
+                    const dl = window.i18n
+                        ? window.i18n.t('notifications.syncStatsDownloaded', { count: stats.downloaded })
+                        : `${stats.downloaded} downloaded`;
+                    message += ` (${dl})`;
                 }
                 if (stats.uploaded > 0) {
-                    message += ` (${stats.uploaded} uploaded)`;
+                    const ul = window.i18n
+                        ? window.i18n.t('notifications.syncStatsUploaded', { count: stats.uploaded })
+                        : `${stats.uploaded} uploaded`;
+                    message += ` (${ul})`;
                 }
             }
             this.showNotification(message, 'success');
@@ -4214,7 +8086,10 @@ Please provide a helpful response based on the note content and conversation his
             console.log('[Sync] UI refreshed after sync completion');
         } catch (error) {
             console.error('[Sync] Failed to handle sync completion:', error);
-            this.showNotification('Sync completed but UI refresh failed', 'warning');
+            const msg = window.i18n
+                ? window.i18n.t('notifications.syncRefreshFailed')
+                : 'Sync completed but UI refresh failed';
+            this.showNotification(msg, 'warning');
         }
     }
 
@@ -4237,7 +8112,9 @@ Please provide a helpful response based on the note content and conversation his
 
             // Show notification about the change
             const statusText = settings.enabled ? 'enabled' : 'disabled';
-            this.showNotification(`End-to-end encryption ${statusText}`, 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const statusKey = settings.enabled ? 'notifications.encryptionEnabled' : 'notifications.encryptionDisabled';
+            this.showNotification(t(statusKey), 'success');
 
         } catch (error) {
             console.error('[Encryption] Failed to handle settings update:', error);
@@ -4245,12 +8122,11 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     updateSyncUI() {
-        const indicator = document.getElementById('sync-status-indicator');
-        const icon = document.getElementById('sync-status-icon');
-        const text = document.getElementById('sync-status-text');
-        const manualBtn = document.getElementById('sync-manual-btn');
+        const syncBtn = document.getElementById('sync-btn');
+        const icon = document.getElementById('sync-btn-icon');
+        const text = document.getElementById('sync-btn-text');
 
-        if (!indicator || !icon || !text) return;
+        if (!syncBtn || !icon || !text) return;
 
         console.log('[UI] Updating sync UI with status:', {
             isAuthenticated: this.syncStatus.isAuthenticated,
@@ -4258,40 +8134,62 @@ Please provide a helpful response based on the note content and conversation his
             inProgress: this.syncStatus.inProgress
         });
 
+        // Check if we're offline
+        const isOnline = navigator.onLine;
+
         // Determine if content is in sync using checksums when available
         const contentInSync = !!(this.syncStatus.localChecksum && this.syncStatus.remoteChecksum && this.syncStatus.localChecksum === this.syncStatus.remoteChecksum);
 
-        // Update sync status indicator
+        // Reset all status classes
+        syncBtn.classList.remove('connected', 'disconnected', 'syncing', 'error');
+
+        const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+
+        // Update sync button based on status
         if (this.syncStatus.inProgress) {
-            indicator.className = 'sync-status-indicator syncing';
-            icon.className = 'fas fa-spinner fa-spin';
-            text.textContent = 'Syncing...';
-            manualBtn.disabled = true;
+            syncBtn.classList.add('syncing');
+            icon.className = 'fas fa-sync-alt';
+            text.textContent = t('settings.sync.statusSyncing', 'Syncing...');
+            syncBtn.disabled = true;
+            syncBtn.title = t('settings.sync.statusSyncingTooltip', 'Sync in progress...');
+        } else if (!isOnline) {
+            // Show offline state
+            syncBtn.classList.add('disconnected');
+            icon.className = 'fas fa-wifi-slash';
+            text.textContent = t('settings.sync.statusOffline', 'Offline');
+            syncBtn.disabled = true;
+            syncBtn.title = t('notifications.noInternet', 'No internet connection');
         } else if (this.syncStatus.isAuthenticated) {
             if (contentInSync) {
-                indicator.className = 'sync-status-indicator connected';
-                icon.className = 'fas fa-cloud';
-                text.textContent = 'Content in sync';
-                manualBtn.disabled = false;
+                syncBtn.classList.add('connected');
+                icon.className = 'fas fa-cloud-check';
+                text.textContent = t('settings.sync.statusConnected', 'Synced');
+                syncBtn.disabled = false;
+                syncBtn.title = t('settings.sync.statusConnectedTooltip', 'In sync - Click to sync manually');
             } else {
-                indicator.className = 'sync-status-indicator disconnected';
-                icon.className = 'fas fa-cloud-upload';
-                text.textContent = 'Ready to sync';
-                manualBtn.disabled = false;
+                syncBtn.classList.add('disconnected');
+                icon.className = 'fas fa-cloud-upload-alt';
+                text.textContent = t('settings.sync.statusSyncAvailable', 'Sync');
+                syncBtn.disabled = false;
+                syncBtn.title = t('settings.sync.statusSyncAvailableTooltip', 'Click to sync with Google Drive');
             }
         } else {
-            indicator.className = 'sync-status-indicator disconnected';
-            icon.className = 'fas fa-cloud-off';
-            text.textContent = 'Not connected';
-            manualBtn.disabled = true;
+            syncBtn.classList.add('disconnected');
+            icon.className = 'fas fa-cloud-slash';
+            text.textContent = t('settings.sync.statusNotConnected', 'Not connected');
+            syncBtn.disabled = true;
+            syncBtn.title = t('settings.sync.statusNotConnectedTooltip', 'Not connected to Google Drive');
         }
 
-        // Update last sync time
+        // Update last sync time in settings modal if open
         const lastSyncElement = document.getElementById('google-drive-last-sync');
         if (lastSyncElement && this.syncStatus.lastSync) {
             const lastSyncDate = new Date(this.syncStatus.lastSync);
             const timeAgo = this.getTimeAgo(lastSyncDate);
-            lastSyncElement.textContent = `Last synced: ${timeAgo}`;
+            const label = window.i18n
+                ? window.i18n.t('settings.sync.lastSynced', { timeAgo })
+                : `Last synced: ${timeAgo}`;
+            lastSyncElement.textContent = label;
         }
     }
 
@@ -4302,20 +8200,29 @@ Please provide a helpful response based on the note content and conversation his
         const diffHours = Math.floor(diffMins / 60);
         const diffDays = Math.floor(diffHours / 24);
 
-        if (diffMins < 1) return 'just now';
-        if (diffMins < 60) return `${diffMins}m ago`;
-        if (diffHours < 24) return `${diffHours}h ago`;
-        if (diffDays < 7) return `${diffDays}d ago`;
+        if (diffMins < 1) {
+            return window.i18n ? window.i18n.t('settings.sync.timeJustNow', 'just now') : 'just now';
+        }
+        if (diffMins < 60) {
+            return window.i18n ? window.i18n.t('settings.sync.timeMinutesAgo', { count: diffMins }) : `${diffMins}m ago`;
+        }
+        if (diffHours < 24) {
+            return window.i18n ? window.i18n.t('settings.sync.timeHoursAgo', { count: diffHours }) : `${diffHours}h ago`;
+        }
+        if (diffDays < 7) {
+            return window.i18n ? window.i18n.t('settings.sync.timeDaysAgo', { count: diffDays }) : `${diffDays}d ago`;
+        }
 
-        return date.toLocaleDateString();
+        return this.formatLocalizedDateTime(date, false);
     }
 
     showSyncSettings() {
         try {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             const content = `
                 <div style="max-width: 700px;">
                     <div style="margin-bottom: 24px;">
-                        <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cloud"></i> Google Drive Sync Settings</h4>
+                        <h4 style="margin: 0 0 16px 0; color: var(--text-primary);"><i class="fas fa-cloud"></i> ${t('settings.sync.title', 'Google Drive Sync Settings')}</h4>
                     </div>
 
                     <div id="sync-settings-content">
@@ -4325,13 +8232,13 @@ Please provide a helpful response based on the note content and conversation his
                                 <div class="sync-status-card" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 8px; padding: 16px; margin-bottom: 16px;">
                                     <div class="sync-status-header" style="display: flex; align-items: center; margin-bottom: 12px;">
                                         <div class="sync-status-indicator" id="modal-sync-indicator" style="width: 12px; height: 12px; border-radius: 50%; margin-right: 8px;"></div>
-                                        <span class="sync-status-text" id="modal-sync-status-text" style="font-weight: 500;">Loading...</span>
+                                        <span class="sync-status-text" id="modal-sync-status-text" style="font-weight: 500;">${t('settings.sync.statusLoading', 'Loading...')}</span>
                                     </div>
                                     <div class="sync-last-sync" id="modal-sync-last-sync" style="font-size: 0.9rem; color: var(--text-secondary);"></div>
                                     <div class="sync-buttons" style="margin-top: 12px;">
-                                        <button id="modal-google-drive-connect-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px;">Connect Google Drive</button>
-                                        <button id="modal-google-drive-disconnect-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px; display: none;">Disconnect</button>
-                                        <button id="modal-google-drive-sync-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;" disabled>Sync Now</button>
+                                        <button id="modal-google-drive-connect-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px;">${t('settings.sync.connectGoogleDrive', 'Connect Google Drive')}</button>
+                                        <button id="modal-google-drive-disconnect-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem; margin-right: 8px; display: none;">${t('settings.sync.disconnect', 'Disconnect')}</button>
+                                        <button id="modal-google-drive-sync-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;" disabled>${t('settings.sync.syncNow', 'Sync Now')}</button>
                                     </div>
                                 </div>
                             </div>
@@ -4339,20 +8246,20 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Options Section -->
                         <div class="sync-section" style="margin-bottom: 24px;">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Options</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">${t('settings.sync.syncOptions', 'Sync Options')}</h5>
                             <div class="sync-options" style="display: grid; gap: 12px;">
                                 <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color);">
                                     <input type="checkbox" id="modal-auto-sync" style="margin-right: 12px;">
                                     <div>
-                                        <label for="modal-auto-sync" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Automatic Sync</label>
-                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Automatically sync changes every 5 minutes when connected</div>
+                                        <label for="modal-auto-sync" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">${t('settings.sync.autoSyncLabel', 'Automatic Sync')}</label>
+                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${t('settings.sync.autoSyncDescription', 'Automatically sync changes every 5 minutes when connected')}</div>
                                     </div>
                                 </div>
                                 <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color);">
                                     <input type="checkbox" id="modal-sync-on-startup" style="margin-right: 12px;">
                                     <div>
-                                        <label for="modal-sync-on-startup" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Sync on Startup</label>
-                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Sync data when the application starts</div>
+                                        <label for="modal-sync-on-startup" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">${t('settings.sync.syncOnStartupLabel', 'Sync on Startup')}</label>
+                                        <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${t('settings.sync.syncOnStartupDescription', 'Sync data when the application starts')}</div>
                                     </div>
                                 </div>
                             </div>
@@ -4360,7 +8267,7 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Encryption Section -->
                         <div class="sync-section" style="margin-bottom: 24px;">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;"><i class="fas fa-lock"></i> End-to-End Encryption</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;"><i class="fas fa-lock"></i> ${t('settings.sync.encryptionSectionTitle', 'End-to-End Encryption')}</h5>
                             <div class="sync-encryption-section" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
                                 <div class="encryption-status" id="encryption-status" style="margin-bottom: 16px;">
                                     <div style="display: flex; align-items: center; margin-bottom: 8px;">
@@ -4374,28 +8281,28 @@ Please provide a helpful response based on the note content and conversation his
                                     <div class="sync-option" style="display: flex; align-items: center; padding: 12px; background: var(--surface-bg); border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 12px;">
                                         <input type="checkbox" id="modal-encryption-enabled" style="margin-right: 12px;">
                                         <div>
-                                            <label for="modal-encryption-enabled" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">Enable End-to-End Encryption</label>
-                                            <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">Encrypt your data before uploading to Google Drive. Your data will only be accessible with your passphrase.</div>
+                                            <label for="modal-encryption-enabled" style="cursor: pointer; color: var(--text-primary); font-weight: 500;">${t('settings.sync.enableEncryption', 'Enable End-to-End Encryption')}</label>
+                                            <div class="sync-option-description" style="font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px;">${t('settings.sync.encryptionDescription', 'Encrypt your data before uploading to Google Drive. Your data will only be accessible with your passphrase.')}</div>
                                         </div>
                                     </div>
 
                                     <div class="encryption-passphrase-section" id="encryption-passphrase-section" style="display: none;">
                                         <div style="margin-bottom: 12px;">
-                                            <label for="modal-encryption-passphrase" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
-                                            <input type="password" id="modal-encryption-passphrase" placeholder="Enter your passphrase (min. 8 characters)" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                                            <label for="modal-encryption-passphrase" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">${t('settings.sync.passphraseLabel', 'Passphrase')}</label>
+                                            <input type="password" id="modal-encryption-passphrase" placeholder="${t('settings.sync.passphrasePlaceholder', 'Enter your passphrase (min. 8 characters)')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                                             <div class="encryption-passphrase-help" style="font-size: 0.75rem; color: var(--text-secondary); margin-top: 4px;">
-                                                Your passphrase is used to encrypt and decrypt your data. Choose a strong passphrase and keep it safe.
+                                                ${t('settings.sync.passphraseHelp', 'Your passphrase is used to encrypt and decrypt your data. Choose a strong passphrase and keep it safe.')}
                                             </div>
                                         </div>
 
                                         <div style="margin-bottom: 12px;">
-                                            <label for="modal-encryption-passphrase-confirm" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">Confirm Passphrase</label>
-                                            <input type="password" id="modal-encryption-passphrase-confirm" placeholder="Confirm your passphrase" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                                            <label for="modal-encryption-passphrase-confirm" style="display: block; margin-bottom: 4px; color: var(--text-primary); font-weight: 500;">${t('settings.sync.confirmPassphraseLabel', 'Confirm Passphrase')}</label>
+                                            <input type="password" id="modal-encryption-passphrase-confirm" placeholder="${t('settings.sync.confirmPassphrasePlaceholder', 'Confirm your passphrase')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                                         </div>
 
                                         <div class="encryption-buttons" style="display: flex; gap: 8px;">
-                                            <button id="modal-encryption-save-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Save Encryption Settings</button>
-                                            <button id="modal-encryption-cancel-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">Cancel</button>
+                                            <button id="modal-encryption-save-btn" class="sync-button" style="background: var(--accent-color); color: white; border: none; padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">${t('settings.sync.saveEncryption', 'Save Encryption Settings')}</button>
+                                            <button id="modal-encryption-cancel-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 6px 12px; border-radius: 4px; cursor: pointer; font-size: 0.85rem;">${t('settings.sync.cancel', 'Cancel')}</button>
                                         </div>
 
                                         <div id="encryption-validation" style="margin-top: 8px; font-size: 0.8rem;"></div>
@@ -4406,7 +8313,7 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Conflicts Section (hidden by default) -->
                         <div id="modal-conflicts-section" class="sync-section" style="display: none;">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Sync Conflicts</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">${t('settings.sync.conflictsTitle', 'Sync Conflicts')}</h5>
                             <div id="modal-conflicts-list" style="background: var(--surface-bg); border: 1px solid var(--border-color); border-radius: 6px; padding: 16px;">
                                 <!-- Conflicts will be populated here -->
                             </div>
@@ -4414,41 +8321,28 @@ Please provide a helpful response based on the note content and conversation his
 
                         <!-- Setup Section -->
                         <div class="sync-section">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Setup Instructions</h5>
+                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">${t('settings.sync.setupInstructions', 'Setup Instructions')}</h5>
                             <div class="sync-setup-section" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
                                 <div class="sync-setup-steps" style="counter-reset: step-counter;">
                                     <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
                                         <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">1</div>
-                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Create Google Cloud Project</h6>
-                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Go to <a href="https://console.cloud.google.com/" target="_blank" style="color: var(--accent-color);">Google Cloud Console</a> and create a new project.</p>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">${t('settings.sync.step1Title', 'Create Google Cloud Project')}</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${t('settings.sync.step1Description', 'Go to Google Cloud Console and create a new project.')}</p>
                                     </div>
                                     <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
                                         <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">2</div>
-                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Enable Google Drive API</h6>
-                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">In the Cloud Console, enable the Google Drive API for your project.</p>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">${t('settings.sync.step2Title', 'Enable Google Drive API')}</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${t('settings.sync.step2Description', 'In the Cloud Console, enable the Google Drive API for your project.')}</p>
                                     </div>
                                     <div class="sync-setup-step" style="counter-increment: step-counter; margin-bottom: 12px; position: relative; padding-left: 32px;">
                                         <div style="position: absolute; left: 0; top: 0; width: 24px; height: 24px; background: var(--accent-color); color: white; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.8rem; font-weight: 600;">3</div>
-                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">Import Credentials</h6>
-                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">Use the button below to load your OAuth credentials file.</p>
+                                        <h6 style="margin: 0 0 4px 0; font-size: 0.9rem; color: var(--text-primary);">${t('settings.sync.step3Title', 'Import Credentials')}</h6>
+                                        <p style="margin: 0; font-size: 0.85rem; color: var(--text-secondary);">${t('settings.sync.step3Description', 'Download your OAuth client credentials JSON and import it into CogNotez.')}</p>
                                     </div>
                                 </div>
 
                                 <div style="margin-top: 16px;">
-                                    <button id="modal-import-credentials-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Import Credentials File</button>
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Advanced Options Section -->
-                        <div class="sync-section">
-                            <h5 style="margin: 0 0 12px 0; color: var(--text-primary); font-size: 1rem;">Advanced Options</h5>
-                            <div class="sync-advanced-options" style="background: var(--surface-bg); border-radius: 6px; padding: 16px; border: 1px solid var(--border-color);">
-                                <div class="sync-buttons" style="display: flex; gap: 12px; flex-wrap: wrap;">
-                                    <button id="modal-clear-orphaned-ai-btn" class="sync-button" style="background: #ef4444; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">Clear Orphaned AI Conversations</button>
-                                </div>
-                                <div style="margin-top: 12px; font-size: 0.85rem; color: var(--text-secondary);">
-                                    <strong>Clear Orphaned AI Conversations:</strong> Deletes AI conversations for notes that no longer exist. Useful for cleaning up conversations from deleted notes.
+                                    <button id="modal-import-credentials-btn" class="sync-button" style="background: var(--surface-bg); color: var(--text-color); border: 1px solid var(--border-color); padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.9rem;">${t('settings.sync.importCredentialsButton', 'Import Credentials File')}</button>
                                 </div>
                             </div>
                         </div>
@@ -4456,8 +8350,10 @@ Please provide a helpful response based on the note content and conversation his
                 </div>
             `;
 
-            const modal = this.createModal('Cloud Sync Settings', content, [
-                { text: 'Close', type: 'secondary', action: 'close-sync-settings' }
+            const modalTitle = t('settings.sync.cloudTitle', 'Cloud Sync Settings');
+            const closeLabel = window.i18n ? window.i18n.t('modals.close') : 'Close';
+            const modal = this.createModal(modalTitle, content, [
+                { text: closeLabel, type: 'secondary', action: 'close-sync-settings' }
             ]);
 
             // Initialize sync status in modal
@@ -4468,7 +8364,8 @@ Please provide a helpful response based on the note content and conversation his
 
         } catch (error) {
             console.error('[Sync] Failed to show sync settings modal:', error);
-            this.showNotification('Failed to open sync settings', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('settings.sync.failedToOpenSyncSettings'), 'error');
         }
     }
 
@@ -4484,7 +8381,6 @@ Please provide a helpful response based on the note content and conversation his
             const importBtn = modal.querySelector('#modal-import-credentials-btn');
             const autoSyncCheckbox = modal.querySelector('#modal-auto-sync');
             const startupSyncCheckbox = modal.querySelector('#modal-sync-on-startup');
-            const clearOrphanedAIBtn = modal.querySelector('#modal-clear-orphaned-ai-btn');
 
             // Encryption controls
             const encryptionEnabledCheckbox = modal.querySelector('#modal-encryption-enabled');
@@ -4503,14 +8399,23 @@ Please provide a helpful response based on the note content and conversation his
             connectBtn.addEventListener('click', async () => {
                 try {
                     connectBtn.disabled = true;
-                    connectBtn.textContent = 'Connecting...';
+                    const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                    connectBtn.textContent = t('settings.sync.statusConnecting', 'Connecting...');
 
                     const result = await this.backendAPI.connectGoogleDrive();
 
                     if (result.success) {
-                        this.showNotification(result.message || 'Successfully connected to Google Drive', 'success');
+                        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                        this.showNotification(result.message || t('settings.sync.connectedSuccessfully', 'Successfully connected to Google Drive'), 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
+                        
+                        // Close the sync settings modal and show restart dialog
+                        this.closeModal(modal);
+                        setTimeout(() => {
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showRestartDialog(t('modals.restartGoogleDriveConnect'));
+                        }, 500);
                     } else {
                         // Don't show notification here - let the IPC error event handler do it
                         // This prevents duplicate notifications
@@ -4522,7 +8427,7 @@ Please provide a helpful response based on the note content and conversation his
                     console.error('[Sync] Failed to connect Google Drive:', error);
                 } finally {
                     connectBtn.disabled = false;
-                    connectBtn.textContent = 'Connect Google Drive';
+                    connectBtn.textContent = t('settings.sync.connectGoogleDrive', 'Connect Google Drive');
                 }
             });
 
@@ -4530,23 +8435,33 @@ Please provide a helpful response based on the note content and conversation his
             disconnectBtn.addEventListener('click', async () => {
                 try {
                     disconnectBtn.disabled = true;
-                    disconnectBtn.textContent = 'Disconnecting...';
+                    const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                    disconnectBtn.textContent = t('settings.sync.statusDisconnecting', 'Disconnecting...');
 
                     const result = await this.backendAPI.disconnectGoogleDrive();
 
                     if (result.success) {
-                        this.showNotification('Successfully disconnected from Google Drive', 'success');
+                        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                        this.showNotification(t('settings.sync.disconnectedSuccessfully', 'Successfully disconnected from Google Drive'), 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
+                        
+                        // Close the sync settings modal and show restart dialog
+                        this.closeModal(modal);
+                        setTimeout(() => {
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showRestartDialog(t('modals.restartGoogleDriveDisconnect'));
+                        }, 500);
                     } else {
                         this.showNotification(result.error || 'Failed to disconnect from Google Drive', 'error');
                     }
                 } catch (error) {
                     console.error('[Sync] Failed to disconnect Google Drive:', error);
-                    this.showNotification('Failed to disconnect from Google Drive', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('settings.sync.failedToDisconnect'), 'error');
                 } finally {
                     disconnectBtn.disabled = false;
-                    disconnectBtn.textContent = 'Disconnect';
+                    disconnectBtn.textContent = t('settings.sync.disconnect', 'Disconnect');
                 }
             });
 
@@ -4554,7 +8469,8 @@ Please provide a helpful response based on the note content and conversation his
             syncBtn.addEventListener('click', async () => {
                 try {
                     syncBtn.disabled = true;
-                    syncBtn.textContent = 'Syncing...';
+                    const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+                    syncBtn.textContent = t('settings.sync.statusSyncing', 'Syncing...');
 
                     // Export local data from the renderer process database manager
                     let localData = null;
@@ -4583,7 +8499,8 @@ Please provide a helpful response based on the note content and conversation his
                     // Error notification handled by sync-completed event
                 } finally {
                     syncBtn.disabled = false;
-                    syncBtn.textContent = 'Sync Now';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    syncBtn.textContent = t('settings.sync.syncNow');
                 }
             });
 
@@ -4602,13 +8519,15 @@ Please provide a helpful response based on the note content and conversation his
 
                     if (!result.canceled && result.filePaths.length > 0) {
                         importBtn.disabled = true;
-                        importBtn.textContent = 'Importing...';
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        importBtn.textContent = t('settings.sync.importing');
 
                         const credentialsPath = result.filePaths[0];
                         const setupResult = await this.backendAPI.setupGoogleDriveCredentials(credentialsPath);
 
                         if (setupResult.success) {
-                            this.showNotification('Credentials imported successfully', 'success');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('settings.sync.credentialsImportedSuccess'), 'success');
                             // Update modal to show connection options
                             modal.querySelector('.sync-setup-section').style.display = 'none';
                         } else {
@@ -4617,10 +8536,12 @@ Please provide a helpful response based on the note content and conversation his
                     }
                 } catch (error) {
                     console.error('[Sync] Failed to import credentials:', error);
-                    this.showNotification('Failed to import credentials', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('settings.sync.failedToImportCredentials'), 'error');
                 } finally {
                     importBtn.disabled = false;
-                    importBtn.textContent = 'Import Credentials File';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    importBtn.textContent = t('settings.sync.importCredentialsButton');
                 }
             });
 
@@ -4630,14 +8551,17 @@ Please provide a helpful response based on the note content and conversation his
                     const enabled = autoSyncCheckbox.checked;
 
                     if (!this.notesManager || !this.notesManager.db) {
-                        this.showNotification('Database not available', 'error');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.databaseNotAvailable'), 'error');
                         return;
                     }
 
                     const db = this.notesManager.db;
                     db.setAutoSync(enabled);
 
-                    this.showNotification(`Auto-sync ${enabled ? 'enabled' : 'disabled'}`, 'info');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    const syncKey = enabled ? 'notifications.autoSyncEnabled' : 'notifications.autoSyncDisabled';
+                    this.showNotification(t(syncKey), 'info');
 
                     if (enabled) {
                         this.startAutoSync();
@@ -4646,7 +8570,8 @@ Please provide a helpful response based on the note content and conversation his
                     }
                 } catch (error) {
                     console.error('[Sync] Failed to toggle auto sync:', error);
-                    this.showNotification('Failed to update auto-sync setting', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('settings.sync.failedToUpdateAutoSync'), 'error');
                 }
             });
 
@@ -4656,43 +8581,21 @@ Please provide a helpful response based on the note content and conversation his
                     const enabled = startupSyncCheckbox.checked;
 
                     if (!this.notesManager || !this.notesManager.db) {
-                        this.showNotification('Database not available', 'error');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.databaseNotAvailable'), 'error');
                         return;
                     }
 
                     const db = this.notesManager.db;
                     db.updateSyncMetadata({ syncOnStartup: enabled });
 
-                    this.showNotification(`Sync on startup ${enabled ? 'enabled' : 'disabled'}`, 'info');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    const startupKey = enabled ? 'notifications.syncOnStartupEnabled' : 'notifications.syncOnStartupDisabled';
+                    this.showNotification(t(startupKey), 'info');
                 } catch (error) {
                     console.error('[Sync] Failed to toggle sync on startup:', error);
-                    this.showNotification('Failed to update sync on startup setting', 'error');
-                }
-            });
-
-            // Clear orphaned AI conversations button
-            clearOrphanedAIBtn.addEventListener('click', async () => {
-                try {
-                    const confirmed = confirm('Are you sure you want to clear orphaned AI conversations? This will delete AI conversations for notes that no longer exist.');
-
-                    if (!confirmed) return;
-
-                    clearOrphanedAIBtn.disabled = true;
-                    clearOrphanedAIBtn.textContent = 'Clearing...';
-
-                    const result = await this.backendAPI.clearOrphanedAIConversations();
-
-                    if (result.success) {
-                        this.showNotification(result.message, 'success');
-                    } else {
-                        this.showNotification(result.error || 'Failed to clear orphaned AI conversations', 'error');
-                    }
-                } catch (error) {
-                    console.error('[Sync] Failed to clear orphaned AI conversations:', error);
-                    this.showNotification('Failed to clear orphaned AI conversations', 'error');
-                } finally {
-                    clearOrphanedAIBtn.disabled = false;
-                    clearOrphanedAIBtn.textContent = 'Clear Orphaned AI Conversations';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('settings.sync.failedToUpdateSyncOnStartup'), 'error');
                 }
             });
 
@@ -4735,29 +8638,31 @@ Please provide a helpful response based on the note content and conversation his
             const rendererSyncEnabled = (this.notesManager && this.notesManager.db) ? this.notesManager.db.isSyncEnabled() : false;
 
             // Update status indicator
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             if (status.isAuthenticated && (status.syncEnabled || rendererSyncEnabled)) {
                 indicator.style.backgroundColor = 'var(--success-color)';
-                statusText.textContent = 'Connected';
+                statusText.textContent = t('settings.sync.statusConnectedLabel', 'Connected');
                 connectBtn.style.display = 'none';
                 disconnectBtn.style.display = 'inline-block';
                 syncBtn.disabled = false;
             } else if (status.isAuthenticated) {
                 indicator.style.backgroundColor = 'var(--warning-color)';
-                statusText.textContent = 'Ready to sync';
+                statusText.textContent = t('settings.sync.statusReadyToSync', 'Ready to sync');
                 connectBtn.style.display = 'none';
                 disconnectBtn.style.display = 'inline-block';
                 syncBtn.disabled = false;
             } else {
                 indicator.style.backgroundColor = 'var(--error-color)';
-                statusText.textContent = 'Not Connected';
+                statusText.textContent = t('settings.sync.statusNotConnected', 'Not connected');
                 connectBtn.style.display = 'inline-block';
                 disconnectBtn.style.display = 'none';
                 syncBtn.disabled = true;
 
                 // Add a note about credentials if they're missing
                 if (status.error && (status.error.includes('credentials not found') || status.error.includes('Google Drive credentials'))) {
-                    statusText.textContent = 'Setup Required';
-                    lastSync.textContent = 'Import Google Drive credentials to get started';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    statusText.textContent = t('settings.sync.setupRequired');
+                    lastSync.textContent = t('settings.sync.importCredentialsToStart');
                 }
             }
 
@@ -4765,9 +8670,13 @@ Please provide a helpful response based on the note content and conversation his
             if (status.lastSync) {
                 const lastSyncDate = new Date(status.lastSync);
                 const timeAgo = this.getTimeAgo(lastSyncDate);
-                lastSync.textContent = `Last synced: ${timeAgo}`;
+                lastSync.textContent = window.i18n
+                    ? window.i18n.t('settings.sync.lastSynced', { timeAgo })
+                    : `Last synced: ${timeAgo}`;
             } else {
-                lastSync.textContent = 'Never synced';
+                lastSync.textContent = window.i18n
+                    ? window.i18n.t('settings.sync.neverSynced')
+                    : 'Never synced';
             }
 
             // Check for and display conflicts
@@ -4817,7 +8726,9 @@ Please provide a helpful response based on the note content and conversation his
                     encryptionPassphraseInput.style.display = '';
                     encryptionPassphraseConfirmInput.style.display = '';
                     encryptionValidation.style.display = '';
-                    encryptionSaveBtn.textContent = 'Save Encryption Settings';
+                    encryptionSaveBtn.textContent = window.i18n
+                        ? window.i18n.t('settings.sync.saveEncryption')
+                        : 'Save Encryption Settings';
                 } else {
                     // Hide inputs when disabling but keep Save button visible
                     encryptionPassphraseInput.style.display = 'none';
@@ -4826,7 +8737,9 @@ Please provide a helpful response based on the note content and conversation his
                     encryptionPassphraseInput.value = '';
                     encryptionPassphraseConfirmInput.value = '';
                     encryptionValidation.textContent = '';
-                    encryptionSaveBtn.textContent = 'Disable Encryption';
+                    encryptionSaveBtn.textContent = window.i18n
+                        ? window.i18n.t('settings.sync.disableEncryption', 'Disable Encryption')
+                        : 'Disable Encryption';
                 }
             };
 
@@ -4850,19 +8763,20 @@ Please provide a helpful response based on the note content and conversation his
                     return;
                 }
 
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 if (passphrase.length < 8) {
-                    encryptionValidation.textContent = 'Passphrase must be at least 8 characters long';
+                    encryptionValidation.textContent = t('encryption.passphraseMinLengthLong');
                     encryptionValidation.style.color = 'var(--error-color)';
                     return;
                 }
 
                 if (passphrase !== confirmPassphrase) {
-                    encryptionValidation.textContent = 'Passphrases do not match';
+                    encryptionValidation.textContent = t('encryption.passphrasesDoNotMatch');
                     encryptionValidation.style.color = 'var(--error-color)';
                     return;
                 }
 
-                encryptionValidation.textContent = '✓ Passphrases match';
+                encryptionValidation.textContent = t('encryption.passphrasesMatch');
                 encryptionValidation.style.color = 'var(--success-color)';
             };
 
@@ -4881,17 +8795,20 @@ Please provide a helpful response based on the note content and conversation his
 
                     if (enabled) {
                         if (!passphrase) {
-                            this.showNotification('Please enter a passphrase', 'error');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('encryption.passphraseRequired'), 'error');
                             return;
                         }
 
                         if (passphrase.length < 8) {
-                            this.showNotification('Passphrase must be at least 8 characters long', 'error');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('encryption.passphraseMinLengthLong'), 'error');
                             return;
                         }
 
                         if (passphrase !== confirmPassphrase) {
-                            this.showNotification('Passphrases do not match', 'error');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showNotification(t('encryption.passphrasesDoNotMatch'), 'error');
                             return;
                         }
 
@@ -4899,7 +8816,8 @@ Please provide a helpful response based on the note content and conversation his
                         if (!saltToUse) {
                             const saltResult = await ipcRenderer.invoke('derive-salt-from-passphrase', passphrase);
                             if (!saltResult.success) {
-                                this.showNotification(`Failed to derive salt: ${saltResult.error}`, 'error');
+                                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                                this.showNotification(t('encryption.failedToDeriveSalt', { error: saltResult.error }), 'error');
                                 return;
                             }
                             saltToUse = saltResult.saltBase64;
@@ -4912,13 +8830,15 @@ Please provide a helpful response based on the note content and conversation his
                         });
 
                         if (!validationResult.success || !validationResult.isValid) {
-                            this.showNotification(`Invalid encryption settings: ${validationResult.errors?.join(', ') || 'Unknown error'}`, 'error');
+                            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                            this.showNotification(t('notifications.invalidEncryptionSettings', { errors: validationResult.errors?.join(', ') || 'Unknown error' }), 'error');
                             return;
                         }
                     }
 
                     encryptionSaveBtn.disabled = true;
-                    encryptionSaveBtn.textContent = 'Saving...';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    encryptionSaveBtn.textContent = t('encryption.saving');
 
                     console.log('[Encryption] Sending settings:', {
                         enabled: enabled,
@@ -4938,7 +8858,8 @@ Please provide a helpful response based on the note content and conversation his
                     console.log('[Encryption] Save result:', saveResult);
 
                     if (saveResult.success) {
-                        this.showNotification('Encryption settings saved successfully', 'success');
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        this.showNotification(t('encryption.encryptionSettingsSaved'), 'success');
                         this.updateModalEncryptionStatus(modal, saveResult.settings);
                         await this.updateModalSyncStatus(modal); // Refresh sync status
 
@@ -4952,10 +8873,13 @@ Please provide a helpful response based on the note content and conversation his
                     }
                 } catch (error) {
                     console.error('[Encryption] Failed to save settings:', error);
-                    this.showNotification('Failed to save encryption settings', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('encryption.failedToSaveEncryptionSettings'), 'error');
                 } finally {
                     encryptionSaveBtn.disabled = false;
-                    encryptionSaveBtn.textContent = 'Save Encryption Settings';
+                    encryptionSaveBtn.textContent = window.i18n
+                        ? window.i18n.t('settings.sync.saveEncryption')
+                        : 'Save Encryption Settings';
                 }
             });
 
@@ -4985,13 +8909,13 @@ Please provide a helpful response based on the note content and conversation his
 
             if (settings.enabled) {
                 encryptionIndicator.style.backgroundColor = 'var(--success-color)';
-                encryptionStatusText.textContent = 'Encryption Enabled';
-                encryptionDescription.textContent = 'Your data is encrypted before being uploaded to Google Drive.';
+                encryptionStatusText.textContent = window.i18n ? window.i18n.t('encryption.enabledTitle') : 'Encryption Enabled';
+                encryptionDescription.textContent = window.i18n ? window.i18n.t('encryption.enabledDescription') : 'Your data is encrypted before being uploaded to Google Drive.';
                 encryptionEnabledCheckbox.checked = true;
             } else {
                 encryptionIndicator.style.backgroundColor = 'var(--text-secondary)';
-                encryptionStatusText.textContent = 'Encryption Disabled';
-                encryptionDescription.textContent = 'Your data will be uploaded unencrypted to Google Drive.';
+                encryptionStatusText.textContent = window.i18n ? window.i18n.t('encryption.disabledTitle') : 'Encryption Disabled';
+                encryptionDescription.textContent = window.i18n ? window.i18n.t('encryption.disabledDescription') : 'Your data will be uploaded unencrypted to Google Drive.';
                 encryptionEnabledCheckbox.checked = false;
             }
 
@@ -5011,15 +8935,17 @@ Please provide a helpful response based on the note content and conversation his
                     <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 0.95rem;">${message}</p>
                     <div style="margin-top: 12px;">
                         <label for="modal-passphrase-input" style="display: block; margin-bottom: 6px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
-                        <input type="password" id="modal-passphrase-input" placeholder="Enter your encryption passphrase" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        <input type="password" id="modal-passphrase-input" placeholder="${t('placeholder.enterEncryptionPassphrase')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                         <div id="modal-passphrase-error" style="margin-top: 6px; font-size: 0.85rem; color: var(--error-color);"></div>
                     </div>
                 </div>
             `;
 
-            const modal = this.createModal('Encrypted Data Detected', content, [
-                { text: 'Cancel', type: 'secondary', action: 'cancel-passphrase' },
-                { text: 'Decrypt', type: 'primary', action: 'confirm-passphrase' }
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const modal = this.createModal(t('modals.encryptedDataDetected'), content, [
+                { text: t('modals.cancel'), type: 'secondary', action: 'cancel-passphrase' },
+                { text: t('modals.decrypt'), type: 'primary', action: 'confirm-passphrase' }
             ]);
 
             const input = modal.querySelector('#modal-passphrase-input');
@@ -5028,14 +8954,16 @@ Please provide a helpful response based on the note content and conversation his
             const onConfirm = async () => {
                 const passphrase = input.value;
                 if (!passphrase || passphrase.length < 8) {
-                    errorText.textContent = 'Passphrase must be at least 8 characters';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    errorText.textContent = t('encryption.passphraseMinLength');
                     return;
                 }
 
                 // Derive salt from passphrase
                 const saltResult = await ipcRenderer.invoke('derive-salt-from-passphrase', passphrase);
                 if (!saltResult.success) {
-                    errorText.textContent = saltResult.error || 'Failed to derive salt';
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    errorText.textContent = saltResult.error || t('encryption.failedToDeriveSalt', { error: '' }).replace(': ', '');
                     return;
                 }
 
@@ -5052,11 +8980,13 @@ Please provide a helpful response based on the note content and conversation his
 
                 // Retry sync now that passphrase is set for this session
                 modal.remove();
-                this.showNotification('Passphrase set. Retrying sync...', 'info');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('settings.sync.passphraseSetRetrying'), 'info');
                 try {
                     await this.manualSync();
                 } catch (e) {
-                    this.showNotification('Sync failed after setting passphrase', 'error');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showNotification(t('settings.sync.syncFailedAfterPassphrase'), 'error');
                 }
             };
 
@@ -5075,7 +9005,8 @@ Please provide a helpful response based on the note content and conversation his
             input.focus();
         } catch (error) {
             console.error('[Encryption] Failed to prompt for passphrase:', error);
-            this.showNotification('Encrypted cloud data detected. Open Sync Settings to enter your passphrase.', 'warning');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('settings.sync.encryptedDataDetected'), 'warning');
         }
     }
 
@@ -5109,8 +9040,9 @@ Please provide a helpful response based on the note content and conversation his
                     background: rgba(245, 158, 11, 0.1);
                 `;
 
+                const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
                 conflictElement.innerHTML = `
-                    <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">${conflict.localTitle || 'Untitled Note'}</div>
+                    <div style="font-weight: 500; color: var(--text-primary); margin-bottom: 4px;">${conflict.localTitle || untitledTitle}</div>
                     <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 8px;">
                         Local: ${new Date(conflict.localModified).toLocaleString()}<br>
                         Remote: ${new Date(conflict.remoteModified).toLocaleString()}
@@ -5133,7 +9065,8 @@ Please provide a helpful response based on the note content and conversation his
     resolveModalConflict(conflictId, resolution, modalId) {
         try {
             if (!this.notesManager || !this.notesManager.db) {
-                this.showNotification('Database not available', 'error');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.databaseNotAvailable'), 'error');
                 return;
             }
 
@@ -5141,7 +9074,8 @@ Please provide a helpful response based on the note content and conversation his
             const success = db.resolveSyncConflict(conflictId, resolution);
 
             if (success) {
-                this.showNotification(`Conflict resolved using ${resolution} version`, 'success');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.conflictResolved', { resolution }), 'success');
 
                 // Refresh conflicts display
                 const modal = document.getElementById(modalId);
@@ -5149,19 +9083,31 @@ Please provide a helpful response based on the note content and conversation his
                     this.displayModalConflicts(modal);
                 }
             } else {
-                this.showNotification('Failed to resolve conflict', 'error');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('settings.sync.failedToResolveConflict'), 'error');
             }
 
         } catch (error) {
             console.error('[Sync] Failed to resolve modal conflict:', error);
-            this.showNotification('Failed to resolve conflict', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToResolveConflict'), 'error');
         }
     }
 
     async manualSync() {
         try {
             if (!this.syncStatus.isAuthenticated) {
-                this.showNotification('Please connect to Google Drive first', 'warning');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('settings.sync.pleaseConnectGoogleDrive'), 'warning');
+                return;
+            }
+
+            // Check if we're online before attempting sync
+            const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(3000);
+            if (!isOnline) {
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('settings.sync.cannotSyncNoInternet'), 'error');
+                console.log('[Sync] Manual sync cancelled - device is offline');
                 return;
             }
 
@@ -5188,6 +9134,34 @@ Please provide a helpful response based on the note content and conversation his
             if (result.success) {
                 // Success notification handled by sync-completed event
                 await this.updateSyncStatus();
+
+                // Also sync media files if available
+                try {
+                    const electron = require('electron');
+                    if (electron && electron.ipcRenderer) {
+                        console.log('[Sync] Syncing media files to Google Drive...');
+                        const mediaResult = await electron.ipcRenderer.invoke('sync-media-to-drive');
+                        if (mediaResult.success) {
+                            const { uploaded, skipped, deletedFromDrive, deletedFromLocal } = mediaResult;
+                            console.log(`[Sync] Media sync: ${uploaded} uploaded, ${skipped} skipped, ${deletedFromDrive} deleted from Drive, ${deletedFromLocal} deleted from local`);
+                            
+                            // Show notification if files were deleted
+                            const totalDeleted = (deletedFromDrive || 0) + (deletedFromLocal || 0);
+                            if (totalDeleted > 0) {
+                                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                                this.showNotification(t('notifications.cleanedUpUnusedMedia', { 
+                                    total: totalDeleted, 
+                                    plural: totalDeleted > 1 ? 's' : '',
+                                    drive: deletedFromDrive,
+                                    local: deletedFromLocal
+                                }), 'info');
+                            }
+                        }
+                    }
+                } catch (mediaError) {
+                    console.warn('[Sync] Media sync failed (non-critical):', mediaError);
+                    // Don't fail the whole sync if media sync fails
+                }
             } else {
                 // Error notification handled by sync-completed event
             }
@@ -5212,8 +9186,15 @@ Please provide a helpful response based on the note content and conversation his
         this.autoSyncInterval = setInterval(async () => {
             try {
                 if (!this.syncStatus.inProgress && this.syncStatus.isAuthenticated && this.syncStatus.syncEnabled) {
-                    console.log('[Sync] Running auto-sync...');
-                    await this.manualSync();
+                    // Check if we're online before attempting auto-sync
+                    const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
+                    if (isOnline) {
+                        console.log('[Sync] Running auto-sync...');
+                        await this.manualSync();
+                    } else {
+                        console.log('[Sync] Skipping auto-sync - device is offline');
+                        // Don't show notification for auto-sync failures to avoid spam
+                    }
                 }
             } catch (error) {
                 console.error('[Sync] Auto-sync failed:', error);
@@ -5241,3 +9222,4 @@ function resolveModalConflict(conflictId, resolution, modalId) {
 document.addEventListener('DOMContentLoaded', () => {
     window.cognotezApp = new CogNotezApp();
 });
+

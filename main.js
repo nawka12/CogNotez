@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, Menu, ipcMain, dialog, protocol, shell } = require('electron');
 const path = require('path');
 const fs = require('fs').promises;
 const { autoUpdater } = require('electron-updater');
@@ -8,11 +8,43 @@ let mainWindow;
 // App-level quit guards for sync-before-exit
 let isQuittingAfterSync = false;
 let appQuittingRequested = false;
+// Global sync lock to prevent concurrent sync operations across IPC handlers
+let globalSyncInProgress = false;
 
 // Log version information for debugging
 console.log('Node.js version:', process.version);
 console.log('Electron version:', process.versions.electron);
 console.log('Chrome version:', process.versions.chrome);
+
+// Helper function to get MIME type from file extension
+function getMimeTypeFromExtension(ext) {
+  const mimeTypes = {
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.png': 'image/png',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.svg': 'image/svg+xml',
+    '.bmp': 'image/bmp',
+    '.tiff': 'image/tiff',
+    '.mp4': 'video/mp4',
+    '.webm': 'video/webm',
+    '.ogg': 'video/ogg',
+    '.avi': 'video/x-msvideo',
+    '.mov': 'video/quicktime',
+    '.wmv': 'video/x-ms-wmv',
+    '.flv': 'video/x-flv',
+    '.pdf': 'application/pdf',
+    '.txt': 'text/plain',
+    '.md': 'text/markdown',
+    '.html': 'text/html',
+    '.css': 'text/css',
+    '.js': 'application/javascript',
+    '.json': 'application/json'
+  };
+  
+  return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
+}
 
 function createWindow() {
   // Create the browser window
@@ -39,6 +71,26 @@ function createWindow() {
     mainWindow.show();
   });
 
+  // Prevent navigation and open external links in default browser
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    // Allow navigation to the app's own files
+    if (url.startsWith('file://') || url.startsWith('cognotez-media://')) {
+      return;
+    }
+    // Prevent navigation and open in external browser instead
+    event.preventDefault();
+    shell.openExternal(url);
+  });
+
+  // Handle new window requests (e.g., target="_blank")
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Open external links in the user's default browser
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      shell.openExternal(url);
+    }
+    return { action: 'deny' };
+  });
+
   // Open DevTools in development
   if (process.env.NODE_ENV === 'development') {
     mainWindow.webContents.openDevTools();
@@ -52,6 +104,41 @@ function createWindow() {
       if (appQuittingRequested || isQuittingAfterSync) {
         return;
       }
+
+      // First, check if sync is already in progress - prevent closing during sync
+      if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+        console.log('[Main] Sync in progress, preventing window close...');
+        event.preventDefault();
+        
+        // Show loading screen to user
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-show');
+        }
+        
+        // Wait for sync to complete (with a reasonable timeout)
+        let attempts = 0;
+        while ((globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) && attempts < 120) { // Wait up to 60 seconds
+          await new Promise(resolve => setTimeout(resolve, 500));
+          attempts++;
+        }
+        
+        // Hide loading screen
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-hide');
+        }
+        
+        if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+          console.warn('[Main] Sync still in progress after timeout, but allowing close to prevent hang');
+          // After timeout, allow close to prevent the app from hanging
+          return;
+        }
+        
+        // Sync completed, now close the window since user already requested close
+        console.log('[Main] Sync completed, closing window...');
+        mainWindow.destroy();
+        return;
+      }
+
       // Check if auto-sync is enabled and we should sync before closing
       if (global.databaseManager && global.databaseManager.isAutoSyncEnabled() && !isClosingWithSync) {
         console.log('[Main] Auto-sync enabled, syncing before closing...');
@@ -60,14 +147,28 @@ function createWindow() {
         event.preventDefault();
         isClosingWithSync = true;
 
+        // Show loading screen to user
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-show');
+        }
+
         try {
           // Trigger sync
           await performSyncBeforeClose();
+
+          // Hide loading screen
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-closing-hide');
+          }
 
           // After sync completes, close the window
           console.log('[Main] Sync completed, closing window...');
           mainWindow.destroy();
         } catch (error) {
+          // Hide loading screen even on error
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-closing-hide');
+          }
           console.error('[Main] Sync failed before close, proceeding with close anyway:', error);
           // Even if sync fails, allow the window to close
           mainWindow.destroy();
@@ -179,21 +280,24 @@ async function performSyncBeforeClose() {
       global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
     }
 
-    // Check if sync is already in progress
-    if (global.googleDriveSyncManager.syncInProgress) {
+    // Check if sync is already in progress (check both global and manager-level locks)
+    if (globalSyncInProgress || global.googleDriveSyncManager.syncInProgress) {
       console.log('[Main] Sync already in progress, waiting for it to complete...');
       // Wait for the existing sync to complete (with a timeout)
       let attempts = 0;
-      while (global.googleDriveSyncManager.syncInProgress && attempts < 60) { // Wait up to 30 seconds
+      while ((globalSyncInProgress || global.googleDriveSyncManager.syncInProgress) && attempts < 60) { // Wait up to 30 seconds
         await new Promise(resolve => setTimeout(resolve, 500));
         attempts++;
       }
 
-      if (global.googleDriveSyncManager.syncInProgress) {
+      if (globalSyncInProgress || global.googleDriveSyncManager.syncInProgress) {
         console.warn('[Main] Sync still in progress after timeout, proceeding with close');
         return; // Don't start another sync
       }
     }
+
+    // Set global lock
+    globalSyncInProgress = true;
 
     // Get local data for sync
     if (!global.databaseManager) {
@@ -248,14 +352,58 @@ async function performSyncBeforeClose() {
   } catch (error) {
     console.error('[Main] Sync before close failed:', error);
     throw error;
+  } finally {
+    // Always release the global sync lock
+    globalSyncInProgress = false;
+    console.log('[Main] Released global sync lock (performSyncBeforeClose)');
   }
+}
+
+// Register custom protocol for media files
+function registerMediaProtocol() {
+  protocol.registerFileProtocol('cognotez-media', async (request, callback) => {
+    try {
+      const fileId = request.url.replace('cognotez-media://', '');
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+
+      // Ensure media directory exists
+      try {
+        await fs.mkdir(mediaDir, { recursive: true });
+      } catch (error) {
+        // Directory might already exist, that's fine
+      }
+
+      // Find file with this ID (could have any extension)
+      const files = await fs.readdir(mediaDir);
+      const matchingFile = files.find(file => file.startsWith(fileId));
+
+      if (matchingFile) {
+        const filePath = path.join(mediaDir, matchingFile);
+        callback({ path: filePath });
+      } else {
+        console.error('[Media Protocol] File not found:', fileId, 'in directory:', mediaDir);
+        callback({ error: -6 }); // FILE_NOT_FOUND
+      }
+    } catch (error) {
+      console.error('[Media Protocol] Error:', error);
+      callback({ error: -2 }); // FAILED
+    }
+  });
+
+  console.log('[Media Protocol] Registered cognotez-media:// protocol');
 }
 
 // This method will be called when Electron has finished initialization
 async function initApp() {
+  // Register custom protocol for media files
+  registerMediaProtocol();
+  
   createWindow();
   setupAutoUpdater();
-  createMenu();
+  // Load default language (en) and create menu
+  createMenu('en').catch(err => {
+    console.error('[Main] Failed to create menu:', err);
+  });
 
   // Initialize database manager for Google Drive sync
   try {
@@ -282,6 +430,30 @@ async function initApp() {
   }
 }
 
+// Request single instance lock to prevent multiple instances
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  // Another instance is already running, quit this instance
+  console.log('[Main] Another instance is already running. Exiting...');
+  app.quit();
+} else {
+  // This is the first instance, set up event handlers
+  
+  // Handle second instance attempts - focus the existing window
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    console.log('[Main] Second instance detected, focusing existing window');
+    // If we have a window, focus it
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) {
+        mainWindow.restore();
+      }
+      mainWindow.focus();
+      mainWindow.show();
+    }
+  });
+}
+
 // Initialize app when ready
 if (app) {
   app.on('ready', initApp);
@@ -300,16 +472,32 @@ if (app) {
       }
 
       // If a sync is already running, wait briefly for it to finish
-      if (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress) {
+      if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+        console.log('[Main] Sync in progress, preventing app quit...');
+        
+        // Show loading screen to user
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-show');
+        }
+        
         let attempts = 0;
-        while (global.googleDriveSyncManager.syncInProgress && attempts < 60) { // up to ~30s
+        while ((globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) && attempts < 120) { // up to ~60s
           event.preventDefault();
           await new Promise(resolve => setTimeout(resolve, 500));
           attempts++;
         }
-        if (!global.googleDriveSyncManager.syncInProgress) {
+        
+        // Hide loading screen
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-hide');
+        }
+        
+        if (!globalSyncInProgress && (!global.googleDriveSyncManager || !global.googleDriveSyncManager.syncInProgress)) {
+          console.log('[Main] Sync completed, allowing quit to proceed');
           return; // existing sync finished; let quit proceed
         }
+        // If still in progress after timeout, log warning but continue with quit to prevent hang
+        console.warn('[Main] Sync still in progress after timeout, proceeding with quit to prevent hang');
       }
 
       // We will perform a quick sync before quitting
@@ -353,6 +541,263 @@ if (ipcMain) {
 
   ipcMain.handle('show-save-dialog', async (event, options) => {
     return await dialog.showSaveDialog(mainWindow, options);
+  });
+
+  // PDF generation handlers
+  ipcMain.handle('generate-pdf-from-html', async (event, { html, filename }) => {
+    let tempHtmlPath = null;
+    let tempWindow = null;
+    let timeoutId = null;
+    
+    try {
+      console.log('[PDF] Starting PDF generation...');
+      
+      // Show save dialog for PDF
+      const result = await dialog.showSaveDialog(mainWindow, {
+        defaultPath: filename,
+        filters: [
+          { name: 'PDF', extensions: ['pdf'] }
+        ]
+      });
+
+      if (result.canceled) {
+        console.log('[PDF] User canceled PDF generation');
+        return { success: false, canceled: true };
+      }
+
+      console.log('[PDF] Creating temporary HTML file...');
+      
+      // Create temporary HTML file instead of using data URL
+      const tempDir = path.join(app.getPath('temp'), 'cognotez-pdf');
+      try {
+        await fs.mkdir(tempDir, { recursive: true });
+      } catch (mkdirError) {
+        console.error('[PDF] Failed to create temp directory:', mkdirError);
+        throw new Error('Failed to create temporary directory');
+      }
+      
+      tempHtmlPath = path.join(tempDir, `temp-${Date.now()}.html`);
+      await fs.writeFile(tempHtmlPath, html, 'utf8');
+      console.log('[PDF] HTML file created:', tempHtmlPath);
+      console.log('[PDF] HTML content preview:', html.substring(0, 500) + '...');
+      
+      // Verify the file was written correctly
+      try {
+        const fileStats = await fs.stat(tempHtmlPath);
+        console.log('[PDF] HTML file size:', fileStats.size, 'bytes');
+        const readBack = await fs.readFile(tempHtmlPath, 'utf8');
+        console.log('[PDF] HTML file verification: file can be read back, length:', readBack.length);
+      } catch (verifyError) {
+        console.error('[PDF] HTML file verification failed:', verifyError);
+      }
+
+      // Create a temporary window to render the HTML
+      console.log('[PDF] Creating temporary window...');
+      tempWindow = new BrowserWindow({
+        width: 800,
+        height: 600,
+        show: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          webSecurity: false // Allow loading local files
+        }
+      });
+
+      // Set up timeout for the entire process
+      const timeoutPromise = new Promise((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error('PDF generation timed out after 30 seconds'));
+        }, 30000);
+      });
+
+      // Load the HTML file with timeout
+      console.log('[PDF] Loading HTML content...');
+      
+      // Set up content loading promise BEFORE loading the file
+      const contentLoadPromise = new Promise((resolve, reject) => {
+        let loadFinished = false;
+        
+        tempWindow.webContents.once('did-finish-load', () => {
+          if (loadFinished) return;
+          loadFinished = true;
+          console.log('[PDF] Content loaded successfully');
+          
+          // Simple approach: just wait a bit for images and proceed
+          setTimeout(() => {
+            console.log('[PDF] Proceeding with PDF generation after content load');
+            resolve();
+          }, 3000); // Wait 3 seconds for images to load
+        });
+        
+        tempWindow.webContents.once('did-fail-load', (event, errorCode, errorDescription) => {
+          if (loadFinished) return;
+          loadFinished = true;
+          reject(new Error(`Failed to load content: ${errorDescription}`));
+        });
+      });
+      
+      // Add debugging for the load process
+      tempWindow.webContents.on('did-start-loading', () => {
+        console.log('[PDF] Started loading HTML content');
+      });
+      
+      tempWindow.webContents.on('did-stop-loading', () => {
+        console.log('[PDF] Stopped loading HTML content');
+      });
+      
+      tempWindow.webContents.on('did-finish-load', () => {
+        console.log('[PDF] HTML content finished loading');
+      });
+      
+      tempWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+        console.error('[PDF] HTML content failed to load:', errorCode, errorDescription, validatedURL);
+      });
+      
+      const loadPromise = tempWindow.loadFile(tempHtmlPath);
+      
+      // Race between loading and timeout
+      await Promise.race([loadPromise, timeoutPromise]);
+      console.log('[PDF] HTML file load completed');
+
+      // Wait for content to load and images to be ready
+      console.log('[PDF] Waiting for content to load...');
+      await Promise.race([contentLoadPromise, timeoutPromise]);
+
+      // Generate PDF
+      console.log('[PDF] Generating PDF...');
+      const pdfData = await Promise.race([
+        tempWindow.webContents.printToPDF({
+          printBackground: true,
+          pageSize: 'A4',
+          margins: {
+            marginType: 'printableArea'
+          }
+        }),
+        timeoutPromise
+      ]);
+
+      // Write PDF to file
+      console.log('[PDF] Writing PDF file...');
+      await fs.writeFile(result.filePath, pdfData);
+
+      console.log(`[PDF] Generated PDF: ${result.filePath}`);
+      return { success: true, filePath: result.filePath };
+    } catch (error) {
+      console.error('[PDF] Failed to generate PDF:', error);
+      return { success: false, error: error.message };
+    } finally {
+      // Clear timeout
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+      
+      // Clean up
+      if (tempWindow) {
+        try {
+          tempWindow.close();
+        } catch (closeError) {
+          console.warn('[PDF] Failed to close temp window:', closeError);
+        }
+      }
+      
+      if (tempHtmlPath) {
+        try {
+          await fs.unlink(tempHtmlPath);
+        } catch (cleanupError) {
+          console.warn('[PDF] Failed to cleanup temp HTML file:', cleanupError);
+        }
+      }
+      
+      // Clean up temporary media files
+      try {
+        const tempMediaDir = path.join(app.getPath('temp'), 'cognotez-pdf-media');
+        if (await fs.access(tempMediaDir).then(() => true).catch(() => false)) {
+          const files = await fs.readdir(tempMediaDir);
+          for (const file of files) {
+            try {
+              await fs.unlink(path.join(tempMediaDir, file));
+            } catch (fileError) {
+              console.warn(`[PDF] Failed to cleanup temp media file ${file}:`, fileError);
+            }
+          }
+        }
+      } catch (cleanupError) {
+        console.warn('[PDF] Failed to cleanup temp media files:', cleanupError);
+      }
+    }
+  });
+
+  ipcMain.handle('get-media-file-as-base64', async (event, fileId) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Find file with this ID (could have any extension)
+      const files = await fs.readdir(mediaDir);
+      const matchingFile = files.find(file => file.startsWith(fileId));
+
+      if (!matchingFile) {
+        throw new Error(`Media file not found: ${fileId}`);
+      }
+
+      const filePath = path.join(mediaDir, matchingFile);
+      const fileBuffer = await fs.readFile(filePath);
+      const mimeType = getMimeTypeFromExtension(path.extname(matchingFile));
+      const base64 = fileBuffer.toString('base64');
+      const dataUrl = `data:${mimeType};base64,${base64}`;
+
+      return { dataUrl, mimeType, size: fileBuffer.length, filename: matchingFile };
+    } catch (error) {
+      console.error('[PDF] Failed to get media file as base64:', error);
+      throw error;
+    }
+  });
+
+  ipcMain.handle('copy-media-file-for-pdf', async (event, fileId) => {
+    try {
+      console.log(`[PDF] Copying media file for PDF: ${fileId}`);
+      
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Check if media directory exists
+      try {
+        await fs.access(mediaDir);
+      } catch (accessError) {
+        throw new Error(`Media directory not found: ${mediaDir}`);
+      }
+      
+      // Find file with this ID (could have any extension)
+      const files = await fs.readdir(mediaDir);
+      const matchingFile = files.find(file => file.startsWith(fileId));
+
+      if (!matchingFile) {
+        console.error(`[PDF] Media file not found: ${fileId} in directory: ${mediaDir}`);
+        throw new Error(`Media file not found: ${fileId}`);
+      }
+
+      const sourcePath = path.join(mediaDir, matchingFile);
+      const mimeType = getMimeTypeFromExtension(path.extname(matchingFile));
+      
+      console.log(`[PDF] Found media file: ${matchingFile}, MIME type: ${mimeType}`);
+      
+      // Create temporary directory for PDF media files
+      const tempDir = path.join(app.getPath('temp'), 'cognotez-pdf-media');
+      try {
+        await fs.mkdir(tempDir, { recursive: true });
+      } catch (mkdirError) {
+        throw new Error(`Failed to create temp media directory: ${mkdirError.message}`);
+      }
+      
+      // Copy file to temporary location
+      const tempPath = path.join(tempDir, matchingFile);
+      await fs.copyFile(sourcePath, tempPath);
+      
+      console.log(`[PDF] Successfully copied media file to: ${tempPath}`);
+      return { tempPath, mimeType, filename: matchingFile };
+    } catch (error) {
+      console.error('[PDF] Failed to copy media file for PDF:', error);
+      throw error;
+    }
   });
 
   ipcMain.handle('show-open-dialog', async (event, options) => {
@@ -503,6 +948,13 @@ if (ipcMain) {
     return app.getVersion();
   });
 
+  // App restart handler
+  ipcMain.on('restart-app', () => {
+    console.log('[Main] Restarting application...');
+    app.relaunch();
+    app.exit(0);
+  });
+
   // Google Drive sync IPC handlers
   ipcMain.handle('google-drive-authenticate', async () => {
     try {
@@ -645,6 +1097,12 @@ if (ipcMain) {
 
   ipcMain.handle('google-drive-sync', async (event, options = {}) => {
     try {
+      // Check global sync lock to prevent concurrent sync operations
+      if (globalSyncInProgress) {
+        console.warn('[Sync] Sync already in progress globally, rejecting concurrent request');
+        return { success: false, error: 'Sync operation already in progress' };
+      }
+
       if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
         throw new Error('Not authenticated with Google Drive');
       }
@@ -654,6 +1112,9 @@ if (ipcMain) {
         const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
         global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
       }
+
+      // Set global lock
+      globalSyncInProgress = true;
 
       // Get local data - use provided data or fallback to database manager
       let localData;
@@ -711,22 +1172,40 @@ if (ipcMain) {
         });
 
         // If we downloaded data, apply it
-        if (syncResult.action === 'download') {
-          // Get the remote data that was downloaded
-          const remoteData = await global.googleDriveSyncManager.downloadData();
-          const importResult = global.databaseManager.importDataFromSync(remoteData.data, {
+        if (syncResult.action === 'download' && syncResult.remoteData) {
+          // Use the remote data that was already downloaded during sync
+          console.log('[Sync] Applying downloaded data to main process database');
+          const importResult = global.databaseManager.importDataFromSync(syncResult.remoteData, {
             mergeStrategy: 'merge',
             force: false,
-            preserveSyncMeta: true
+            preserveSyncMeta: true,
+            mergeTags: true,
+            mergeConversations: true
           });
+
+          // Check if import succeeded
+          if (!importResult.success) {
+            console.error('[Sync] Failed to import downloaded data:', importResult.error);
+            throw new Error(`Failed to import downloaded data: ${importResult.error || 'Unknown error'}`);
+          }
+          console.log('[Sync] Successfully imported downloaded data');
         } else if (syncResult.action === 'merge' && syncResult.mergedData) {
           // For merge operations, import the merged data directly
           console.log('[Sync] Applying merged data to main process database');
           const importResult = global.databaseManager.importDataFromSync(syncResult.mergedData, {
             mergeStrategy: 'replace', // Replace with merged data
             force: true,
-            preserveSyncMeta: true
+            preserveSyncMeta: true,
+            mergeTags: true,
+            mergeConversations: true
           });
+
+          // Check if import succeeded
+          if (!importResult.success) {
+            console.error('[Sync] Failed to import merged data:', importResult.error);
+            throw new Error(`Failed to import merged data: ${importResult.error || 'Unknown error'}`);
+          }
+          console.log('[Sync] Successfully imported merged data');
         }
 
         // Send updated data back to renderer process to update localStorage
@@ -746,6 +1225,10 @@ if (ipcMain) {
     } catch (error) {
       console.error('Google Drive sync failed:', error);
       return { success: false, error: error.message };
+    } finally {
+      // Always release the global sync lock
+      globalSyncInProgress = false;
+      console.log('[Sync] Released global sync lock');
     }
   });
 
@@ -798,6 +1281,143 @@ if (ipcMain) {
     }
   });
 
+  // Share note on Google Drive
+  ipcMain.handle('google-drive-share-note', async (event, { note, permissions, email }) => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive. Please connect Google Drive in Sync Settings.');
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
+      }
+
+      console.log('[Google Drive] Sharing note:', note.title);
+      const result = await global.googleDriveSyncManager.shareNoteOnDrive(note, permissions, email);
+      console.log('[Google Drive] Share result:', result);
+      
+      // Update note in database with share information
+      if (result.success && global.databaseManager) {
+        const noteData = global.databaseManager.data.notes[note.id];
+        if (noteData) {
+          if (!noteData.collaboration) {
+            noteData.collaboration = {
+              is_shared: false,
+              shared_with: [],
+              last_edited_by: null,
+              edit_history: [],
+              google_drive_file_id: null,
+              google_drive_share_link: null
+            };
+          }
+          noteData.collaboration.is_shared = true;
+          noteData.collaboration.google_drive_file_id = result.fileId;
+          noteData.collaboration.google_drive_share_link = result.shareLink;
+          // Update timestamp so sync knows this version is newer
+          noteData.updated_at = new Date().toISOString();
+          global.databaseManager.saveToLocalStorage();
+          console.log('[Google Drive] Updated note with share information');
+          
+          // Return the updated collaboration data so renderer can update its database
+          result.updatedCollaboration = {
+            is_shared: true,
+            shared_with: noteData.collaboration.shared_with || [],
+            last_edited_by: noteData.collaboration.last_edited_by,
+            edit_history: noteData.collaboration.edit_history || [],
+            google_drive_file_id: result.fileId,
+            google_drive_share_link: result.shareLink
+          };
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      console.error('[Google Drive] Share note failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Revoke share (delete shared note from Google Drive)
+  ipcMain.handle('google-drive-revoke-share', async (event, { fileId, noteId }) => {
+    try {
+      if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
+        throw new Error('Not authenticated with Google Drive');
+      }
+
+      // Check if note already has no collaboration data (might have been revoked on another device)
+      if (global.databaseManager) {
+        const noteData = global.databaseManager.data.notes[noteId];
+        if (noteData && noteData.collaboration) {
+          // If fileId is null or collaboration is already not shared, just update local state
+          if (!fileId || !noteData.collaboration.google_drive_file_id || !noteData.collaboration.is_shared) {
+            console.log('[Google Drive] Note already not shared, clearing collaboration data');
+            noteData.collaboration.is_shared = false;
+            noteData.collaboration.google_drive_file_id = null;
+            noteData.collaboration.google_drive_share_link = null;
+            noteData.updated_at = new Date().toISOString();
+            global.databaseManager.saveToLocalStorage();
+            return { 
+              success: true,
+              updatedCollaboration: {
+                is_shared: false,
+                shared_with: [],
+                last_edited_by: null,
+                edit_history: [],
+                google_drive_file_id: null,
+                google_drive_share_link: null
+              }
+            };
+          }
+        }
+      }
+
+      if (!global.googleDriveSyncManager) {
+        const { GoogleDriveSyncManager } = require('./src/js/google-drive-sync.js');
+        const encryptionSettings = global.databaseManager ? global.databaseManager.getEncryptionSettings() : null;
+        global.googleDriveSyncManager = new GoogleDriveSyncManager(global.googleAuthManager, encryptionSettings);
+      }
+
+      // Get note data to extract media files for deletion
+      let noteData = null;
+      if (global.databaseManager && noteId) {
+        noteData = global.databaseManager.data.notes[noteId];
+      }
+
+      console.log('[Google Drive] Revoking share for file:', fileId);
+      const result = await global.googleDriveSyncManager.stopSharingNote(fileId, noteData);
+      
+      // Update note in database to remove share information
+      if (result && global.databaseManager && noteData) {
+        if (noteData.collaboration) {
+          noteData.collaboration.is_shared = false;
+          noteData.collaboration.google_drive_file_id = null;
+          noteData.collaboration.google_drive_share_link = null;
+          // Update timestamp so sync knows this version is newer
+          noteData.updated_at = new Date().toISOString();
+          global.databaseManager.saveToLocalStorage();
+          console.log('[Google Drive] Removed share information from note');
+        }
+      }
+      
+      return { 
+        success: true,
+        updatedCollaboration: {
+          is_shared: false,
+          shared_with: [],
+          last_edited_by: null,
+          edit_history: [],
+          google_drive_file_id: null,
+          google_drive_share_link: null
+        }
+      };
+    } catch (error) {
+      console.error('[Google Drive] Revoke share failed:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
   ipcMain.handle('google-drive-download', async () => {
     try {
       if (!global.googleAuthManager || !global.googleAuthManager.isAuthenticated) {
@@ -819,7 +1439,9 @@ if (ipcMain) {
       if (downloadResult.data) {
         const importResult = global.databaseManager.importDataFromSync(downloadResult.data, {
           mergeStrategy: 'merge',
-          force: false
+          force: false,
+          mergeTags: true,
+          mergeConversations: true
         });
 
         const result = {
@@ -970,101 +1592,473 @@ if (ipcMain) {
     }
   });
 
+  // ============================================================
+  // PHASE 5: MEDIA FILE HANDLERS
+  // ============================================================
+
+  // Get media directory path
+  ipcMain.handle('get-media-directory', async () => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      // Ensure media directory exists
+      await fs.mkdir(mediaDir, { recursive: true });
+      return mediaDir;
+    } catch (error) {
+      console.error('[Media] Failed to get media directory:', error);
+      throw error;
+    }
+  });
+
+  // Save media file to filesystem
+  ipcMain.handle('save-media-file', async (event, { fileName, buffer, type }) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      await fs.mkdir(mediaDir, { recursive: true });
+
+      const filePath = path.join(mediaDir, fileName);
+      const bufferData = Buffer.from(buffer);
+      
+      await fs.writeFile(filePath, bufferData);
+      
+      console.log(`[Media] Saved ${type} file: ${fileName} (${bufferData.length} bytes)`);
+      return filePath;
+    } catch (error) {
+      console.error('[Media] Failed to save media file:', error);
+      throw error;
+    }
+  });
+
+  // Get media file from filesystem
+  ipcMain.handle('get-media-file', async (event, filePath) => {
+    try {
+      const buffer = await fs.readFile(filePath);
+      return {
+        data: buffer,
+        path: filePath,
+        size: buffer.length
+      };
+    } catch (error) {
+      console.error('[Media] Failed to get media file:', error);
+      throw error;
+    }
+  });
+
+  // Read media file directly from filesystem (for synced files)
+  ipcMain.handle('read-media-file', async (event, filePath) => {
+    try {
+      // Ensure the file exists before reading
+      await fs.access(filePath);
+
+      const buffer = await fs.readFile(filePath);
+      console.log(`[Media] Successfully read media file: ${filePath} (${buffer.length} bytes)`);
+      return buffer;
+    } catch (error) {
+      console.error(`[Media] Failed to read media file: ${filePath}`, error);
+      throw error;
+    }
+  });
+
+  // Find and read media file by ID (intelligent file discovery)
+  ipcMain.handle('find-and-read-media-file', async (event, fileId) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+
+      // 1. Try the fileId as-is (for backwards compatibility)
+      let filePath = path.join(mediaDir, fileId);
+      try {
+        await fs.access(filePath);
+        const buffer = await fs.readFile(filePath);
+        console.log(`[Media] Successfully read media file: ${fileId} (${buffer.length} bytes)`);
+        return { buffer, filename: fileId };
+      } catch (error) {
+        // File not found, continue to intelligent discovery
+      }
+
+      // 2. Use intelligent file discovery - find files that start with the fileId
+      try {
+        const files = await fs.readdir(mediaDir);
+
+        // Find files that start with the fileId followed by a dot (extension)
+        const matchingFiles = files.filter(file => {
+          // Check if file starts with fileId + '.' (e.g., "fileId.png", "fileId.jpg")
+          return file.startsWith(fileId + '.');
+        });
+
+        if (matchingFiles.length > 0) {
+          // Use the first matching file (there should typically be only one)
+          const filename = matchingFiles[0];
+          filePath = path.join(mediaDir, filename);
+          const buffer = await fs.readFile(filePath);
+          console.log(`[Media] Successfully read media file: ${filename} (${buffer.length} bytes)`);
+          return { buffer, filename };
+        }
+
+        // 3. As a last resort, try to find files that start with the fileId (without requiring extension)
+        const looseMatches = files.filter(file => file.startsWith(fileId));
+        if (looseMatches.length > 0) {
+          const filename = looseMatches[0];
+          filePath = path.join(mediaDir, filename);
+          const buffer = await fs.readFile(filePath);
+          console.log(`[Media] Successfully read media file (loose match): ${filename} (${buffer.length} bytes)`);
+          return { buffer, filename };
+        }
+
+      } catch (error) {
+        console.warn(`[Media] Failed to list media directory: ${mediaDir}`, error);
+      }
+
+      throw new Error(`Media file not found: ${fileId}`);
+    } catch (error) {
+      console.error(`[Media] Failed to find and read media file: ${fileId}`, error);
+      throw error;
+    }
+  });
+
+  // Delete media file
+  ipcMain.handle('delete-media-file', async (event, filePath) => {
+    try {
+      await fs.unlink(filePath);
+      console.log('[Media] Deleted media file:', filePath);
+      return { success: true };
+    } catch (error) {
+      console.error('[Media] Failed to delete media file:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Save downloaded media file (used during sync)
+  ipcMain.handle('save-downloaded-media-file', async (event, { fileId, fileData }) => {
+    try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      await fs.mkdir(mediaDir, { recursive: true });
+
+      const fileName = `${fileId}`;
+      const filePath = path.join(mediaDir, fileName);
+      const bufferData = Buffer.from(fileData);
+
+      await fs.writeFile(filePath, bufferData);
+
+      console.log(`[Media] Saved downloaded media file: ${fileName} (${bufferData.length} bytes)`);
+      return filePath;
+    } catch (error) {
+      console.error('[Media] Failed to save downloaded media file:', error);
+      throw error;
+    }
+  });
+
+  // Sync media files to Google Drive (smart sync with orphan cleanup)
+  ipcMain.handle('sync-media-to-drive', async () => {
+    try {
+      if (!global.googleDriveSyncManager) {
+        throw new Error('Google Drive sync not initialized');
+      }
+
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      
+      // Check if media directory exists
+      let localFiles = [];
+      try {
+        await fs.access(mediaDir);
+        const files = await fs.readdir(mediaDir);
+        for (const file of files) {
+          const filePath = path.join(mediaDir, file);
+          const stats = await fs.stat(filePath);
+          if (stats.isFile()) {
+            localFiles.push({
+              name: file,
+              path: filePath,
+              mtime: stats.mtimeMs,
+              size: stats.size
+            });
+          }
+        }
+      } catch {
+        // No media directory yet, nothing to sync locally
+        console.log('[Media] No local media directory found');
+      }
+
+      // Get list of media files from Google Drive
+      const driveFiles = await global.googleDriveSyncManager.listMediaFiles();
+      const driveFileMap = new Map(driveFiles.map(f => [f.name, f]));
+      
+      // Get referenced media IDs from all notes
+      const referencedMediaIds = new Set();
+      if (global.databaseManager && global.databaseManager.data.notes) {
+        const notes = Object.values(global.databaseManager.data.notes);
+        const mediaPattern = /cognotez-media:\/\/([a-z0-9]+)/gi;
+        
+        for (const note of notes) {
+          if (note.content) {
+            let match;
+            while ((match = mediaPattern.exec(note.content)) !== null) {
+              referencedMediaIds.add(match[1]);
+            }
+          }
+        }
+      }
+      
+      console.log(`[Media] Found ${referencedMediaIds.size} referenced media IDs in notes`);
+      
+      // Upload new or modified files
+      let uploaded = 0;
+      let skipped = 0;
+      
+      for (const localFile of localFiles) {
+        // Extract media ID from filename (before the extension)
+        const mediaId = localFile.name.split('.')[0];
+        
+        // Skip if not referenced in any note
+        if (!referencedMediaIds.has(mediaId)) {
+          console.log(`[Media] Skipping unreferenced file: ${localFile.name}`);
+          skipped++;
+          continue;
+        }
+        
+        const driveFile = driveFileMap.get(localFile.name);
+        
+        // Upload if file doesn't exist on Drive or has different size
+        if (!driveFile || driveFile.size !== String(localFile.size)) {
+          const fileData = await fs.readFile(localFile.path);
+          await global.googleDriveSyncManager.uploadMediaFile(localFile.name, fileData, localFile.mtime);
+          uploaded++;
+          console.log(`[Media] Uploaded: ${localFile.name}`);
+        } else {
+          skipped++;
+        }
+      }
+      
+      // Delete orphaned files from Google Drive (files not referenced in any note)
+      let deletedFromDrive = 0;
+      for (const driveFile of driveFiles) {
+        const mediaId = driveFile.name.split('.')[0];
+        
+        if (!referencedMediaIds.has(mediaId)) {
+          console.log(`[Media] Deleting orphaned file from Drive: ${driveFile.name}`);
+          await global.googleDriveSyncManager.deleteMediaFile(driveFile.id);
+          deletedFromDrive++;
+        }
+      }
+      
+      // Delete orphaned files from local filesystem (files not referenced in any note)
+      let deletedFromLocal = 0;
+      for (const localFile of localFiles) {
+        const mediaId = localFile.name.split('.')[0];
+        
+        if (!referencedMediaIds.has(mediaId)) {
+          console.log(`[Media] Deleting orphaned file from local: ${localFile.name}`);
+          try {
+            await fs.unlink(localFile.path);
+            deletedFromLocal++;
+          } catch (error) {
+            console.warn(`[Media] Failed to delete local file ${localFile.name}:`, error.message);
+          }
+        }
+      }
+
+      console.log(`[Media] Sync complete: ${uploaded} uploaded, ${skipped} skipped, ${deletedFromDrive} deleted from Drive, ${deletedFromLocal} deleted from local`);
+      return { 
+        success: true, 
+        uploaded,
+        skipped,
+        deletedFromDrive,
+        deletedFromLocal,
+        total: localFiles.length
+      };
+      
+    } catch (error) {
+      console.error('[Media] Failed to sync media to Drive:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Download media files from Google Drive
+  ipcMain.handle('download-media-from-drive', async () => {
+    try {
+      if (!global.googleDriveSyncManager) {
+        throw new Error('Google Drive sync not initialized');
+      }
+
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      await fs.mkdir(mediaDir, { recursive: true });
+
+      // Download all media files from Google Drive
+      const mediaFiles = await global.googleDriveSyncManager.listMediaFiles();
+      let filesDownloaded = 0;
+
+      for (const fileInfo of mediaFiles) {
+        const fileData = await global.googleDriveSyncManager.downloadMediaFile(fileInfo.id);
+        const filePath = path.join(mediaDir, fileInfo.name);
+        await fs.writeFile(filePath, fileData);
+        filesDownloaded++;
+      }
+
+      console.log(`[Media] Downloaded ${filesDownloaded} media files from Google Drive`);
+      return { success: true, filesDownloaded };
+      
+    } catch (error) {
+      console.error('[Media] Failed to download media from Drive:', error);
+      return { success: false, error: error.message };
+    }
+  });
+
+  // Handle language change from renderer
+  ipcMain.on('menu-language-changed', async (event, lang) => {
+    try {
+      await updateMenuLanguage(lang);
+      console.log(`[Menu] Menu language updated to: ${lang}`);
+    } catch (error) {
+      console.error('[Menu] Failed to update menu language:', error);
+    }
+  });
+
 } else {
   console.error('ipcMain not available - Electron may not be properly initialized');
 }
 
+// Load translations for menu
+let menuTranslations = {};
+let currentMenuLanguage = 'en';
+
+const loadMenuTranslations = async (lang = 'en') => {
+  try {
+    const localePath = path.join(__dirname, 'src', 'locales', `${lang}.json`);
+    const localeContent = await fs.readFile(localePath, 'utf8');
+    const locale = JSON.parse(localeContent);
+    menuTranslations = locale.menu || {};
+    currentMenuLanguage = lang;
+    return menuTranslations;
+  } catch (error) {
+    console.error(`[Menu] Failed to load translations for ${lang}:`, error);
+    // Fallback to English if loading fails
+    if (lang !== 'en') {
+      return loadMenuTranslations('en');
+    }
+    return {};
+  }
+};
+
+// Helper function to get translated menu label
+const t = (key) => {
+  return menuTranslations[key] || key;
+};
+
 // Create application menu
-const createMenu = () => {
+const createMenu = async (lang = 'en') => {
+  // Load translations if language changed
+  if (lang !== currentMenuLanguage) {
+    await loadMenuTranslations(lang);
+  }
+  
   const template = [
-    {
-      label: 'File',
-      submenu: [
-        {
-          label: 'New Note',
-          accelerator: 'CmdOrCtrl+N',
-          click: () => {
-            mainWindow.webContents.send('menu-new-note');
-          }
-        },
-        {
-          label: 'Open Note',
-          accelerator: 'CmdOrCtrl+O',
-          click: () => {
-            mainWindow.webContents.send('menu-open-note');
-          }
-        },
+      {
+        label: t('file'),
+        submenu: [
+          {
+            label: t('newNote'),
+            accelerator: 'CmdOrCtrl+N',
+            click: () => {
+              mainWindow.webContents.send('menu-new-note');
+            }
+          },
+          { type: 'separator' },
+          {
+            label: t('export'),
+            submenu: [
+              {
+                label: t('exportMarkdown'),
+                click: () => {
+                  mainWindow.webContents.send('menu-export-markdown');
+                }
+              },
+              {
+                label: t('exportText'),
+                click: () => {
+                  mainWindow.webContents.send('menu-export-text');
+                }
+              },
+              {
+                label: t('sharePDF'),
+                click: () => {
+                  mainWindow.webContents.send('menu-export-pdf');
+                }
+              },
+              { type: 'separator' },
+              {
+                label: t('createFullBackup'),
+                click: () => {
+                  mainWindow.webContents.send('menu-create-backup');
+                }
+              }
+            ]
+          },
+          {
+            label: t('import'),
+            submenu: [
+              {
+                label: t('importNote'),
+                click: () => {
+                  mainWindow.webContents.send('menu-import-note');
+                }
+              },
+              {
+                label: t('importMultipleFiles'),
+                click: () => {
+                  mainWindow.webContents.send('menu-import-multiple');
+                }
+              },
+              { type: 'separator' },
+              {
+                label: t('restoreFromBackup'),
+                click: () => {
+                  mainWindow.webContents.send('menu-restore-backup');
+                }
+              }
+            ]
+          },
         { type: 'separator' },
         {
-          label: 'Export',
-          submenu: [
-            {
-              label: 'Export as Markdown',
-              click: () => {
-                mainWindow.webContents.send('menu-export-markdown');
-              }
-            },
-            {
-              label: 'Export as Text',
-              click: () => {
-                mainWindow.webContents.send('menu-export-text');
-              }
-            },
-            { type: 'separator' },
-            {
-              label: 'Export All Notes (JSON)',
-              click: () => {
-                mainWindow.webContents.send('menu-export-json');
-              }
-            },
-            {
-              label: 'Create Full Backup',
-              click: () => {
-                mainWindow.webContents.send('menu-create-backup');
-              }
-            }
-          ]
-        },
-        {
-          label: 'Import',
-          submenu: [
-            {
-              label: 'Import Note',
-              click: () => {
-                mainWindow.webContents.send('menu-import-note');
-              }
-            },
-            {
-              label: 'Import Multiple Files',
-              click: () => {
-                mainWindow.webContents.send('menu-import-multiple');
-              }
-            },
-            { type: 'separator' },
-            {
-              label: 'Restore from Backup',
-              click: () => {
-                mainWindow.webContents.send('menu-restore-backup');
-              }
-            },
-            {
-              label: 'Migration Wizard',
-              click: () => {
-                mainWindow.webContents.send('menu-migration-wizard');
-              }
-            }
-          ]
-        },
-        { type: 'separator' },
-        {
-          label: 'Quit',
+          label: t('quit'),
           accelerator: process.platform === 'darwin' ? 'Cmd+Q' : 'Ctrl+Q',
           click: async () => {
             try {
               appQuittingRequested = true;
+              
+              // First, check if sync is already in progress - wait for it to complete
+              if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+                console.log('[Main] Sync in progress, waiting before quit...');
+                
+                // Show loading screen to user
+                if (mainWindow && mainWindow.webContents) {
+                  mainWindow.webContents.send('sync-closing-show');
+                }
+                
+                // Wait for sync to complete (with a reasonable timeout)
+                let attempts = 0;
+                while ((globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) && attempts < 120) { // Wait up to 60 seconds
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  attempts++;
+                }
+                
+                // Hide loading screen
+                if (mainWindow && mainWindow.webContents) {
+                  mainWindow.webContents.send('sync-closing-hide');
+                }
+                
+                if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+                  console.warn('[Main] Sync still in progress after timeout, proceeding with quit to prevent hang');
+                } else {
+                  console.log('[Main] Sync completed, proceeding with quit...');
+                }
+              }
+              
               // Check if auto-sync is enabled and we should sync before quitting
               if (global.databaseManager && global.databaseManager.isAutoSyncEnabled()) {
                 console.log('[Main] Auto-sync enabled, syncing before quit...');
+
+                // Show loading screen to user
+                if (mainWindow && mainWindow.webContents) {
+                  mainWindow.webContents.send('sync-closing-show');
+                }
 
                 try {
                   // Trigger sync
@@ -1073,6 +2067,11 @@ const createMenu = () => {
                 } catch (error) {
                   console.error('[Main] Sync failed before quit, proceeding with quit anyway:', error);
                   // Even if sync fails, allow the app to quit
+                } finally {
+                  // Hide loading screen
+                  if (mainWindow && mainWindow.webContents) {
+                    mainWindow.webContents.send('sync-closing-hide');
+                  }
                 }
               }
 
@@ -1090,116 +2089,131 @@ const createMenu = () => {
       ]
     },
     {
-      label: 'Edit',
+      label: t('edit'),
       submenu: [
-        { role: 'undo' },
-        { role: 'redo' },
+        { role: 'undo', label: t('undo') },
+        { role: 'redo', label: t('redo') },
         { type: 'separator' },
-        { role: 'cut' },
-        { role: 'copy' },
-        { role: 'paste' },
-        { role: 'selectall' }
+        { role: 'cut', label: t('cut') },
+        { role: 'copy', label: t('copy') },
+        { role: 'paste', label: t('paste') },
+        { role: 'selectall', label: t('selectAll') }
       ]
     },
     {
-      label: 'AI',
+      label: t('ai'),
       submenu: [
         {
-          label: 'Summarize Selection',
+          label: t('summarizeSelection'),
           accelerator: 'CmdOrCtrl+Shift+S',
           click: () => {
             mainWindow.webContents.send('menu-summarize');
           }
         },
         {
-          label: 'Ask AI About Selection',
+          label: t('askAIAboutSelection'),
           accelerator: 'CmdOrCtrl+Shift+A',
           click: () => {
             mainWindow.webContents.send('menu-ask-ai');
           }
         },
         {
-          label: 'Edit Selection with AI',
+          label: t('editSelectionWithAI'),
           accelerator: 'CmdOrCtrl+Shift+E',
           click: () => {
             mainWindow.webContents.send('menu-edit-ai');
           }
         },
+        {
+          label: t('generateContentWithAI'),
+          accelerator: 'CmdOrCtrl+Shift+G',
+          click: () => {
+            mainWindow.webContents.send('menu-generate-ai');
+          }
+        },
         { type: 'separator' },
         {
-          label: 'Rewrite Selection',
+          label: t('rewriteSelection'),
           accelerator: 'CmdOrCtrl+Shift+W',
           click: () => {
             mainWindow.webContents.send('menu-rewrite');
           }
         },
         {
-          label: 'Extract Key Points',
+          label: t('extractKeyPoints'),
           accelerator: 'CmdOrCtrl+Shift+K',
           click: () => {
             mainWindow.webContents.send('menu-key-points');
           }
         },
         {
-          label: 'Generate Tags',
+          label: t('generateTags'),
           accelerator: 'CmdOrCtrl+Shift+T',
           click: () => {
             mainWindow.webContents.send('menu-generate-tags');
           }
         },
-        { type: 'separator' },
-        {
-          label: 'AI Settings',
-          click: () => {
-            mainWindow.webContents.send('menu-ai-settings');
-          }
-        }
+        
       ]
     },
     {
-      label: 'View',
+      label: t('view'),
       submenu: [
-        { role: 'reload' },
-        { role: 'forcereload' },
-        { role: 'toggledevtools' },
+        { role: 'reload', label: t('reload') },
+        { role: 'forcereload', label: t('forceReload') },
+        { role: 'toggledevtools', label: t('toggleDevTools') },
         { type: 'separator' },
-        { role: 'resetzoom' },
-        { role: 'zoomin' },
-        { role: 'zoomout' },
+        { role: 'resetzoom', label: t('resetZoom') },
+        { role: 'zoomin', label: t('zoomIn') },
+        { role: 'zoomout', label: t('zoomOut') },
         { type: 'separator' },
-        { role: 'togglefullscreen' }
+        { role: 'togglefullscreen', label: t('toggleFullscreen') }
       ]
     },
     {
-      label: 'Settings',
+      label: t('settings'),
       submenu: [
         {
-          label: 'General Settings',
+          label: t('generalSettings'),
           click: () => {
             mainWindow.webContents.send('menu-general-settings');
           }
+        },
+        {
+          label: t('cloudSyncSettings'),
+          click: () => {
+            mainWindow.webContents.send('menu-sync-settings');
+          }
+        },
+        { type: 'separator' },
+        {
+          label: t('aiSettings'),
+          click: () => {
+            mainWindow.webContents.send('menu-ai-settings');
+          }
+        },
+        {
+          label: t('advancedSettings'),
+          click: () => {
+            mainWindow.webContents.send('menu-advanced-settings');
+          }
         }
       ]
     },
     {
-      label: 'Help',
+      label: t('help'),
       submenu: [
         {
-          label: 'Check for Updates',
+          label: t('checkForUpdates'),
           click: () => {
             mainWindow.webContents.send('menu-check-updates');
           }
         },
         { type: 'separator' },
         {
-          label: 'About CogNotez',
+          label: t('aboutCogNotez'),
           click: () => {
-            dialog.showMessageBox(mainWindow, {
-              type: 'info',
-              title: 'About CogNotez',
-              message: 'CogNotez - AI-Powered Note App',
-              detail: `Version ${app.getVersion()}\nAn offline-first note-taking application with local LLM integration.`
-            });
+            mainWindow.webContents.send('menu-about');
           }
         }
       ]
@@ -1208,6 +2222,15 @@ const createMenu = () => {
 
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
+};
+
+// Update menu when language changes
+const updateMenuLanguage = async (lang) => {
+  try {
+    await createMenu(lang);
+  } catch (error) {
+    console.error('[Menu] Failed to update menu language:', error);
+  }
 };
 
 // Menu is created when app is ready (handled in app.on('ready') callback above)

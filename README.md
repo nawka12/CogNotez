@@ -1,64 +1,85 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
+![Version](https://img.shields.io/badge/version-2.1.4-blue.svg)
+![License](https://img.shields.io/badge/license-MIT-green.svg)
+![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
+![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D20.0.0-brightgreen.svg)
+
 An offline-first, privacy-focused note-taking application that leverages local Large Language Models (LLMs) for intelligent features. Built with Electron and featuring web scraping, advanced import/export capabilities, and seamless AI integration.
 
-## CogNotez is still on development.
+**[Download Latest Release](https://github.com/nawka12/CogNotez/releases)** | **[Report Issues](https://github.com/nawka12/CogNotez/issues)** | **[View Documentation](https://github.com/nawka12/CogNotez)**
+
+## Quick Start
+
+1. **Download** the latest release from [GitHub Releases](https://github.com/nawka12/CogNotez/releases)
+2. **Install Ollama** (for AI features):
+   ```bash
+   curl -fsSL https://ollama.com/install.sh | sh
+   ollama pull llama3.2:latest
+   ollama serve
+   ```
+3. **Launch CogNotez** and start taking notes!
+4. **Create your first note**: Press `Ctrl+N` or click the "+" button
+5. **Try AI features**: Select text, right-click, and explore AI-powered actions
+
+> **Note**: CogNotez works great offline! AI features require Ollama running locally or OpenRouter API key for online use.
 
 ## Features
 
-### Core Functionality
+### Core
 - **Offline-First**: Full functionality without internet connection
 - **Privacy-Focused**: All data stays on your device
 - **Local AI Integration**: Uses Ollama for AI features
 - **Clean Interface**: Modern, minimalist design with light/dark themes
-- **Data Portability**: Export notes in multiple formats
+- **Multi-Language**: English, Spanish, Indonesian, Japanese, and Javanese support
 
-### AI-Powered Features
+### AI-Powered
 - **Smart Summarization**: AI-generated summaries of notes or selected text
 - **Contextual Q&A**: Ask AI questions about your notes
 - **Text Editing**: AI-powered text transformations and improvements
-- **Text Rewriting**: Rewrite content in different styles (professional, casual, academic, simple, creative)
+- **Content Generation**: AI-powered content creation and brainstorming
+- **Text Rewriting**: Rewrite content in different styles
 - **Key Points Extraction**: Automatically extract main points from text
 - **Tag Generation**: AI-suggested tags for better organization
-- **Conversation History**: All AI interactions saved in database
-- **Streaming Responses**: Real-time AI response generation
-- **Multi-Model Support**: Choose from different Ollama models
 - **Web Scraping**: Extract content from websites, Reddit, and Fandom wikis
 - **Web Search Integration**: Optional SearXNG integration for enhanced AI queries
-- **Advanced Import/Export**: Support for JSON and bulk file operations
 
-### User Experience
-- **Keyboard Shortcuts**: Full keyboard navigation support
-- **Context Menus**: Right-click AI actions on selected text
-- **Theme Support**: Light and dark modes with custom accent color
-- **Search**: Fast, real-time note search
-- **Auto-Save**: Automatic saving with manual override
-- **Data Portability**: JSON export/import for easy migration
+### Organization & Search
+- **Folder & Tag Navigation**: Organize notes with folder-based navigation using tags
+- **Advanced Search**: Full-text search with tag filtering, date ranges, and sorting
+- **Note Templates**: Built-in templates and AI-generated custom templates
+- **Multi-Tab Support**: Work with multiple notes simultaneously
+
+### Rich Media & Editing
+- **Rich Media**: Images, videos with flexible sizing controls
+- **Find & Replace**: Powerful text search with regex support
+- **Undo/Redo**: Full history tracking for text editing
+- **Preview Mode**: Toggle between edit, preview, and split view modes
+- **Markdown Support**: Full markdown editing with live preview
+
+### Security & Sync
+- **Password-Locked Notes**: End-to-end encryption (AES-256-GCM) for protected notes
+- **Google Drive Sync**: Optional cloud sync with end-to-end encryption
+- **Google Drive Sharing**: Share notes on Google Drive with customizable permissions (view, comment, edit)
 - **Backup & Restore**: Complete data backup and restoration
-- **Migration Wizard**: Guided data migration between installations
-- **Sharing**: Share notes via clipboard or exported files
-- **Statistics**: Note statistics and analytics dashboard
+- **Import/Export**: JSON export/import for easy migration
 
-## Technology Stack
-
-- **Frontend**: Vanilla JavaScript (HTML/CSS/JS)
-- **Desktop Framework**: Electron
-- **AI Integration**: Ollama (local LLM) with optional OpenRouter API fallback
-- **Database**: localStorage (JSON-based) for portable offline storage
-- **Web Scraping**: Axios and Cheerio for content extraction
-- **Markdown Processing**: Marked library for rendering
-- **Styling**: CSS Custom Properties with theme support
+### Sharing & Export
+- **Multiple Export Formats**: Markdown (.md), Plain Text (.txt), PDF (with media preservation)
+- **Clipboard Sharing**: Copy notes as Markdown or plain text to clipboard
+- **File Export**: Export individual notes or complete backup for easy sharing
+- **Share Link Management**: Manage Google Drive share links and permissions
 
 ## Installation & Setup
 
 ### Prerequisites
+- **Node.js** (v20 or higher)
+- **Ollama** (for AI features) - [Download here](https://ollama.com/)
 
-1. **Node.js** (v16 or higher)
-2. **Ollama** (for AI features) - [Download here](https://ollama.com/)
-
-#### Optional Components
-3. **SearXNG** (for web search integration) - [Setup Guide](https://docs.searxng.org/)
-4. **OpenRouter API Key** (alternative to local Ollama) - [Get API Key](https://openrouter.ai/)
+### Optional Components
+- **SearXNG** (for web search integration) - [Setup Guide](https://docs.searxng.org/)
+- **OpenRouter API Key** (alternative to local Ollama) - [Get API Key](https://openrouter.ai/)
 
 ### Installation Steps
 
@@ -73,15 +94,10 @@ An offline-first, privacy-focused note-taking application that leverages local L
    npm install
    ```
 
-3. **Set up Ollama (for AI features)**
+3. **Set up Ollama** (for AI features)
    ```bash
-   # Install Ollama (if not already installed)
    curl -fsSL https://ollama.com/install.sh | sh
-
-   # Pull a language model (recommended: gemma3:latest)
-   ollama pull gemma3:latest
-
-   # Start Ollama service
+   ollama pull llama3.2:latest
    ollama serve
    ```
 
@@ -90,72 +106,40 @@ An offline-first, privacy-focused note-taking application that leverages local L
    npm start
    ```
 
-### Database Setup
+### Google Drive Sync
 
-CogNotez uses localStorage for data storage, which provides a simple yet robust solution for offline-first applications. Data is stored as JSON in the browser's local storage and automatically synchronized.
+1. Open the app and click the cloud icon (☁️) in the header
+2. Click "Import Credentials File" and select the OAuth JSON from Google Cloud Console
+3. Click "Connect Google Drive" and complete the Google sign-in
+4. (Optional) Enable "End-to-End Encryption" and set a passphrase
+5. Choose whether to enable Auto Sync and Sync on Startup
 
-**Benefits of localStorage for offline-first apps:**
-- No additional dependencies required
-- Automatic data persistence across sessions
-- JSON-based format for easy export/import
-- Cross-platform compatibility
-- Zero configuration required
-- Perfect for desktop applications
+For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 
 ## Usage
 
 ### Basic Note Taking
-
-1. **Create a new note**: Click the "+" button or press `Ctrl+N`
-2. **Edit notes**: Click on any note in the sidebar to edit
-3. **Save notes**: Press `Ctrl+S` or click the save button
-4. **Search notes**: Use the search bar to find notes instantly
-
-### Advanced Features
-
-#### Web Scraping
-CogNotez includes powerful web scraping capabilities to extract content from various sources:
-
-- **Reddit Integration**: Extract posts, comments, and discussions from Reddit threads
-- **Fandom Wiki Support**: Scrape content from Fandom wikis and similar platforms
-- **Generic Website Scraping**: Extract main content from any website
-- **Smart Content Detection**: Automatically identifies and extracts the most relevant content
-- **Rate Limiting**: Built-in delays to respect website policies
-
-#### Data Import/Export
-Comprehensive import and export capabilities for maximum data portability:
-
-- **JSON Export/Import**: Complete database export and import for backups
-- **Bulk File Operations**: Import multiple files at once
-- **Migration Wizard**: Guided migration between CogNotez installations
-
-#### Backup & Restore
-- **Automatic Backups**: Create timestamped backups before major operations
-- **Full System Backup**: Complete database and settings backup
-- **Selective Restore**: Restore specific data or entire databases
-- **Backup Verification**: Integrity checks on backup files
-
-#### Sharing & Collaboration
-- **Clipboard Sharing**: Copy notes to clipboard in multiple formats
-- **File Export**: Export individual or multiple notes as files
-- **Format Options**: Markdown and plain text export formats
-- **Shareable Links**: Generate shareable note references
+- **Create**: `Ctrl+N` or click the "+" button
+- **Save**: `Ctrl+S` or click the save button
+- **Open**: `Ctrl+O` to open a note
+- **Search**: Use the search bar (click × to clear) or press `Ctrl+/` to focus search
+- **Filter**: Click folder items in sidebar (All Notes, Untagged, or tag folders)
+- **Find & Replace**: `Ctrl+F` to find, `Ctrl+H` for find and replace
+- **Undo/Redo**: `Ctrl+Z` to undo, `Ctrl+Y` to redo
+- **Preview**: `Ctrl+P` to toggle between edit, preview, and split view modes
 
 ### AI Features
 
-#### Text Selection Actions (Right-click or keyboard shortcuts)
+**Right-click on selected text** to access:
+- **📝 Summarize Selection** (`Ctrl+Shift+S`)
+- **🤖 Ask AI About Selection** (`Ctrl+Shift+A`)
+- **✏️ Edit Selection with AI** (`Ctrl+Shift+E`)
+- **🎨 Rewrite Selection** (`Ctrl+Shift+W`)
+- **📋 Extract Key Points** (`Ctrl+Shift+K`)
+- **🏷️ Generate Tags** (`Ctrl+Shift+T`)
 
-1. **Summarize Selection**: `Ctrl+Shift+S`
-   - Select text and choose "Summarize Selection"
-   - AI generates a concise summary
-
-2. **Ask AI About Selection**: `Ctrl+Shift+A`
-   - Select text and ask questions about it
-   - AI provides contextual answers
-
-3. **Edit Selection with AI**: `Ctrl+Shift+E`
-   - Select text and describe desired changes
-   - AI transforms the text accordingly
+**Right-click anywhere** (no selection) for:
+- **✨ Generate with AI** (`Ctrl+Shift+G`)
 
 ### Keyboard Shortcuts
 
@@ -163,271 +147,184 @@ Comprehensive import and export capabilities for maximum data portability:
 |----------|--------|
 | `Ctrl+N` | Create new note |
 | `Ctrl+S` | Save current note |
-| `Ctrl+O` | Open note dialog |
+| `Ctrl+O` | Open note |
 | `Ctrl+/` | Focus search |
+| `Ctrl+F` | Find text |
+| `Ctrl+H` | Find and replace |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `Ctrl+P` | Toggle preview mode |
 | `Ctrl+Shift+S` | Summarize selected text |
 | `Ctrl+Shift+A` | Ask AI about selected text |
 | `Ctrl+Shift+E` | Edit selected text with AI |
-| `Ctrl+Shift+R` | Rewrite selected text |
+| `Ctrl+Shift+G` | Generate content with AI |
+| `Ctrl+Shift+W` | Rewrite selected text |
 | `Ctrl+Shift+K` | Extract key points |
-| `Ctrl+Shift+T` | Generate tags for selection |
+| `Ctrl+Shift+T` | Generate tags |
 | `F1` | Show keyboard shortcuts help |
 | `Escape` | Close menus/dialogs |
-| `Right-click` | Show AI context menu on selected text |
 
-### Right-Click Context Menu
+### Rich Media
 
-Select any text in your notes and right-click to access powerful AI features:
+**Images**: Click the image button (🖼️), drag & drop, or paste from clipboard. Supported formats: JPEG, PNG, GIF, WebP, SVG.
 
-- **📝 Summarize Selection**: Get a concise summary of selected text
-- **🤖 Ask AI About Selection**: Ask questions about the selected content
-- **✏️ Edit Selection with AI**: Transform text with AI assistance
-- **🎨 Rewrite Selection**: Change writing style (professional, casual, etc.)
-- **📋 Extract Key Points**: Pull out main points from text
-- **🏷️ Generate Tags**: Get AI-suggested tags for organization
+**Videos**: Click the video button (🎥) or drag & drop video files (MP4, WebM, OGG).
 
-### Themes
+**Sizing**: Images and videos auto-scale by default. Use HTML attributes (`width`, `height`) for manual control.
 
-- **Light Mode**: Clean, bright interface
-- **Dark Mode**: Easy on the eyes for low-light environments
-- Toggle using the theme button in the header
+### Note Templates
 
-### AI Settings
+**Built-in Templates**: Blank Note, Meeting Notes, Daily Journal, Project Plan, Book Notes, Research Notes, To-Do List, Brainstorm, Recipe, Code Snippet.
 
-Configure your AI integration through the **AI → AI Settings** menu:
+**Custom Templates**: Create from current note or generate with AI. Access via **File → New from Template**.
 
-- **Connection Status**: Check if Ollama is running
-- **Endpoint Configuration**: Set custom Ollama server address
-- **Model Selection**: Choose from available AI models
-- **Connection Testing**: Verify your setup works correctly
+### Sharing Notes
 
-**Setup Ollama:**
-```bash
-# Install Ollama
-curl -fsSL https://ollama.com/install.sh | sh
+**Share Button**: Click the share icon (📤) in the note editor toolbar to access sharing options:
 
-# Pull a model (recommended: gemma3:latest)
-ollama pull gemma3:latest
+- **Google Drive**: Share on Google Drive with customizable permissions (view-only, comment, or edit)
+  - Requires Google Drive sync setup (see [Google Drive Sync](#google-drive-sync))
+  - Automatically updates shared notes when edited
+  - Manage shared links and revoke access
+  
+- **Export as File**:
+  - **Markdown**: Export as `.md` file
+  - **Plain Text**: Export as `.txt` file
+  - **PDF**: Export as PDF with media preserved
+  
+- **Copy to Clipboard**: Copy note content as Markdown or plain text
 
-# Start the service
-ollama serve
-```
+**Share via Menu**: Access export options via **File → Export** menu.
 
-## Project Structure
+### Internationalization
 
-```
-cognotez/
-├── main.js                    # Electron main process and menu system
-├── package.json              # Dependencies and build scripts
-├── package-lock.json         # Dependency lock file
-├── src/                      # Application source code
-│   ├── index.html           # Main HTML interface
-│   ├── css/
-│   │   ├── styles.css       # Main application styles
-│   │   └── themes.css       # Light/dark theme definitions
-│   └── js/
-│       ├── app.js           # Main application coordinator
-│       ├── ai.js            # AI integration and chat
-│       ├── backend.js       # File operations and data management
-│       ├── database.js      # Database abstraction layer
-│       ├── notes.js         # Note CRUD operations
-│       ├── scraper.js       # Web scraping functionality
-│       └── ui.js            # UI utilities and enhancements
-├── dist/                     # Build output directory
-│   └── linux-unpacked/      # Linux executable and resources
-├── test-*.js                # Test scripts for various features
-├── scraper-aichan.js        # Additional scraping utilities
-├── specs.md                 # Project specifications
-└── README.md                # This documentation
-```
+Supported languages: **English**, **Spanish**, **Indonesian**, **Japanese**, **Javanese (Basa Jawa)**.
 
-## Development
+Change language via **More options (⋯) → Language** in the header. Language preference is automatically saved.
 
-### Building for Distribution
+## Offline Functionality
 
-```bash
-# Create distributable packages
-npm run dist
+### What Works Offline
+- ✅ All note-taking features (create, edit, delete, search)
+- ✅ Local AI features (when using Ollama)
+- ✅ Theme switching and preferences
+- ✅ Data export and backup
+- ✅ Password-protected notes
+- ✅ Fast startup (<2 seconds)
 
-# Build only
-npm run build
-```
+### What Requires Internet
+- ❌ Google Drive sync and sharing
+- ❌ OpenRouter AI (cloud-based)
+- ❌ SearXNG web search
+- ❌ Web scraping features
 
-### Development Mode
+The app displays real-time network status indicators (🟢 Online, 🔴 Offline, ⚠️ Partial).
 
-```bash
-# Run with dev tools open
-npm run dev
-```
+## Troubleshooting
 
-### Code Structure
+### AI Features Not Working
+1. **Check Ollama Status**: `ollama list` and `curl http://localhost:11434/api/tags`
+2. **Restart Ollama**: `ollama serve`
+3. **Pull Models**: `ollama pull llama3.2:latest`
+4. **Check Network**: Ensure Ollama is running locally or you have internet for OpenRouter
 
-- **Main Process** (`main.js`): Electron window management, menu system, and IPC handlers
-- **Renderer Process** (`src/`): Web-based UI and application logic
-- **Core Modules**:
-  - `app.js`: Main application coordinator and initialization
-  - `notes.js`: Note CRUD operations and management
-  - `ai.js`: AI integration, chat, and tool calling
-  - `database.js`: localStorage abstraction and data persistence
-  - `backend.js`: File operations, import/export, and data management
-  - `scraper.js`: Web scraping functionality for external content
-  - `ui.js`: UI utilities, themes, and user interactions
+### Application Won't Start
+1. Check Node.js version: `node --version` (should be v20+)
+2. Reinstall dependencies: `rm -rf node_modules && npm install`
+3. Check for errors: `npm start` and review console output
 
-## Configuration
+### Performance Issues
+- Ensure sufficient RAM for AI models (4GB+ recommended)
+- Close unnecessary applications
+- Use SSD storage for better performance
 
-### AI Settings
-
-The application automatically detects Ollama running on `localhost:11434`. Advanced configuration options include:
-
-#### Ollama Configuration
-1. **Local Models**: Automatic detection of installed Ollama models
-2. **Custom Endpoints**: Configure alternative Ollama server addresses
-3. **Model Selection**: Choose from available models for different tasks
-
-#### OpenRouter Integration (Optional)
-1. **API Key Setup**: Configure OpenRouter API key for cloud AI fallback
-2. **Model Selection**: Access to various AI models through OpenRouter
-3. **Tool Calling**: Enhanced AI capabilities with web search integration
-
-#### SearXNG Web Search (Optional)
-1. **Server Configuration**: Set custom SearXNG instance URL
-2. **Search Integration**: Enable web search for AI queries
-3. **Privacy-Focused**: Use self-hosted SearXNG for maximum privacy
-
-### Theme Customization
-
-Edit `src/css/themes.css` to customize:
-- Color palette
-- Accent colors (currently `#BDABE3`)
-- Font families
-- Spacing and sizing
+### Google Drive Sync Issues
+- Check network connectivity (app shows offline indicator when disconnected)
+- Verify OAuth credentials are correctly imported
+- Ensure Google Cloud Console has your email as a Test user
 
 ## Contributing
 
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
+We welcome contributions! Here's how you can help:
+
+- **Report Bugs**: [Create a bug report](https://github.com/nawka12/CogNotez/issues)
+- **Suggest Features**: [Submit a feature request](https://github.com/nawka12/CogNotez/issues)
+- **Submit Pull Requests**: Fork the repo and submit a PR
+- **Improve Documentation**: Help make our docs better
+
+### Development Setup
+1. Fork and clone the repository
+2. Install dependencies: `npm install`
+3. Run in development mode: `npm run dev`
+4. Make your changes and test thoroughly
+5. Submit a pull request with a clear description
+
+## Version History
+
+### v2.1.4 (Current)
+- Sync closing overlay to inform users when sync is in progress during app closure
+- Enhanced user experience during sync operations with better notifications
+- Improved internationalization support with new translation keys for sync-related messages
+- Enhanced timeout handling and logging for sync operations
+
+### v2.1.3
+- Enhanced internationalization support
+- Improved user notifications and translations
+
+### v2.1.2
+- Enhanced internationalization support
+- Added Spanish language support
+- Improved translations across the application
+
+### v2.1.1
+- Added Javanese (Basa Jawa) language support
+- Enhanced translations for user notifications, prompts, tag management, and sharing features
+
+### v2.1.0
+- Full multi-language support (English, Indonesian, Japanese)
+- Complete UI translation including menus, dialogs, and tooltips
+- Language selector in header overflow menu
+- Automatic language detection based on system preferences
+
+### v2.0.0
+- Folder & Tag Navigation with folder-based organization
+- Enhanced search with clear button
+- Media insertion buttons in toolbar
+- Revamped header toolbar
+- Enhanced splash screen with animated background
+
+### v1.5.0
+- Multi-tab support for working with multiple notes simultaneously
+- Enhanced header and search functionality
+
+### v1.4.2
+- Cancel button for AI operations
+
+### v1.4.1
+- Google Drive note sharing with permission management
+- Media file management for shared notes
+- Collaboration metadata tracking
+- Bug fixes and stability improvements
+
+### v1.4.0
+- Find & Replace with regex support
+- Undo/Redo with full history tracking
+- Preview mode toggle (Edit/Preview/Split)
+
+For earlier versions, see the full [changelog](https://github.com/nawka12/CogNotez/releases).
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/nawka12/CogNotez/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/nawka12/CogNotez/discussions)
+- **Documentation**: Check [specs.md](specs.md) for detailed requirements
 
 ## License
 
 MIT License - see LICENSE file for details.
 
-## Roadmap
-
-### Phase 1 ✅ (Completed)
-- ✅ Basic Electron setup
-- ✅ Core UI and theming
-- ✅ Note creation and editing
-- ✅ SQLite database integration
-
-### Phase 2 ✅ (Completed)
-- ✅ Full Ollama integration
-- ✅ Advanced AI features (summarization, Q&A, text editing, rewriting)
-- ✅ Context menus and keyboard shortcuts
-- ✅ AI settings and configuration
-- ✅ Data export/import functionality
-
-### Phase 3 ✅ (Completed)
-- ✅ Complete AI feature set (7+ AI actions)
-- ✅ Right-click context menu system
-- ✅ Comprehensive keyboard shortcuts
-- ✅ AI conversation history
-- ✅ Multi-model support
-- ✅ Streaming AI responses
-
-### Recently Added Features ✅
-- ✅ Web scraping integration (Reddit, Fandom, generic sites)
-- ✅ SearXNG web search integration
-- ✅ Advanced import/export (JSON, bulk operations)
-- ✅ Backup and restore functionality
-- ✅ Migration wizard
-- ✅ Enhanced sharing capabilities
-- ✅ Statistics and analytics dashboard
-- ✅ OpenRouter API integration as Ollama fallback
-
-### Future Enhancements
-- 🔄 Plugin system for custom AI models
-- 🔄 Advanced theming and customization
-- 🔄 Cloud sync (optional, privacy-focused)
-- 🔄 Mobile version
-- 🔄 Advanced search and filtering
-- 🔄 Note templates and workflows
-- 🔄 Collaborative features
-- 🔄 Advanced AI model management
-- 🔄 Custom web scraping rules
-
-## Troubleshooting
-
-### AI Features Not Working
-
-1. **Check Ollama Status**:
-   ```bash
-   ollama list
-   curl http://localhost:11434/api/tags
-   ```
-
-2. **Restart Ollama**:
-   ```bash
-   ollama serve
-   ```
-
-3. **Pull Models**:
-   ```bash
-   ollama pull gemma3:latest
-   ```
-
-### Application Won't Start
-
-1. **Check Node.js version**: `node --version` (should be v16+)
-2. **Reinstall dependencies**: `rm -rf node_modules && npm install`
-3. **Check for errors**: `npm start` and check console output
-
-### Performance Issues
-
-- Ensure sufficient RAM for AI models (4GB+ recommended)
-- Close unnecessary applications
-- Use SSD storage for better performance
-
-### SearXNG Integration Issues
-
-1. **Connection Failed**:
-   ```bash
-   # Test SearXNG connection
-   curl http://localhost:8080/search?q=test
-   ```
-
-2. **Configuration**:
-   - Verify SEARXNG_URL environment variable
-   - Check if SearXNG is running on the correct port
-   - Ensure proper CORS configuration in SearXNG
-
-### Web Scraping Issues
-
-1. **Content Not Extracted**:
-   - Some websites block automated requests
-   - Try different user agents in scraper settings
-   - Check if the website requires JavaScript
-
-2. **Rate Limiting**:
-   - Built-in delays prevent overwhelming servers
-   - Increase delays in scraper configuration if needed
-
-### Import/Export Issues
-
-1. **JSON Import Fails**:
-   - Verify JSON file format and structure
-   - Check for corrupted backup files
-   - Ensure sufficient disk space
-
-
-## Support
-
-- **Issues**: Create an issue on GitHub
-- **Discussions**: Use GitHub Discussions for questions
-- **Documentation**: Check the specs.md file for detailed requirements
-
 ---
 
 **CogNotez** - Taking notes into the AI era, while keeping your data private and secure.
+
+Made with ❤️ by [nawka12](https://github.com/nawka12)

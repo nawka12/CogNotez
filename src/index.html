@@ -2,7 +2,12 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="CogNotez">
+    <meta name="theme-color" content="#3ECF8E">
     <title>CogNotez - AI-Powered Notes</title>
     <script>
         // Apply theme immediately to prevent flashbang
@@ -18,21 +23,55 @@
 <body>
     <!-- Splash Screen -->
     <div id="splash-screen" class="splash-screen">
+        <!-- Animated background -->
+        <div class="splash-bg">
+            <div class="splash-gradient"></div>
+            <div class="splash-particles">
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+                <div class="particle"></div>
+            </div>
+            <div class="splash-rings">
+                <div class="ring ring-1"></div>
+                <div class="ring ring-2"></div>
+                <div class="ring ring-3"></div>
+            </div>
+        </div>
+        
         <div class="splash-content">
             <div class="splash-logo">
-                <div class="splash-icon"><img src="../assets/icon.svg" alt="CogNotez Logo" width="64" height="64"></div>
-                <h1 class="splash-title">CogNotez</h1>
-                <p class="splash-subtitle">AI-Powered Note App</p>
+                <div class="splash-icon-wrapper">
+                    <div class="splash-icon-glow"></div>
+                    <div class="splash-icon">
+                        <img src="../assets/icon.svg" alt="CogNotez Logo" width="72" height="72">
+                    </div>
+                </div>
+                <h1 class="splash-title">
+                    <span class="title-letter">C</span><span class="title-letter">o</span><span class="title-letter">g</span><span class="title-letter">N</span><span class="title-letter">o</span><span class="title-letter">t</span><span class="title-letter">e</span><span class="title-letter">z</span>
+                </h1>
+                <p class="splash-subtitle" data-i18n="app.subtitle">AI-Powered Note Taking</p>
             </div>
+            
             <div class="splash-progress">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
+                    <div class="progress-glow"></div>
                 </div>
-                <div class="progress-text" id="progress-text">Initializing...</div>
+                <div class="progress-info">
+                    <span class="progress-text" id="progress-text" data-i18n="splash.startingUp">Starting up...</span>
+                    <span class="progress-percent" id="progress-percent">0%</span>
+                </div>
             </div>
+            
             <div class="splash-footer">
-                <p class="splash-version" id="splash-version">Version</p>
-                <div class="splash-spinner"></div>
+                <p class="splash-version" id="splash-version" data-i18n="splash.version">Version</p>
+                <div class="splash-status">
+                    <div class="status-dot"></div>
+                    <span class="status-text" data-i18n="splash.loading">Loading</span>
+                </div>
             </div>
         </div>
     </div>
@@ -41,45 +80,132 @@
         <!-- Header -->
         <header class="app-header">
             <div class="header-left">
+                <button id="mobile-menu-toggle" class="mobile-menu-toggle" title="Toggle menu" data-i18n-title="header.toggleMenu">
+                    <i class="fas fa-bars"></i>
+                </button>
                 <div class="app-title-container">
                     <img src="../assets/icon.svg" alt="CogNotez Logo" class="app-logo" width="32" height="32">
                     <h1 class="app-title">CogNotez</h1>
                 </div>
-                <div class="search-container">
-                    <input type="text" id="search-input" placeholder="Search notes..." class="search-input">
-                    <button id="search-button" class="search-button"><i class="fas fa-search"></i></button>
+                <div class="search-container" id="search-container">
+                    <div class="search-input-wrapper">
+                        <i class="fas fa-search search-icon"></i>
+                        <input type="text" id="search-input" placeholder="Search notes..." class="search-input" data-i18n-placeholder="header.searchNotes">
+                        <button id="search-clear-btn" class="search-clear-btn" title="Clear search" data-i18n-title="header.clearSearch">
+                            <i class="fas fa-times"></i>
+                        </button>
+                        <kbd class="search-shortcut" id="search-shortcut">Ctrl+K</kbd>
+                    </div>
                 </div>
             </div>
             <div class="header-right">
-                <!-- Sync Status -->
-                <div id="sync-status-container" class="sync-status-container" style="display: none;">
-                    <div class="sync-status-indicator" id="sync-status-indicator">
-                        <i class="fas fa-cloud" id="sync-status-icon"></i>
-                        <span class="sync-status-text" id="sync-status-text">Sync</span>
-                    </div>
-                    <button id="sync-manual-btn" class="sync-manual-btn" title="Manual Sync">
-                        <i class="fas fa-sync-alt"></i>
+                <!-- Unified Header Toolbar -->
+                <div class="header-toolbar">
+                    <!-- Sync Button (hidden until sync is enabled) -->
+                    <button id="sync-btn" class="header-toolbar-btn hidden" title="Sync status - Click to sync" data-i18n-title="header.syncStatus">
+                        <i class="fas fa-cloud" id="sync-btn-icon"></i>
+                        <span class="toolbar-btn-label" id="sync-btn-text" data-i18n="header.sync">Sync</span>
+                    </button>
+                    
+                    <div class="toolbar-divider sync-divider hidden"></div>
+                    
+                    <button id="theme-toggle" class="header-toolbar-btn" title="Toggle theme" data-i18n-title="header.toggleTheme">
+                        <i class="fas fa-sun theme-icon-light"></i>
+                        <i class="fas fa-moon theme-icon-dark"></i>
+                    </button>
+                    <button id="ai-toggle-btn" class="header-toolbar-btn" title="Toggle AI Assistant" data-i18n-title="header.toggleAI">
+                        <i class="fas fa-robot"></i>
+                    </button>
+                    
+                    <div class="toolbar-divider"></div>
+                    
+                    <button id="new-note-btn" class="header-toolbar-btn new-note-btn" title="New note" data-i18n-title="header.newNote">
+                        <i class="fas fa-plus"></i>
+                        <span class="toolbar-btn-label" data-i18n="header.new">New</span>
+                    </button>
+                    
+                    <button id="header-overflow-btn" class="header-toolbar-btn" title="More options" data-i18n-title="header.moreOptions">
+                        <i class="fas fa-ellipsis-v"></i>
                     </button>
                 </div>
-
-                <button id="theme-toggle" class="theme-toggle" title="Toggle theme"><i class="fas fa-moon"></i></button>
-                <button id="ai-toggle-btn" class="ai-toggle-btn" title="Toggle AI Assistant"><i class="fas fa-robot"></i></button>
-                <button id="sync-settings-btn" class="sync-settings-btn" title="Sync Settings"><i class="fas fa-cloud"></i></button>
-                <button id="new-note-btn" class="new-note-btn" title="New note"><i class="fas fa-plus"></i></button>
+                
+                <!-- Header Overflow Menu -->
+                <div id="header-overflow-menu" class="header-overflow-menu hidden">
+                    <button id="mobile-search-btn" class="header-overflow-item" title="Search Notes" data-i18n-title="header.searchNotesMenu"><i class="fas fa-search"></i> <span data-i18n="header.searchNotesMenu">Search Notes</span></button>
+                    <button id="advanced-search-btn" class="header-overflow-item" title="Advanced Search" data-i18n-title="header.advancedSearch"><i class="fas fa-filter"></i> <span data-i18n="header.advancedSearch">Advanced Search</span></button>
+                    <button id="templates-btn" class="header-overflow-item" title="Templates" data-i18n-title="header.templates"><i class="fas fa-file-alt"></i> <span data-i18n="header.templates">Templates</span></button>
+                    <div class="header-overflow-separator"></div>
+                    <div class="header-overflow-item language-selector-item">
+                        <i class="fas fa-language"></i>
+                        <span data-i18n="header.language">Language</span>
+                        <select id="language-selector" class="language-selector">
+                            <option value="en">English</option>
+                            <option value="id">Bahasa Indonesia</option>
+                            <option value="jv">Basa Jawa</option>
+                            <option value="ja">日本語</option>
+                            <option value="es">Español</option>
+                        </select>
+                    </div>
+                    <button id="mobile-theme-toggle" class="header-overflow-item mobile-only-item" title="Toggle Theme" data-i18n-title="header.toggleThemeMenu"><i class="fas fa-adjust"></i> <span data-i18n="header.toggleThemeMenu">Toggle Theme</span></button>
+                    <button id="mobile-ai-toggle" class="header-overflow-item mobile-only-item" title="AI Assistant" data-i18n-title="header.aiAssistant"><i class="fas fa-robot"></i> <span data-i18n="header.aiAssistant">AI Assistant</span></button>
+                </div>
             </div>
         </header>
+        
+        <!-- Note Tabs Bar -->
+        <div class="note-tabs-bar" id="note-tabs-bar">
+            <div class="note-tabs-container" id="note-tabs-container">
+                <!-- Tabs will be populated here -->
+            </div>
+            <button class="tabs-overflow-btn hidden" id="tabs-overflow-btn" title="More tabs" data-i18n-title="sidebar.moreTabs">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
 
         <!-- Main Content -->
         <main class="main-content">
+            <!-- Sidebar Backdrop (for mobile) -->
+            <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+            
             <!-- Sidebar -->
-            <aside class="sidebar">
+            <aside class="sidebar" id="sidebar">
                 <div class="sidebar-header">
-                    <h2>Notes</h2>
-                    <button id="sidebar-toggle" class="sidebar-toggle"><i class="fas fa-bars"></i></button>
+                    <h2 data-i18n="sidebar.notes">Notes</h2>
+                    <button id="sidebar-toggle" class="sidebar-toggle"><i class="fas fa-chevron-left"></i></button>
                 </div>
+                
+                <!-- Folder/Category Navigation -->
+                <div class="sidebar-folders" id="sidebar-folders">
+                    <div class="folder-item active" data-folder="all">
+                        <i class="fas fa-layer-group folder-icon"></i>
+                        <span class="folder-name" data-i18n="sidebar.allNotes">All Notes</span>
+                        <span class="folder-count" id="folder-count-all">0</span>
+                    </div>
+                    <div class="folder-item" data-folder="untagged">
+                        <i class="fas fa-file-alt folder-icon"></i>
+                        <span class="folder-name" data-i18n="sidebar.untagged">Untagged</span>
+                        <span class="folder-count" id="folder-count-untagged">0</span>
+                    </div>
+                    <div class="folders-divider" id="tags-divider">
+                        <button id="tags-toggle-btn" class="tags-toggle-btn" title="Toggle tags list" data-i18n-title="sidebar.toggleTagsList">
+                            <i class="fas fa-chevron-down" id="tags-toggle-icon"></i>
+                        </button>
+                        <span data-i18n="sidebar.tags">Tags</span>
+                        <button id="create-folder-btn" class="create-folder-btn" title="Create new tag" data-i18n-title="sidebar.createNewTag">
+                            <i class="fas fa-plus"></i>
+                        </button>
+                    </div>
+                    <div class="tag-folders-list" id="tag-folders-list">
+                        <!-- Tag folders will be populated dynamically -->
+                    </div>
+                </div>
+                
                 <div class="notes-list" id="notes-list">
                     <!-- Notes will be populated here -->
                 </div>
+                
+                <!-- Resize Handle -->
+                <div class="sidebar-resize-handle" id="sidebar-resize-handle"></div>
             </aside>
 
             <!-- Main Content Area -->
@@ -87,60 +213,64 @@
                 <!-- Editor Area -->
                 <div class="editor-container" id="editor-container">
                     <div class="editor-header">
-                        <div class="note-info">
-                            <input type="text" id="note-title" placeholder="Note title..." class="note-title-input">
+                        <div class="editor-header-top">
+                            <input type="text" id="note-title" placeholder="Untitled note..." class="note-title-input" data-i18n-placeholder="editor.untitledNote">
+                            <div class="editor-toolbar editor-actions">
+                                <button id="undo-btn" class="editor-tool-btn" title="Undo (Ctrl+Z)" data-i18n-title="editor.undo"><i class="fas fa-undo"></i></button>
+                                <button id="redo-btn" class="editor-tool-btn" title="Redo (Ctrl+Y)" data-i18n-title="editor.redo"><i class="fas fa-redo"></i></button>
+                                <div class="editor-toolbar-divider"></div>
+                                <button id="preview-toggle-btn" class="editor-tool-btn" title="Preview Mode" data-i18n-title="editor.previewMode"><i class="fas fa-eye"></i></button>
+                                <button id="save-btn" class="editor-tool-btn" title="Save" data-i18n-title="editor.save"><i class="fas fa-save"></i></button>
+                                <!-- Rich media buttons (image / video) -->
+                                <button id="insert-image-btn" class="editor-tool-btn" title="Insert Image" data-i18n-title="editor.insertImage"><i class="fas fa-image"></i></button>
+                                <button id="insert-video-btn" class="editor-tool-btn" title="Insert Video" data-i18n-title="editor.insertVideo"><i class="fas fa-video"></i></button>
+                                <div class="editor-toolbar-divider"></div>
+                                <button id="editor-overflow-btn" class="editor-tool-btn" title="More options" data-i18n-title="editor.moreOptions"><i class="fas fa-ellipsis-h"></i></button>
+                            </div>
+                        </div>
+                        <div class="editor-header-meta">
                             <div id="note-tags-display" class="note-tags-display"></div>
                             <span id="note-date" class="note-date"></span>
                         </div>
-                        <div class="editor-actions">
-                            <button id="undo-btn" class="action-btn" title="Undo (Ctrl+Z)"><i class="fas fa-undo"></i></button>
-                            <button id="redo-btn" class="action-btn" title="Redo (Ctrl+Y)"><i class="fas fa-redo"></i></button>
-                            <button id="find-btn" class="action-btn" title="Find (Ctrl+F)"><i class="fas fa-search"></i></button>
-                            <button id="replace-btn" class="action-btn" title="Replace (Ctrl+H)"><i class="fas fa-exchange-alt"></i></button>
-                            <button id="preview-toggle-btn" class="action-btn" title="Toggle Preview/Edit"><i class="fas fa-edit"></i></button>
-                            <button id="save-btn" class="action-btn" title="Save"><i class="fas fa-save"></i></button>
-                            <button id="ai-summary-btn" class="action-btn" title="AI Summary"><i class="fas fa-file-alt"></i></button>
-                            <button id="generate-tags-btn" class="action-btn" title="Generate Tags"><i class="fas fa-tags"></i></button>
-                            <button id="manage-tags-btn" class="action-btn" title="Manage Tags"><i class="fas fa-clipboard-list"></i></button>
-                            <button id="export-btn" class="action-btn" title="Export"><i class="fas fa-download"></i></button>
-                            <button id="share-btn" class="action-btn" title="Share"><i class="fas fa-share"></i></button>
+                        
+                        <!-- Overflow menu -->
+                        <div id="editor-overflow-menu" class="editor-overflow-menu hidden">
+                            <button id="find-btn" class="overflow-menu-item" title="Find (Ctrl+F)" data-i18n-title="editor.findShortcut"><i class="fas fa-search"></i> <span data-i18n="editor.find">Find</span></button>
+                            <button id="replace-btn" class="overflow-menu-item" title="Replace (Ctrl+H)" data-i18n-title="editor.replaceShortcut"><i class="fas fa-exchange-alt"></i> <span data-i18n="editor.replace">Replace</span></button>
+                            <div class="overflow-menu-separator"></div>
+                            <button id="ai-summary-btn" class="overflow-menu-item" title="AI Summary" data-i18n-title="editor.aiSummary"><i class="fas fa-file-alt"></i> <span data-i18n="editor.aiSummary">AI Summary</span></button>
+                            <button id="generate-tags-btn" class="overflow-menu-item" title="Generate Tags" data-i18n-title="editor.generateTags"><i class="fas fa-tags"></i> <span data-i18n="editor.generateTags">Generate Tags</span></button>
+                            <button id="manage-tags-btn" class="overflow-menu-item" title="Manage Tags" data-i18n-title="editor.manageTags"><i class="fas fa-clipboard-list"></i> <span data-i18n="editor.manageTags">Manage Tags</span></button>
+                            <div class="overflow-menu-separator"></div>
+                            <button id="export-btn" class="overflow-menu-item" title="Export" data-i18n-title="editor.export"><i class="fas fa-download"></i> <span data-i18n="editor.export">Export</span></button>
+                            <button id="share-btn" class="overflow-menu-item" title="Share" data-i18n-title="editor.share"><i class="fas fa-share"></i> <span data-i18n="editor.share">Share</span></button>
+                            <button id="password-lock-btn" class="overflow-menu-item" title="Password Protection" data-i18n-title="editor.passwordProtection"><i class="fas fa-lock"></i> <span data-i18n="editor.passwordLock">Password Lock</span></button>
                         </div>
                     </div>
                     <div class="editor-wrapper">
-                        <textarea id="note-editor" class="note-editor hidden" placeholder="Start writing your note..."></textarea>
+                        <textarea id="note-editor" class="note-editor hidden" placeholder="Start writing your note..." data-i18n-placeholder="editor.startWriting"></textarea>
                         <div id="markdown-preview" class="markdown-preview"></div>
                     </div>
 
                     <!-- AI Edit Approval (Inline) -->
                     <div id="ai-edit-approval-inline" class="ai-edit-approval-inline hidden">
                         <div class="ai-edit-approval-header">
-                            <h3>Review AI Edits</h3>
+                            <h3 data-i18n="ai.reviewEdits">Review AI Edits</h3>
                             <div class="approval-header-actions">
-                                <button id="ai-edit-help-btn" class="approval-help-btn" title="Help"><i class="fas fa-question-circle"></i></button>
-                                <button id="ai-edit-approval-close" class="approval-close-btn" title="Close"><i class="fas fa-times"></i></button>
+                                <button id="ai-edit-help-btn" class="approval-help-btn" title="Help" data-i18n-title="ai.help"><i class="fas fa-question-circle"></i></button>
+                                <button id="ai-edit-approval-close" class="approval-close-btn" title="Close" data-i18n-title="ai.close"><i class="fas fa-times"></i></button>
                             </div>
                         </div>
                         <div class="ai-edit-approval-body">
                             <div class="ai-edit-instructions">
-                                <p>Review the proposed changes below. Each changed line has its own Accept/Reject buttons:</p>
-                                <div class="legend">
-                                    <div class="legend-item">
-                                        <span class="block-status original">Red boxes</span> - Your original text that will be changed
-                                    </div>
-                                    <div class="legend-item">
-                                        <span class="block-status edited">Green boxes</span> - AI's suggested replacement text
-                                    </div>
+                                <div class="bulk-actions">
+                                    <button id="accept-changes-btn" class="btn-success" data-i18n="ai.acceptAll">Accept All</button>
+                                    <button id="reject-changes-btn" class="btn-secondary" data-i18n="ai.rejectAll">Reject All</button>
                                 </div>
                             </div>
                             <div class="ai-edit-diff-container">
                                 <div class="diff-content" id="ai-edit-diff-content">
                                     <!-- Diff content will be populated here -->
-                                </div>
-                            </div>
-                            <div class="ai-edit-actions">
-                                <div class="block-actions">
-                                    <button id="accept-changes-btn" class="btn-success">Accept All</button>
-                                    <button id="reject-changes-btn" class="btn-secondary">Reject All</button>
                                 </div>
                             </div>
                         </div>
@@ -149,14 +279,42 @@
 
                 <!-- No Note Selected Placeholder -->
                 <div class="no-note-placeholder hidden" id="no-note-placeholder">
+                    <!-- Animated background elements -->
+                    <div class="placeholder-bg-elements">
+                        <div class="floating-shape shape-1"></div>
+                        <div class="floating-shape shape-2"></div>
+                        <div class="floating-shape shape-3"></div>
+                        <div class="floating-shape shape-4"></div>
+                        <div class="floating-shape shape-5"></div>
+                    </div>
+                    
                     <div class="placeholder-content">
-                        <div class="placeholder-icon"><i class="fas fa-sticky-note"></i></div>
-                        <h2 class="placeholder-title">Select a note to start</h2>
-                        <p class="placeholder-description">Choose a note from the sidebar or create a new one to begin writing</p>
-                        <button id="create-first-note-btn" class="create-note-btn">
-                            <span class="btn-icon"><i class="fas fa-plus"></i></span>
-                            Create New Note
-                        </button>
+                        <div class="placeholder-icon-wrapper">
+                            <div class="placeholder-icon-ring"></div>
+                            <div class="placeholder-icon">
+                                <i class="fas fa-feather-alt"></i>
+                            </div>
+                        </div>
+                        <h2 class="placeholder-title" data-i18n="placeholder.readyToCapture">Ready to capture your thoughts?</h2>
+                        <p class="placeholder-description" data-i18n="placeholder.selectNote">Select an existing note from the sidebar or start fresh with a new canvas</p>
+                        
+                        <div class="placeholder-actions">
+                            <button id="create-first-note-btn" class="create-note-btn">
+                                <span class="btn-icon"><i class="fas fa-plus"></i></span>
+                                <span data-i18n="placeholder.createNewNote">Create New Note</span>
+                            </button>
+                        </div>
+                        
+                        <div class="placeholder-tips">
+                            <div class="tip-item">
+                                <i class="fas fa-keyboard"></i>
+                                <span data-i18n="placeholder.quickNote">Press <kbd>Ctrl</kbd> + <kbd>N</kbd> for quick note</span>
+                            </div>
+                            <div class="tip-item">
+                                <i class="fas fa-magic"></i>
+                                <span data-i18n="placeholder.aiReady">AI assistant ready to help you write</span>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </section>
@@ -164,9 +322,9 @@
             <!-- AI Panel (hidden by default) -->
             <aside class="ai-panel hidden" id="ai-panel">
                 <div class="ai-panel-header">
-                    <h3>AI Assistant</h3>
+                    <h3 data-i18n="ai.assistant">AI Assistant</h3>
                     <div class="ai-panel-actions">
-                        <button id="ai-reset-btn" class="ai-reset-btn" title="New Chat"><i class="fas fa-plus-circle"></i></button>
+                        <button id="ai-reset-btn" class="ai-reset-btn" title="New Chat" data-i18n-title="ai.newChat"><i class="fas fa-plus-circle"></i></button>
                         <button id="ai-panel-close" class="ai-panel-close"><i class="fas fa-times"></i></button>
                     </div>
                 </div>
@@ -175,8 +333,8 @@
                         <!-- AI conversation will appear here -->
                     </div>
                     <div class="ai-input-container">
-                        <input type="text" id="ai-input" placeholder="Ask me anything..." class="ai-input">
-                        <button id="ai-send-btn" class="ai-send-btn">Send</button>
+                        <textarea id="ai-input" placeholder="Ask me anything..." class="ai-input" rows="1" data-i18n-placeholder="ai.askAnything"></textarea>
+                        <button id="ai-send-btn" class="ai-send-btn" title="Send message" data-i18n-title="ai.sendMessage"><i class="fas fa-paper-plane"></i></button>
                     </div>
                 </div>
             </aside>
@@ -184,23 +342,32 @@
 
         <!-- Context Menu (hidden) -->
         <div id="context-menu" class="context-menu hidden">
-            <div class="context-menu-item" data-action="summarize"><i class="fas fa-file-alt"></i> Summarize Note</div>
-            <div class="context-menu-item" data-action="ask-ai"><i class="fas fa-robot"></i> Ask AI About Note</div>
+            <!-- Standard operations -->
+            <div class="context-menu-item" data-action="cut"><i class="fas fa-cut"></i> <span data-i18n="contextMenu.cut">Cut</span></div>
+            <div class="context-menu-item" data-action="copy"><i class="fas fa-copy"></i> <span data-i18n="contextMenu.copy">Copy</span></div>
+            <div class="context-menu-item" data-action="paste"><i class="fas fa-paste"></i> <span data-i18n="contextMenu.paste">Paste</span></div>
+            <div class="context-menu-item" data-action="generate-ai"><i class="fas fa-magic"></i> <span data-i18n="contextMenu.generateAI">Generate with AI</span></div>
+            <div class="context-menu-item" data-action="download-media"><i class="fas fa-download"></i> <span data-i18n="contextMenu.download">Download</span></div>
+            <div class="context-menu-separator"></div>
+            <!-- AI operations (shown only when text is selected) -->
+            <div class="context-menu-item context-menu-ai" data-action="summarize"><i class="fas fa-file-alt"></i> <span data-i18n="contextMenu.summarize">Summarize</span></div>
+            <div class="context-menu-item context-menu-ai" data-action="ask-ai"><i class="fas fa-robot"></i> <span data-i18n="contextMenu.askAI">Ask AI</span></div>
+            <div class="context-menu-item context-menu-ai" data-action="edit-ai"><i class="fas fa-edit"></i> <span data-i18n="contextMenu.editAI">Edit with AI</span></div>
         </div>
 
         <!-- Modals/Dialogs -->
         <div id="ai-dialog" class="modal hidden">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h3 id="ai-dialog-title">AI Assistant</h3>
+                    <h3 id="ai-dialog-title" data-i18n="ai.assistant">AI Assistant</h3>
                     <button id="ai-dialog-close" class="modal-close"><i class="fas fa-times"></i></button>
                 </div>
                 <div class="modal-body">
                     <div id="ai-dialog-context" class="ai-dialog-context"></div>
-                    <input type="text" id="ai-dialog-input" placeholder="What would you like to do?" class="ai-dialog-input">
+                    <input type="text" id="ai-dialog-input" placeholder="What would you like to do?" class="ai-dialog-input" data-i18n-placeholder="ai.askAnything">
                     <div class="ai-dialog-actions">
-                        <button id="ai-dialog-cancel" class="btn-secondary">Cancel</button>
-                        <button id="ai-dialog-submit" class="btn-primary">Submit</button>
+                        <button id="ai-dialog-cancel" class="btn-secondary" data-i18n="modals.cancel">Cancel</button>
+                        <button id="ai-dialog-submit" class="btn-primary" data-i18n="modals.submit">Submit</button>
                     </div>
                 </div>
             </div>
@@ -209,18 +376,125 @@
         <!-- Loading Overlay -->
         <div id="loading-overlay" class="loading-overlay hidden">
             <div class="loading-spinner"></div>
-            <div class="loading-text">Processing with AI...</div>
+            <div class="loading-text" data-i18n="ai.processing">Processing with AI...</div>
+            <button id="loading-cancel-btn" class="loading-cancel-btn hidden" data-i18n="modals.cancel">Cancel</button>
+        </div>
+
+        <!-- Sync Closing Loading Overlay -->
+        <div id="sync-closing-overlay" class="loading-overlay hidden">
+            <div class="loading-spinner"></div>
+            <div class="loading-text" data-i18n="settings.sync.syncClosingMessage">Syncing in Progress, closing after sync complete</div>
+        </div>
+
+        <!-- Advanced Search Panel -->
+        <div id="advanced-search-panel" class="advanced-search-panel hidden">
+            <div class="advanced-search-header">
+                <h3 data-i18n="advancedSearch.title">Advanced Search</h3>
+                <button id="advanced-search-close" class="advanced-search-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="advanced-search-body">
+                <div class="search-filter-group">
+                    <label data-i18n="advancedSearch.searchText">Search Text</label>
+                    <input type="text" id="filter-text" placeholder="Search in title, content, tags..." class="filter-input" data-i18n-placeholder="advancedSearch.searchInPlaceholder">
+                </div>
+                <div class="search-filter-group">
+                    <label data-i18n="advancedSearch.filterByTags">Filter by Tags</label>
+                    <select id="filter-tags" multiple class="filter-select">
+                        <!-- Tags will be populated dynamically -->
+                    </select>
+                </div>
+                <div class="search-filter-group">
+                    <label data-i18n="advancedSearch.dateRange">Date Range</label>
+                    <div class="date-range-inputs">
+                        <input type="date" id="filter-date-from" class="filter-input-date" placeholder="From" data-i18n-placeholder="advancedSearch.from">
+                        <span data-i18n="advancedSearch.to">to</span>
+                        <input type="date" id="filter-date-to" class="filter-input-date" placeholder="To" data-i18n-placeholder="advancedSearch.to">
+                    </div>
+                </div>
+                <div class="search-filter-group">
+                    <label data-i18n="advancedSearch.filterOptions">Filter Options</label>
+                    <div class="filter-checkboxes">
+                        <label><input type="checkbox" id="filter-favorites"> <span data-i18n="advancedSearch.favoritesOnly">Favorites only</span></label>
+                        <label><input type="checkbox" id="filter-pinned"> <span data-i18n="advancedSearch.pinnedOnly">Pinned only</span></label>
+                        <label><input type="checkbox" id="filter-protected"> <span data-i18n="advancedSearch.passwordProtected">Password protected</span></label>
+                    </div>
+                </div>
+                <div class="search-filter-group">
+                    <label data-i18n="advancedSearch.sortBy">Sort By</label>
+                    <select id="filter-sort" class="filter-select">
+                        <option value="updated_at_desc" data-i18n="advancedSearch.lastModifiedNewest">Last Modified (Newest)</option>
+                        <option value="updated_at_asc" data-i18n="advancedSearch.lastModifiedOldest">Last Modified (Oldest)</option>
+                        <option value="created_at_desc" data-i18n="advancedSearch.createdNewest">Created (Newest)</option>
+                        <option value="created_at_asc" data-i18n="advancedSearch.createdOldest">Created (Oldest)</option>
+                        <option value="title_asc" data-i18n="advancedSearch.titleAZ">Title (A-Z)</option>
+                        <option value="title_desc" data-i18n="advancedSearch.titleZA">Title (Z-A)</option>
+                        <option value="word_count_desc" data-i18n="advancedSearch.wordCountHigh">Word Count (High to Low)</option>
+                        <option value="word_count_asc" data-i18n="advancedSearch.wordCountLow">Word Count (Low to High)</option>
+                    </select>
+                </div>
+                <div class="advanced-search-actions">
+                    <button id="apply-filters-btn" class="btn-primary" data-i18n="advancedSearch.applyFilters">Apply Filters</button>
+                    <button id="clear-filters-btn" class="btn-secondary" data-i18n="advancedSearch.clearAll">Clear All</button>
+                </div>
+                <div class="search-results-summary">
+                    <span id="search-results-count" data-i18n="advancedSearch.notesFound">0 notes found</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Template Chooser Dialog -->
+        <div id="template-chooser" class="modal hidden">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 data-i18n="templates.chooseTemplate">Choose a Template</h3>
+                    <button id="template-chooser-close" class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="template-grid" id="template-grid">
+                        <!-- Templates will be populated here -->
+                    </div>
+                    <div class="template-actions">
+                        <button id="create-custom-template-btn" class="btn-secondary"><i class="fas fa-plus"></i> <span data-i18n="templates.createCustomTemplate">Create Custom Template</span></button>
+                        <button id="generate-ai-template-btn" class="btn-primary"><i class="fas fa-robot"></i> <span data-i18n="templates.generateAITemplate">Generate Template with AI</span></button>
+                    </div>
+                </div>
+            </div>
         </div>
 
     </div>
 
+    <script src="./js/i18n.js"></script>
+    <script src="./js/encryption.js"></script>
     <script src="./js/database.js"></script>
+    <script src="./js/network-utils.js"></script>
     <script src="./js/backend.js"></script>
     <script src="./js/scraper.js"></script>
+    <!-- Phase 5 Modules -->
+    <script src="./js/advanced-search.js"></script>
+    <script src="./js/templates.js"></script>
+    <script src="./js/rich-media.js"></script>
+    <!-- End Phase 5 -->
     <script src="./js/app.js"></script>
     <script src="./js/notes.js"></script>
     <script src="./js/ai-edit-approval.js"></script>
     <script src="./js/ai.js"></script>
     <script src="./js/ui.js"></script>
+    <script>
+        // Initialize i18n after DOM is ready
+        document.addEventListener('DOMContentLoaded', async () => {
+            await window.i18n.initialize();
+            // Notify main process of initial language
+            if (typeof require !== 'undefined') {
+                try {
+                    const { ipcRenderer } = require('electron');
+                    if (ipcRenderer) {
+                        ipcRenderer.send('menu-language-changed', window.i18n.getLanguage());
+                    }
+                } catch (error) {
+                    console.warn('[i18n] Could not notify main process of language:', error);
+                }
+            }
+        });
+    </script>
 </body>
 </html>

@@ -1,6 +1,17 @@
 // localStorage-based Database Manager for CogNotez
 const fs = require('fs');
 const path = require('path');
+
+// Helper function to get encryption manager (works in both main and renderer process)
+function getEncryptionManager() {
+    // In main process, require the module
+    if (typeof window === 'undefined') {
+        return require('./encryption');
+    }
+    // In renderer process, use the global window.encryptionManager
+    return window.encryptionManager;
+}
+
 let electronApp = null;
 try {
     const electron = require('electron');
@@ -53,6 +64,9 @@ class DatabaseManager {
             // Ensure data structure exists
             this.ensureDataStructure();
 
+            // CRITICAL SECURITY: Clean up any existing plaintext leaks in password-protected notes
+            this.sanitizePasswordProtectedNotes();
+
             this.initialized = true;
             console.log('[DEBUG] localStorage database initialized successfully');
             console.log('[DEBUG] Database loaded with', Object.keys(this.data.notes).length, 'notes');
@@ -101,9 +115,27 @@ class DatabaseManager {
 
     saveToLocalStorage() {
         try {
+            // CRITICAL SECURITY: Sanitize password-protected notes before saving
+            // This prevents plaintext content from being persisted to disk
+            const dataToSave = { ...this.data };
+            dataToSave.notes = {};
+            
+            for (const [noteId, note] of Object.entries(this.data.notes)) {
+                if (note.password_protected) {
+                    // For password-protected notes, ensure content and preview are NEVER saved as plaintext
+                    dataToSave.notes[noteId] = {
+                        ...note,
+                        content: '',
+                        preview: ''
+                    };
+                } else {
+                    dataToSave.notes[noteId] = note;
+                }
+            }
+
             // Check if localStorage is available (only in renderer process)
             if (typeof localStorage !== 'undefined') {
-                localStorage.setItem('cognotez_data', JSON.stringify(this.data));
+                localStorage.setItem('cognotez_data', JSON.stringify(dataToSave));
                 console.log('[DEBUG] Data saved to localStorage');
             } else {
                 // In main process: persist to file under userData
@@ -113,7 +145,7 @@ class DatabaseManager {
                     if (!fs.existsSync(dir)) {
                         fs.mkdirSync(dir, { recursive: true });
                     }
-                    fs.writeFileSync(filePath, JSON.stringify(this.data, null, 2), 'utf8');
+                    fs.writeFileSync(filePath, JSON.stringify(dataToSave, null, 2), 'utf8');
                     console.log('[DEBUG] Data saved to file:', filePath);
                 } catch (fileError) {
                     console.error('[DEBUG] Failed to save data file:', fileError);
@@ -122,6 +154,24 @@ class DatabaseManager {
         } catch (error) {
             console.error('[DEBUG] Failed to save data to localStorage:', error);
             throw error;
+        }
+    }
+
+    // CRITICAL SECURITY: Sanitize any password-protected notes that have plaintext content
+    sanitizePasswordProtectedNotes() {
+        let sanitizedCount = 0;
+        for (const [noteId, note] of Object.entries(this.data.notes)) {
+            if (note.password_protected && (note.content || note.preview)) {
+                // Found a password-protected note with plaintext - clean it immediately
+                note.content = '';
+                note.preview = '';
+                sanitizedCount++;
+            }
+        }
+        if (sanitizedCount > 0) {
+            console.log(`[Database] SECURITY: Sanitized ${sanitizedCount} password-protected notes with leaked plaintext`);
+            // Save immediately to persist the fix
+            this.saveToLocalStorage();
         }
     }
 
@@ -137,6 +187,7 @@ class DatabaseManager {
     }
 
     ensureDataStructure() {
+        if (!this.data) this.data = {};
         if (!this.data.notes) this.data.notes = {};
         if (!this.data.ai_conversations) this.data.ai_conversations = {};
         if (!this.data.settings) this.data.settings = {};
@@ -181,21 +232,35 @@ class DatabaseManager {
         const wordCount = this.calculateWordCount(noteData.content || '');
         const charCount = (noteData.content || '').length;
 
-        const note = {
+		const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+		const note = {
             id: id,
-            title: noteData.title || 'Untitled Note',
+            title: noteData.title || untitledTitle,
             content: noteData.content || '',
             preview: noteData.preview || '',
             tags: noteData.tags || [],
             category: noteData.category || null,
             is_favorite: noteData.is_favorite || false,
             is_archived: noteData.is_archived || false,
+            pinned: noteData.pinned || false,
+            password_protected: noteData.password_protected || false,
+            password_hash: noteData.password_hash || null,
+			encrypted_content: noteData.encrypted_content || null,
             word_count: wordCount,
             char_count: charCount,
             created_at: now,
             updated_at: now,
             created: new Date(now),
-            modified: new Date(now)
+            modified: new Date(now),
+            // Collaboration metadata
+            collaboration: noteData.collaboration || {
+                is_shared: false,
+                shared_with: [],
+                last_edited_by: null,
+                edit_history: [],
+                google_drive_file_id: null,
+                google_drive_share_link: null
+            }
         };
 
         this.data.notes[id] = note;
@@ -207,12 +272,15 @@ class DatabaseManager {
     getNote(id) {
         const note = this.data.notes[id];
         if (note && !note.is_archived) {
+            // Create a deep copy to prevent accidental mutation of database objects
+            const noteCopy = JSON.parse(JSON.stringify(note));
+            
             // Ensure proper date objects
-            if (typeof note.created === 'string') {
-                note.created = new Date(note.created_at || note.created);
-                note.modified = new Date(note.updated_at || note.modified);
+            if (typeof noteCopy.created === 'string') {
+                noteCopy.created = new Date(noteCopy.created_at || noteCopy.created);
+                noteCopy.modified = new Date(noteCopy.updated_at || noteCopy.modified);
             }
-            return note;
+            return noteCopy;
         }
         return null;
     }
@@ -229,10 +297,12 @@ class DatabaseManager {
         if (options.search) {
             const searchTerm = options.search.toLowerCase();
             notes = notes.filter(note => {
-                // Search in title, content, and preview
+                // Search in title, and only in content/preview if not password protected
+                const safeContent = note.password_protected ? '' : (note.content || '');
+                const safePreview = note.password_protected ? '' : (note.preview || '');
                 const textMatch = note.title.toLowerCase().includes(searchTerm) ||
-                                note.content.toLowerCase().includes(searchTerm) ||
-                                (note.preview && note.preview.toLowerCase().includes(searchTerm));
+                                safeContent.toLowerCase().includes(searchTerm) ||
+                                safePreview.toLowerCase().includes(searchTerm);
 
                 // Search in tags
                 let tagMatch = false;
@@ -254,11 +324,19 @@ class DatabaseManager {
             notes = notes.filter(note => note.is_favorite === options.isFavorite);
         }
 
-        // Sorting
+        // Sorting - pinned notes always come first
         const sortBy = options.sortBy || 'updated_at';
         const sortOrder = options.sortOrder || 'DESC';
 
         notes.sort((a, b) => {
+            // Pinned notes always come first
+            const aPinned = a.pinned || false;
+            const bPinned = b.pinned || false;
+
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+
+            // Within pinned or unpinned groups, sort by the specified criteria
             let aVal = a[sortBy];
             let bVal = b[sortBy];
 
@@ -326,6 +404,51 @@ class DatabaseManager {
 
         if (noteData.is_archived !== undefined) {
             note.is_archived = noteData.is_archived;
+        }
+
+        if (noteData.pinned !== undefined) {
+            note.pinned = noteData.pinned;
+        }
+
+        if (noteData.password_protected !== undefined) {
+            note.password_protected = noteData.password_protected;
+        }
+
+        if (noteData.password_hash !== undefined) {
+            note.password_hash = noteData.password_hash;
+        }
+
+		if (noteData.encrypted_content !== undefined) {
+			note.encrypted_content = noteData.encrypted_content;
+		}
+
+        // Collaboration metadata
+        if (noteData.collaboration !== undefined) {
+            note.collaboration = { ...note.collaboration, ...noteData.collaboration };
+        }
+
+        // Track changes for collaboration (if content or title changed)
+        if ((noteData.content !== undefined || noteData.title !== undefined) && note.collaboration) {
+            if (!note.collaboration.edit_history) {
+                note.collaboration.edit_history = [];
+            }
+            // Add edit entry (limit to last 50 entries)
+            note.collaboration.edit_history.push({
+                timestamp: now,
+                edited_by: noteData.edited_by || note.collaboration.last_edited_by || 'local',
+                changes: {
+                    title_changed: noteData.title !== undefined,
+                    content_changed: noteData.content !== undefined
+                }
+            });
+            // Keep only last 50 entries
+            if (note.collaboration.edit_history.length > 50) {
+                note.collaboration.edit_history = note.collaboration.edit_history.slice(-50);
+            }
+            // Update last edited by
+            if (noteData.edited_by) {
+                note.collaboration.last_edited_by = noteData.edited_by;
+            }
         }
 
         // Update timestamps
@@ -424,16 +547,12 @@ class DatabaseManager {
         return deletedCount;
     }
 
-    // Clear orphaned AI conversations (conversations for notes that no longer exist)
+    // Clear all AI conversations
     clearOrphanedAIConversations() {
-        const existingNoteIds = new Set(Object.keys(this.data.notes));
         let deletedCount = 0;
 
-        const conversationsToDelete = Object.keys(this.data.ai_conversations).filter(id => {
-            const conversation = this.data.ai_conversations[id];
-            // Check if the conversation has a note_id and if that note still exists
-            return conversation.note_id && !existingNoteIds.has(conversation.note_id);
-        });
+        // Get all conversation IDs
+        const conversationsToDelete = Object.keys(this.data.ai_conversations);
 
         conversationsToDelete.forEach(id => {
             delete this.data.ai_conversations[id];
@@ -442,7 +561,7 @@ class DatabaseManager {
 
         if (deletedCount > 0) {
             this.saveToLocalStorage();
-            console.log(`[Database] Cleared ${deletedCount} orphaned AI conversations`);
+            console.log(`[Database] Cleared ${deletedCount} AI conversations`);
         }
 
         return deletedCount;
@@ -474,19 +593,24 @@ class DatabaseManager {
             iterations: settings.iterations
         });
 
-        const encryptionManager = require('./encryption');
+        // Get encryption manager
+        const encMgr = getEncryptionManager();
+        if (!encMgr) {
+            throw new Error('Encryption manager not available');
+        }
 
         // Generate new salt if enabling encryption and no salt provided
         if (settings.enabled && !settings.saltBase64 && !this.data.encryption.saltBase64) {
             if (!settings.passphrase) {
                 throw new Error('Passphrase is required to derive encryption salt');
             }
-            settings.saltBase64 = encryptionManager.deriveSaltFromPassphrase(settings.passphrase);
+            // Use encryptionManager to derive salt from passphrase
+            settings.saltBase64 = encMgr.deriveSaltFromPassphrase(settings.passphrase);
         }
 
         // Validate settings before applying
         if (settings.passphrase) {
-            const validation = encryptionManager.validateSettings({
+            const validation = encMgr.validateSettings({
                 passphrase: settings.passphrase,
                 saltBase64: settings.saltBase64
             });
@@ -576,6 +700,47 @@ class DatabaseManager {
         }
     }
 
+    clearUnusedTags() {
+        // Find all tag IDs that are actually used in notes
+        const usedTagIds = new Set();
+        
+        // Check note_tags associations
+        Object.values(this.data.note_tags).forEach(noteTag => {
+            if (noteTag.tag_id) {
+                usedTagIds.add(noteTag.tag_id);
+            }
+        });
+        
+        // Also check tags array in notes (for backward compatibility)
+        Object.values(this.data.notes).forEach(note => {
+            if (note.tags && Array.isArray(note.tags)) {
+                note.tags.forEach(tagId => usedTagIds.add(tagId));
+            }
+        });
+
+        // Find unused tags
+        const allTagIds = Object.keys(this.data.tags);
+        const unusedTagIds = allTagIds.filter(tagId => !usedTagIds.has(tagId));
+
+        // Delete unused tags
+        let deletedCount = 0;
+        unusedTagIds.forEach(tagId => {
+            delete this.data.tags[tagId];
+            deletedCount++;
+        });
+
+        if (deletedCount > 0) {
+            this.saveToLocalStorage();
+            console.log(`[Database] Cleared ${deletedCount} unused tags`);
+        }
+
+        return {
+            deletedCount,
+            remainingCount: Object.keys(this.data.tags).length,
+            deletedTags: unusedTagIds
+        };
+    }
+
     // Statistics
     getStats() {
         const notes = Object.values(this.data.notes);
@@ -658,8 +823,24 @@ class DatabaseManager {
 
     // Export data as JSON string (for localStorage-based backup)
     exportDataAsJSON() {
+        // Sanitize notes to prevent plaintext leakage for password-protected notes
+        const sanitizedNotes = {};
+        for (const [noteId, note] of Object.entries(this.data.notes)) {
+            if (note.password_protected) {
+                // For password-protected notes, ensure content and preview are cleared
+                sanitizedNotes[noteId] = {
+                    ...note,
+                    content: '',
+                    preview: ''
+                };
+            } else {
+                sanitizedNotes[noteId] = note;
+            }
+        }
+
         const exportData = {
             ...this.data,
+            notes: sanitizedNotes,
             metadata: {
                 ...this.data.metadata,
                 exportedAt: new Date().toISOString(),
@@ -797,8 +978,23 @@ class DatabaseManager {
 
     // Enhanced export for sync (excludes local-only settings and secrets)
     exportDataForSync() {
+        // Sanitize notes to prevent plaintext leakage for password-protected notes
+        const sanitizedNotes = {};
+        for (const [noteId, note] of Object.entries(this.data.notes)) {
+            if (note.password_protected) {
+                // For password-protected notes, ensure content and preview are cleared
+                sanitizedNotes[noteId] = {
+                    ...note,
+                    content: '',
+                    preview: ''
+                };
+            } else {
+                sanitizedNotes[noteId] = note;
+            }
+        }
+
         const exportData = {
-            notes: this.data.notes,
+            notes: sanitizedNotes,
             ai_conversations: this.data.ai_conversations,
             tags: this.data.tags,
             note_tags: this.data.note_tags,
@@ -810,10 +1006,16 @@ class DatabaseManager {
             }
         };
 
+        // Log collaboration data being exported for debugging
+        const sharedNotes = Object.values(sanitizedNotes).filter(n => n.collaboration?.is_shared);
+        if (sharedNotes.length > 0) {
+            console.log(`[Database] Exporting ${sharedNotes.length} shared note(s) with collaboration data`);
+        }
+
         // Calculate checksum based on content only (exclude sync state and timestamp metadata)
         // This ensures checksum consistency across devices when content hasn't changed
         const contentOnlyData = {
-            notes: this.data.notes,
+            notes: sanitizedNotes,
             ai_conversations: this.data.ai_conversations,
             tags: this.data.tags,
             note_tags: this.data.note_tags,
@@ -866,23 +1068,33 @@ class DatabaseManager {
             // Preserve local sync settings that should not be overridden by remote
             const localSyncSettings = { ...(this.data && this.data.sync ? this.data.sync : {}) };
 
-            // Apply sync data
-            if (options.mergeStrategy === 'replace') {
-                // Complete replacement but preserve local-only data (settings, encryption)
-                const preservedSettings = { ...(this.data.settings || {}) };
-                const preservedEncryption = { ...(this.data.encryption || {}) };
-                this.data = importData;
-                // Restore preserved local-only fields
-                this.data.settings = preservedSettings;
-                this.data.encryption = preservedEncryption;
-            } else {
-                // Merge strategy (default)
-                this.mergeSyncData(importData, options);
-            }
+            // Create a backup of current data before applying changes (for rollback on error)
+            const dataBackup = JSON.parse(JSON.stringify(this.data));
 
-            // Update sync metadata if provided
-            if (syncData.syncMetadata) {
-                this.updateSyncMetadata(syncData.syncMetadata);
+            try {
+                // Apply sync data
+                if (options.mergeStrategy === 'replace') {
+                    // Complete replacement but preserve local-only data (settings, encryption)
+                    const preservedSettings = { ...(this.data.settings || {}) };
+                    const preservedEncryption = { ...(this.data.encryption || {}) };
+                    this.data = importData;
+                    // Restore preserved local-only fields
+                    this.data.settings = preservedSettings;
+                    this.data.encryption = preservedEncryption;
+                } else {
+                    // Merge strategy (default)
+                    this.mergeSyncData(importData, options);
+                }
+
+                // Update sync metadata if provided
+                if (syncData.syncMetadata) {
+                    this.updateSyncMetadata(syncData.syncMetadata);
+                }
+            } catch (applyError) {
+                // Restore backup if an error occurred during data application
+                console.error('[Database] Error during sync data application, restoring backup:', applyError);
+                this.data = dataBackup;
+                throw new Error(`Failed to apply sync data: ${applyError.message}`);
             }
 
             // Restore local sync controls and metadata (do not let remote toggle your sync settings)
@@ -910,6 +1122,12 @@ class DatabaseManager {
             }
 
             this.saveToLocalStorage();
+
+            // Log collaboration data that was imported
+            const importedSharedNotes = Object.values(importData.notes).filter(n => n.collaboration?.is_shared);
+            if (importedSharedNotes.length > 0) {
+                console.log(`[Database] Imported ${importedSharedNotes.length} shared note(s) with collaboration data`);
+            }
 
             return {
                 success: true,
@@ -975,27 +1193,111 @@ class DatabaseManager {
                     const localTime = new Date(localNote.updated_at || localNote.created_at);
                     const remoteTime = new Date(remoteNote.updated_at || remoteNote.created_at);
 
+                    // Check if collaboration data differs (important for share revocation)
+                    const localCollaboration = localNote.collaboration || {};
+                    const remoteCollaboration = remoteNote.collaboration || {};
+                    const collaborationChanged = JSON.stringify(localCollaboration.google_drive_file_id) !== JSON.stringify(remoteCollaboration.google_drive_file_id) ||
+                                                JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
+
                     if (remoteTime > localTime) {
-                        // Remote is newer
+                        // Remote is newer - use remote note completely, including its collaboration state
+                        // This ensures revocations and updates sync properly
                         this.data.notes[noteId] = { ...remoteNote };
+                    } else if (localTime > remoteTime) {
+                        // Local is newer - keep local content but merge collaboration data if remote revoked
+                        // This ensures share revocations sync even when local content is newer
+                        if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                            // Remote revoked the share - update collaboration data even though local is newer
+                            if (!this.data.notes[noteId].collaboration) {
+                                this.data.notes[noteId].collaboration = {};
+                            }
+                            this.data.notes[noteId].collaboration.is_shared = false;
+                            this.data.notes[noteId].collaboration.google_drive_file_id = null;
+                            this.data.notes[noteId].collaboration.google_drive_share_link = null;
+                        }
+                        // Keep local note (it's already in place)
+                    } else {
+                        // Same timestamp - merge collaboration data if it changed
+                        if (collaborationChanged) {
+                            if (remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
+                                // Remote revoked the share
+                                if (!this.data.notes[noteId].collaboration) {
+                                    this.data.notes[noteId].collaboration = {};
+                                }
+                                this.data.notes[noteId].collaboration.is_shared = false;
+                                this.data.notes[noteId].collaboration.google_drive_file_id = null;
+                                this.data.notes[noteId].collaboration.google_drive_share_link = null;
+                            } else if (remoteCollaboration.google_drive_file_id && remoteCollaboration.is_shared) {
+                                // Remote shared the note
+                                if (!this.data.notes[noteId].collaboration) {
+                                    this.data.notes[noteId].collaboration = {};
+                                }
+                                this.data.notes[noteId].collaboration.is_shared = remoteCollaboration.is_shared;
+                                this.data.notes[noteId].collaboration.google_drive_file_id = remoteCollaboration.google_drive_file_id;
+                                this.data.notes[noteId].collaboration.google_drive_share_link = remoteCollaboration.google_drive_share_link;
+                            }
+                        }
+                        // Keep local note (it's already in place)
                     }
-                    // If local is newer or same time, keep local
                 }
             }
         }
 
-        // Merge other data types (keep local versions for settings, tags, etc.)
-        // This is a simplified approach - you might want more sophisticated merging
+        // Merge other data types - respect local deletions
+        // Local state is the source of truth for deletions
+        
         if (remoteData.ai_conversations && options.mergeConversations) {
-            Object.assign(this.data.ai_conversations, remoteData.ai_conversations);
+            // Only add remote conversations that don't exist locally
+            // This respects local deletions (if user cleared conversations)
+            const existingNoteIds = new Set(Object.keys(this.data.notes));
+            
+            for (const [convId, remoteConv] of Object.entries(remoteData.ai_conversations)) {
+                // Only add if:
+                // 1. Conversation doesn't exist locally (new from remote)
+                // 2. Associated note still exists
+                const noteExists = !remoteConv.note_id || existingNoteIds.has(remoteConv.note_id);
+                if (!this.data.ai_conversations[convId] && noteExists) {
+                    this.data.ai_conversations[convId] = remoteConv;
+                }
+            }
         }
 
         if (remoteData.tags && options.mergeTags) {
-            Object.assign(this.data.tags, remoteData.tags);
+            // Only add remote tags that are actually used in notes or already exist locally
+            // This prevents re-adding tags that were intentionally deleted
+            const usedTagIds = new Set();
+            
+            // Check which tags are currently used
+            Object.values(this.data.notes).forEach(note => {
+                if (note.tags && Array.isArray(note.tags)) {
+                    note.tags.forEach(tagId => usedTagIds.add(tagId));
+                }
+            });
+            Object.values(this.data.note_tags).forEach(noteTag => {
+                if (noteTag.tag_id) usedTagIds.add(noteTag.tag_id);
+            });
+            
+            // Only merge tags that exist locally or are used in notes
+            for (const [tagId, remoteTag] of Object.entries(remoteData.tags)) {
+                if (this.data.tags[tagId] || usedTagIds.has(tagId)) {
+                    this.data.tags[tagId] = remoteTag;
+                }
+            }
         }
 
         if (remoteData.note_tags && options.mergeTags) {
-            Object.assign(this.data.note_tags, remoteData.note_tags);
+            // Only add remote note_tags if the note still exists
+            // This prevents orphaned tag associations
+            const existingNoteIds = new Set(Object.keys(this.data.notes));
+            
+            for (const [noteTagKey, remoteNoteTag] of Object.entries(remoteData.note_tags)) {
+                if (existingNoteIds.has(remoteNoteTag.note_id)) {
+                    // Only add if not already present locally
+                    if (!this.data.note_tags[noteTagKey]) {
+                        this.data.note_tags[noteTagKey] = remoteNoteTag;
+                    }
+                }
+            }
         }
     }
 

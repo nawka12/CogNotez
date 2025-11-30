@@ -19,7 +19,7 @@ class NotesManager {
         }
     }
 
-    async renderNotesList(searchQuery = '') {
+    async renderNotesList(searchQuery = '', folderFilter = null) {
         try {
             let notes;
             if (this.db && this.db.initialized) {
@@ -35,11 +35,17 @@ class NotesManager {
                 console.log('[DEBUG] NotesManager.renderNotesList got', notes.length, 'notes from localStorage fallback');
             }
 
+            // Apply folder/tag filter
+            if (folderFilter) {
+                notes = this.filterNotesByFolder(notes, folderFilter);
+                console.log('[DEBUG] After folder filter:', notes.length, 'notes for folder:', folderFilter);
+            }
+
             this.currentNotes = notes;
             this.notesListElement.innerHTML = '';
 
             if (notes.length === 0) {
-                this.renderEmptyState();
+                this.renderEmptyState(folderFilter);
                 return;
             }
 
@@ -47,9 +53,73 @@ class NotesManager {
                 const noteElement = this.createNoteElement(note);
                 this.notesListElement.appendChild(noteElement);
             });
+            
+            // Update folder counts after rendering
+            this.updateFolderCounts();
         } catch (error) {
             console.error('Error rendering notes list:', error);
-            this.renderEmptyState();
+            this.renderEmptyState(folderFilter);
+        }
+    }
+
+    // Filter notes by folder (tag or special folder)
+    filterNotesByFolder(notes, folderFilter) {
+        if (!folderFilter || folderFilter === 'all') {
+            return notes;
+        }
+
+        if (folderFilter === 'untagged') {
+            return notes.filter(note => !note.tags || note.tags.length === 0);
+        }
+
+        // Filter by specific tag ID
+        return notes.filter(note => note.tags && note.tags.includes(folderFilter));
+    }
+
+    // Update folder counts in the sidebar
+    async updateFolderCounts() {
+        try {
+            let allNotes;
+            if (this.db && this.db.initialized) {
+                allNotes = await this.db.getAllNotes();
+            } else {
+                allNotes = this.getNotesFromLocalStorage();
+            }
+
+            // Update "All Notes" count
+            const allCountEl = document.getElementById('folder-count-all');
+            if (allCountEl) {
+                allCountEl.textContent = allNotes.length;
+            }
+
+            // Update "Untagged" count
+            const untaggedCountEl = document.getElementById('folder-count-untagged');
+            if (untaggedCountEl) {
+                const untaggedCount = allNotes.filter(note => !note.tags || note.tags.length === 0).length;
+                untaggedCountEl.textContent = untaggedCount;
+            }
+
+            // Update tag folder counts
+            const tagCounts = {};
+            allNotes.forEach(note => {
+                if (note.tags && note.tags.length > 0) {
+                    note.tags.forEach(tagId => {
+                        tagCounts[tagId] = (tagCounts[tagId] || 0) + 1;
+                    });
+                }
+            });
+
+            // Update each tag folder count element
+            Object.entries(tagCounts).forEach(([tagId, count]) => {
+                const countEl = document.querySelector(`.tag-folder-item[data-tag-id="${tagId}"] .tag-folder-count`);
+                if (countEl) {
+                    countEl.textContent = count;
+                }
+            });
+
+            return { total: allNotes.length, tagCounts };
+        } catch (error) {
+            console.error('Error updating folder counts:', error);
         }
     }
 
@@ -60,6 +130,10 @@ class NotesManager {
 
         if (this.app.currentNote && this.app.currentNote.id === note.id) {
             element.classList.add('active');
+        }
+
+        if (note.pinned) {
+            element.classList.add('pinned');
         }
 
         // Generate tags HTML if tags exist
@@ -79,14 +153,22 @@ class NotesManager {
             tagsHtml += '</div>';
         }
 
+        const passwordProtectedTitle = window.i18n ? window.i18n.t('notes.passwordProtected') : 'Password protected';
+        const pinTitle = note.pinned ? (window.i18n ? window.i18n.t('notes.unpinNote') : 'Unpin note') : (window.i18n ? window.i18n.t('notes.pinNote') : 'Pin note');
+        const deleteTitle = window.i18n ? window.i18n.t('notes.deleteNote') : 'Delete note';
+        
         element.innerHTML = `
             <div class="note-item-content">
-                <div class="note-item-title">${this.escapeHtml(note.title)}</div>
-                <div class="note-item-preview">${this.escapeHtml(note.preview)}</div>
+                <div class="note-item-title">
+                    ${note.password_protected ? `<i class="fas fa-lock note-lock-icon" title="${passwordProtectedTitle}"></i>` : ''}
+                    ${this.escapeHtml(note.title)}
+                </div>
+                <div class="note-item-preview">${this.escapeHtml(note.password_protected ? '' : (note.preview || ''))}</div>
                 ${tagsHtml}
-                <div class="note-item-date">${new Date(note.modified).toLocaleDateString()}</div>
+                <div class="note-item-date">${this.app.formatLocalizedDateTime(note.modified, false)}</div>
             </div>
-            <button class="note-delete-btn" data-note-id="${note.id}" title="Delete note"><i class="fas fa-trash"></i></button>
+            <button class="note-pin-btn ${note.pinned ? 'pinned' : ''}" data-note-id="${note.id}" title="${pinTitle}"><i class="fas fa-thumbtack"></i></button>
+            <button class="note-delete-btn" data-note-id="${note.id}" title="${deleteTitle}"><i class="fas fa-trash"></i></button>
         `;
 
         // Note selection is now handled by the app.js delegate event listener
@@ -99,17 +181,40 @@ class NotesManager {
             this.deleteNote(note.id);
         });
 
+        // Pin button functionality
+        const pinBtn = element.querySelector('.note-pin-btn');
+        pinBtn.addEventListener('click', (e) => {
+            e.stopPropagation(); // Prevent triggering the note selection
+            this.togglePinNote(note.id);
+        });
+
         return element;
     }
 
-    renderEmptyState() {
+    renderEmptyState(folderFilter = null) {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
+        
+        let icon = 'fa-sticky-note';
+        let title = 'No notes yet';
+        let subtitle = 'Click the + button to create your first note';
+
+        if (folderFilter === 'untagged') {
+            icon = 'fa-file-alt';
+            title = 'No untagged notes';
+            subtitle = 'All your notes have been organized with tags';
+        } else if (folderFilter && folderFilter !== 'all') {
+            icon = 'fa-folder-open';
+            const tagName = this.getTagName(folderFilter);
+            title = `No notes in "${tagName}"`;
+            subtitle = 'Add this tag to notes to see them here';
+        }
+
         emptyState.innerHTML = `
             <div style="text-align: center; padding: 40px 20px; color: var(--text-tertiary);">
-                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas fa-sticky-note"></i></div>
-                <div style="font-size: 16px; margin-bottom: 8px;">No notes yet</div>
-                <div style="font-size: 14px;">Click the + button to create your first note</div>
+                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas ${icon}"></i></div>
+                <div style="font-size: 16px; margin-bottom: 8px;">${title}</div>
+                <div style="font-size: 14px;">${subtitle}</div>
             </div>
         `;
         this.notesListElement.appendChild(emptyState);
@@ -128,10 +233,16 @@ class NotesManager {
                 const tag = this.db.data.tags[tagId];
                 return tag ? tag.name : tagId;
             } else {
-                // Fallback: try to find in app's notes data
+                // Fallback: check if we have tag data from fallback loading
+                if (this.db && this.db.data && this.db.data.tags) {
+                    const tag = this.db.data.tags[tagId];
+                    return tag ? tag.name : tagId;
+                }
+
+                // Final fallback: try to find in app's notes data
                 for (const note of this.app.notes || []) {
                     if (note.tags && note.tags.includes(tagId)) {
-                        // For now, return the tagId itself as we don't have tag names in localStorage
+                        // Return the tagId itself as we don't have tag names in old localStorage format
                         return tagId;
                     }
                 }
@@ -161,6 +272,22 @@ class NotesManager {
         try {
             const savedNotes = localStorage.getItem('notes');
             const notes = savedNotes ? JSON.parse(savedNotes) : [];
+
+            // Load tag data for fallback compatibility
+            const tagDataString = localStorage.getItem('cognotez_fallback_tags');
+            if (tagDataString) {
+                try {
+                    const tagData = JSON.parse(tagDataString);
+                    if (this.db && !this.db.initialized) {
+                        // Initialize minimal tag data structure for fallback
+                        this.db.data = this.db.data || {};
+                        this.db.data.tags = tagData.tags || {};
+                        this.db.data.note_tags = tagData.note_tags || {};
+                    }
+                } catch (tagError) {
+                    console.warn('Error loading tag data from localStorage:', tagError);
+                }
+            }
 
             // Synchronize with main app's notes array
             this.app.notes = notes;
@@ -207,8 +334,16 @@ class NotesManager {
                 const note = await this.db.getNote(noteId);
                 if (!note) return;
 
-                if (confirm(`Delete "${note.title}"? This action cannot be undone.`)) {
+                // Use custom modal instead of native confirm() to avoid focus/rendering issues
+                const shouldDelete = await this.showDeleteConfirmation(note.title);
+                
+                if (shouldDelete) {
                     await this.db.deleteNote(noteId);
+
+                    // Close any open tab for this note
+                    if (this.app && typeof this.app.closeTab === 'function') {
+                        this.app.closeTab(noteId, true);
+                    }
 
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
                         this.app.currentNote = null;
@@ -216,7 +351,13 @@ class NotesManager {
                         this.app.showNoNotePlaceholder();
                     }
 
-                    await this.renderNotesList();
+                    await this.renderNotesList('', this.app.currentFolder);
+                    
+                    // Update folder counts
+                    await this.app.renderTagFolders();
+                    
+                    // Force a reflow/repaint to ensure UI is responsive
+                    this.forceReflow();
                 }
             } else {
                 // Fallback to localStorage
@@ -224,8 +365,17 @@ class NotesManager {
                 if (index === -1) return;
 
                 const note = this.app.notes[index];
-                if (confirm(`Delete "${note.title}"? This action cannot be undone.`)) {
+                
+                // Use custom modal instead of native confirm() to avoid focus/rendering issues
+                const shouldDelete = await this.showDeleteConfirmation(note.title);
+                
+                if (shouldDelete) {
                     this.app.notes.splice(index, 1);
+
+                    // Close any open tab for this note
+                    if (this.app && typeof this.app.closeTab === 'function') {
+                        this.app.closeTab(noteId, true);
+                    }
 
                     if (this.app.currentNote && this.app.currentNote.id === noteId) {
                         this.app.currentNote = null;
@@ -234,12 +384,91 @@ class NotesManager {
                     }
 
                     this.app.saveNotes();
-                    this.renderNotesList();
+                    this.renderNotesList('', this.app.currentFolder);
+                    
+                    // Update folder counts
+                    this.app.renderTagFolders();
+                    
+                    // Force a reflow/repaint to ensure UI is responsive
+                    this.forceReflow();
                 }
             }
         } catch (error) {
             console.error('Error deleting note:', error);
         }
+    }
+
+    // Show delete confirmation using custom modal (avoids native confirm() focus issues)
+    showDeleteConfirmation(noteTitle) {
+        return new Promise((resolve) => {
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const deleteTitle = t('notes.deleteNoteTitle');
+            const deleteWarning = t('notes.deleteNoteWarning');
+            const deleteButtonText = t('notes.deleteButton');
+            const cancelButtonText = t('modals.cancel');
+
+            // Escape title and wrap in strong tags for the message
+            const escapedTitle = this.app.escapeHtml(noteTitle);
+            const formattedTitle = `<strong>${escapedTitle}</strong>`;
+            // Get translated message and replace {{title}} with formatted version
+            const deleteMessageTemplate = t('notes.deleteNoteMessage', { title: noteTitle });
+            const deleteMessage = deleteMessageTemplate.replace(/\{\{title\}\}/g, formattedTitle);
+
+            const content = `
+                <div style="padding: 10px 0;">
+                    <p style="margin: 0 0 20px 0; color: var(--text-primary);">
+                        ${deleteMessage}
+                    </p>
+                    <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
+                        ${deleteWarning}
+                    </p>
+                </div>
+            `;
+
+            const modal = this.app.createModal(deleteTitle, content, [
+                { text: deleteButtonText, type: 'primary', action: 'delete', callback: () => resolve(true) },
+                { text: cancelButtonText, type: 'secondary', action: 'cancel', callback: () => resolve(false) }
+            ]);
+
+            // Also handle clicking outside or pressing Escape
+            modal.addEventListener('click', (e) => {
+                if (e.target === modal) {
+                    resolve(false);
+                }
+            });
+
+            // Handle escape key
+            const handleEscape = (e) => {
+                if (e.key === 'Escape') {
+                    document.removeEventListener('keydown', handleEscape);
+                    resolve(false);
+                }
+            };
+            document.addEventListener('keydown', handleEscape);
+        });
+    }
+
+    // Force browser reflow to fix rendering/focus issues (fixes bug where DevTools reopen was needed)
+    forceReflow() {
+        // Trigger a forced reflow by reading offsetHeight
+        const body = document.body;
+        void body.offsetHeight;
+        
+        // Also ensure focus is properly managed
+        setTimeout(() => {
+            // Clear any stuck focus
+            if (document.activeElement && document.activeElement.tagName !== 'BODY') {
+                const activeEl = document.activeElement;
+                // Only blur if it's not a text input we want to keep focused
+                if (!activeEl.matches('input[type="text"], textarea')) {
+                    activeEl.blur();
+                }
+            }
+            
+            // Re-enable event propagation by forcing a focus cycle
+            document.body.focus();
+            document.body.blur();
+        }, 50);
     }
 
     async duplicateNote(noteId) {
@@ -256,27 +485,76 @@ class NotesManager {
             const duplicate = {
                 id: Date.now().toString(),
                 title: `${originalNote.title} (Copy)`,
-                content: originalNote.content,
-                preview: originalNote.preview || '',
+                content: originalNote.password_protected ? '' : originalNote.content,
+                preview: originalNote.password_protected ? '' : (originalNote.preview || ''),
                 tags: originalNote.tags || [],
-                category: originalNote.category
+                category: originalNote.category,
+                password_protected: originalNote.password_protected || false,
+                password_hash: originalNote.password_hash || null,
+                encrypted_content: originalNote.encrypted_content || null
             };
 
             if (this.db && this.db.initialized) {
                 await this.db.createNote(duplicate);
-                await this.renderNotesList();
+                await this.renderNotesList('', this.app.currentFolder);
                 const newNote = await this.db.getNote(duplicate.id);
                 this.app.displayNote(newNote);
+                await this.app.renderTagFolders();
             } else {
                 duplicate.created = new Date();
                 duplicate.modified = new Date();
                 this.app.notes.unshift(duplicate);
                 this.app.saveNotes();
-                this.renderNotesList();
+                this.renderNotesList('', this.app.currentFolder);
                 this.app.displayNote(duplicate);
+                this.app.renderTagFolders();
             }
         } catch (error) {
             console.error('Error duplicating note:', error);
+        }
+    }
+
+    async togglePinNote(noteId) {
+        try {
+            let note;
+            let allNotes;
+
+            if (this.db && this.db.initialized) {
+                note = await this.db.getNote(noteId);
+                allNotes = await this.db.getAllNotes();
+            } else {
+                note = this.app.notes.find(n => n.id === noteId);
+                allNotes = this.app.notes;
+            }
+
+            if (!note) return;
+
+            const currentlyPinned = note.pinned || false;
+            const pinnedCount = allNotes.filter(n => n.pinned).length;
+
+            if (!currentlyPinned && pinnedCount >= 3) {
+                // Cannot pin more than 3 notes
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                const pinLimitTitle = t('notes.pinLimitReached');
+                const pinLimitMessage = t('notes.pinLimitMessage');
+                await this.app.showAlert(pinLimitTitle, pinLimitMessage);
+                return;
+            }
+
+            // Toggle the pinned status
+            const newPinnedStatus = !currentlyPinned;
+
+            if (this.db && this.db.initialized) {
+                await this.db.updateNote(noteId, { pinned: newPinnedStatus });
+            } else {
+                note.pinned = newPinnedStatus;
+                this.app.saveNotes();
+            }
+
+            // Re-render the notes list to reflect the change
+            await this.renderNotesList('', this.app.currentFolder);
+        } catch (error) {
+            console.error('Error toggling pin status:', error);
         }
     }
 
@@ -301,17 +579,28 @@ class NotesManager {
     }
 
     sortNotes(criteria = 'modified') {
-        switch (criteria) {
-            case 'modified':
-                this.app.notes.sort((a, b) => new Date(b.modified) - new Date(a.modified));
-                break;
-            case 'created':
-                this.app.notes.sort((a, b) => new Date(b.created) - new Date(a.created));
-                break;
-            case 'title':
-                this.app.notes.sort((a, b) => a.title.localeCompare(b.title));
-                break;
-        }
+        const sortFunction = (a, b) => {
+            // Pinned notes always come first
+            const aPinned = a.pinned || false;
+            const bPinned = b.pinned || false;
+
+            if (aPinned && !bPinned) return -1;
+            if (!aPinned && bPinned) return 1;
+
+            // Within pinned or unpinned groups, sort by the specified criteria
+            switch (criteria) {
+                case 'modified':
+                    return new Date(b.modified) - new Date(a.modified);
+                case 'created':
+                    return new Date(b.created) - new Date(a.created);
+                case 'title':
+                    return a.title.localeCompare(b.title);
+                default:
+                    return new Date(b.modified) - new Date(a.modified);
+            }
+        };
+
+        this.app.notes.sort(sortFunction);
         this.renderNotesList();
     }
 
@@ -428,6 +717,20 @@ class NotesManager {
             existingMenu.remove();
         }
 
+        // Get the note to check if it's pinned
+        let note;
+        if (this.db && this.db.initialized) {
+            note = this.db.getNote(noteId);
+        } else {
+            note = this.app.notes.find(n => n.id === noteId);
+        }
+
+        const isPinned = note ? (note.pinned || false) : false;
+        const pinText = isPinned ? 'Unpin' : 'Pin';
+
+        const isPasswordProtected = note ? (note.password_protected || false) : false;
+        const passwordText = isPasswordProtected ? 'Remove Password' : 'Add Password';
+
         const menu = document.createElement('div');
         menu.className = 'note-context-menu context-menu';
         menu.style.left = x + 'px';
@@ -435,6 +738,8 @@ class NotesManager {
 
         menu.innerHTML = `
             <div class="context-menu-item" data-action="open">Open</div>
+            <div class="context-menu-item" data-action="password">${passwordText}</div>
+            <div class="context-menu-item" data-action="pin">${pinText}</div>
             <div class="context-menu-item" data-action="duplicate">Duplicate</div>
             <div class="context-menu-item" data-action="export">Export</div>
             <div class="context-menu-item" data-action="delete" style="color: #dc3545;">Delete</div>
@@ -465,6 +770,12 @@ class NotesManager {
             case 'open':
                 this.app.switchToNoteWithWarning(noteId);
                 break;
+            case 'password':
+                this.handlePasswordProtection(noteId);
+                break;
+            case 'pin':
+                this.togglePinNote(noteId);
+                break;
             case 'duplicate':
                 this.duplicateNote(noteId);
                 break;
@@ -479,6 +790,29 @@ class NotesManager {
                 this.deleteNote(noteId);
                 break;
         }
+    }
+
+    async handlePasswordProtection(noteId) {
+        let note;
+        if (this.db && this.db.initialized) {
+            note = await this.db.getNote(noteId);
+        } else {
+            note = this.app.notes.find(n => n.id === noteId);
+        }
+
+        if (!note) return;
+
+        // Store the current note temporarily
+        const currentNote = this.app.currentNote;
+
+        // Switch to the note to enable password management
+        this.app.currentNote = note;
+        this.app.displayNote(note);
+
+        // Show password protection dialog
+        this.app.showPasswordProtectionDialog();
+
+        // Note: The dialog will handle updating the UI and refreshing the notes list
     }
 }
 

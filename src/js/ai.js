@@ -5,7 +5,7 @@ class AIManager {
         // Backend configurations
         this.backend = 'ollama'; // 'ollama' or 'openrouter'
         this.ollamaEndpoint = 'http://localhost:11434'; // Default Ollama endpoint
-        this.ollamaModel = 'llama2'; // Default Ollama model
+        this.ollamaModel = 'llama3.2:latest'; // Default Ollama model (supports tool calling)
         this.openRouterApiKey = ''; // OpenRouter API key
         this.openRouterModel = 'openai/gpt-4o-mini'; // Default OpenRouter model (better at tool calling)
         this.searxngUrl = 'http://localhost:8080'; // Default SearXNG instance URL
@@ -282,8 +282,8 @@ class AIManager {
     async _doInitialize() {
         try {
             // Initialize AI edit approval system first
-            if (typeof AIEditApproval !== 'undefined') {
-                this.editApproval = new AIEditApproval(this.app);
+            if (typeof window.AIEditApproval !== 'undefined') {
+                this.editApproval = new window.AIEditApproval(this.app);
                 this.editApproval.initialize();
                 console.log('[DEBUG] AI Manager: Edit approval system initialized');
             } else {
@@ -332,16 +332,28 @@ class AIManager {
                 if (savedSearxngMaxResults) this.searxngMaxResults = parseInt(savedSearxngMaxResults);
             }
 
-            console.log('[DEBUG] AI Manager: Checking connection...');
-            await this.checkConnection();
-            console.log('[DEBUG] AI Manager: Loading available models...');
-            await this.loadAvailableModels();
-            console.log('[DEBUG] AI Manager: AI service initialized successfully');
+            // Quick offline check to avoid slow timeouts during startup
+            if (!navigator.onLine) {
+                console.log('[DEBUG] AI Manager: Device is offline, skipping connection check');
+                this.isConnected = false;
+                return false;
+            }
 
-            return true;
+            console.log('[DEBUG] AI Manager: Checking connection...');
+            try {
+                await this.checkConnection();
+                console.log('[DEBUG] AI Manager: Loading available models...');
+                await this.loadAvailableModels();
+                console.log('[DEBUG] AI Manager: AI service initialized successfully');
+                return true;
+            } catch (error) {
+                console.warn('[DEBUG] AI Manager: AI connection failed:', error.message);
+                this.isConnected = false;
+                return false;
+            }
         } catch (error) {
             console.warn('[DEBUG] AI Manager: AI service not available:', error.message);
-            this.showOfflineMessage();
+            this.isConnected = false;
             return false;
         }
     }
@@ -363,7 +375,7 @@ class AIManager {
     async checkOllamaConnection() {
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+            const timeoutId = setTimeout(() => controller.abort(), 2000); // 2 second timeout for faster startup
 
             const response = await fetch(`${this.ollamaEndpoint}/api/tags`, {
                 signal: controller.signal,
@@ -383,7 +395,10 @@ class AIManager {
         } catch (error) {
             this.isConnected = false;
             if (error.name === 'AbortError') {
-                throw new Error('Connection timeout - Ollama may not be running');
+                throw new Error('Connection timeout - Ollama is not responding. Please start Ollama using "ollama serve" or check if it\'s running on a different port.');
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error(`Cannot reach Ollama at ${this.ollamaEndpoint}. Please ensure:\n1. Ollama is installed and running ("ollama serve")\n2. The endpoint URL is correct\n3. No firewall is blocking the connection`);
             }
             throw new Error(`Cannot connect to Ollama service: ${error.message}`);
         }
@@ -391,12 +406,12 @@ class AIManager {
 
     async checkOpenRouterConnection() {
         if (!this.openRouterApiKey || this.openRouterApiKey.trim() === '') {
-            throw new Error('OpenRouter API key is required');
+            throw new Error('OpenRouter API key is required. Please add your API key in AI Settings.');
         }
 
         try {
             const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout for API
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout for faster startup
 
             const response = await fetch('https://openrouter.ai/api/v1/models', {
                 signal: controller.signal,
@@ -412,14 +427,17 @@ class AIManager {
                 this.isConnected = true;
                 return true;
             } else if (response.status === 401) {
-                throw new Error('Invalid OpenRouter API key');
+                throw new Error('Invalid OpenRouter API key. Please check your API key in AI Settings.');
             } else {
                 throw new Error(`OpenRouter API responded with status: ${response.status}`);
             }
         } catch (error) {
             this.isConnected = false;
             if (error.name === 'AbortError') {
-                throw new Error('Connection timeout - OpenRouter API may be unavailable');
+                throw new Error('Connection timeout - Check your internet connection or OpenRouter service may be temporarily unavailable.');
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error('No internet connection. OpenRouter requires an active internet connection to function.');
             }
             throw new Error(`Cannot connect to OpenRouter API: ${error.message}`);
         }
@@ -496,11 +514,30 @@ class AIManager {
     }
 
     showOfflineMessage() {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         let message = '';
         if (this.backend === 'ollama') {
-            message = '🤖 AI features are currently offline. Please ensure Ollama is running locally.';
+            const fallback = `🤖 AI features are currently offline.
+
+**To use Ollama:**
+1. Install Ollama from https://ollama.com
+2. Start Ollama by running "ollama serve" in terminal
+3. Pull a model: "ollama pull llama2"
+4. Verify it's running at ${this.ollamaEndpoint}
+
+**Alternative:** Switch to OpenRouter in AI Settings for cloud-based AI (requires internet).`;
+            message = window.i18n ? window.i18n.t('ai.offlineOllama', { endpoint: this.ollamaEndpoint }) : fallback;
         } else if (this.backend === 'openrouter') {
-            message = '🤖 AI features are currently offline. Please check your OpenRouter API key and internet connection.';
+            const fallback = `🤖 AI features are currently offline.
+
+**To use OpenRouter:**
+1. Ensure you have an active internet connection
+2. Get an API key from https://openrouter.ai
+3. Add your API key in AI Settings
+4. Test the connection
+
+**Alternative:** Switch to Ollama in AI Settings for local AI (works offline).`;
+            message = window.i18n ? window.i18n.t('ai.offlineOpenRouter', {}) : fallback;
         }
         this.app.showAIMessage(message, 'assistant');
     }
@@ -561,12 +598,23 @@ class AIManager {
 
     // OpenRouter settings
     async updateOpenRouterApiKey(newApiKey) {
+        const oldApiKey = this.openRouterApiKey;
+        const keyChanged = oldApiKey !== newApiKey;
+        
         this.openRouterApiKey = newApiKey;
         await this.saveSettings();
-        if (this.backend === 'openrouter') {
+        
+        // If API key changed, return true to indicate restart is needed
+        // Restart is needed even if clearing the key, as it affects app initialization
+        if (keyChanged) {
+            console.log('[AIManager] OpenRouter API key changed, restart will be triggered');
+        } else if (this.backend === 'openrouter') {
+            // Only check connection if key didn't change (to avoid unnecessary API calls before restart)
             await this.checkConnection();
             await this.loadAvailableModels();
         }
+        
+        return keyChanged; // Return true if restart is needed
     }
 
     async updateOpenRouterModel(newModel) {
@@ -724,7 +772,7 @@ class AIManager {
     // SearXNG web search functionality
     async searchWithSearxng(query, options = {}) {
         if (!this.searxngEnabled) {
-            throw new Error('SearXNG is not enabled');
+            throw new Error('SearXNG is not enabled. Enable it in AI Settings to use web search.');
         }
 
         try {
@@ -736,13 +784,19 @@ class AIManager {
             searchUrl.searchParams.set('language', 'en');
             searchUrl.searchParams.set('safesearch', '1');
 
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000);
+
             const response = await fetch(searchUrl.toString(), {
                 method: 'GET',
+                signal: controller.signal,
                 headers: {
                     'Accept': 'application/json',
                     'User-Agent': 'CogNotez/1.0'
                 }
             });
+
+            clearTimeout(timeoutId);
 
             if (!response.ok) {
                 throw new Error(`SearXNG search failed: ${response.status}`);
@@ -772,7 +826,13 @@ class AIManager {
 
         } catch (error) {
             console.error('SearXNG search error:', error);
-            throw new Error(`Failed to search with SearXNG: ${error.message}`);
+            if (error.name === 'AbortError') {
+                throw new Error(`Web search timed out. SearXNG at ${this.searxngUrl} is not responding. Please check if it's running.`);
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error(`Cannot reach SearXNG for web search. Ensure SearXNG is running at ${this.searxngUrl} and accessible.`);
+            }
+            throw new Error(`Web search failed: ${error.message}. Check SearXNG configuration in AI Settings.`);
         }
     }
 
@@ -802,6 +862,12 @@ class AIManager {
             }
         } catch (error) {
             console.error('SearXNG connection check failed:', error);
+            if (error.name === 'AbortError') {
+                throw new Error(`SearXNG connection timeout. Please ensure:\n1. SearXNG is running at ${this.searxngUrl}\n2. The URL is correct\n3. No firewall is blocking access`);
+            }
+            if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+                throw new Error(`Cannot reach SearXNG at ${this.searxngUrl}. Please check if SearXNG is running and accessible.`);
+            }
             throw new Error(`Cannot connect to SearXNG: ${error.message}`);
         }
     }
@@ -853,12 +919,16 @@ class AIManager {
             }
         };
 
+        // Get abort signal from app if available
+        const abortSignal = this.app?.currentAIAbortController?.signal;
+
         const response = await fetch(`${this.ollamaEndpoint}/api/generate`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
         });
 
         if (!response.ok) {
@@ -952,6 +1022,9 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
             console.log(`⚠️ [INITIAL TOOLS] No tools available (SearXNG not connected or disabled)`);
         }
 
+        // Get abort signal from app if available
+        const abortSignal = this.app?.currentAIAbortController?.signal;
+
         const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
             method: 'POST',
             headers: {
@@ -960,7 +1033,8 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
                 'HTTP-Referer': 'https://cognotez.kayfahaarukku.com',
                 'X-Title': 'CogNotez'
             },
-            body: JSON.stringify(requestBody)
+            body: JSON.stringify(requestBody),
+            signal: abortSignal
         });
 
         if (!response.ok) {
@@ -1398,7 +1472,12 @@ Summary:`;
         // For Ollama backend, use tool calling if SearXNG is enabled, otherwise manual search
         if (this.backend === 'ollama') {
             if (this.searxngEnabled) {
-                return this.askQuestionWithOllamaToolCalling(question, context, options);
+                try {
+                    return await this.askQuestionWithOllamaToolCalling(question, context, options);
+                } catch (error) {
+                    console.warn('[DEBUG] Ollama tool calling failed, falling back to manual search:', error.message);
+                    return this.askQuestionWithManualSearch(question, context, options);
+                }
             } else {
                 return this.askQuestionWithManualSearch(question, context, options);
             }
@@ -1801,6 +1880,19 @@ Provide only the modified text without any additional explanations, comments, or
         });
     }
 
+    async generateContent(prompt, options = {}) {
+        const fullPrompt = `You are a helpful AI assistant for a note-taking application. Generate content based on the user's request.
+
+Request: ${prompt}
+
+Provide the generated content directly without any additional explanations, comments, or questions. Make it useful and well-formatted for a note-taking context.`;
+        return await this.processWithAI(fullPrompt, '', {
+            temperature: 0.7,
+            max_tokens: 4096,
+            ...options
+        });
+    }
+
 
     // Advanced AI features
     async rewriteText(text, style = 'professional', options = {}) {
@@ -1838,11 +1930,15 @@ Key Points:`;
     }
 
     async generateTags(text, options = {}) {
-        const prompt = `Analyze the following text and suggest the 3 most relevant and important tags that would help categorize and find this content. Focus on the most essential tags only.
+        // Include note title in the prompt if provided for better context
+        const titleContext = options.noteTitle ? `Note Title: "${options.noteTitle}"\n\n` : '';
+        
+        const prompt = `Analyze the following content and suggest the 3 most relevant and important tags that would help categorize and find this note. Focus on the most essential tags only.
 
-Provide exactly 3 tags (or fewer if the content doesn't warrant that many) as a comma-separated list:
-
+${titleContext}Content:
 ${text}
+
+Provide exactly 3 tags (or fewer if the content doesn't warrant that many) as a comma-separated list.
 
 Suggested tags:`;
         return await this.processWithAI(prompt, '', {
@@ -1873,7 +1969,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Summarizing content...');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.summarizingContent', 'Summarizing content...'));
             this.app.showLoading();
             const summary = await this.summarize(text);
             this.app.showAIMessage(`${summary}`, 'assistant');
@@ -1881,7 +1978,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage('❌ Failed to generate summary. Please check your AI connection.', 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.showAIMessage(t('ai.failedToGenerateSummary', '❌ Failed to generate summary. Please check your AI connection.'), 'assistant');
         } finally {
             this.app.hideLoading();
         }
@@ -1893,7 +1991,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Processing with AI...');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.processing', 'Processing with AI...'));
             this.app.showLoading();
             const answer = await this.askQuestion(question, context);
             this.app.showAIMessage(`${answer}`, 'assistant');
@@ -1901,7 +2000,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage('❌ Failed to get AI response. Please check your AI connection.', 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.showAIMessage(t('ai.failedToGetAIResponse', '❌ Failed to get AI response. Please check your AI connection.'), 'assistant');
         } finally {
             this.app.hideLoading();
         }
@@ -1924,13 +2024,20 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Editing text with AI...');
-            this.app.showLoading();
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.editingTextWithAI', 'Editing text with AI...'));
+            this.app.showLoading(null, true); // Show cancel button for AI operations
 
             console.log('[DEBUG] AI handleEditText: Starting with text:', text.substring(0, 50) + '...');
             console.log('[DEBUG] AI handleEditText: Instruction:', instruction);
 
             editedResult = await this.editText(text, instruction);
+
+            // Check if operation was cancelled before applying result
+            if (this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleEditText: Operation was cancelled, not applying result');
+                return;
+            }
 
             // Check if the result indicates tool failure
             if (editedResult && (
@@ -1940,17 +2047,30 @@ Suggested tags:`;
                 editedResult.includes('All scraping attempts failed')
             )) {
                 console.log('[DEBUG] AI handleEditText: Tool execution appears to have failed - showing fallback message');
-                this.app.showAIMessage('❌ Text editing failed due to tool execution issues. Please check your SearXNG connection and try again.', 'assistant');
+                this.app.showAIMessage(t('ai.editFailedToolExecution', '❌ Text editing failed due to tool execution issues. Please check your SearXNG connection and try again.'), 'assistant');
                 return;
             }
 
             console.log('[DEBUG] AI handleEditText: Got edited result:', editedResult.substring(0, 50) + '...');
 
             // Show approval interface instead of directly applying changes
+            // Ensure edit approval system is available (lazy-init if needed)
+            if (!this.editApproval && typeof window.AIEditApproval !== 'undefined') {
+                console.log('[DEBUG] AI handleEditText: Lazily initializing edit approval system');
+                this.editApproval = new window.AIEditApproval(this.app);
+                this.editApproval.initialize();
+            }
+
+            // Check again if operation was cancelled before showing approval dialog
+            if (this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleEditText: Operation was cancelled before showing approval dialog');
+                return;
+            }
+
             if (this.editApproval && editedResult) {
                 console.log('[DEBUG] AI handleEditText: Showing approval interface');
                 this.editApproval.showApprovalDialog(text, editedResult, instruction);
-                this.app.showAIMessage('✅ AI edit generated! Accept to apply or Reject to keep original.', 'assistant');
+                this.app.showAIMessage(t('ai.editGenerated', '✅ AI edit generated! Accept to apply or Reject to keep original.'), 'assistant');
             } else {
                 console.error('[DEBUG] AI handleEditText: Edit approval system not available');
 
@@ -1962,7 +2082,7 @@ Suggested tags:`;
                         if (this.editApproval && editedResult) {
                             console.log('[DEBUG] AI handleEditText: Reinitialization successful, showing approval dialog');
                             this.editApproval.showApprovalDialog(text, editedResult, instruction);
-                            this.app.showAIMessage('✅ AI edit generated! Please review the changes in the approval dialog.', 'assistant');
+                            this.app.showAIMessage(t('ai.editGeneratedReview', '✅ AI edit generated! Please review the changes in the approval dialog.'), 'assistant');
                             return;
                         }
                     } catch (reinitError) {
@@ -1971,19 +2091,130 @@ Suggested tags:`;
                 }
 
                 const errorMsg = this.editApproval ?
-                    '❌ Edit approval interface encountered an error. Please refresh the application.' :
-                    '❌ AI edit approval system not initialized. Please wait a moment and try again.';
+                    t('ai.editApprovalError', '❌ Edit approval interface encountered an error. Please refresh the application.') :
+                    t('ai.editApprovalNotInitialized', '❌ AI edit approval system not initialized. Please wait a moment and try again.');
                 this.app.showAIMessage(errorMsg, 'assistant');
             }
 
         } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('cancelled') || this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleEditText: Operation was cancelled');
+                return;
+            }
             console.error('[DEBUG] AI handleEditText error:', error);
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage(`❌ Failed to edit text: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const fallback = `❌ Failed to edit text: ${error.message}. Please check your AI connection and SearXNG setup.`;
+            const message = window.i18n ? window.i18n.t('ai.failedToEditText', { error: error.message }) : fallback;
+            this.app.showAIMessage(message, 'assistant');
         } finally {
             this.app.hideLoading();
+            this.app.isAIOperationCancelled = false; // Reset flag
+        }
+    }
+
+    async handleGenerateContent(prompt) {
+        let generatedResult = null;
+
+        try {
+            // Wait for AI manager initialization to complete
+            if (this.initializationPromise) {
+                console.log('[DEBUG] AI handleGenerateContent: Waiting for AI manager initialization...');
+                const initSuccess = await this.initializationPromise;
+                if (!initSuccess) {
+                    throw new Error('AI manager initialization failed');
+                }
+            }
+
+            // Ensure AI panel is visible
+            if (!this.app.aiPanelVisible) {
+                this.app.toggleAIPanel();
+            }
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.generatingContentWithAI', 'Generating content with AI...'));
+            this.app.showLoading(null, true); // Show cancel button for AI operations
+
+            console.log('[DEBUG] AI handleGenerateContent: Starting with prompt:', prompt);
+
+            generatedResult = await this.generateContent(prompt);
+
+            // Check if operation was cancelled before applying result
+            if (this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleGenerateContent: Operation was cancelled, not applying result');
+                return;
+            }
+
+            // Check if the result indicates tool failure
+            if (generatedResult && (
+                generatedResult.includes('Failed to scrape') ||
+                generatedResult.includes('Web scraper not available') ||
+                generatedResult.includes('Tool execution failed') ||
+                generatedResult.includes('All scraping attempts failed')
+            )) {
+                console.log('[DEBUG] AI handleGenerateContent: Tool execution appears to have failed - showing fallback message');
+                this.app.showAIMessage(t('ai.contentGenerationFailedToolExecution', '❌ Content generation failed due to tool execution issues. Please check your SearXNG connection and try again.'), 'assistant');
+                return;
+            }
+
+            console.log('[DEBUG] AI handleGenerateContent: Got generated result:', generatedResult.substring(0, 50) + '...');
+
+            // Show approval interface for generated content (insertion instead of replacement)
+            // For now, we'll use the same approval system but with insertion logic
+            if (!this.generateApproval && typeof window.AIGenerateApproval !== 'undefined') {
+                console.log('[DEBUG] AI handleGenerateContent: Lazily initializing generate approval system');
+                this.generateApproval = new window.AIGenerateApproval(this.app);
+                this.generateApproval.initialize();
+            }
+
+            if (this.generateApproval && generatedResult) {
+                console.log('[DEBUG] AI handleGenerateContent: Showing approval interface');
+                this.generateApproval.showApprovalDialog(generatedResult, prompt);
+                this.app.showAIMessage(t('ai.contentGenerated', '✅ AI content generated! Accept to insert or Reject to discard.'), 'assistant');
+            } else {
+                console.error('[DEBUG] AI handleGenerateContent: Generate approval system not available');
+
+                // Try to reinitialize if generate approval system is missing
+                if (!this.generateApproval) {
+                    console.log('[DEBUG] AI handleGenerateContent: Attempting to reinitialize AI manager...');
+                    try {
+                        await this.reinitialize();
+                        if (this.generateApproval && generatedResult) {
+                            console.log('[DEBUG] AI handleGenerateContent: Reinitialization successful, showing approval dialog');
+                            this.generateApproval.showApprovalDialog(generatedResult, prompt);
+                            this.app.showAIMessage(t('ai.contentGeneratedReview', '✅ AI content generated! Please review in the approval dialog.'), 'assistant');
+                            return;
+                        }
+                    } catch (reinitError) {
+                        console.error('[DEBUG] AI handleGenerateContent: Reinitialization failed:', reinitError);
+                    }
+                }
+
+                // Fallback: directly insert the generated content
+                console.log('[DEBUG] AI handleGenerateContent: Using fallback - directly inserting content');
+                this.app.insertTextAtCursor(generatedResult);
+                this.app.showAIMessage(t('ai.contentGeneratedInserted', '✅ Content generated and inserted!'), 'assistant');
+            }
+
+        } catch (error) {
+            // Don't show error if operation was cancelled
+            if (error.name === 'AbortError' || error.message?.includes('aborted') || error.message?.includes('cancelled') || this.app.isAIOperationCancelled) {
+                console.log('[DEBUG] AI handleGenerateContent: Operation was cancelled');
+                return;
+            }
+            console.error('[DEBUG] AI handleGenerateContent error:', error);
+            if (!this.app.aiPanelVisible) {
+                this.app.toggleAIPanel();
+            }
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const fallback = `❌ Failed to generate content: ${error.message}. Please check your AI connection and SearXNG setup.`;
+            const message = window.i18n ? window.i18n.t('ai.failedToGenerateContent', { error: error.message }) : fallback;
+            this.app.showAIMessage(message, 'assistant');
+        } finally {
+            this.app.hideLoading();
+            this.app.isAIOperationCancelled = false; // Reset flag
         }
     }
 
