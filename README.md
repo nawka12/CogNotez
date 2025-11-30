@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-2.1.3-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.4-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -121,7 +121,8 @@ For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 ### Basic Note Taking
 - **Create**: `Ctrl+N` or click the "+" button
 - **Save**: `Ctrl+S` or click the save button
-- **Search**: Use the search bar (click × to clear)
+- **Open**: `Ctrl+O` to open a note
+- **Search**: Use the search bar (click × to clear) or press `Ctrl+/` to focus search
 - **Filter**: Click folder items in sidebar (All Notes, Untagged, or tag folders)
 - **Find & Replace**: `Ctrl+F` to find, `Ctrl+H` for find and replace
 - **Undo/Redo**: `Ctrl+Z` to undo, `Ctrl+Y` to redo
@@ -146,6 +147,8 @@ For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 |----------|--------|
 | `Ctrl+N` | Create new note |
 | `Ctrl+S` | Save current note |
+| `Ctrl+O` | Open note |
+| `Ctrl+/` | Focus search |
 | `Ctrl+F` | Find text |
 | `Ctrl+H` | Find and replace |
 | `Ctrl+Z` | Undo |
@@ -159,6 +162,7 @@ For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 | `Ctrl+Shift+K` | Extract key points |
 | `Ctrl+Shift+T` | Generate tags |
 | `F1` | Show keyboard shortcuts help |
+| `Escape` | Close menus/dialogs |
 
 ### Rich Media
 
@@ -257,7 +261,13 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.1.3 (Current)
+### v2.1.4 (Current)
+- Sync closing overlay to inform users when sync is in progress during app closure
+- Enhanced user experience during sync operations with better notifications
+- Improved internationalization support with new translation keys for sync-related messages
+- Enhanced timeout handling and logging for sync operations
+
+### v2.1.3
 - Enhanced internationalization support
 - Improved user notifications and translations
 
