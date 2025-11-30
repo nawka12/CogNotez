@@ -1,0 +1,68 @@
+name: cognotez
+description: CogNotez - An AI-powered note app with local LLM integration (Android version)
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  
+  # UI & Theming
+  cupertino_icons: ^1.0.6
+  flutter_markdown: ^0.6.18
+  flutter_colorpicker: ^1.0.3
+  
+  # State Management
+  provider: ^6.1.1
+  
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.9.0
+  path_provider: ^2.1.1
+  
+  # Encryption
+  crypto: ^3.0.3
+  encrypt: ^5.0.3
+  
+  # Network & AI
+  http: ^1.1.2
+  dio: ^5.4.0
+  
+  # File Operations
+  file_picker: ^8.1.2
+  share_plus: ^7.2.1
+  
+  # Google Drive Sync
+  google_sign_in: ^6.1.6
+  googleapis: ^11.3.0
+  googleapis_auth: ^1.4.1
+  
+  # PDF Export
+  pdf: ^3.10.7
+  printing: ^5.12.0
+  
+  # Internationalization
+  intl: ^0.20.2
+  flutter_localizations:
+    sdk: flutter
+  
+  # Utilities
+  uuid: ^4.2.1
+  shared_preferences: ^2.2.2
+  url_launcher: ^6.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.1
+
+flutter:
+  uses-material-design: true
+  
+  assets:
+    - assets/icon.png
+    - assets/icon.svg
+
