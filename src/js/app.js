@@ -925,12 +925,12 @@ class CogNotezApp {
         // Show splash screen immediately
         this.showSplashScreen();
         this.updateSplashVersion();
-        this.updateSplashProgress('Starting up...', 5);
+        this.updateSplashProgress('splash.startingUp', 5);
 
         try {
             // Phase 1: Core initialization (required before app can function)
             console.log('[DEBUG] Initializing backend API...');
-            this.updateSplashProgress('Connecting services...', 15);
+            this.updateSplashProgress('splash.connectingServices', 15);
             this.backendAPI = new BackendAPI();
             this.backendAPI.setAppReference(this);
 
@@ -943,14 +943,14 @@ class CogNotezApp {
             await this.notesManager.initialize();
                 })()
             ]);
-            this.updateSplashProgress('Loading your notes...', 40);
+            this.updateSplashProgress('splash.loadingNotes', 40);
 
             // Start auto-save if enabled in settings
             this.initializeAutoSave();
 
             // Phase 2: UI and features (can run in parallel)
             console.log('[DEBUG] Initializing managers...');
-            this.updateSplashProgress('Preparing interface...', 55);
+            this.updateSplashProgress('splash.preparingInterface', 55);
             
             // Initialize AI manager, UI manager, and Phase 5 features in parallel
             await Promise.all([
@@ -970,12 +970,12 @@ class CogNotezApp {
 
             // Phase 3: Sync setup (quick, just registers - doesn't sync yet)
             console.log('[DEBUG] Setting up sync...');
-            this.updateSplashProgress('Setting up sync...', 75);
+            this.updateSplashProgress('splash.settingUpSync', 75);
             await this.initializeSync();
 
             // Phase 4: Final UI setup
             console.log('[DEBUG] Setting up event listeners and UI...');
-            this.updateSplashProgress('Almost ready...', 90);
+            this.updateSplashProgress('splash.almostReady', 90);
             this.setupEventListeners();
             this.loadTheme();
             this.syncPreviewModeUI();
@@ -991,7 +991,7 @@ class CogNotezApp {
             this.setupExternalLinkHandling();
 
             // Mark as ready and hide splash quickly
-            this.updateSplashProgress('Ready!', 100);
+            this.updateSplashProgress('splash.ready', 100);
             const elapsed = Math.round(performance.now() - startTime);
             console.log(`[DEBUG] CogNotez initialized in ${elapsed}ms`);
 
@@ -1007,7 +1007,7 @@ class CogNotezApp {
             console.error('[DEBUG] Failed to initialize application:', error);
             // Continue with basic functionality even if database fails
             console.log('[DEBUG] Continuing with basic functionality...');
-            this.updateSplashProgress('Loading basics...', 60);
+            this.updateSplashProgress('splash.loadingBasics', 60);
             this.setupEventListeners();
             this.setupIPC();
             this.loadTheme();
@@ -1016,7 +1016,7 @@ class CogNotezApp {
             // Start auto-save if enabled in settings (fallback mode)
             this.initializeAutoSave();
 
-            this.updateSplashProgress('Ready!', 100);
+            this.updateSplashProgress('splash.ready', 100);
             this.setupExternalLinkHandling();
 
             setTimeout(() => {
@@ -1469,18 +1469,20 @@ class CogNotezApp {
         const toggleBtn = document.getElementById('preview-toggle-btn');
         if (!toggleBtn) return;
 
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+
         switch (this.previewMode) {
             case 'edit':
                 toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
-                toggleBtn.title = 'Edit Mode';
+                toggleBtn.title = t('editor.editMode');
                 break;
             case 'preview':
                 toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-                toggleBtn.title = 'Preview Mode';
+                toggleBtn.title = t('editor.previewMode');
                 break;
             case 'split':
                 toggleBtn.innerHTML = '<i class="fas fa-columns"></i>';
-                toggleBtn.title = 'Split Mode';
+                toggleBtn.title = t('editor.splitMode');
                 break;
         }
     }
@@ -5822,7 +5824,10 @@ Please provide a helpful response based on the note content and conversation his
         const statusText = document.querySelector('.status-text');
 
         if (progressText && text) {
-            progressText.textContent = text;
+            // Translate if it's a translation key (starts with "splash.") or use text directly
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const translatedText = text.startsWith('splash.') ? t(text) : text;
+            progressText.textContent = translatedText;
         }
 
         if (percentage !== null) {
@@ -6107,48 +6112,49 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showKeyboardShortcutsHelp() {
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         const shortcuts = [
             // Basic operations
-            { key: 'Ctrl+N', description: 'Create new note' },
-            { key: 'Ctrl+S', description: 'Save current note' },
-            { key: 'Ctrl+O', description: 'Open note' },
-            { key: 'Ctrl+/', description: 'Focus search' },
+            { key: 'Ctrl+N', description: t('keyboard.createNewNote') },
+            { key: 'Ctrl+S', description: t('keyboard.saveCurrentNote') },
+            { key: 'Ctrl+O', description: t('keyboard.openNoteDesc') },
+            { key: 'Ctrl+/', description: t('keyboard.focusSearchDesc') },
 
             // Text editing operations
-            { key: 'Ctrl+Z', description: 'Undo last change' },
-            { key: 'Ctrl+Y', description: 'Redo last undone change' },
-            { key: 'Ctrl+F', description: 'Find text in current note' },
-            { key: 'Ctrl+H', description: 'Find and replace text' },
-            { key: 'Ctrl+P', description: 'Toggle preview mode (Edit → Preview → Split)' },
+            { key: 'Ctrl+Z', description: t('keyboard.undoLastChange') },
+            { key: 'Ctrl+Y', description: t('keyboard.redoLastUndoneChange') },
+            { key: 'Ctrl+F', description: t('keyboard.findTextInNote') },
+            { key: 'Ctrl+H', description: t('keyboard.findAndReplaceText') },
+            { key: 'Ctrl+P', description: t('keyboard.togglePreviewMode') },
 
             // AI operations (all require text selection)
-            { key: 'Ctrl+Shift+S', description: 'Summarize selected text' },
-            { key: 'Ctrl+Shift+A', description: 'Ask AI about selected text' },
-            { key: 'Ctrl+Shift+E', description: 'Edit selected text with AI' },
-            { key: 'Ctrl+Shift+G', description: 'Generate content with AI' },
-            { key: 'Ctrl+Shift+W', description: 'Rewrite selected text' },
-            { key: 'Ctrl+Shift+K', description: 'Extract key points' },
-            { key: 'Ctrl+Shift+T', description: 'Generate tags for selection' },
+            { key: 'Ctrl+Shift+S', description: t('keyboard.summarizeSelectedText') },
+            { key: 'Ctrl+Shift+A', description: t('keyboard.askAIAboutSelectedText') },
+            { key: 'Ctrl+Shift+E', description: t('keyboard.editSelectedTextWithAI') },
+            { key: 'Ctrl+Shift+G', description: t('keyboard.generateContentWithAI') },
+            { key: 'Ctrl+Shift+W', description: t('keyboard.rewriteSelectedText') },
+            { key: 'Ctrl+Shift+K', description: t('keyboard.extractKeyPoints') },
+            { key: 'Ctrl+Shift+T', description: t('keyboard.generateTagsForSelection') },
 
             // Other shortcuts
-            { key: 'F1', description: 'Show this help dialog' },
-            { key: 'Escape', description: 'Close menus/dialogs' },
-            { key: 'Right-click', description: 'Show AI context menu on selected text' }
+            { key: 'F1', description: t('keyboard.showThisHelpDialog') },
+            { key: 'Escape', description: t('keyboard.closeMenusDialogs') },
+            { key: 'Right-click', description: t('keyboard.showAIContextMenu') }
         ];
 
         const content = `
             <div style="max-height: 400px; overflow-y: auto;">
                 <div style="margin-bottom: 16px;">
-                    <h4 style="margin: 0 0 8px 0; color: var(--text-primary);">💡 Pro tip:</h4>
+                    <h4 style="margin: 0 0 8px 0; color: var(--text-primary);">${t('keyboard.proTip')}</h4>
                     <p style="margin: 0; color: var(--text-secondary); font-size: 13px;">
-                        Select any text in your notes and use the keyboard shortcuts above, or right-click for a context menu.
+                        ${t('keyboard.proTipDescription')}
                     </p>
                 </div>
                 <table style="width: 100%; border-collapse: collapse;">
                     <thead>
                         <tr>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">Shortcut</th>
-                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">Description</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">${t('keyboard.shortcutHeader')}</th>
+                            <th style="text-align: left; padding: 8px; border-bottom: 1px solid var(--border-color); font-weight: 600;">${t('keyboard.descriptionHeader')}</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -6163,8 +6169,8 @@ Please provide a helpful response based on the note content and conversation his
             </div>
         `;
 
-        this.createModal('Keyboard Shortcuts & AI Features', content, [
-            { text: 'Got it!', type: 'primary', action: 'close' }
+        this.createModal(t('keyboard.shortcutsAndAIFeatures'), content, [
+            { text: t('keyboard.gotIt'), type: 'primary', action: 'close' }
         ]);
     }
 

@@ -6,8 +6,14 @@
   },
   "splash": {
     "startingUp": "Starting up...",
+    "connectingServices": "Connecting services...",
+    "loadingNotes": "Loading your notes...",
+    "preparingInterface": "Preparing interface...",
+    "settingUpSync": "Setting up sync...",
+    "almostReady": "Almost ready...",
+    "loadingBasics": "Loading basics...",
     "loading": "Loading",
-    "ready": "Ready",
+    "ready": "Ready!",
     "almostThere": "Almost there",
     "starting": "Starting",
     "version": "Version"
@@ -27,7 +33,8 @@
     "advancedSearch": "Advanced Search",
     "templates": "Templates",
     "toggleThemeMenu": "Toggle Theme",
-    "aiAssistant": "AI Assistant"
+    "aiAssistant": "AI Assistant",
+    "language": "Language"
   },
   "sidebar": {
     "notes": "Notes",
@@ -45,6 +52,8 @@
     "undo": "Undo (Ctrl+Z)",
     "redo": "Redo (Ctrl+Y)",
     "previewMode": "Preview Mode",
+    "editMode": "Edit Mode",
+    "splitMode": "Split Mode",
     "save": "Save",
     "insertImage": "Insert Image",
     "insertVideo": "Insert Video",
@@ -513,6 +522,10 @@
   },
   "keyboard": {
     "shortcuts": "Keyboard Shortcuts",
+    "shortcutsAndAIFeatures": "Keyboard Shortcuts & AI Features",
+    "gotIt": "Got it!",
+    "proTip": "💡 Pro tip:",
+    "proTipDescription": "Select any text in your notes and use the keyboard shortcuts above, or right-click for a context menu.",
     "newNote": "New Note",
     "saveNote": "Save Note",
     "openNote": "Open Note",
@@ -521,7 +534,26 @@
     "askAISelection": "Ask AI About Selection",
     "editSelectionAI": "Edit Selection with AI",
     "shortcutHeader": "Shortcut",
-    "descriptionHeader": "Description"
+    "descriptionHeader": "Description",
+    "createNewNote": "Create new note",
+    "saveCurrentNote": "Save current note",
+    "openNoteDesc": "Open note",
+    "focusSearchDesc": "Focus search",
+    "undoLastChange": "Undo last change",
+    "redoLastUndoneChange": "Redo last undone change",
+    "findTextInNote": "Find text in current note",
+    "findAndReplaceText": "Find and replace text",
+    "togglePreviewMode": "Toggle preview mode (Edit → Preview → Split)",
+    "summarizeSelectedText": "Summarize selected text",
+    "askAIAboutSelectedText": "Ask AI about selected text",
+    "editSelectedTextWithAI": "Edit selected text with AI",
+    "generateContentWithAI": "Generate content with AI",
+    "rewriteSelectedText": "Rewrite selected text",
+    "extractKeyPoints": "Extract key points",
+    "generateTagsForSelection": "Generate tags for selection",
+    "showThisHelpDialog": "Show this help dialog",
+    "closeMenusDialogs": "Close menus/dialogs",
+    "showAIContextMenu": "Show AI context menu on selected text"
   },
   "about": {
     "title": "About CogNotez",
