@@ -580,8 +580,10 @@ class UIManager {
             </div>
         `;
 
-        this.createModal('Keyboard Shortcuts', content, [
-            { text: 'Close', type: 'secondary', action: 'close' }
+        const modalTitle = t('keyboard.shortcuts', 'Keyboard Shortcuts');
+        const closeText = t('modals.close', 'Close');
+        this.createModal(modalTitle, content, [
+            { text: closeText, type: 'secondary', action: 'close' }
         ]);
     }
 
@@ -1285,12 +1287,14 @@ class UIManager {
             const confirmPassword = confirmInput ? confirmInput.value : password;
 
             if (requireConfirmation && password !== confirmPassword) {
-                this.showNotification('Passwords do not match', 'error');
+                const errorMsg = window.i18n ? window.i18n.t('password.passwordsDoNotMatch') : 'Passwords do not match';
+                this.showNotification(errorMsg, 'error');
                 return;
             }
 
             if (!password.trim()) {
-                this.showNotification('Password cannot be empty', 'error');
+                const errorMsg = window.i18n ? window.i18n.t('password.passwordCannotBeEmpty') : 'Password cannot be empty';
+                this.showNotification(errorMsg, 'error');
                 return;
             }
 

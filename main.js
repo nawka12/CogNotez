@@ -104,6 +104,41 @@ function createWindow() {
       if (appQuittingRequested || isQuittingAfterSync) {
         return;
       }
+
+      // First, check if sync is already in progress - prevent closing during sync
+      if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+        console.log('[Main] Sync in progress, preventing window close...');
+        event.preventDefault();
+        
+        // Show loading screen to user
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-show');
+        }
+        
+        // Wait for sync to complete (with a reasonable timeout)
+        let attempts = 0;
+        while ((globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) && attempts < 120) { // Wait up to 60 seconds
+          await new Promise(resolve => setTimeout(resolve, 500));
+          attempts++;
+        }
+        
+        // Hide loading screen
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-hide');
+        }
+        
+        if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+          console.warn('[Main] Sync still in progress after timeout, but allowing close to prevent hang');
+          // After timeout, allow close to prevent the app from hanging
+          return;
+        }
+        
+        // Sync completed, now close the window since user already requested close
+        console.log('[Main] Sync completed, closing window...');
+        mainWindow.destroy();
+        return;
+      }
+
       // Check if auto-sync is enabled and we should sync before closing
       if (global.databaseManager && global.databaseManager.isAutoSyncEnabled() && !isClosingWithSync) {
         console.log('[Main] Auto-sync enabled, syncing before closing...');
@@ -112,14 +147,28 @@ function createWindow() {
         event.preventDefault();
         isClosingWithSync = true;
 
+        // Show loading screen to user
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-show');
+        }
+
         try {
           // Trigger sync
           await performSyncBeforeClose();
+
+          // Hide loading screen
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-closing-hide');
+          }
 
           // After sync completes, close the window
           console.log('[Main] Sync completed, closing window...');
           mainWindow.destroy();
         } catch (error) {
+          // Hide loading screen even on error
+          if (mainWindow && mainWindow.webContents) {
+            mainWindow.webContents.send('sync-closing-hide');
+          }
           console.error('[Main] Sync failed before close, proceeding with close anyway:', error);
           // Even if sync fails, allow the window to close
           mainWindow.destroy();
@@ -423,16 +472,32 @@ if (app) {
       }
 
       // If a sync is already running, wait briefly for it to finish
-      if (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress) {
+      if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+        console.log('[Main] Sync in progress, preventing app quit...');
+        
+        // Show loading screen to user
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-show');
+        }
+        
         let attempts = 0;
-        while (global.googleDriveSyncManager.syncInProgress && attempts < 60) { // up to ~30s
+        while ((globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) && attempts < 120) { // up to ~60s
           event.preventDefault();
           await new Promise(resolve => setTimeout(resolve, 500));
           attempts++;
         }
-        if (!global.googleDriveSyncManager.syncInProgress) {
+        
+        // Hide loading screen
+        if (mainWindow && mainWindow.webContents) {
+          mainWindow.webContents.send('sync-closing-hide');
+        }
+        
+        if (!globalSyncInProgress && (!global.googleDriveSyncManager || !global.googleDriveSyncManager.syncInProgress)) {
+          console.log('[Main] Sync completed, allowing quit to proceed');
           return; // existing sync finished; let quit proceed
         }
+        // If still in progress after timeout, log warning but continue with quit to prevent hang
+        console.warn('[Main] Sync still in progress after timeout, proceeding with quit to prevent hang');
       }
 
       // We will perform a quick sync before quitting
@@ -1957,9 +2022,43 @@ const createMenu = async (lang = 'en') => {
           click: async () => {
             try {
               appQuittingRequested = true;
+              
+              // First, check if sync is already in progress - wait for it to complete
+              if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+                console.log('[Main] Sync in progress, waiting before quit...');
+                
+                // Show loading screen to user
+                if (mainWindow && mainWindow.webContents) {
+                  mainWindow.webContents.send('sync-closing-show');
+                }
+                
+                // Wait for sync to complete (with a reasonable timeout)
+                let attempts = 0;
+                while ((globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) && attempts < 120) { // Wait up to 60 seconds
+                  await new Promise(resolve => setTimeout(resolve, 500));
+                  attempts++;
+                }
+                
+                // Hide loading screen
+                if (mainWindow && mainWindow.webContents) {
+                  mainWindow.webContents.send('sync-closing-hide');
+                }
+                
+                if (globalSyncInProgress || (global.googleDriveSyncManager && global.googleDriveSyncManager.syncInProgress)) {
+                  console.warn('[Main] Sync still in progress after timeout, proceeding with quit to prevent hang');
+                } else {
+                  console.log('[Main] Sync completed, proceeding with quit...');
+                }
+              }
+              
               // Check if auto-sync is enabled and we should sync before quitting
               if (global.databaseManager && global.databaseManager.isAutoSyncEnabled()) {
                 console.log('[Main] Auto-sync enabled, syncing before quit...');
+
+                // Show loading screen to user
+                if (mainWindow && mainWindow.webContents) {
+                  mainWindow.webContents.send('sync-closing-show');
+                }
 
                 try {
                   // Trigger sync
@@ -1968,6 +2067,11 @@ const createMenu = async (lang = 'en') => {
                 } catch (error) {
                   console.error('[Main] Sync failed before quit, proceeding with quit anyway:', error);
                   // Even if sync fails, allow the app to quit
+                } finally {
+                  // Hide loading screen
+                  if (mainWindow && mainWindow.webContents) {
+                    mainWindow.webContents.send('sync-closing-hide');
+                  }
                 }
               }
 

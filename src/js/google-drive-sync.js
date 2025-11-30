@@ -647,9 +647,11 @@ class GoogleDriveSyncManager {
 
     _formatSyncErrorMessage(error) {
         try {
-            if (!error) return 'Sync failed due to an unknown error';
+            const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+            
+            if (!error) return t('settings.sync.syncFailedUnknown', 'Sync failed due to an unknown error');
             if (error.encryptionRequired) {
-                return 'Cloud data is encrypted. Enter your E2EE passphrase to continue.';
+                return t('settings.sync.syncFailedEncryptionRequired', 'Cloud data is encrypted. Enter your E2EE passphrase to continue.');
             }
             
             // Network-related errors
@@ -660,20 +662,21 @@ class GoogleDriveSyncManager {
                 error.message.includes('ETIMEDOUT') ||
                 error.message.includes('network')
             )) {
-                return 'No internet connection. Sync requires an active internet connection. Will retry when online.';
+                return t('settings.sync.syncFailedNoInternet', 'No internet connection. Sync requires an active internet connection. Will retry when online.');
             }
             
             const code = error.code || error.status || '';
-            if (code === 404) return 'Remote backup not found on Google Drive.';
-            if (code === 401 || code === 403) return 'Google Drive access denied. Please reconnect your account in Sync Settings.';
-            if (code === 429) return 'Google Drive rate limit reached. Auto-sync paused temporarily.';
+            if (code === 404) return t('settings.sync.syncFailedNotFound', 'Remote backup not found on Google Drive.');
+            if (code === 401 || code === 403) return t('settings.sync.syncFailedAccessDenied', 'Google Drive access denied. Please reconnect your account in Sync Settings.');
+            if (code === 429) return t('settings.sync.syncFailedRateLimit', 'Google Drive rate limit reached. Auto-sync paused temporarily.');
             if (code === 500 || code === 502 || code === 503 || code === 504) {
-                return 'Google Drive service temporarily unavailable. Will retry automatically.';
+                return t('settings.sync.syncFailedServiceUnavailable', 'Google Drive service temporarily unavailable. Will retry automatically.');
             }
             
-            return `Sync failed: ${error.message || 'Unexpected error'}`;
+            return t('settings.sync.syncFailedGeneric', `Sync failed: ${error.message || 'Unexpected error'}`, { error: error.message || 'Unexpected error' });
         } catch (_) {
-            return 'Sync failed due to an unknown error';
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            return t('settings.sync.syncFailedUnknown', 'Sync failed due to an unknown error');
         }
     }
 

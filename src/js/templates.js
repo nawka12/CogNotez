@@ -13,260 +13,338 @@ class TemplatesManager {
         this.loadDefaultTemplates();
         await this.loadCustomTemplates();
         this.setupEventListeners();
+        
+        // Re-render templates when language changes
+        window.addEventListener('languageChanged', async () => {
+            // Reload templates with new language
+            this.loadDefaultTemplates();
+            await this.loadCustomTemplates();
+            if (this.isOpen()) {
+                this.renderTemplates();
+            }
+        });
+        
         console.log('[Templates] Templates initialized with', this.templates.length, 'templates');
     }
 
+    // Helper function to get translated template name
+    getTemplateName(template) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+        return template.nameKey ? t(template.nameKey) : (template.name || '');
+    }
+
+    // Helper function to get translated template description
+    getTemplateDescription(template) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+        return template.descriptionKey ? t(template.descriptionKey) : (template.description || '');
+    }
+
+    // Helper function to get translated template content string
+    t(key, params = {}) {
+        return window.i18n ? window.i18n.t(key, params) : key;
+    }
+
+    // Helper function to process template content and apply translations
+    processTemplateContent(content) {
+        if (!content || typeof content !== 'string') return content;
+        
+        const tc = (key, params) => this.t(`templates.templateContent.${key}`, params);
+        const t = (key, params) => this.t(key, params);
+        
+        // Replace translation placeholders with actual translations
+        // Pattern: {{tc:key}} or {{tc:key:number:1}} for params
+        let processed = content;
+        
+        // Handle template content translations: {{tc:key}} or {{tc:key:number:1}}
+        processed = processed.replace(/\{\{tc:([^}:]+)(?::([^}]+))?\}\}/g, (match, key, paramStr) => {
+            const params = {};
+            if (paramStr) {
+                const paramPairs = paramStr.split(':');
+                for (let i = 0; i < paramPairs.length; i += 2) {
+                    if (paramPairs[i + 1]) {
+                        const paramValue = paramPairs[i + 1];
+                        // Try to parse as number if it's a number
+                        params[paramPairs[i]] = isNaN(paramValue) ? paramValue : Number(paramValue);
+                    }
+                }
+            }
+            return tc(key, params);
+        });
+        
+        // Handle regular translations: {{t:key}}
+        processed = processed.replace(/\{\{t:([^}]+)\}\}/g, (match, key) => {
+            return t(key);
+        });
+        
+        // Handle date formatting: {{date}} or {{date:format}}
+        processed = processed.replace(/\{\{date(?::([^}]+))?\}\}/g, (match, format) => {
+            return this.app.formatLocalizedDateTime(new Date(), format === 'false' ? false : true);
+        });
+        
+        return processed;
+    }
+
     loadDefaultTemplates() {
+        // Use placeholders that will be processed when template is used
+        const tc = (key, params) => {
+            if (params && Object.keys(params).length > 0) {
+                const paramStr = Object.entries(params).map(([k, v]) => `${k}:${v}`).join(':');
+                return `{{tc:${key}:${paramStr}}}`;
+            }
+            return `{{tc:${key}}}`;
+        };
+        const t = (key) => `{{t:${key}}}`;
+        
         this.templates = [
             {
                 id: 'blank',
-                name: 'Blank Note',
-                description: 'Start with a clean slate',
+                nameKey: 'templates.blankNote',
+                descriptionKey: 'templates.blankNoteDescription',
                 icon: '📝',
                 content: '',
                 isDefault: true
             },
             {
                 id: 'meeting-notes',
-                name: 'Meeting Notes',
-                description: 'Template for meeting minutes',
+                nameKey: 'templates.meetingNotes',
+                descriptionKey: 'templates.meetingNotesDescription',
                 icon: '📋',
-                content: `# Meeting Notes
+                content: `# ${t('templates.meetingNotes')}
 
-**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
-**Attendees:** 
+**${tc('date')}** {{date:false}}
+**${tc('attendees')}** 
 
-## Agenda
+## ${tc('agenda')}
 - 
 
-## Discussion Points
+## ${tc('discussionPoints')}
 - 
 
-## Action Items
+## ${tc('actionItems')}
 - [ ] 
 
-## Next Meeting
+## ${tc('nextMeeting')}
 `,
                 isDefault: true
             },
             {
                 id: 'daily-journal',
-                name: 'Daily Journal',
-                description: 'Daily journaling template',
+                nameKey: 'templates.dailyJournal',
+                descriptionKey: 'templates.dailyJournalDescription',
                 icon: '📓',
-                content: `# Daily Journal - ${this.app.formatLocalizedDateTime(new Date(), false)}
+                content: `# ${tc('dailyJournal')} {{date:false}}
 
-## Mood
+## ${tc('mood')}
 😊 / 😐 / 😔
 
-## Today's Goals
+## ${tc('todaysGoals')}
 - [ ] 
 - [ ] 
 - [ ] 
 
-## What Happened
+## ${tc('whatHappened')}
 
 
-## Grateful For
+## ${tc('gratefulFor')}
 1. 
 2. 
 3. 
 
-## Tomorrow's Focus
+## ${tc('tomorrowsFocus')}
 `,
                 isDefault: true
             },
             {
                 id: 'project-plan',
-                name: 'Project Plan',
-                description: 'Project planning template',
+                nameKey: 'templates.projectPlan',
+                descriptionKey: 'templates.projectPlanDescription',
                 icon: '🎯',
-                content: `# Project Plan
+                content: `# ${t('templates.projectPlan')}
 
-## Overview
-**Project Name:** 
-**Start Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
-**Status:** Planning
+## ${tc('overview')}
+**${tc('projectName')}** 
+**${tc('startDate')}** {{date:false}}
+**${tc('status')}** ${tc('planning')}
 
-## Objectives
+## ${tc('objectives')}
 - 
 
-## Milestones
+## ${tc('milestones')}
 1. [ ] 
 2. [ ] 
 3. [ ] 
 
-## Resources Needed
+## ${tc('resourcesNeeded')}
 - 
 
-## Timeline
-- Week 1: 
-- Week 2: 
-- Week 3: 
+## ${tc('timeline')}
+- ${tc('week', { number: 1 })} 
+- ${tc('week', { number: 2 })} 
+- ${tc('week', { number: 3 })} 
 
-## Risks & Mitigation
+## ${tc('risksAndMitigation')}
 - 
 
-## Success Criteria
+## ${tc('successCriteria')}
 - 
 `,
                 isDefault: true
             },
             {
                 id: 'book-notes',
-                name: 'Book Notes',
-                description: 'Template for book summaries',
+                nameKey: 'templates.bookNotes',
+                descriptionKey: 'templates.bookNotesDescription',
                 icon: '📚',
-                content: `# Book Notes
+                content: `# ${t('templates.bookNotes')}
 
-**Title:** 
-**Author:** 
-**Date Read:** ${new Date().toLocaleDateString()}
-**Rating:** ⭐⭐⭐⭐⭐
+**${tc('title')}** 
+**${tc('author')}** 
+**${tc('dateRead')}** {{date}}
+**${tc('rating')}** ⭐⭐⭐⭐⭐
 
-## Summary
-Brief overview of the book...
+## ${tc('summary')}
+${tc('briefOverview')}
 
-## Key Takeaways
+## ${tc('keyTakeaways')}
 1. 
 2. 
 3. 
 
-## Favorite Quotes
+## ${tc('favoriteQuotes')}
 > 
 
-## My Thoughts
+## ${tc('myThoughts')}
 `,
                 isDefault: true
             },
             {
                 id: 'research-notes',
-                name: 'Research Notes',
-                description: 'Academic research template',
+                nameKey: 'templates.researchNotes',
+                descriptionKey: 'templates.researchNotesDescription',
                 icon: '🔬',
-                content: `# Research Notes
+                content: `# ${t('templates.researchNotes')}
 
-**Topic:** 
-**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
-**Source:** 
+**${tc('topic')}** 
+**${tc('date')}** {{date:false}}
+**${tc('source')}** 
 
-## Research Question
+## ${tc('researchQuestion')}
 
 
-## Key Findings
+## ${tc('keyFindings')}
 - 
 
-## Data/Evidence
+## ${tc('dataEvidence')}
 
 
-## Analysis
+## ${tc('analysis')}
 
 
-## References
+## ${tc('references')}
 1. 
 `,
                 isDefault: true
             },
             {
                 id: 'todo-list',
-                name: 'To-Do List',
-                description: 'Task management template',
+                nameKey: 'templates.todoList',
+                descriptionKey: 'templates.todoListDescription',
                 icon: '✅',
-                content: `# To-Do List - ${this.app.formatLocalizedDateTime(new Date(), false)}
+                content: `# ${tc('todoList')} ${this.app.formatLocalizedDateTime(new Date(), false)}
 
-## High Priority
-- [ ] 
-- [ ] 
-
-## Medium Priority
+## ${tc('highPriority')}
 - [ ] 
 - [ ] 
 
-## Low Priority
+## ${tc('mediumPriority')}
 - [ ] 
 - [ ] 
 
-## Completed Today
+## ${tc('lowPriority')}
+- [ ] 
+- [ ] 
+
+## ${tc('completedToday')}
 - [x] 
 `,
                 isDefault: true
             },
             {
                 id: 'brainstorm',
-                name: 'Brainstorm',
-                description: 'Idea generation template',
+                nameKey: 'templates.brainstorm',
+                descriptionKey: 'templates.brainstormDescription',
                 icon: '💡',
-                content: `# Brainstorming Session
+                content: `# ${tc('brainstormingSession')}
 
-**Topic:** 
-**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
+**${tc('topic')}** 
+**${tc('date')}** {{date:false}}
 
-## Ideas
+## ${tc('ideas')}
 1. 
 2. 
 3. 
 4. 
 5. 
 
-## Best Ideas
+## ${tc('bestIdeas')}
 ⭐ 
 
-## Next Steps
+## ${tc('nextSteps')}
 - [ ] 
 `,
                 isDefault: true
             },
             {
                 id: 'recipe',
-                name: 'Recipe',
-                description: 'Cooking recipe template',
+                nameKey: 'templates.recipe',
+                descriptionKey: 'templates.recipeDescription',
                 icon: '🍳',
-                content: `# Recipe: 
+                content: `# ${tc('recipe')} 
 
-**Prep Time:** 
-**Cook Time:** 
-**Servings:** 
-**Difficulty:** Easy / Medium / Hard
+**${tc('prepTime')}** 
+**${tc('cookTime')}** 
+**${tc('servings')}** 
+**${tc('difficulty')}** ${tc('difficultyOptions')}
 
-## Ingredients
+## ${tc('ingredients')}
 - 
 - 
 - 
 
-## Instructions
+## ${tc('instructions')}
 1. 
 2. 
 3. 
 
-## Notes
+## ${tc('notes')}
 `,
                 isDefault: true
             },
             {
                 id: 'code-snippet',
-                name: 'Code Snippet',
-                description: 'Code documentation template',
+                nameKey: 'templates.codeSnippet',
+                descriptionKey: 'templates.codeSnippetDescription',
                 icon: '💻',
-                content: `# Code Snippet
+                content: `# ${t('templates.codeSnippet')}
 
-**Language:** 
-**Purpose:** 
-**Date:** ${this.app.formatLocalizedDateTime(new Date(), false)}
+**${tc('language')}** 
+**${tc('purpose')}** 
+**${tc('date')}** {{date:false}}
 
-## Code
+## ${tc('code')}
 \`\`\`javascript
-// Your code here
+// ${tc('yourCodeHere')}
 \`\`\`
 
-## Description
+## ${tc('description')}
 
 
-## Usage
+## ${tc('usage')}
 \`\`\`javascript
-// Example usage
+// ${tc('exampleUsage')}
 \`\`\`
 
-## Notes
+## ${tc('notes')}
 `,
                 isDefault: true
             }
@@ -363,6 +441,10 @@ Brief overview of the book...
         const card = document.createElement('div');
         card.className = 'template-card';
         
+        // Translate template name and description for default templates
+        const templateName = this.getTemplateName(template);
+        const templateDescription = this.getTemplateDescription(template);
+        
         const deleteBtn = !template.isDefault 
             ? `<button class="template-delete-btn" title="Delete template"><i class="fas fa-trash"></i></button>`
             : '';
@@ -370,8 +452,8 @@ Brief overview of the book...
         card.innerHTML = `
             ${deleteBtn}
             <div class="template-card-icon">${template.icon}</div>
-            <div class="template-card-title">${template.name}</div>
-            <div class="template-card-description">${template.description}</div>
+            <div class="template-card-title">${templateName}</div>
+            <div class="template-card-description">${templateDescription}</div>
         `;
 
         // Handle card click for using template
@@ -397,38 +479,55 @@ Brief overview of the book...
     }
 
     async useTemplate(template) {
-        console.log('[Templates] Using template:', template.name);
+        const t = (key, params) => window.i18n ? window.i18n.t(key, params) : key;
+        const templateName = this.getTemplateName(template);
+        console.log('[Templates] Using template:', templateName);
 
         try {
             // Create a new note with the template content
             if (this.app.createNewNote) {
                 await this.app.createNewNote();
                 
-                // Set the template content
+                // Set the template content (process translations)
                 const editor = document.getElementById('note-editor');
                 if (editor && this.app.currentNote) {
-                    editor.value = template.content;
+                    const processedContent = this.processTemplateContent(template.content);
+                    editor.value = processedContent;
                     
                     // Update the note in database
                     const db = this.app.notesManager?.db;
                     if (db && db.initialized) {
                         db.updateNote(this.app.currentNote.id, {
-                            content: template.content,
-                            preview: this.generatePreview(template.content)
+                            content: processedContent,
+                            preview: this.generatePreview(processedContent)
                         });
                     }
                     
+                    // Update the current note object to reflect the template content
+                    if (this.app.currentNote) {
+                        this.app.currentNote.content = processedContent;
+                        this.app.currentNote.preview = this.generatePreview(processedContent);
+                    }
+                    
+                    // Trigger input event to update UI (word count, unsaved indicator, etc.)
+                    this.app._ignoreNextInputForUnsaved = true;
+                    const inputEvent = new Event('input', { bubbles: true });
+                    editor.dispatchEvent(inputEvent);
+                    
                     // Update preview if in preview mode
-                    this.app.updatePreview?.();
+                    if (this.app.previewMode === 'preview' || this.app.previewMode === 'split') {
+                        this.app.renderMarkdownPreview?.();
+                    }
                 }
             }
 
             this.close();
-            this.app.showNotification?.(`Template "${template.name}" applied`, 'success');
+            this.app.showNotification?.(t('templates.templateApplied', { name: templateName }), 'success');
 
         } catch (error) {
             console.error('[Templates] Failed to apply template:', error);
-            this.app.showNotification?.('Failed to apply template', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.app.showNotification?.(t('templates.failedToApplyTemplate'), 'error');
         }
     }
 
@@ -439,17 +538,19 @@ Brief overview of the book...
     async generateAITemplate() {
         console.log('[Templates] generateAITemplate called');
 
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        
         // Check if AI manager exists and is initialized
         if (!this.app.aiManager) {
             console.error('[Templates] AI manager not found');
-            this.app.showNotification?.('AI is not available. Please restart the application.', 'error');
+            this.app.showNotification?.(t('templates.aiNotAvailable'), 'error');
             return;
         }
 
         // Check if AI is connected
         if (!this.app.aiManager.isConnected) {
             console.error('[Templates] AI manager not connected');
-            this.app.showNotification?.('AI is not connected. Please check your AI settings and ensure your AI service is running.', 'error');
+            this.app.showNotification?.(t('templates.aiNotConnected'), 'error');
             return;
         }
 
@@ -459,47 +560,48 @@ Brief overview of the book...
     }
 
     showAITemplateDialog() {
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         const dialogHTML = `
             <div id="ai-template-dialog-overlay" class="modal">
                 <div class="modal-content" style="max-width: 600px; background: var(--modal-bg, rgba(255, 255, 255, 0.95)); color: var(--text-primary);">
                     <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-                        <h3 style="color: var(--text-primary);"><i class="fas fa-robot"></i> Generate Template with AI</h3>
-                        <button id="ai-template-dialog-close" class="modal-close" style="color: var(--text-secondary);" title="Close"><i class="fas fa-times"></i></button>
+                        <h3 style="color: var(--text-primary);"><i class="fas fa-robot"></i> ${t('templates.generateAITemplate')}</h3>
+                        <button id="ai-template-dialog-close" class="modal-close" style="color: var(--text-secondary);" title="${t('modals.close')}"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="modal-body" style="color: var(--text-primary);">
                         <div class="form-group" style="margin-bottom: 20px;">
                             <label for="ai-template-description" style="display: block; margin-bottom: 8px; font-weight: 500;">
-                                Describe the template you want to create:
+                                ${t('templates.describeTemplate')}
                             </label>
                             <textarea 
                                 id="ai-template-description" 
-                                placeholder="e.g., A template for bug reports with sections for steps to reproduce, expected behavior, actual behavior, and environment details"
+                                placeholder="${t('templates.templateDescriptionPlaceholder')}"
                                 style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary); font-family: inherit; resize: vertical;"
                             ></textarea>
                         </div>
                         <div class="form-group" style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 12px; font-weight: 500;">Template Type (optional):</label>
+                            <label style="display: block; margin-bottom: 12px; font-weight: 500;">${t('templates.templateTypeOptional')}</label>
                             <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px;">
-                                <button class="ai-template-suggestion" data-type="Meeting Notes">📋 Meeting Notes</button>
-                                <button class="ai-template-suggestion" data-type="Project Plan">🎯 Project Plan</button>
-                                <button class="ai-template-suggestion" data-type="Bug Report">🐛 Bug Report</button>
-                                <button class="ai-template-suggestion" data-type="Weekly Review">📊 Weekly Review</button>
-                                <button class="ai-template-suggestion" data-type="Research Notes">🔬 Research Notes</button>
-                                <button class="ai-template-suggestion" data-type="Recipe">🍳 Recipe</button>
+                                <button class="ai-template-suggestion" data-type="Meeting Notes">📋 ${t('templates.meetingNotes')}</button>
+                                <button class="ai-template-suggestion" data-type="Project Plan">🎯 ${t('templates.projectPlan')}</button>
+                                <button class="ai-template-suggestion" data-type="Bug Report">🐛 ${t('templates.bugReport')}</button>
+                                <button class="ai-template-suggestion" data-type="Weekly Review">📊 ${t('templates.weeklyReview')}</button>
+                                <button class="ai-template-suggestion" data-type="Research Notes">🔬 ${t('templates.researchNotes')}</button>
+                                <button class="ai-template-suggestion" data-type="Recipe">🍳 ${t('templates.recipe')}</button>
                             </div>
                         </div>
                         <div id="ai-template-preview-section" class="hidden" style="margin-bottom: 20px;">
-                            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">Generated Template Preview:</label>
+                            <label style="display: block; margin-bottom: 8px; font-weight: 500; color: var(--text-primary);">${t('templates.generatedTemplatePreview')}</label>
                             <div id="ai-template-preview" style="max-height: 300px; overflow-y: auto; padding: 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 6px; font-family: 'Courier New', monospace; font-size: 13px; white-space: pre-wrap; color: var(--text-primary);"></div>
                         </div>
                         <div id="ai-template-loading" class="hidden" style="text-align: center; padding: 20px;">
                             <div class="loading-spinner" style="margin: 0 auto 12px;"></div>
-                            <p style="color: var(--text-secondary);">Generating template with AI...</p>
+                            <p style="color: var(--text-secondary);">${t('templates.generatingTemplate')}</p>
                         </div>
                         <div class="ai-dialog-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <button id="ai-template-cancel" class="btn-secondary">Cancel</button>
-                            <button id="ai-template-generate" class="btn-primary"><i class="fas fa-magic"></i> Generate</button>
-                            <button id="ai-template-save" class="btn-primary hidden"><i class="fas fa-save"></i> Save as Template</button>
+                            <button id="ai-template-cancel" class="btn-secondary">${t('modals.cancel')}</button>
+                            <button id="ai-template-generate" class="btn-primary"><i class="fas fa-magic"></i> ${t('templates.generate')}</button>
+                            <button id="ai-template-save" class="btn-primary hidden"><i class="fas fa-save"></i> ${t('templates.saveAsTemplate')}</button>
                         </div>
                     </div>
                 </div>
@@ -548,7 +650,8 @@ Brief overview of the book...
 
             btn.addEventListener('click', () => {
                 const type = btn.getAttribute('data-type');
-                descInput.value = `A ${type.toLowerCase()} template with appropriate sections and formatting`;
+                const t = (key, params) => window.i18n ? window.i18n.t(key, params) : key;
+                descInput.value = t('templates.templateSuggestionDescription', { type: type.toLowerCase() });
             });
 
             btn.addEventListener('mouseenter', () => {
@@ -607,20 +710,21 @@ Generate the template now:`;
                 previewDiv.textContent = generatedContent;
                 previewSection.classList.remove('hidden');
                 saveBtn.classList.remove('hidden');
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 generateBtn.textContent = t('templates.regenerate');
 
             } catch (error) {
                 console.error('[Templates] Failed to generate AI template:', error);
 
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                
                 // Provide more specific error messages
-                let errorMessage = 'Failed to generate template. ';
+                let errorMessage = t('templates.failedToGenerateTemplate');
                 if (error.message.includes('Connection timeout') || error.message.includes('not available')) {
-                    errorMessage += 'Please check your AI service connection.';
+                    errorMessage += t('templates.checkAIServiceConnection');
                 } else if (error.message.includes('API key')) {
-                    errorMessage += 'Please check your AI API key in settings.';
+                    errorMessage += t('templates.checkAIAPIKey');
                 } else {
-                    errorMessage += 'Please try again or check the console for details.';
+                    errorMessage += t('templates.tryAgainOrCheckConsole');
                 }
 
                 this.app.showNotification?.(errorMessage, 'error');
@@ -669,6 +773,7 @@ Generate the template now:`;
     }
 
     showTemplateCreatorDialog(content, isAIGenerated = false) {
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         // Try to extract a name from the content if AI-generated
         let suggestedName = '';
         let suggestedDescription = '';
@@ -679,7 +784,8 @@ Generate the template now:`;
             const firstHeading = content.match(/^#\s+(.+)$/m);
             if (firstHeading) {
                 suggestedName = firstHeading[1].trim();
-                suggestedDescription = `AI-generated template for ${suggestedName.toLowerCase()}`;
+                const t = (key, params) => window.i18n ? window.i18n.t(key, params) : key;
+                suggestedDescription = t('templates.aiGeneratedTemplateFor', { name: suggestedName.toLowerCase() });
             }
             
             // Try to detect icon from content
@@ -694,27 +800,27 @@ Generate the template now:`;
             <div id="template-creator-overlay" class="modal">
                 <div class="modal-content" style="max-width: 500px; background: var(--modal-bg, rgba(255, 255, 255, 0.95)); color: var(--text-primary);">
                     <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-                        <h3 style="color: var(--text-primary);">${isAIGenerated ? '<i class="fas fa-robot"></i> ' : ''}Save Custom Template</h3>
-                        <button id="template-creator-close" class="modal-close" style="color: var(--text-secondary);" title="Close"><i class="fas fa-times"></i></button>
+                        <h3 style="color: var(--text-primary);">${isAIGenerated ? '<i class="fas fa-robot"></i> ' : ''}${t('templates.saveCustomTemplate')}</h3>
+                        <button id="template-creator-close" class="modal-close" style="color: var(--text-secondary);" title="${t('modals.close')}"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="modal-body" style="color: var(--text-primary);">
-                        ${!content ? '<div class="template-creator-warning" style="padding: 12px; background: var(--warning-bg, #fff3cd); border: 1px solid var(--warning-border, #ffc107); border-radius: 6px; margin-bottom: 16px; color: var(--warning-text, #856404);"><i class="fas fa-exclamation-triangle"></i> No content in current note. Template will be empty.</div>' : ''}
-                        ${isAIGenerated ? '<div class="template-creator-info" style="padding: 12px; background: var(--accent-bg, #e3f2fd); border: 1px solid var(--accent-border, #2196F3); border-radius: 6px; margin-bottom: 16px; color: var(--accent-text, #1565c0);"><i class="fas fa-magic"></i> Template generated by AI. Review and customize before saving.</div>' : ''}
+                        ${!content ? `<div class="template-creator-warning" style="padding: 12px; background: var(--warning-bg, #fff3cd); border: 1px solid var(--warning-border, #ffc107); border-radius: 6px; margin-bottom: 16px; color: var(--warning-text, #856404);"><i class="fas fa-exclamation-triangle"></i> ${t('templates.noContentWarning')}</div>` : ''}
+                        ${isAIGenerated ? `<div class="template-creator-info" style="padding: 12px; background: var(--accent-bg, #e3f2fd); border: 1px solid var(--accent-border, #2196F3); border-radius: 6px; margin-bottom: 16px; color: var(--accent-text, #1565c0);"><i class="fas fa-magic"></i> ${t('templates.aiGeneratedInfo')}</div>` : ''}
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label for="template-name-input" style="display: block; margin-bottom: 8px; font-weight: 500;">Template Name *</label>
-                            <input type="text" id="template-name-input" class="ai-dialog-input" placeholder="e.g., Weekly Report" value="${suggestedName}" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);" required>
+                            <label for="template-name-input" style="display: block; margin-bottom: 8px; font-weight: 500;">${t('templates.templateName')}</label>
+                            <input type="text" id="template-name-input" class="ai-dialog-input" placeholder="${t('templates.templateNamePlaceholder')}" value="${suggestedName}" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label for="template-description-input" style="display: block; margin-bottom: 8px; font-weight: 500;">Description *</label>
-                            <input type="text" id="template-description-input" class="ai-dialog-input" placeholder="e.g., Template for weekly status reports" value="${suggestedDescription}" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);" required>
+                            <label for="template-description-input" style="display: block; margin-bottom: 8px; font-weight: 500;">${t('templates.description')}</label>
+                            <input type="text" id="template-description-input" class="ai-dialog-input" placeholder="${t('templates.descriptionPlaceholder')}" value="${suggestedDescription}" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);" required>
                         </div>
                         <div class="form-group" style="margin-bottom: 16px;">
-                            <label for="template-icon-input" style="display: block; margin-bottom: 8px; font-weight: 500;">Icon (emoji)</label>
+                            <label for="template-icon-input" style="display: block; margin-bottom: 8px; font-weight: 500;">${t('templates.icon')}</label>
                             <input type="text" id="template-icon-input" class="ai-dialog-input" placeholder="📝" value="${suggestedIcon}" maxlength="2" style="width: 100%; padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; background: var(--bg-primary); color: var(--text-primary);">
                         </div>
                         <div class="ai-dialog-actions" style="display: flex; gap: 12px; justify-content: flex-end;">
-                            <button id="template-creator-cancel" class="btn-secondary">Cancel</button>
-                            <button id="template-creator-create" class="btn-primary">Save Template</button>
+                            <button id="template-creator-cancel" class="btn-secondary">${t('modals.cancel')}</button>
+                            <button id="template-creator-create" class="btn-primary">${t('templates.saveTemplate')}</button>
                         </div>
                     </div>
                 </div>
@@ -778,7 +884,8 @@ Generate the template now:`;
             // Save to database
             await this.saveCustomTemplates();
             
-            this.app.showNotification?.(`Template "${name}" created successfully!`, 'success');
+            const t = (key, params) => window.i18n ? window.i18n.t(key, params) : key;
+            this.app.showNotification?.(t('templates.templateCreated', { name }), 'success');
             this.renderTemplates();
             
             console.log('[Templates] Template saved and rendered');
@@ -820,21 +927,22 @@ Generate the template now:`;
         if (index === -1) return;
 
         const template = this.customTemplates[index];
+        const t = (key, params) => window.i18n ? window.i18n.t(key, params) : key;
         
         // Create confirmation dialog
         const dialogHTML = `
             <div id="template-delete-confirm-overlay" class="modal">
                 <div class="modal-content" style="max-width: 400px; background: var(--modal-bg, rgba(255, 255, 255, 0.95)); color: var(--text-primary);">
                     <div class="modal-header" style="border-bottom: 1px solid var(--border-color);">
-                        <h3 style="color: var(--text-primary);">Delete Template</h3>
-                        <button id="template-delete-confirm-close" class="modal-close" style="color: var(--text-secondary);" title="Close"><i class="fas fa-times"></i></button>
+                        <h3 style="color: var(--text-primary);">${t('templates.deleteTemplate')}</h3>
+                        <button id="template-delete-confirm-close" class="modal-close" style="color: var(--text-secondary);" title="${t('modals.close')}"><i class="fas fa-times"></i></button>
                     </div>
                     <div class="modal-body" style="color: var(--text-primary);">
-                        <p style="margin-bottom: 20px;">Are you sure you want to delete the template <strong>"${template.name}"</strong>?</p>
-                        <p style="color: var(--text-secondary); font-size: 14px;">This action cannot be undone.</p>
+                        <p style="margin-bottom: 20px;">${t('templates.deleteTemplateConfirm', { name: template.name })}</p>
+                        <p style="color: var(--text-secondary); font-size: 14px;">${t('templates.cannotBeUndone')}</p>
                         <div class="ai-dialog-actions" style="display: flex; gap: 12px; justify-content: flex-end; margin-top: 24px;">
-                            <button id="template-delete-cancel" class="btn-secondary">Cancel</button>
-                            <button id="template-delete-confirm" class="btn-primary" style="background: var(--error-color, #f44336);">Delete</button>
+                            <button id="template-delete-cancel" class="btn-secondary">${t('modals.cancel')}</button>
+                            <button id="template-delete-confirm" class="btn-primary" style="background: var(--error-color, #f44336);">${t('modals.delete')}</button>
                         </div>
                     </div>
                 </div>
@@ -863,7 +971,8 @@ Generate the template now:`;
 
             await this.saveCustomTemplates();
             this.renderTemplates();
-            this.app.showNotification?.('Template deleted', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.app.showNotification?.(t('templates.templateDeleted'), 'success');
             
             closeDialog();
         });

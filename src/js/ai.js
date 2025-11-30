@@ -514,9 +514,10 @@ class AIManager {
     }
 
     showOfflineMessage() {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         let message = '';
         if (this.backend === 'ollama') {
-            message = `🤖 AI features are currently offline.
+            const fallback = `🤖 AI features are currently offline.
 
 **To use Ollama:**
 1. Install Ollama from https://ollama.com
@@ -525,8 +526,9 @@ class AIManager {
 4. Verify it's running at ${this.ollamaEndpoint}
 
 **Alternative:** Switch to OpenRouter in AI Settings for cloud-based AI (requires internet).`;
+            message = window.i18n ? window.i18n.t('ai.offlineOllama', { endpoint: this.ollamaEndpoint }) : fallback;
         } else if (this.backend === 'openrouter') {
-            message = `🤖 AI features are currently offline.
+            const fallback = `🤖 AI features are currently offline.
 
 **To use OpenRouter:**
 1. Ensure you have an active internet connection
@@ -535,6 +537,7 @@ class AIManager {
 4. Test the connection
 
 **Alternative:** Switch to Ollama in AI Settings for local AI (works offline).`;
+            message = window.i18n ? window.i18n.t('ai.offlineOpenRouter', {}) : fallback;
         }
         this.app.showAIMessage(message, 'assistant');
     }
@@ -1966,7 +1969,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Summarizing content...');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.summarizingContent', 'Summarizing content...'));
             this.app.showLoading();
             const summary = await this.summarize(text);
             this.app.showAIMessage(`${summary}`, 'assistant');
@@ -1974,7 +1978,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage('❌ Failed to generate summary. Please check your AI connection.', 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.showAIMessage(t('ai.failedToGenerateSummary', '❌ Failed to generate summary. Please check your AI connection.'), 'assistant');
         } finally {
             this.app.hideLoading();
         }
@@ -1986,7 +1991,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Processing with AI...');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.processing', 'Processing with AI...'));
             this.app.showLoading();
             const answer = await this.askQuestion(question, context);
             this.app.showAIMessage(`${answer}`, 'assistant');
@@ -1994,7 +2000,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage('❌ Failed to get AI response. Please check your AI connection.', 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.showAIMessage(t('ai.failedToGetAIResponse', '❌ Failed to get AI response. Please check your AI connection.'), 'assistant');
         } finally {
             this.app.hideLoading();
         }
@@ -2017,7 +2024,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Editing text with AI...');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.editingTextWithAI', 'Editing text with AI...'));
             this.app.showLoading(null, true); // Show cancel button for AI operations
 
             console.log('[DEBUG] AI handleEditText: Starting with text:', text.substring(0, 50) + '...');
@@ -2039,7 +2047,7 @@ Suggested tags:`;
                 editedResult.includes('All scraping attempts failed')
             )) {
                 console.log('[DEBUG] AI handleEditText: Tool execution appears to have failed - showing fallback message');
-                this.app.showAIMessage('❌ Text editing failed due to tool execution issues. Please check your SearXNG connection and try again.', 'assistant');
+                this.app.showAIMessage(t('ai.editFailedToolExecution', '❌ Text editing failed due to tool execution issues. Please check your SearXNG connection and try again.'), 'assistant');
                 return;
             }
 
@@ -2062,7 +2070,7 @@ Suggested tags:`;
             if (this.editApproval && editedResult) {
                 console.log('[DEBUG] AI handleEditText: Showing approval interface');
                 this.editApproval.showApprovalDialog(text, editedResult, instruction);
-                this.app.showAIMessage('✅ AI edit generated! Accept to apply or Reject to keep original.', 'assistant');
+                this.app.showAIMessage(t('ai.editGenerated', '✅ AI edit generated! Accept to apply or Reject to keep original.'), 'assistant');
             } else {
                 console.error('[DEBUG] AI handleEditText: Edit approval system not available');
 
@@ -2074,7 +2082,7 @@ Suggested tags:`;
                         if (this.editApproval && editedResult) {
                             console.log('[DEBUG] AI handleEditText: Reinitialization successful, showing approval dialog');
                             this.editApproval.showApprovalDialog(text, editedResult, instruction);
-                            this.app.showAIMessage('✅ AI edit generated! Please review the changes in the approval dialog.', 'assistant');
+                            this.app.showAIMessage(t('ai.editGeneratedReview', '✅ AI edit generated! Please review the changes in the approval dialog.'), 'assistant');
                             return;
                         }
                     } catch (reinitError) {
@@ -2083,8 +2091,8 @@ Suggested tags:`;
                 }
 
                 const errorMsg = this.editApproval ?
-                    '❌ Edit approval interface encountered an error. Please refresh the application.' :
-                    '❌ AI edit approval system not initialized. Please wait a moment and try again.';
+                    t('ai.editApprovalError', '❌ Edit approval interface encountered an error. Please refresh the application.') :
+                    t('ai.editApprovalNotInitialized', '❌ AI edit approval system not initialized. Please wait a moment and try again.');
                 this.app.showAIMessage(errorMsg, 'assistant');
             }
 
@@ -2098,7 +2106,10 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage(`❌ Failed to edit text: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const fallback = `❌ Failed to edit text: ${error.message}. Please check your AI connection and SearXNG setup.`;
+            const message = window.i18n ? window.i18n.t('ai.failedToEditText', { error: error.message }) : fallback;
+            this.app.showAIMessage(message, 'assistant');
         } finally {
             this.app.hideLoading();
             this.app.isAIOperationCancelled = false; // Reset flag
@@ -2122,7 +2133,8 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.updateLoadingText('Generating content with AI...');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            this.app.updateLoadingText(t('ai.generatingContentWithAI', 'Generating content with AI...'));
             this.app.showLoading(null, true); // Show cancel button for AI operations
 
             console.log('[DEBUG] AI handleGenerateContent: Starting with prompt:', prompt);
@@ -2143,7 +2155,7 @@ Suggested tags:`;
                 generatedResult.includes('All scraping attempts failed')
             )) {
                 console.log('[DEBUG] AI handleGenerateContent: Tool execution appears to have failed - showing fallback message');
-                this.app.showAIMessage('❌ Content generation failed due to tool execution issues. Please check your SearXNG connection and try again.', 'assistant');
+                this.app.showAIMessage(t('ai.contentGenerationFailedToolExecution', '❌ Content generation failed due to tool execution issues. Please check your SearXNG connection and try again.'), 'assistant');
                 return;
             }
 
@@ -2160,7 +2172,7 @@ Suggested tags:`;
             if (this.generateApproval && generatedResult) {
                 console.log('[DEBUG] AI handleGenerateContent: Showing approval interface');
                 this.generateApproval.showApprovalDialog(generatedResult, prompt);
-                this.app.showAIMessage('✅ AI content generated! Accept to insert or Reject to discard.', 'assistant');
+                this.app.showAIMessage(t('ai.contentGenerated', '✅ AI content generated! Accept to insert or Reject to discard.'), 'assistant');
             } else {
                 console.error('[DEBUG] AI handleGenerateContent: Generate approval system not available');
 
@@ -2172,7 +2184,7 @@ Suggested tags:`;
                         if (this.generateApproval && generatedResult) {
                             console.log('[DEBUG] AI handleGenerateContent: Reinitialization successful, showing approval dialog');
                             this.generateApproval.showApprovalDialog(generatedResult, prompt);
-                            this.app.showAIMessage('✅ AI content generated! Please review in the approval dialog.', 'assistant');
+                            this.app.showAIMessage(t('ai.contentGeneratedReview', '✅ AI content generated! Please review in the approval dialog.'), 'assistant');
                             return;
                         }
                     } catch (reinitError) {
@@ -2183,7 +2195,7 @@ Suggested tags:`;
                 // Fallback: directly insert the generated content
                 console.log('[DEBUG] AI handleGenerateContent: Using fallback - directly inserting content');
                 this.app.insertTextAtCursor(generatedResult);
-                this.app.showAIMessage('✅ Content generated and inserted!', 'assistant');
+                this.app.showAIMessage(t('ai.contentGeneratedInserted', '✅ Content generated and inserted!'), 'assistant');
             }
 
         } catch (error) {
@@ -2196,7 +2208,10 @@ Suggested tags:`;
             if (!this.app.aiPanelVisible) {
                 this.app.toggleAIPanel();
             }
-            this.app.showAIMessage(`❌ Failed to generate content: ${error.message}. Please check your AI connection and SearXNG setup.`, 'assistant');
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const fallback = `❌ Failed to generate content: ${error.message}. Please check your AI connection and SearXNG setup.`;
+            const message = window.i18n ? window.i18n.t('ai.failedToGenerateContent', { error: error.message }) : fallback;
+            this.app.showAIMessage(message, 'assistant');
         } finally {
             this.app.hideLoading();
             this.app.isAIOperationCancelled = false; // Reset flag

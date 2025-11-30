@@ -268,7 +268,10 @@ class AdvancedSearchManager {
     updateResultsCount(count) {
         const countElement = document.getElementById('search-results-count');
         if (countElement) {
-            countElement.textContent = `${count} note${count !== 1 ? 's' : ''} found`;
+            const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+            const plural = count !== 1 ? 's' : '';
+            const text = t('advancedSearch.searchResultsCount', `${count} note${plural} found`, { count, plural });
+            countElement.textContent = text;
         }
     }
 

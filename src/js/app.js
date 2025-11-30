@@ -1426,6 +1426,8 @@ class CogNotezApp {
         ipcRenderer.on('sync-data-updated', (event, syncData) => this.handleSyncDataUpdated(syncData));
         ipcRenderer.on('sync-completed', (event, syncResult) => this.handleSyncCompleted(syncResult));
         ipcRenderer.on('sync-requires-passphrase', (event, payload) => this.promptForDecryptionPassphrase(payload));
+        ipcRenderer.on('sync-closing-show', () => this.showSyncClosingOverlay());
+        ipcRenderer.on('sync-closing-hide', () => this.hideSyncClosingOverlay());
 
         // Encryption-related IPC events
         ipcRenderer.on('encryption-settings-updated', (event, settings) => this.handleEncryptionSettingsUpdated(settings));
@@ -4041,6 +4043,10 @@ class CogNotezApp {
     // Show confirmation dialog (replaces native confirm())
     showConfirmation(title, message) {
         return new Promise((resolve) => {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const cancelText = t('modals.cancel', 'Cancel');
+            const confirmText = t('modals.confirm', 'Confirm');
+            
             const content = `
                 <div style="padding: 10px 0;">
                     <p style="margin: 0; color: var(--text-primary); white-space: pre-line;">
@@ -4050,8 +4056,8 @@ class CogNotezApp {
             `;
 
             const modal = this.createModal(title, content, [
-                { text: 'Cancel', type: 'secondary', action: 'cancel', callback: () => resolve(false) },
-                { text: 'Confirm', type: 'primary', action: 'confirm', callback: () => resolve(true) }
+                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(false) },
+                { text: confirmText, type: 'primary', action: 'confirm', callback: () => resolve(true) }
             ]);
 
             // Also handle clicking outside or pressing Escape
@@ -4075,6 +4081,10 @@ class CogNotezApp {
     // Show input prompt dialog (replaces native prompt())
     showInputPrompt(title, message, defaultValue = '', placeholder = '') {
         return new Promise((resolve) => {
+            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const cancelText = t('modals.cancel', 'Cancel');
+            const okText = t('modals.ok', 'OK');
+            
             const inputId = 'prompt-input-' + Date.now();
             const content = `
                 <div style="padding: 10px 0;">
@@ -4089,8 +4099,8 @@ class CogNotezApp {
             `;
 
             const modal = this.createModal(title, content, [
-                { text: 'Cancel', type: 'secondary', action: 'cancel', callback: () => resolve(null) },
-                { text: 'OK', type: 'primary', action: 'confirm', callback: () => {
+                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(null) },
+                { text: okText, type: 'primary', action: 'confirm', callback: () => {
                     const input = modal.querySelector(`#${inputId}`);
                     resolve(input ? input.value.trim() : null);
                 }}
@@ -5924,6 +5934,28 @@ Please provide a helpful response based on the note content and conversation his
         // The flag will be cleared when the operation finishes or is cancelled
     }
 
+    showSyncClosingOverlay() {
+        const syncClosingOverlay = document.getElementById('sync-closing-overlay');
+        if (syncClosingOverlay) {
+            // Ensure translation is applied (i18n system handles data-i18n automatically, but update manually as backup)
+            if (window.i18n) {
+                const textElement = syncClosingOverlay.querySelector('.loading-text');
+                if (textElement && textElement.hasAttribute('data-i18n')) {
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    textElement.textContent = t('settings.sync.syncClosingMessage');
+                }
+            }
+            syncClosingOverlay.classList.remove('hidden');
+        }
+    }
+
+    hideSyncClosingOverlay() {
+        const syncClosingOverlay = document.getElementById('sync-closing-overlay');
+        if (syncClosingOverlay) {
+            syncClosingOverlay.classList.add('hidden');
+        }
+    }
+
     cancelAIOperation() {
         console.log('[AI] Cancelling current AI operation...');
         
@@ -7126,7 +7158,8 @@ Please provide a helpful response based on the note content and conversation his
             // Show restart dialog if auto-save setting changed
             if (autoSaveChanged) {
                 setTimeout(() => {
-                    this.showRestartDialog('Auto-save setting requires an app restart to take full effect.');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showRestartDialog(t('modals.restartAutoSave'));
                 }, 500);
             }
         });
@@ -8380,7 +8413,8 @@ Please provide a helpful response based on the note content and conversation his
                         // Close the sync settings modal and show restart dialog
                         this.closeModal(modal);
                         setTimeout(() => {
-                            this.showRestartDialog('Google Drive connection requires an app restart to sync properly.');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showRestartDialog(t('modals.restartGoogleDriveConnect'));
                         }, 500);
                     } else {
                         // Don't show notification here - let the IPC error event handler do it
@@ -8415,7 +8449,8 @@ Please provide a helpful response based on the note content and conversation his
                         // Close the sync settings modal and show restart dialog
                         this.closeModal(modal);
                         setTimeout(() => {
-                            this.showRestartDialog('Google Drive disconnection requires an app restart to complete.');
+                            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                            this.showRestartDialog(t('modals.restartGoogleDriveDisconnect'));
                         }, 500);
                     } else {
                         this.showNotification(result.error || 'Failed to disconnect from Google Drive', 'error');
