@@ -1412,7 +1412,10 @@ class CogNotezApp {
         ipcRenderer.on('menu-about', () => this.showAboutDialog());
 
         // Update-related IPC events
-        ipcRenderer.on('update-checking', () => this.showUpdateStatus('Checking for updates...'));
+        ipcRenderer.on('update-checking', () => {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showUpdateStatus(t('notifications.checkingForUpdates'));
+        });
         ipcRenderer.on('update-available', (event, info) => this.showUpdateAvailable(info));
         ipcRenderer.on('update-not-available', (event, info) => this.showUpdateNotAvailable(info));
         ipcRenderer.on('update-error', (event, error) => this.showUpdateError(error));
@@ -1429,20 +1432,22 @@ class CogNotezApp {
 
         // Google Drive authentication IPC handlers
         ipcRenderer.on('google-drive-auth-success', (event, data) => {
-            this.showNotification(data.message || 'Google Drive authentication successful', 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(data.message || t('notifications.googleDriveAuthSuccess'), 'success');
             // Refresh sync status to show connected state
             this.updateSyncStatus();
         });
 
         ipcRenderer.on('google-drive-auth-error', (event, data) => {
-            let errorMessage = 'Google Drive authentication failed';
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            let errorMessage = t('notifications.googleDriveAuthFailed');
             if (data.error) {
                 if (data.error.includes('credentials not found') || data.error.includes('Google Drive credentials')) {
-                    errorMessage = 'Google Drive credentials file not found. Please upload your Google Drive credentials JSON file first by clicking "Import Credentials" in the sync settings.';
+                    errorMessage = t('notifications.googleDriveCredentialsNotFound');
                 } else if (data.error.includes('access_denied') || data.error.includes('403')) {
-                    errorMessage = 'Google Drive access denied. Your email needs to be added as a test user in Google Cloud Console → OAuth consent screen → Audience → Test users → ADD USERS.';
+                    errorMessage = t('notifications.googleDriveAccessDenied');
                 } else {
-                    errorMessage = `Google Drive authentication failed: ${data.error}`;
+                    errorMessage = t('notifications.googleDriveAuthFailedError', { error: data.error });
                 }
             }
             this.showNotification(errorMessage, 'error');
@@ -1968,21 +1973,21 @@ class CogNotezApp {
     // Show warning dialog for unsaved changes
     async showUnsavedChangesWarning() {
         return new Promise((resolve) => {
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
             const content = `
                 <div style="padding: 10px 0;">
                     <p style="margin: 0 0 20px 0; color: var(--text-primary);">
                         You have unsaved changes in the current note.
                     </p>
                     <p style="margin: 0 0 20px 0; color: var(--text-secondary); font-size: 14px;">
-                        What would you like to do?
+                        ${t('modals.unsavedChangesMessage')}
                     </p>
                 </div>
             `;
-
-            const modal = this.createModal('Unsaved Changes', content, [
-                { text: 'Save and Switch', type: 'primary', action: 'save-switch' },
-                { text: 'Discard Changes', type: 'secondary', action: 'discard-switch' },
-                { text: 'Cancel', type: 'secondary', action: 'cancel' }
+            const modal = this.createModal(t('modals.unsavedChanges'), content, [
+                { text: t('modals.saveAndSwitch'), type: 'primary', action: 'save-switch' },
+                { text: t('modals.discardChanges'), type: 'secondary', action: 'discard-switch' },
+                { text: t('modals.cancel'), type: 'secondary', action: 'cancel' }
             ]);
 
             const saveBtn = modal.querySelector('[data-action="save-switch"]');
@@ -2280,10 +2285,12 @@ class CogNotezApp {
         const icon = lockBtn.querySelector('i');
         if (this.currentNote.password_protected) {
             icon.className = 'fas fa-lock-open';
-            lockBtn.title = 'Remove Password Protection';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            lockBtn.title = t('tooltips.removePasswordProtection');
         } else {
             icon.className = 'fas fa-lock';
-            lockBtn.title = 'Add Password Protection';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            lockBtn.title = t('tooltips.addPasswordProtection');
         }
     }
 
@@ -3380,7 +3387,8 @@ class CogNotezApp {
     }
 
     generatePreview(content) {
-        if (!content || !content.trim()) return 'Empty note';
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        if (!content || !content.trim()) return t('notes.emptyNote');
 
         // Split content into lines
         const lines = content.split('\n');
@@ -3437,7 +3445,7 @@ class CogNotezApp {
         }
         
         // If no meaningful content found, return fallback
-        return 'Empty note';
+        return t('notes.emptyNote');
     }
 
     updateNotePreview() {
@@ -3654,11 +3662,12 @@ class CogNotezApp {
     }
 
     showCreateTagDialog() {
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         const content = `
             <div class="create-tag-form">
                 <div class="form-group" style="margin-bottom: 16px;">
-                    <label for="new-folder-tag-name" style="display: block; margin-bottom: 6px; font-weight: 500;">Tag Name</label>
-                    <input type="text" id="new-folder-tag-name" placeholder="Enter tag name..." 
+                    <label for="new-folder-tag-name" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('tags.tagName')}</label>
+                    <input type="text" id="new-folder-tag-name" placeholder="${t('placeholder.enterTagName')}" 
                            class="filter-input" style="width: 100%; padding: 10px 12px; border-radius: 6px;">
                 </div>
                 <div class="form-group">
@@ -3677,9 +3686,9 @@ class CogNotezApp {
             </div>
         `;
 
-        const modal = this.createModal('Create New Tag', content, [
-            { text: 'Create', type: 'primary', action: 'create', callback: () => this.createTagFromDialog() },
-            { text: 'Cancel', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('modals.createNewTag'), content, [
+            { text: t('modals.create'), type: 'primary', action: 'create', callback: () => this.createTagFromDialog() },
+            { text: t('modals.cancel'), type: 'secondary', action: 'cancel' }
         ]);
 
         // Setup color selection
@@ -3868,7 +3877,8 @@ class CogNotezApp {
                 await this.switchFolder('all');
             }
 
-            this.showNotification(`Tag "${tag.name}" deleted`, 'success');
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            this.showNotification(t('notifications.tagDeleted', { name: tag.name }), 'success');
             await this.renderTagFolders();
             await this.notesManager.renderNotesList('', this.currentFolder);
 
@@ -4184,8 +4194,9 @@ class CogNotezApp {
                 </div>
             `;
 
-            this.createModal('About CogNotez', content, [
-                { text: 'Close', type: 'primary', action: 'close' }
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.createModal(t('about.title'), content, [
+                { text: t('modals.close'), type: 'primary', action: 'close' }
             ]);
         }
     }
@@ -4347,12 +4358,8 @@ Please provide a helpful response based on the note content and conversation his
 • Pull a model: "ollama pull llama2"
 • Or switch to OpenRouter in AI Settings`;
                 } else {
-                    response = `<i class="fas fa-robot"></i> AI features are currently offline.
-
-**To enable OpenRouter:**
-• Check your internet connection
-• Verify your API key in AI Settings
-• Or switch to Ollama for offline AI`;
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    response = `<i class="fas fa-robot"></i> ${t('notifications.aiFeaturesOffline')}`;
                 }
             }
 
@@ -4379,9 +4386,10 @@ Please provide a helpful response based on the note content and conversation his
             const backend = this.aiManager ? this.aiManager.backend : 'ollama';
             let errorMsg = '❌ Sorry, I encountered an error. ';
             if (backend === 'ollama') {
-                errorMsg += 'Please check that Ollama is running and accessible.';
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                errorMsg += t('notifications.checkOllamaRunning');
             } else {
-                errorMsg += 'Please check your internet connection and OpenRouter settings.';
+                errorMsg += t('notifications.checkInternetAndOpenRouter');
             }
             this.showAIMessage(errorMsg, 'assistant');
         }
@@ -4441,7 +4449,8 @@ Please provide a helpful response based on the note content and conversation his
         // Copy button
         const copyBtn = document.createElement('button');
         copyBtn.className = 'ai-message-action';
-        copyBtn.title = 'Copy message';
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        copyBtn.title = t('tooltips.copyMessage');
         copyBtn.innerHTML = '<i class="fas fa-copy"></i>';
         copyBtn.addEventListener('click', (e) => {
             e.stopPropagation();
@@ -4466,7 +4475,8 @@ Please provide a helpful response based on the note content and conversation his
         if (type === 'assistant' && !options.isWelcome && !message.includes('Hello! I\'m your AI assistant')) {
             const regenerateBtn = document.createElement('button');
             regenerateBtn.className = 'ai-message-action';
-            regenerateBtn.title = 'Regenerate response';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            regenerateBtn.title = t('tooltips.regenerateResponse');
             regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
             
             // Capture app instance for use in event listener
@@ -4851,12 +4861,14 @@ Please provide a helpful response based on the note content and conversation his
             case 'ask-ai':
                 this.preserveSelection = true;
                 if (this.selectedText) {
-                    this.showAIDialog('Ask AI About Selection',
-                        `Ask a question about the selected text: "${this.selectedText.substring(0, 50)}${this.selectedText.length > 50 ? '...' : ''}"`,
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    this.showAIDialog(t('ai.askAboutSelection'),
+                        t('ai.askAboutSelectionMessage', { text: this.selectedText.substring(0, 50) + (this.selectedText.length > 50 ? '...' : '') }),
                         'ask-ai');
                 } else {
-                    this.showAIDialog('Ask AI About Note',
-                        `Ask a question about: "${this.currentNote ? this.currentNote.title : 'Untitled'}"`,
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    this.showAIDialog(t('ai.askAboutNote'),
+                        t('ai.askAboutNoteMessage', { title: this.currentNote ? this.currentNote.title : 'Untitled' }),
                         'ask-ai');
                 }
                 break;
@@ -4864,8 +4876,9 @@ Please provide a helpful response based on the note content and conversation his
             case 'edit-ai':
                 if (this.selectedText) {
                     this.preserveSelection = true;
-                    this.showAIDialog('Edit Selection with AI',
-                        'How would you like to edit this text?',
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    this.showAIDialog(t('ai.editSelectionWithAI'),
+                        t('ai.howToEditText'),
                         'edit-ai');
                 } else {
                     const t = (key) => window.i18n ? window.i18n.t(key) : key;
@@ -4941,7 +4954,8 @@ Please provide a helpful response based on the note content and conversation his
                     const attachment = attachments.find(att => att.id === fileId);
                     const originalName = attachment?.name || fileId;
 
-                    this.showNotification(`Media file "${originalName}" not found locally`, 'error');
+                    const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                    this.showNotification(t('notifications.mediaFileNotFound', { name: originalName }), 'error');
                 } else {
                     const t = (key) => window.i18n ? window.i18n.t(key) : key;
                     this.showNotification(t('notifications.mediaManagerNotAvailable'), 'error');
@@ -5022,8 +5036,9 @@ Please provide a helpful response based on the note content and conversation his
             return;
         }
         this.preserveSelection = true;
-        this.showAIDialog('Rewrite Selection',
-            'How would you like to rewrite this text?',
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showAIDialog(t('ai.rewriteSelection'),
+            t('ai.howToRewriteText'),
             'rewrite');
     }
 
@@ -5034,8 +5049,9 @@ Please provide a helpful response based on the note content and conversation his
             return;
         }
         this.preserveSelection = true;
-        this.showAIDialog('Extract Key Points',
-            'Extracting key points from selected text...',
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showAIDialog(t('ai.extractKeyPoints'),
+            t('ai.extractingKeyPoints'),
             'key-points');
     }
 
@@ -5116,8 +5132,9 @@ Please provide a helpful response based on the note content and conversation his
             }
             console.error('[DEBUG] processAIDialog: AI action failed:', error);
             const backend = this.aiManager ? this.aiManager.backend : 'ollama';
-            const connectionType = backend === 'ollama' ? 'Ollama service' : 'internet connection and API key';
-            this.showNotification(`AI action failed. Please check your ${connectionType}.`, 'error');
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            const connectionType = backend === 'ollama' ? t('notifications.ollamaService') : t('notifications.internetConnectionAndApiKey');
+            this.showNotification(t('notifications.aiActionFailed', { connectionType }), 'error');
         } finally {
             this.hideLoading();
             this.isAIOperationCancelled = false; // Reset flag
@@ -5125,6 +5142,7 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     async handleAIAction(action, input, customData = {}) {
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
         console.log('[DEBUG] handleAIAction called with action:', action, 'input:', input);
         console.log('[DEBUG] handleAIAction: selectedText =', this.selectedText ? this.selectedText.substring(0, 50) + '...' : 'none');
         console.log('[DEBUG] handleAIAction: selectionStart =', this.selectionStart, 'selectionEnd =', this.selectionEnd);
@@ -5190,7 +5208,7 @@ Please provide a helpful response based on the note content and conversation his
                     // Create abort controller for this AI operation
                     this.currentAIAbortController = new AbortController();
                     this.isAIOperationCancelled = false; // Reset cancellation flag
-                    this.updateLoadingText('Rewriting text...');
+                    this.updateLoadingText(t('ai.rewritingText'));
                     this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         console.log('[DEBUG] handleAIAction rewrite: starting with selectedText:', this.selectedText.substring(0, 50) + '...');
@@ -5207,10 +5225,12 @@ Please provide a helpful response based on the note content and conversation his
                         console.log('[DEBUG] handleAIAction rewrite: got response:', response.substring(0, 50) + '...');
                         await this.aiManager.saveConversation(noteId, `Rewrite "${this.selectedText.substring(0, 50)}..." in ${style} style`, response, this.selectedText, 'rewrite');
                         this.replaceSelection(response);
-                        this.showAIMessage('✅ Text rewritten successfully!', 'assistant');
+                        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                        this.showAIMessage(`✅ ${t('notifications.textRewrittenSuccess')}`, 'assistant');
                     } catch (error) {
                         console.error('[DEBUG] handleAIAction rewrite error:', error);
-                        this.showAIMessage(`❌ Failed to rewrite text: ${error.message}`, 'assistant');
+                        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                        this.showAIMessage(`❌ ${t('notifications.textRewriteFailed', { error: error.message })}`, 'assistant');
                     } finally {
                         this.hideLoading();
                         this.isAIOperationCancelled = false; // Reset flag
@@ -5225,7 +5245,7 @@ Please provide a helpful response based on the note content and conversation his
                     // Create abort controller for this AI operation
                     this.currentAIAbortController = new AbortController();
                     this.isAIOperationCancelled = false; // Reset cancellation flag
-                    this.updateLoadingText('Extracting key points...');
+                    this.updateLoadingText(t('ai.extractingKeyPointsLoading'));
                     this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         const keyPointsResponse = await this.aiManager.extractKeyPoints(this.selectedText);
@@ -5252,7 +5272,7 @@ Please provide a helpful response based on the note content and conversation his
                     // Create abort controller for this AI operation
                     this.currentAIAbortController = new AbortController();
                     this.isAIOperationCancelled = false; // Reset cancellation flag
-                    this.updateLoadingText('Generating tags...');
+                    this.updateLoadingText(t('ai.generatingTags'));
                     this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         // Include note title for better tag generation context
@@ -5288,9 +5308,10 @@ Please provide a helpful response based on the note content and conversation his
             const backend = this.aiManager ? this.aiManager.backend : 'ollama';
             let errorMsg = '❌ AI action failed. ';
             if (backend === 'ollama') {
-                errorMsg += 'Please ensure Ollama is running ("ollama serve") and a model is loaded.';
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                errorMsg += t('notifications.ensureOllamaRunning');
             } else {
-                errorMsg += 'Please check your internet connection and OpenRouter API key in AI Settings.';
+                errorMsg += t('notifications.checkInternetAndApiKey');
             }
             this.showAIMessage(errorMsg, 'assistant');
             this.hideLoading();
@@ -5509,7 +5530,8 @@ Please provide a helpful response based on the note content and conversation his
         try {
             const filePath = await this.backendAPI.exportNote(this.currentNote, format);
             if (filePath) {
-                this.showNotification(`Note exported successfully to ${filePath}!`);
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.noteExportedSuccess', { path: filePath }));
             }
         } catch (error) {
             console.error('Export failed:', error);
@@ -5528,12 +5550,14 @@ Please provide a helpful response based on the note content and conversation his
 
         try {
             this.showLoading();
-            this.updateLoadingText('Preparing backup...');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.updateLoadingText(t('loading.preparingBackup'));
 
             const filePath = await this.backendAPI.createBackup();
 
             if (filePath) {
-                this.showNotification(`✅ Full backup created successfully at ${filePath}!`, 'success');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.backupCreatedSuccess', { path: filePath }), 'success');
             } else {
                 const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 this.showNotification(t('notifications.backupCancelled'), 'info');
@@ -5542,15 +5566,16 @@ Please provide a helpful response based on the note content and conversation his
             console.error('Backup creation failed:', error);
 
             // Provide user-friendly error messages based on error content
-            let errorMessage = 'Failed to create backup';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            let errorMessage = t('notifications.failedToCreateBackup');
             if (error.message.includes('database file not found')) {
-                errorMessage = 'Database file not found. Please ensure the application has been used to create notes.';
+                errorMessage = t('notifications.databaseFileNotFound');
             } else if (error.message.includes('not writable')) {
-                errorMessage = 'Cannot write to the selected location. Please choose a different directory.';
+                errorMessage = t('notifications.cannotWriteToLocation');
             } else if (error.message.includes('permission denied')) {
-                errorMessage = 'Permission denied. Please check file permissions or run as administrator.';
+                errorMessage = t('notifications.permissionDeniedCheckPermissions');
             } else if (error.message.includes('disk space')) {
-                errorMessage = 'Not enough disk space to create backup.';
+                errorMessage = t('notifications.notEnoughDiskSpace');
             } else if (error.message) {
                 errorMessage = error.message;
             }
@@ -5573,7 +5598,8 @@ Please provide a helpful response based on the note content and conversation his
                 await this.saveNotes();
                 this.renderNotesList();
                 this.displayNote(importedNote);
-                this.showNotification(`Note "${importedNote.title}" imported successfully!`);
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.noteImportedSuccess', { title: importedNote.title }));
             }
             this.hideLoading();
         } catch (error) {
@@ -5593,25 +5619,23 @@ Please provide a helpful response based on the note content and conversation his
 
         try {
             this.showLoading();
-            this.updateLoadingText('Preparing file selection...');
+            this.updateLoadingText(t('loading.preparingFileSelection'));
 
             const result = await this.backendAPI.importMultipleFiles();
 
             if (!result) {
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 this.showNotification(t('notifications.noFilesForImport'), 'info');
                 this.hideLoading();
                 return;
             }
 
             if (result.notes.length === 0) {
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 this.showNotification(t('notifications.noValidFiles'), 'warning');
                 this.hideLoading();
                 return;
             }
 
-            this.updateLoadingText(`Processing ${result.notes.length} files...`);
+                this.updateLoadingText(t('loading.processingFiles', { count: result.notes.length }));
 
             // Add imported notes
             this.notes.unshift(...result.notes);
@@ -5622,27 +5646,29 @@ Please provide a helpful response based on the note content and conversation his
             const failed = result.metadata.failedImports;
             const totalWords = result.notes.reduce((sum, note) => sum + (note.word_count || 0), 0);
 
-            let message = `✅ Successfully imported ${successful} file${successful !== 1 ? 's' : ''}`;
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            let message = `✅ ${t('notifications.filesImportedSuccess', { count: successful, plural: successful !== 1 ? 's' : '' })}`;
             if (totalWords > 0) {
                 const wordsLabel = window.i18n ? window.i18n.t('editor.words') : 'words';
                 message += ` (${totalWords} ${wordsLabel})`;
             }
             if (failed > 0) {
-                message += `. ${failed} file${failed !== 1 ? 's' : ''} failed to import.`;
+                message += `. ${t('notifications.filesImportFailed', { count: failed, plural: failed !== 1 ? 's' : '' })}`;
             }
 
             this.showNotification(message, failed > 0 ? 'warning' : 'success');
 
         } catch (error) {
             console.error('Bulk import failed:', error);
-            let errorMessage = 'Failed to import files';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            let errorMessage = t('notifications.failedToImportFiles');
 
             if (error.message.includes('permission')) {
-                errorMessage = 'Permission denied. Please check file permissions.';
+                errorMessage = t('notifications.permissionDeniedCheckFilePermissions');
             } else if (error.message.includes('not found')) {
-                errorMessage = 'Some files could not be found or accessed.';
+                errorMessage = t('notifications.someFilesNotFound');
             } else if (error.message.includes('format')) {
-                errorMessage = 'Unsupported file format. Please select supported file types.';
+                errorMessage = t('notifications.unsupportedFileFormat');
             } else if (error.message) {
                 errorMessage = `Import failed: ${error.message}`;
             }
@@ -5708,19 +5734,19 @@ Please provide a helpful response based on the note content and conversation his
 
         try {
             this.showLoading();
-            this.updateLoadingText('Preparing to restore backup...');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.updateLoadingText(t('loading.preparingToRestore'));
 
             const success = await this.backendAPI.restoreBackup();
 
             if (success) {
-                this.updateLoadingText('Reloading application data...');
+                this.updateLoadingText(t('loading.reloadingApplicationData'));
 
                 // Refresh the legacy notes array from the restored database data
                 await this.refreshLegacyNotesArray();
 
                 // Reload all data after restore
                 await this.loadNotes();
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 this.showNotification(t('notifications.backupRestored'), 'success');
 
                 // Note: In a production app, you might want to restart the app to ensure clean state
@@ -5734,15 +5760,16 @@ Please provide a helpful response based on the note content and conversation his
             console.error('Backup restore failed:', error);
 
             // Provide user-friendly error messages
-            let errorMessage = 'Failed to restore backup';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            let errorMessage = t('notifications.failedToRestoreBackup');
             if (error.message.includes('not a valid database backup')) {
-                errorMessage = 'Invalid backup file. Please select a valid CogNotez database backup (.db file).';
+                errorMessage = t('notifications.invalidBackupFile');
             } else if (error.message.includes('not found or database location not writable')) {
-                errorMessage = 'Cannot restore to the database location. Please check file permissions.';
+                errorMessage = t('notifications.cannotRestoreToLocation');
             } else if (error.message.includes('empty or corrupted')) {
-                errorMessage = 'The backup file appears to be corrupted or empty. Please select a different backup.';
+                errorMessage = t('notifications.backupFileCorrupted');
             } else if (error.message.includes('permission denied')) {
-                errorMessage = 'Permission denied. Please check file permissions or run as administrator.';
+                errorMessage = t('notifications.permissionDeniedRestore');
             } else if (error.message.includes('disk space')) {
                 errorMessage = 'Not enough disk space to restore backup.';
             } else if (error.message) {
@@ -5809,7 +5836,8 @@ Please provide a helpful response based on the note content and conversation his
             const version = await ipcRenderer.invoke('get-app-version');
             const versionElement = document.getElementById('splash-version');
             if (versionElement) {
-                versionElement.textContent = `Version ${version}`;
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                versionElement.textContent = t('splash.version', { version });
             }
         } catch (error) {
             console.warn('Failed to get app version for splash screen:', error);
@@ -6204,7 +6232,7 @@ Please provide a helpful response based on the note content and conversation his
                     // Create abort controller for this AI operation
                     this.currentAIAbortController = new AbortController();
                     this.isAIOperationCancelled = false; // Reset cancellation flag
-                    this.updateLoadingText('Extracting key points...');
+                    this.updateLoadingText(t('ai.extractingKeyPointsLoading'));
                     this.showLoading(null, true); // Show cancel button for AI operations
                     response = await this.aiManager.extractKeyPoints(this.selectedText);
                     
@@ -6228,7 +6256,7 @@ Please provide a helpful response based on the note content and conversation his
                     // Create abort controller for this AI operation
                     this.currentAIAbortController = new AbortController();
                     this.isAIOperationCancelled = false; // Reset cancellation flag
-                    this.updateLoadingText('Generating tags...');
+                    this.updateLoadingText(t('ai.generatingTags'));
                     this.showLoading(null, true); // Show cancel button for AI operations
                     // Include note title for better tag generation context
                     response = await this.aiManager.generateTags(this.selectedText, { noteTitle: this.noteTitle });
@@ -6263,9 +6291,10 @@ Please provide a helpful response based on the note content and conversation his
             const backend = this.aiManager ? this.aiManager.backend : 'ollama';
             let errorMsg = '❌ AI action failed. ';
             if (backend === 'ollama') {
-                errorMsg += 'Please ensure Ollama is running ("ollama serve") and a model is loaded.';
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                errorMsg += t('notifications.ensureOllamaRunning');
             } else {
-                errorMsg += 'Please check your internet connection and OpenRouter API key in AI Settings.';
+                errorMsg += t('notifications.checkInternetAndApiKey');
             }
             this.showAIMessage(errorMsg, 'assistant');
             this.hideLoading();
@@ -6341,8 +6370,9 @@ Please provide a helpful response based on the note content and conversation his
         }
 
         this.selectedText = selectedText;
-        this.showAIDialog('Ask AI About Selection',
-            `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showAIDialog(t('ai.askAboutSelection'),
+            t('ai.selectedText', { text: selectedText.substring(0, 150) + (selectedText.length > 150 ? '...' : '') }),
             'ask-ai');
     }
 
@@ -6386,8 +6416,9 @@ Please provide a helpful response based on the note content and conversation his
         this.selectionStart = start;
         this.selectionEnd = end;
 
-        this.showAIDialog('Edit Selection with AI',
-            `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showAIDialog(t('ai.editSelectionWithAI'),
+            t('ai.selectedText', { text: selectedText.substring(0, 150) + (selectedText.length > 150 ? '...' : '') }),
             'edit-ai');
     }
 
@@ -6407,8 +6438,9 @@ Please provide a helpful response based on the note content and conversation his
         }
 
         // For generate with AI, we don't need selected text - we're generating new content
-        this.showAIDialog('Generate Content with AI',
-            'What would you like me to generate? (e.g., "a summary of quantum physics", "a todo list for project planning", etc.)',
+        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+        this.showAIDialog(t('ai.generateContentWithAI'),
+            t('ai.whatToGenerate'),
             'generate-ai');
     }
 
@@ -6445,8 +6477,9 @@ Please provide a helpful response based on the note content and conversation his
         const styles = ['professional', 'casual', 'academic', 'simple', 'creative'];
         const styleOptions = styles.map(style => `<option value="${style}">${style.charAt(0).toUpperCase() + style.slice(1)}</option>`).join('');
 
-        this.showCustomAIDialog('Rewrite Selection',
-            `Selected text: "${selectedText.substring(0, 150)}${selectedText.length > 150 ? '...' : ''}"`,
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showCustomAIDialog(t('ai.rewriteSelection'),
+            t('ai.selectedText', { text: selectedText.substring(0, 150) + (selectedText.length > 150 ? '...' : '') }),
             'rewrite',
             `
             <div style="margin-bottom: 12px;">
@@ -6593,7 +6626,8 @@ Please provide a helpful response based on the note content and conversation his
             // Re-render notes list to show updated tags
             await this.notesManager.renderNotesList();
 
-            this.showNotification(`Saved ${Math.min(tags.length, 3)} tag(s) to note (max 3)`, 'success');
+            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+            this.showNotification(t('notifications.tagsSavedToNote', { count: Math.min(tags.length, 3) }), 'success');
         } catch (error) {
             console.error('Error saving tags to note:', error);
             const t = (key) => window.i18n ? window.i18n.t(key) : key;
@@ -6603,7 +6637,8 @@ Please provide a helpful response based on the note content and conversation his
 
     showAISettings() {
         if (!this.aiManager) {
-            const msg = window.i18n ? window.i18n.t('notifications.error') : 'AI manager not available';
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const msg = t('notifications.aiNotAvailable');
             this.showNotification(msg, 'error');
             return;
         }
@@ -6925,7 +6960,8 @@ Please provide a helpful response based on the note content and conversation his
             // Create abort controller for this AI operation
             this.currentAIAbortController = new AbortController();
             this.isAIOperationCancelled = false; // Reset cancellation flag
-            this.updateLoadingText('Testing AI connection...');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.updateLoadingText(t('loading.testingAIConnection'));
             this.showLoading(null, true); // Show cancel button for AI operations
             try {
                 await this.aiManager.switchBackend(backend);
@@ -6986,7 +7022,8 @@ Please provide a helpful response based on the note content and conversation his
                 this.showNotification(`✅ ${t('settings.sync.aiSettingsSaved')}`, 'success');
                 this.closeModal(modal);
             } catch (error) {
-                this.showNotification(`❌ Failed to save settings: ${error.message}`, 'error');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.failedToSaveSettings', { error: error.message }), 'error');
             }
         });
     }
@@ -7160,7 +7197,8 @@ Please provide a helpful response based on the note content and conversation his
         const clearTagsBtn = modal.querySelector('#clear-unused-tags-btn');
         clearTagsBtn.addEventListener('click', async () => {
             if (!this.notesManager.db || !this.notesManager.db.initialized) {
-                this.showNotification('❌ Database not initialized', 'error');
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.databaseNotInitialized'), 'error');
                 return;
             }
 
@@ -7267,25 +7305,26 @@ Please provide a helpful response based on the note content and conversation his
     }
 
     showRestartDialog(message = null) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         // Default message if none provided
-        const defaultMessage = 'This change requires an app restart to take full effect.';
+        const defaultMessage = t('modals.restartMessage', 'This change requires an app restart to take full effect.');
         const displayMessage = message || defaultMessage;
         
         const content = `
             <div style="padding: 10px 0;">
                 <p style="margin: 0 0 20px 0; color: var(--text-primary);">
                     <i class="fas fa-exclamation-circle" style="color: var(--warning-color, #ff9800); margin-right: 8px;"></i>
-                    ${displayMessage}
+                    ${this.escapeHtml(displayMessage)}
                 </p>
                 <p style="margin: 0; color: var(--text-secondary); font-size: 14px;">
-                    Would you like to restart CogNotez now?
+                    ${this.escapeHtml(t('modals.restartQuestion', 'Would you like to restart CogNotez now?'))}
                 </p>
             </div>
         `;
 
-        const modal = this.createModal('Restart Required', content, [
-            { text: 'Restart Now', type: 'primary', action: 'restart', callback: () => this.restartApp() },
-            { text: 'Later', type: 'secondary', action: 'cancel' }
+        const modal = this.createModal(t('modals.restartRequired', 'Restart Required'), content, [
+            { text: t('modals.restartNow', 'Restart Now'), type: 'primary', action: 'restart', callback: () => this.restartApp() },
+            { text: t('modals.later', 'Later'), type: 'secondary', action: 'cancel' }
         ]);
     }
 
@@ -7819,7 +7858,8 @@ Please provide a helpful response based on the note content and conversation his
 
     showDownloadProgress(progress) {
         const percent = Math.round(progress.percent);
-        this.showNotification(`Downloading update: ${percent}%`, 'info');
+        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+        this.showNotification(t('notifications.downloadingUpdate', { percent }), 'info');
     }
 
     showUpdateDownloaded(info) {
@@ -8039,7 +8079,9 @@ Please provide a helpful response based on the note content and conversation his
 
             // Show notification about the change
             const statusText = settings.enabled ? 'enabled' : 'disabled';
-            this.showNotification(`End-to-end encryption ${statusText}`, 'success');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const statusKey = settings.enabled ? 'notifications.encryptionEnabled' : 'notifications.encryptionDisabled';
+            this.showNotification(t(statusKey), 'success');
 
         } catch (error) {
             console.error('[Encryption] Failed to handle settings update:', error);
@@ -8482,7 +8524,9 @@ Please provide a helpful response based on the note content and conversation his
                     const db = this.notesManager.db;
                     db.setAutoSync(enabled);
 
-                    this.showNotification(`Auto-sync ${enabled ? 'enabled' : 'disabled'}`, 'info');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    const syncKey = enabled ? 'notifications.autoSyncEnabled' : 'notifications.autoSyncDisabled';
+                    this.showNotification(t(syncKey), 'info');
 
                     if (enabled) {
                         this.startAutoSync();
@@ -8510,7 +8554,9 @@ Please provide a helpful response based on the note content and conversation his
                     const db = this.notesManager.db;
                     db.updateSyncMetadata({ syncOnStartup: enabled });
 
-                    this.showNotification(`Sync on startup ${enabled ? 'enabled' : 'disabled'}`, 'info');
+                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                    const startupKey = enabled ? 'notifications.syncOnStartupEnabled' : 'notifications.syncOnStartupDisabled';
+                    this.showNotification(t(startupKey), 'info');
                 } catch (error) {
                     console.error('[Sync] Failed to toggle sync on startup:', error);
                     const t = (key) => window.i18n ? window.i18n.t(key) : key;
@@ -8749,7 +8795,8 @@ Please provide a helpful response based on the note content and conversation his
                         });
 
                         if (!validationResult.success || !validationResult.isValid) {
-                            this.showNotification(`Invalid encryption settings: ${validationResult.errors?.join(', ') || 'Unknown error'}`, 'error');
+                            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                            this.showNotification(t('notifications.invalidEncryptionSettings', { errors: validationResult.errors?.join(', ') || 'Unknown error' }), 'error');
                             return;
                         }
                     }
@@ -8853,15 +8900,17 @@ Please provide a helpful response based on the note content and conversation his
                     <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 0.95rem;">${message}</p>
                     <div style="margin-top: 12px;">
                         <label for="modal-passphrase-input" style="display: block; margin-bottom: 6px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
-                        <input type="password" id="modal-passphrase-input" placeholder="Enter your encryption passphrase" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                        <input type="password" id="modal-passphrase-input" placeholder="${t('placeholder.enterEncryptionPassphrase')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                         <div id="modal-passphrase-error" style="margin-top: 6px; font-size: 0.85rem; color: var(--error-color);"></div>
                     </div>
                 </div>
             `;
 
-            const modal = this.createModal('Encrypted Data Detected', content, [
-                { text: 'Cancel', type: 'secondary', action: 'cancel-passphrase' },
-                { text: 'Decrypt', type: 'primary', action: 'confirm-passphrase' }
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            const modal = this.createModal(t('modals.encryptedDataDetected'), content, [
+                { text: t('modals.cancel'), type: 'secondary', action: 'cancel-passphrase' },
+                { text: t('modals.decrypt'), type: 'primary', action: 'confirm-passphrase' }
             ]);
 
             const input = modal.querySelector('#modal-passphrase-input');
@@ -8990,7 +9039,8 @@ Please provide a helpful response based on the note content and conversation his
             const success = db.resolveSyncConflict(conflictId, resolution);
 
             if (success) {
-                this.showNotification(`Conflict resolved using ${resolution} version`, 'success');
+                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                this.showNotification(t('notifications.conflictResolved', { resolution }), 'success');
 
                 // Refresh conflicts display
                 const modal = document.getElementById(modalId);
@@ -9004,7 +9054,8 @@ Please provide a helpful response based on the note content and conversation his
 
         } catch (error) {
             console.error('[Sync] Failed to resolve modal conflict:', error);
-            this.showNotification('Failed to resolve conflict', 'error');
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToResolveConflict'), 'error');
         }
     }
 
@@ -9062,7 +9113,13 @@ Please provide a helpful response based on the note content and conversation his
                             // Show notification if files were deleted
                             const totalDeleted = (deletedFromDrive || 0) + (deletedFromLocal || 0);
                             if (totalDeleted > 0) {
-                                this.showNotification(`Cleaned up ${totalDeleted} unused media file${totalDeleted > 1 ? 's' : ''} (${deletedFromDrive} from Drive, ${deletedFromLocal} from local)`, 'info');
+                                const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
+                                this.showNotification(t('notifications.cleanedUpUnusedMedia', { 
+                                    total: totalDeleted, 
+                                    plural: totalDeleted > 1 ? 's' : '',
+                                    drive: deletedFromDrive,
+                                    local: deletedFromLocal
+                                }), 'info');
                             }
                         }
                     }
