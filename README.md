@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-2.1.2-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.3-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -61,8 +61,15 @@ An offline-first, privacy-focused note-taking application that leverages local L
 ### Security & Sync
 - **Password-Locked Notes**: End-to-end encryption (AES-256-GCM) for protected notes
 - **Google Drive Sync**: Optional cloud sync with end-to-end encryption
+- **Google Drive Sharing**: Share notes on Google Drive with customizable permissions (view, comment, edit)
 - **Backup & Restore**: Complete data backup and restoration
 - **Import/Export**: JSON export/import for easy migration
+
+### Sharing & Export
+- **Multiple Export Formats**: Markdown (.md), Plain Text (.txt), PDF (with media preservation)
+- **Clipboard Sharing**: Copy notes as Markdown or plain text to clipboard
+- **File Export**: Export individual notes or complete backup for easy sharing
+- **Share Link Management**: Manage Google Drive share links and permissions
 
 ## Installation & Setup
 
@@ -167,6 +174,24 @@ For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 
 **Custom Templates**: Create from current note or generate with AI. Access via **File → New from Template**.
 
+### Sharing Notes
+
+**Share Button**: Click the share icon (📤) in the note editor toolbar to access sharing options:
+
+- **Google Drive**: Share on Google Drive with customizable permissions (view-only, comment, or edit)
+  - Requires Google Drive sync setup (see [Google Drive Sync](#google-drive-sync))
+  - Automatically updates shared notes when edited
+  - Manage shared links and revoke access
+  
+- **Export as File**:
+  - **Markdown**: Export as `.md` file
+  - **Plain Text**: Export as `.txt` file
+  - **PDF**: Export as PDF with media preserved
+  
+- **Copy to Clipboard**: Copy note content as Markdown or plain text
+
+**Share via Menu**: Access export options via **File → Export** menu.
+
 ### Internationalization
 
 Supported languages: **English**, **Spanish**, **Indonesian**, **Japanese**, **Javanese (Basa Jawa)**.
@@ -184,7 +209,7 @@ Change language via **More options (⋯) → Language** in the header. Language 
 - ✅ Fast startup (<2 seconds)
 
 ### What Requires Internet
-- ❌ Google Drive sync
+- ❌ Google Drive sync and sharing
 - ❌ OpenRouter AI (cloud-based)
 - ❌ SearXNG web search
 - ❌ Web scraping features
@@ -232,7 +257,11 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.1.2 (Current)
+### v2.1.3 (Current)
+- Enhanced internationalization support
+- Improved user notifications and translations
+
+### v2.1.2
 - Enhanced internationalization support
 - Added Spanish language support
 - Improved translations across the application
@@ -262,7 +291,9 @@ We welcome contributions! Here's how you can help:
 - Cancel button for AI operations
 
 ### v1.4.1
-- Google Drive sharing functionality
+- Google Drive note sharing with permission management
+- Media file management for shared notes
+- Collaboration metadata tracking
 - Bug fixes and stability improvements
 
 ### v1.4.0
