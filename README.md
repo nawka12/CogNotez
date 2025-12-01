@@ -1,4 +1,4 @@
-# <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
+# <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 ![Version](https://img.shields.io/badge/version-2.1.5-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
