@@ -67,22 +67,29 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _openNote(Note note) async {
     // Check if note is password protected and locked
     if (note.isPasswordProtected && note.encryptedContent != null) {
-      // Show unlock dialog
-      final unlockedNote = await showDialog<Note>(
+      // Show unlock dialog - use a variable to capture the result since
+      // PasswordDialog.onComplete is called before the dialog pops itself.
+      // We should NOT call Navigator.pop in the callback as the dialog
+      // already handles that, which would cause a double-pop issue.
+      Note? unlockedNoteResult;
+      await showDialog(
         context: context,
+        barrierDismissible: false,
         builder: (context) => PasswordDialog(
           note: note,
           isUnlocking: true,
           onComplete: (updatedNote, password) {
-            Navigator.pop(context, updatedNote);
+            unlockedNoteResult = updatedNote;
           },
         ),
       );
 
-      if (unlockedNote == null) return;
-      note = unlockedNote;
+      if (unlockedNoteResult == null) return;
+      note = unlockedNoteResult!;
     }
 
+    if (!mounted) return;
+    
     await Navigator.push(
       context,
       MaterialPageRoute(
