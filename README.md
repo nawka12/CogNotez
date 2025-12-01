@@ -1,6 +1,6 @@
 # <img src="assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-2.1.4-blue.svg)
+![Version](https://img.shields.io/badge/version-2.1.5-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -261,7 +261,15 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.1.4 (Current)
+### v2.1.5 (Current)
+- Refactored Find & Replace dialog for improved internationalization and UI updates
+- Enhanced UI responsiveness with dynamic disclaimer messages based on current mode (edit, preview, split)
+- Improved functionality to prevent replacements in preview-only mode
+- Better highlighting support in both editor and preview modes
+- Added comprehensive translation keys for Find & Replace dialog in all supported languages (English, Spanish, Indonesian, Japanese, Javanese)
+- Simplified translation handling with helper functions for better maintainability
+
+### v2.1.4
 - Sync closing overlay to inform users when sync is in progress during app closure
 - Enhanced user experience during sync operations with better notifications
 - Improved internationalization support with new translation keys for sync-related messages
@@ -296,20 +304,6 @@ We welcome contributions! Here's how you can help:
 ### v1.5.0
 - Multi-tab support for working with multiple notes simultaneously
 - Enhanced header and search functionality
-
-### v1.4.2
-- Cancel button for AI operations
-
-### v1.4.1
-- Google Drive note sharing with permission management
-- Media file management for shared notes
-- Collaboration metadata tracking
-- Bug fixes and stability improvements
-
-### v1.4.0
-- Find & Replace with regex support
-- Undo/Redo with full history tracking
-- Preview mode toggle (Edit/Preview/Split)
 
 For earlier versions, see the full [changelog](https://github.com/nawka12/CogNotez/releases).
 
