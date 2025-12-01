@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:sqflite/sqflite.dart';
 import 'package:path/path.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/note.dart';
 import '../models/tag.dart';
 
@@ -23,9 +22,32 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
+  }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    // Migration from version 1 to 2: Add encryption columns
+    if (oldVersion < 2) {
+      // Check if columns exist before adding them
+      final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
+      final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
+      
+      if (!columnNames.contains('encryption_salt')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN encryption_salt TEXT');
+      }
+      if (!columnNames.contains('encryption_iv')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN encryption_iv TEXT');
+      }
+      if (!columnNames.contains('encrypted_content')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN encrypted_content TEXT');
+      }
+      if (!columnNames.contains('metadata')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN metadata TEXT');
+      }
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -39,6 +61,8 @@ class DatabaseHelper {
         updated_at TEXT NOT NULL,
         is_password_protected INTEGER NOT NULL DEFAULT 0,
         encrypted_content TEXT,
+        encryption_salt TEXT,
+        encryption_iv TEXT,
         metadata TEXT
       )
     ''');
@@ -105,6 +129,8 @@ class DatabaseHelper {
       tags: tags,
       isPasswordProtected: (row['is_password_protected'] as int? ?? 0) == 1,
       encryptedContent: row['encrypted_content'] as String?,
+      encryptionSalt: row['encryption_salt'] as String?,
+      encryptionIv: row['encryption_iv'] as String?,
       metadata: metadata,
     );
   }
@@ -119,6 +145,8 @@ class DatabaseHelper {
       'updated_at': note.updatedAt.toIso8601String(),
       'is_password_protected': note.isPasswordProtected ? 1 : 0,
       'encrypted_content': note.encryptedContent,
+      'encryption_salt': note.encryptionSalt,
+      'encryption_iv': note.encryptionIv,
       'metadata': note.metadata != null ? jsonEncode(note.metadata) : null,
     };
   }

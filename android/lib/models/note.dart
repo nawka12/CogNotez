@@ -7,6 +7,8 @@ class Note {
   List<String> tags;
   bool isPasswordProtected;
   String? encryptedContent;
+  String? encryptionSalt;
+  String? encryptionIv;
   Map<String, dynamic>? metadata;
 
   Note({
@@ -18,6 +20,8 @@ class Note {
     this.tags = const [],
     this.isPasswordProtected = false,
     this.encryptedContent,
+    this.encryptionSalt,
+    this.encryptionIv,
     this.metadata,
   });
 
@@ -31,6 +35,8 @@ class Note {
       'tags': tags,
       'is_password_protected': isPasswordProtected,
       'encrypted_content': encryptedContent,
+      'encryption_salt': encryptionSalt,
+      'encryption_iv': encryptionIv,
       'metadata': metadata,
     };
   }
@@ -45,6 +51,8 @@ class Note {
       tags: List<String>.from(json['tags'] as List? ?? []),
       isPasswordProtected: json['is_password_protected'] as bool? ?? false,
       encryptedContent: json['encrypted_content'] as String?,
+      encryptionSalt: json['encryption_salt'] as String?,
+      encryptionIv: json['encryption_iv'] as String?,
       metadata: json['metadata'] as Map<String, dynamic>?,
     );
   }
@@ -58,7 +66,10 @@ class Note {
     List<String>? tags,
     bool? isPasswordProtected,
     String? encryptedContent,
+    String? encryptionSalt,
+    String? encryptionIv,
     Map<String, dynamic>? metadata,
+    bool clearEncryption = false,
   }) {
     return Note(
       id: id ?? this.id,
@@ -68,7 +79,9 @@ class Note {
       updatedAt: updatedAt ?? this.updatedAt,
       tags: tags ?? this.tags,
       isPasswordProtected: isPasswordProtected ?? this.isPasswordProtected,
-      encryptedContent: encryptedContent ?? this.encryptedContent,
+      encryptedContent: clearEncryption ? null : (encryptedContent ?? this.encryptedContent),
+      encryptionSalt: clearEncryption ? null : (encryptionSalt ?? this.encryptionSalt),
+      encryptionIv: clearEncryption ? null : (encryptionIv ?? this.encryptionIv),
       metadata: metadata ?? this.metadata,
     );
   }
@@ -76,5 +89,7 @@ class Note {
   int get wordCount {
     return content.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
   }
+
+  bool get isLocked => isPasswordProtected && encryptedContent != null && content.isEmpty;
 }
 

@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../services/theme_service.dart';
+import '../services/database_service.dart';
+import '../services/backup_service.dart';
 import '../models/settings.dart';
 import 'about_screen.dart';
 
@@ -185,6 +187,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onTap: () => _showSyncIntervalDialog(),
             ),
           ],
+          
+          const Divider(),
+          
+          // Local Backup Section
+          _buildSectionHeader('Local Backup'),
+          ListTile(
+            leading: const Icon(Icons.backup),
+            title: const Text('Export Backup'),
+            subtitle: const Text('Save all notes and tags to a JSON file'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _exportBackup(),
+          ),
+          ListTile(
+            leading: const Icon(Icons.restore),
+            title: const Text('Import Backup'),
+            subtitle: const Text('Restore notes and tags from a backup file'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _importBackup(),
+          ),
+          ListTile(
+            leading: const Icon(Icons.analytics),
+            title: const Text('Backup Statistics'),
+            subtitle: const Text('View data statistics'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showBackupStats(),
+          ),
           
           const Divider(),
           
@@ -522,6 +550,153 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Navigator.pop(context);
             },
             child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _exportBackup() async {
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final backupService = BackupService(databaseService);
+      
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: 16),
+              Text('Creating backup...'),
+            ],
+          ),
+        ),
+      );
+
+      await backupService.exportBackup(share: true);
+      
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Backup created successfully')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to create backup: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importBackup() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Import Backup'),
+        content: const Text(
+          'This will import notes and tags from a backup file. '
+          'Existing items with the same IDs will be skipped. Continue?'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Import'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final backupService = BackupService(databaseService);
+      
+      final result = await backupService.importBackup();
+      
+      if (mounted) {
+        if (result.success) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Imported ${result.notesImported} notes and ${result.tagsImported} tags. '
+                'Skipped ${result.notesSkipped} notes and ${result.tagsSkipped} tags.'
+              ),
+            ),
+          );
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(result.message)),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to import backup: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showBackupStats() async {
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final backupService = BackupService(databaseService);
+      final stats = await backupService.getBackupStats();
+
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('Backup Statistics'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildStatRow('Total Notes', stats.totalNotes.toString()),
+                _buildStatRow('Total Tags', stats.totalTags.toString()),
+                _buildStatRow('Total Words', stats.totalWords.toString()),
+                _buildStatRow('Protected Notes', stats.protectedNotes.toString()),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close'),
+              ),
+            ],
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to load statistics: $e')),
+        );
+      }
+    }
+  }
+
+  Widget _buildStatRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.bold),
           ),
         ],
       ),

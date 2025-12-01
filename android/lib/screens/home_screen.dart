@@ -7,6 +7,8 @@ import '../services/theme_service.dart';
 import 'note_editor_screen.dart';
 import '../widgets/notes_list.dart';
 import '../widgets/sidebar.dart';
+import '../widgets/advanced_search_panel.dart';
+import '../widgets/password_dialog.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -18,15 +20,16 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final TextEditingController _searchController = TextEditingController();
+  final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   bool _isSearching = false;
+  bool _showAdvancedSearch = false;
+  SearchFilters _searchFilters = SearchFilters();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final notesService = Provider.of<NotesService>(context, listen: false);
-      notesService.loadNotes();
-      notesService.loadTags();
+      _refreshData();
     });
   }
 
@@ -36,8 +39,13 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
-  void _createNewNote() {
+  Future<void> _refreshData() async {
     final notesService = Provider.of<NotesService>(context, listen: false);
+    await notesService.loadNotes();
+    await notesService.loadTags();
+  }
+
+  Future<void> _createNewNote() async {
     final note = Note(
       id: const Uuid().v4(),
       title: '',
@@ -46,12 +54,44 @@ class _HomeScreenState extends State<HomeScreen> {
       updatedAt: DateTime.now(),
     );
 
-    Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => NoteEditorScreen(note: note, isNew: true),
       ),
     );
+    
+    await _refreshData();
+  }
+
+  Future<void> _openNote(Note note) async {
+    // Check if note is password protected and locked
+    if (note.isPasswordProtected && note.encryptedContent != null) {
+      // Show unlock dialog
+      final unlockedNote = await showDialog<Note>(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PasswordDialog(
+          note: note,
+          isUnlocking: true,
+          onComplete: (updatedNote, password) {
+            Navigator.pop(context, updatedNote);
+          },
+        ),
+      );
+
+      if (unlockedNote == null) return;
+      note = unlockedNote;
+    }
+
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NoteEditorScreen(note: note, isNew: false),
+      ),
+    );
+    
+    await _refreshData();
   }
 
   void _toggleSearch() {
@@ -59,6 +99,8 @@ class _HomeScreenState extends State<HomeScreen> {
       _isSearching = !_isSearching;
       if (!_isSearching) {
         _searchController.clear();
+        _showAdvancedSearch = false;
+        _searchFilters = SearchFilters();
         final notesService = Provider.of<NotesService>(context, listen: false);
         notesService.searchNotes('');
       }
@@ -66,23 +108,53 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onSearchChanged(String query) {
+    setState(() {
+      _searchFilters = _searchFilters.copyWith(query: query);
+    });
     final notesService = Provider.of<NotesService>(context, listen: false);
     notesService.searchNotes(query);
+  }
+
+  void _toggleAdvancedSearch() {
+    setState(() {
+      _showAdvancedSearch = !_showAdvancedSearch;
+    });
+  }
+
+  List<Note> _getFilteredNotes(NotesService notesService) {
+    return _searchFilters.apply(notesService.notes, notesService.tags);
   }
 
   @override
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
+    final isWideScreen = MediaQuery.of(context).size.width >= 600;
 
     return Scaffold(
+      key: _scaffoldKey,
       appBar: AppBar(
+        leading: isWideScreen ? null : IconButton(
+          icon: const Icon(Icons.menu),
+          onPressed: () {
+            _scaffoldKey.currentState?.openDrawer();
+          },
+          tooltip: 'Menu',
+        ),
         title: _isSearching
             ? TextField(
                 controller: _searchController,
                 autofocus: true,
-                decoration: const InputDecoration(
+                decoration: InputDecoration(
                   hintText: 'Search notes...',
                   border: InputBorder.none,
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _showAdvancedSearch ? Icons.expand_less : Icons.tune,
+                      size: 20,
+                    ),
+                    onPressed: _toggleAdvancedSearch,
+                    tooltip: 'Advanced search',
+                  ),
                 ),
                 onChanged: _onSearchChanged,
               )
@@ -124,16 +196,66 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
         ],
       ),
-      body: Row(
+      drawer: isWideScreen ? null : Drawer(
+        child: SafeArea(
+          child: Sidebar(
+            onFolderSelected: () {
+              Navigator.pop(context);
+            },
+          ),
+        ),
+      ),
+      body: Column(
         children: [
-          const Sidebar(),
-          const VerticalDivider(width: 1),
-          const Expanded(
-            child: NotesList(),
+          // Advanced search panel
+          if (_showAdvancedSearch)
+            AdvancedSearchPanel(
+              filters: _searchFilters,
+              onFiltersChanged: (filters) {
+                setState(() {
+                  _searchFilters = filters;
+                  _searchController.text = filters.query;
+                });
+              },
+              onClose: () {
+                setState(() {
+                  _showAdvancedSearch = false;
+                });
+              },
+            ),
+          // Main content
+          Expanded(
+            child: Row(
+              children: [
+                if (isWideScreen) ...[
+                  const Sidebar(),
+                  const VerticalDivider(width: 1),
+                ],
+                Expanded(
+                  child: Consumer<NotesService>(
+                    builder: (context, notesService, _) {
+                      final filteredNotes = _searchFilters.hasActiveFilters
+                          ? _getFilteredNotes(notesService)
+                          : notesService.notes;
+                      
+                      return NotesList(
+                        notes: filteredNotes,
+                        onNoteSelected: _openNote,
+                        onCreateNote: _createNewNote,
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _createNewNote,
+        tooltip: 'New note',
+        child: const Icon(Icons.add),
       ),
     );
   }
 }
-

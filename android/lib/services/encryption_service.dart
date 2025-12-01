@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:encrypt/encrypt.dart';
 
@@ -34,7 +35,7 @@ class EncryptionService {
       derivedKey.setRange(start, end, t);
     }
     
-    return Key(derivedKey);
+    return Key(Uint8List.fromList(derivedKey));
   }
   
   static List<int> _intToBytes(int value) {
