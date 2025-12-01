@@ -574,9 +574,21 @@
     "searchText": "Buscar texto...",
     "replaceWith": "Reemplazar con...",
     "find": "Buscar",
+    "replace": "Reemplazar",
     "findReplace": "Buscar y Reemplazar",
     "noMatches": "No hay coincidencias",
-    "matchCount": "{{current}} de {{total}} coincidencias"
+    "matchCount": "{{current}} de {{total}} coincidencias",
+    "caseSensitive": "Distinguir mayúsculas y minúsculas",
+    "wholeWord": "Palabra completa",
+    "regularExpression": "Expresión regular",
+    "previous": "Anterior",
+    "next": "Siguiente",
+    "replaceButton": "Reemplazar",
+    "replaceAll": "Reemplazar Todo",
+    "disclaimerEdit": "Buscar y reemplazar funcionan en el editor de texto.",
+    "disclaimerPreview": "En modo vista previa, buscar funciona pero reemplazar está deshabilitado. Cambia al modo edición para reemplazar.",
+    "disclaimerSplit": "Buscar y reemplazar funcionan en el editor. Las coincidencias también se resaltan en la vista previa.",
+    "disclaimerPreviewOnly": "Buscar solo funciona en modo edición. El soporte para modo vista previa llegará pronto."
   },
   "notifications": {
     "processing": "Procesando...",

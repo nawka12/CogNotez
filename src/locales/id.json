@@ -574,9 +574,21 @@
     "searchText": "Cari teks...",
     "replaceWith": "Ganti dengan...",
     "find": "Cari",
+    "replace": "Ganti",
     "findReplace": "Cari & Ganti",
     "noMatches": "Tidak ada yang cocok",
-    "matchCount": "{{current}} dari {{total}} cocok"
+    "matchCount": "{{current}} dari {{total}} cocok",
+    "caseSensitive": "Sesuai huruf besar/kecil",
+    "wholeWord": "Kata utuh",
+    "regularExpression": "Ekspresi reguler",
+    "previous": "Sebelumnya",
+    "next": "Selanjutnya",
+    "replaceButton": "Ganti",
+    "replaceAll": "Ganti Semua",
+    "disclaimerEdit": "Cari dan ganti bekerja di editor teks.",
+    "disclaimerPreview": "Dalam mode pratinjau, cari bekerja tetapi ganti dinonaktifkan. Beralih ke mode edit untuk mengganti.",
+    "disclaimerSplit": "Cari dan ganti bekerja di editor. Kecocokan juga disorot di pratinjau.",
+    "disclaimerPreviewOnly": "Cari hanya bekerja di mode edit. Dukungan mode pratinjau akan segera hadir."
   },
   "notifications": {
     "processing": "Memproses...",

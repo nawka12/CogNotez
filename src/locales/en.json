@@ -574,9 +574,21 @@
     "searchText": "Search text...",
     "replaceWith": "Replace with...",
     "find": "Find",
+    "replace": "Replace",
     "findReplace": "Find & Replace",
     "noMatches": "No matches",
-    "matchCount": "{{current}} of {{total}} matches"
+    "matchCount": "{{current}} of {{total}} matches",
+    "caseSensitive": "Case sensitive",
+    "wholeWord": "Whole word",
+    "regularExpression": "Regular expression",
+    "previous": "Previous",
+    "next": "Next",
+    "replaceButton": "Replace",
+    "replaceAll": "Replace All",
+    "disclaimerEdit": "Find and replace work in the text editor.",
+    "disclaimerPreview": "In preview mode, find works but replace is disabled. Switch to edit mode to replace.",
+    "disclaimerSplit": "Find and replace work in the editor. Matches are also highlighted in preview.",
+    "disclaimerPreviewOnly": "Find only works in edit mode. Preview mode support coming soon."
   },
   "notifications": {
     "processing": "Processing...",

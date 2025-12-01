@@ -574,9 +574,21 @@
     "searchText": "Goleki teks...",
     "replaceWith": "Ganti nganggo...",
     "find": "Goleki",
+    "replace": "Ganti",
     "findReplace": "Goleki & Ganti",
     "noMatches": "Ora ana sing cocog",
-    "matchCount": "{{current}} saka {{total}} cocog"
+    "matchCount": "{{current}} saka {{total}} cocog",
+    "caseSensitive": "Sesuai huruf gedhe/cilik",
+    "wholeWord": "Tembung lengkap",
+    "regularExpression": "Ekspresi reguler",
+    "previous": "Sadurunge",
+    "next": "Sabanjure",
+    "replaceButton": "Ganti",
+    "replaceAll": "Ganti Kabeh",
+    "disclaimerEdit": "Goleki lan ganti bisa digunakake ing editor teks.",
+    "disclaimerPreview": "Ing mode pratinjau, goleki bisa digunakake nanging ganti ora aktif. Pindhah menyang mode sunting kanggo ngganti.",
+    "disclaimerSplit": "Goleki lan ganti bisa digunakake ing editor. Kecocokan uga disorot ing pratinjau.",
+    "disclaimerPreviewOnly": "Goleki mung bisa digunakake ing mode sunting. Dhukungan mode pratinjau bakal teka ing wektu sing cedhak."
   },
   "notifications": {
     "processing": "Ngolah...",

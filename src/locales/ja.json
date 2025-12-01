@@ -574,9 +574,21 @@
     "searchText": "検索テキスト...",
     "replaceWith": "置換テキスト...",
     "find": "検索",
+    "replace": "置換",
     "findReplace": "検索と置換",
     "noMatches": "一致なし",
-    "matchCount": "{{total}}件中{{current}}件一致"
+    "matchCount": "{{total}}件中{{current}}件一致",
+    "caseSensitive": "大文字と小文字を区別",
+    "wholeWord": "単語全体",
+    "regularExpression": "正規表現",
+    "previous": "前へ",
+    "next": "次へ",
+    "replaceButton": "置換",
+    "replaceAll": "すべて置換",
+    "disclaimerEdit": "検索と置換はテキストエディタで機能します。",
+    "disclaimerPreview": "プレビューモードでは、検索は機能しますが、置換は無効です。置換するには編集モードに切り替えてください。",
+    "disclaimerSplit": "検索と置換はエディタで機能します。一致はプレビューでも強調表示されます。",
+    "disclaimerPreviewOnly": "検索は編集モードでのみ機能します。プレビューモードのサポートは近日公開予定です。"
   },
   "notifications": {
     "processing": "処理中...",
