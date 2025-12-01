@@ -70,7 +70,6 @@ class _HomeScreenState extends State<HomeScreen> {
       // Show unlock dialog
       final unlockedNote = await showDialog<Note>(
         context: context,
-        barrierDismissible: false,
         builder: (context) => PasswordDialog(
           note: note,
           isUnlocking: true,

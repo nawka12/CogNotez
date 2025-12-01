@@ -65,18 +65,32 @@ class _PasswordDialogState extends State<PasswordDialog> {
     });
 
     try {
-      if (widget.note.encryptedContent == null ||
-          widget.note.encryptionSalt == null ||
-          widget.note.encryptionIv == null) {
+      if (widget.note.encryptedContent == null) {
         throw Exception('Note encryption data is missing');
       }
 
-      final decryptedContent = EncryptionService.decrypt(
-        widget.note.encryptedContent!,
-        widget.note.encryptionSalt!,
-        widget.note.encryptionIv!,
-        password,
-      );
+      String decryptedContent;
+
+      // Desktop notes store encryption data as a JSON envelope inside
+      // encryptedContent. Android notes use separate salt/IV fields.
+      if (EncryptionService.isDesktopEnvelope(widget.note.encryptedContent!)) {
+        decryptedContent = await EncryptionService.decryptDesktopEnvelope(
+          widget.note.encryptedContent!,
+          password,
+        );
+      } else {
+        if (widget.note.encryptionSalt == null ||
+            widget.note.encryptionIv == null) {
+          throw Exception('Note encryption data is missing');
+        }
+
+        decryptedContent = EncryptionService.decrypt(
+          widget.note.encryptedContent!,
+          widget.note.encryptionSalt!,
+          widget.note.encryptionIv!,
+          password,
+        );
+      }
 
       final unlockedNote = widget.note.copyWith(
         content: decryptedContent,

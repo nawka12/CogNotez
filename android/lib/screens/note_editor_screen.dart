@@ -898,9 +898,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     final canSave = _hasChanges || _isNew;
     
     return PopScope(
+      // Let the system/back stack pop normally when there are no unsaved
+      // changes. When there ARE unsaved changes, intercept back and route
+      // through [_onWillPop] to show the confirmation dialog.
       canPop: !_hasChanges,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
+        // At this point we know there are unsaved changes; ask the user what
+        // to do before actually popping.
         final shouldPop = await _onWillPop();
         if (shouldPop && context.mounted) {
           Navigator.of(context).pop();
@@ -908,6 +913,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              // Delegate to Navigator/pop stack; PopScope will intercept when
+              // there are unsaved changes so behaviour stays consistent for
+              // both app back and system back buttons.
+              Navigator.maybePop(context);
+            },
+            tooltip: 'Back',
+          ),
           title: TextField(
             controller: _titleController,
             decoration: const InputDecoration(

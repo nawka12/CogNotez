@@ -29,15 +29,12 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 #### Unimplemented ❌
 - [ ] Multi-tab support for multiple notes
 - [ ] Find & Replace with regex support
-- [ ] Split view mode (Edit/Preview side-by-side)
 - [ ] Rich media support (Images, Videos)
 - [ ] Drag & drop for media files
 - [ ] Note templates (built-in and custom)
 - [ ] AI-generated templates
 - [ ] Advanced search with filters (date range, tag filtering, sorting)
-- [ ] Note import/export (JSON backup)
-- [ ] Password-protected notes UI
-- [ ] Encryption integration in UI
+- [ ] Note import/export for standalone note files
 - [ ] Google Drive sync
 - [ ] Google Drive sharing with permissions
 - [ ] Auto-sync functionality
@@ -53,21 +50,23 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] AI settings configuration UI (in Settings screen)
 
 #### Unimplemented ❌
-- [ ] AI features UI integration
-- [ ] Context menu for AI actions
-- [ ] Summarize selected text
-- [ ] Ask AI about selection
-- [ ] Edit text with AI
-- [ ] Rewrite text with AI
-- [ ] Generate content with AI
-- [ ] Extract key points
-- [ ] Generate tags with AI
 - [ ] AI conversation panel
 - [ ] SearXNG web search integration
 - [ ] Web scraping functionality
 - [ ] AI edit approval system
 - [ ] Loading indicators for AI operations
 - [ ] Cancel AI operations
+
+#### Implemented (Editor Integration) ✅
+- [x] AI features UI integration
+- [x] Context menu / bottom sheet for AI actions
+- [x] Summarize selected text
+- [x] Ask AI about selection
+- [x] Edit text with AI
+- [x] Rewrite text with AI
+- [x] Generate content with AI
+- [x] Extract key points
+- [x] Generate tags with AI
 
 ### Organization & Search
 
@@ -92,10 +91,12 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 #### Implemented ✅
 - [x] Encryption service (AES-256-GCM)
 - [x] Password hashing utilities
+ - [x] Password protection UI for notes
+ - [x] Note encryption/decryption flow in editor
+ - [x] JSON backup export (desktop-compatible)
+ - [x] JSON backup import / restore (desktop & Android backups)
 
 #### Unimplemented ❌
-- [ ] Password protection UI
-- [ ] Note encryption/decryption flow
 - [ ] Google Drive authentication
 - [ ] Google Drive sync implementation
 - [ ] Google Drive sharing
@@ -103,7 +104,6 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [ ] Permission management (view, comment, edit)
 - [ ] End-to-end encryption for sync
 - [ ] Conflict resolution
-- [ ] Backup & restore functionality
 
 ### Export & Sharing
 
@@ -116,7 +116,7 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] Share via Android share sheet
 
 #### Unimplemented ❌
-- [ ] File picker for import
+- [ ] File picker for importing standalone note files
 
 ### UI/UX Enhancements
 

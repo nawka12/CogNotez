@@ -26,6 +26,7 @@ dependencies:
   # Encryption
   crypto: ^3.0.3
   encrypt: ^5.0.3
+  cryptography: ^2.7.0
   
   # Network & AI
   http: ^1.1.2
