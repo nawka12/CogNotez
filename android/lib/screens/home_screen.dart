@@ -5,6 +5,7 @@ import '../models/note.dart';
 import '../services/notes_service.dart';
 import '../services/theme_service.dart';
 import '../utils/app_theme.dart';
+import '../l10n/app_localizations.dart';
 import 'note_editor_screen.dart';
 import '../widgets/notes_list.dart';
 import '../widgets/sidebar.dart';
@@ -144,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onPressed: () {
             _scaffoldKey.currentState?.openDrawer();
           },
-          tooltip: 'Menu',
+          tooltip: AppLocalizations.of(context)?.menu ?? 'Menu',
           style: IconButton.styleFrom(
             padding: EdgeInsets.zero,
             minimumSize: const Size(40, 40),
@@ -162,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   controller: _searchController,
                   autofocus: true,
                   decoration: InputDecoration(
-                    hintText: 'Search notes...',
+                    hintText: AppLocalizations.of(context)?.searchNotes ?? 'Search notes...',
                     border: InputBorder.none,
                     prefixIcon: Icon(Icons.search, size: isMobile ? 18 : 20),
                     suffixIcon: Row(
@@ -175,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               size: 20,
                             ),
                             onPressed: _toggleAdvancedSearch,
-                            tooltip: 'Advanced search',
+                            tooltip: AppLocalizations.of(context)?.searchNotes ?? 'Advanced search',
                           ),
                         ],
                         if (_searchController.text.isNotEmpty)
@@ -185,7 +186,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               _searchController.clear();
                               _onSearchChanged('');
                             },
-                            tooltip: 'Clear search',
+                            tooltip: AppLocalizations.of(context)?.cancel ?? 'Clear search',
                           ),
                       ],
                     ),
@@ -241,7 +242,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         : ThemeMode.dark;
                     themeService.setThemeMode(newMode);
                   },
-                  tooltip: 'Toggle theme',
+                  tooltip: AppLocalizations.of(context)?.edit ?? 'Toggle theme',
                   style: IconButton.styleFrom(
                     padding: EdgeInsets.all(isMobile ? 6 : 8),
                     minimumSize: Size(isMobile ? 32 : 36, isMobile ? 32 : 36),
@@ -268,7 +269,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       Icon(Icons.add, size: isMobile ? 14 : 16),
                       if (!isMobile) ...[
                         const SizedBox(width: 6),
-                        const Text('New'),
+                        Text(AppLocalizations.of(context)?.newNote ?? 'New'),
                       ],
                     ],
                   ),
@@ -286,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 MaterialPageRoute(builder: (context) => const SettingsScreen()),
               );
             },
-            tooltip: 'Settings',
+            tooltip: AppLocalizations.of(context)?.settings ?? 'Settings',
           ),
         ],
       ),
@@ -351,7 +352,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: _createNewNote,
-        tooltip: 'New note',
+        tooltip: AppLocalizations.of(context)?.newNote ?? 'New note',
         child: const Icon(Icons.add),
       ),
     );

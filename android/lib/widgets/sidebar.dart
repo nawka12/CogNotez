@@ -4,6 +4,7 @@ import '../models/tag.dart';
 import '../services/notes_service.dart';
 import '../screens/tag_management_screen.dart';
 import '../utils/app_theme.dart';
+import '../l10n/app_localizations.dart';
 
 class Sidebar extends StatelessWidget {
   final VoidCallback? onFolderSelected;
@@ -35,7 +36,7 @@ class Sidebar extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text(
-                  'Notes',
+                  AppLocalizations.of(context)?.notes ?? 'Notes',
                   style: TextStyle(
                     fontSize: isMobile ? 16 : 18,
                     fontWeight: FontWeight.bold,
@@ -46,7 +47,7 @@ class Sidebar extends StatelessWidget {
                   IconButton(
                     icon: const Icon(Icons.chevron_left, size: 20),
                     onPressed: onFolderSelected,
-                    tooltip: 'Collapse sidebar',
+                    tooltip: AppLocalizations.of(context)?.collapseSidebar ?? 'Collapse sidebar',
                     padding: EdgeInsets.zero,
                     constraints: const BoxConstraints(),
                   ),
@@ -61,7 +62,7 @@ class Sidebar extends StatelessWidget {
                 // All Notes folder
                 _FolderItem(
                   icon: Icons.folder,
-                  title: 'All Notes',
+                  title: AppLocalizations.of(context)?.allNotes ?? 'All Notes',
                   folderId: 'all',
                   count: notesService.getTotalNotesCount(),
                   onTap: onFolderSelected,
@@ -69,7 +70,7 @@ class Sidebar extends StatelessWidget {
                 // Untagged folder
                 _FolderItem(
                   icon: Icons.description,
-                  title: 'Untagged',
+                  title: AppLocalizations.of(context)?.untagged ?? 'Untagged',
                   folderId: 'untagged',
                   count: notesService.getUntaggedNotesCount(),
                   onTap: onFolderSelected,
@@ -81,7 +82,7 @@ class Sidebar extends StatelessWidget {
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
                       Text(
-                        'Tags',
+                        AppLocalizations.of(context)?.tags ?? 'Tags',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
@@ -99,7 +100,7 @@ class Sidebar extends StatelessWidget {
                             ),
                           );
                         },
-                        tooltip: 'Manage tags',
+                        tooltip: AppLocalizations.of(context)?.manageTags ?? 'Manage tags',
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),

@@ -5,6 +5,7 @@ import '../models/template.dart';
 import '../models/note.dart';
 import '../services/template_service.dart';
 import '../utils/app_theme.dart';
+import '../l10n/app_localizations.dart';
 
 class TemplateChooser extends StatefulWidget {
   final Function(Note) onNoteCreated;
@@ -75,6 +76,7 @@ class _TemplateChooserState extends State<TemplateChooser>
   }
 
   Future<void> _createCustomTemplate() async {
+    final loc = AppLocalizations.of(context);
     final name = _nameController.text.trim();
     final description = _descriptionController.text.trim();
     final icon = _iconController.text.trim();
@@ -82,14 +84,22 @@ class _TemplateChooserState extends State<TemplateChooser>
 
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a template name')),
+        SnackBar(
+          content: Text(
+            loc?.translate('template_name_required') ?? 'Please enter a template name',
+          ),
+        ),
       );
       return;
     }
 
     if (description.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Please enter a description')),
+        SnackBar(
+          content: Text(
+            loc?.translate('template_description_required') ?? 'Please enter a description',
+          ),
+        ),
       );
       return;
     }
@@ -112,14 +122,21 @@ class _TemplateChooserState extends State<TemplateChooser>
     });
 
     if (mounted) {
+      final loc = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Template "$name" created')),
+        SnackBar(
+          content: Text(
+            (loc?.translate('template_created') ?? 'Template "{name}" created')
+                .replaceFirst('{name}', name),
+          ),
+        ),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     return DraggableScrollableSheet(
       initialChildSize: 0.7,
       minChildSize: 0.5,
@@ -150,10 +167,10 @@ class _TemplateChooserState extends State<TemplateChooser>
               // Header with gradient title
               Padding(
                 padding: const EdgeInsets.all(AppTheme.spacingLg),
-                child: Row(
+            child: Row(
                   children: [
                     Text(
-                      'Choose Template',
+                      loc?.translate('choose_template_title') ?? 'Choose Template',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
@@ -192,9 +209,9 @@ class _TemplateChooserState extends State<TemplateChooser>
                   labelColor: Colors.white,
                   unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
                   indicatorSize: TabBarIndicatorSize.tab,
-                  tabs: const [
-                    Tab(text: 'Built-in'),
-                    Tab(text: 'Custom'),
+                  tabs: [
+                    Tab(text: loc?.translate('templates_built_in') ?? 'Built-in'),
+                    Tab(text: loc?.translate('templates_custom') ?? 'Custom'),
                   ],
                 ),
               ),
@@ -244,6 +261,7 @@ class _TemplateChooserState extends State<TemplateChooser>
   Widget _buildCustomTemplatesTab(ScrollController scrollController) {
     final templateService = Provider.of<TemplateService>(context);
     final templates = templateService.customTemplates;
+    final loc = AppLocalizations.of(context);
 
     if (_showCustomTemplateForm) {
       return SingleChildScrollView(
@@ -258,9 +276,9 @@ class _TemplateChooserState extends State<TemplateChooser>
                   icon: const Icon(Icons.arrow_back),
                   onPressed: () => setState(() => _showCustomTemplateForm = false),
                 ),
-                const Text(
-                  'Create Custom Template',
-                  style: TextStyle(
+                Text(
+                  loc?.translate('create_custom_template') ?? 'Create Custom Template',
+                  style: const TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                   ),
@@ -270,28 +288,28 @@ class _TemplateChooserState extends State<TemplateChooser>
             const SizedBox(height: 16),
             TextField(
               controller: _nameController,
-              decoration: const InputDecoration(
-                labelText: 'Template Name',
-                hintText: 'e.g., Weekly Review',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: loc?.translate('template_name_label') ?? 'Template Name',
+                hintText: loc?.translate('template_name_hint') ?? 'e.g., Weekly Review',
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(
-                labelText: 'Description',
-                hintText: 'Brief description of the template',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: loc?.translate('template_description_label') ?? 'Description',
+                hintText: loc?.translate('template_description_hint') ?? 'Brief description of the template',
+                border: const OutlineInputBorder(),
               ),
             ),
             const SizedBox(height: 12),
             TextField(
               controller: _iconController,
-              decoration: const InputDecoration(
-                labelText: 'Icon (emoji)',
+              decoration: InputDecoration(
+                labelText: loc?.translate('template_icon_label') ?? 'Icon (emoji)',
                 hintText: '📝',
-                border: OutlineInputBorder(),
+                border: const OutlineInputBorder(),
               ),
               maxLength: 2,
             ),
@@ -299,10 +317,10 @@ class _TemplateChooserState extends State<TemplateChooser>
             TextField(
               controller: _contentController,
               maxLines: 10,
-              decoration: const InputDecoration(
-                labelText: 'Template Content',
-                hintText: 'Enter the template content...',
-                border: OutlineInputBorder(),
+              decoration: InputDecoration(
+                labelText: loc?.translate('template_content_label') ?? 'Template Content',
+                hintText: loc?.translate('template_content_hint') ?? 'Enter the template content...',
+                border: const OutlineInputBorder(),
                 alignLabelWithHint: true,
               ),
             ),
@@ -311,7 +329,9 @@ class _TemplateChooserState extends State<TemplateChooser>
               width: double.infinity,
               child: FilledButton(
                 onPressed: _createCustomTemplate,
-                child: const Text('Save Template'),
+                child: Text(
+                  loc?.translate('save_template_action') ?? 'Save Template',
+                ),
               ),
             ),
           ],
@@ -329,7 +349,9 @@ class _TemplateChooserState extends State<TemplateChooser>
             child: OutlinedButton.icon(
               onPressed: () => setState(() => _showCustomTemplateForm = true),
               icon: const Icon(Icons.add),
-              label: const Text('Create Custom Template'),
+                label: Text(
+                  loc?.translate('create_custom_template') ?? 'Create Custom Template',
+                ),
             ),
           ),
         ),
@@ -347,12 +369,13 @@ class _TemplateChooserState extends State<TemplateChooser>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No custom templates yet',
+                        loc?.translate('no_custom_templates_title') ?? 'No custom templates yet',
                         style: Theme.of(context).textTheme.titleMedium,
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Create one from scratch or save notes as templates',
+                        loc?.translate('no_custom_templates_description') ??
+                            'Create one from scratch or save notes as templates',
                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                               color: Theme.of(context)
                                   .colorScheme
@@ -388,19 +411,26 @@ class _TemplateChooserState extends State<TemplateChooser>
   }
 
   Future<void> _deleteCustomTemplate(NoteTemplate template) async {
+    final loc = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Template'),
-        content: Text('Are you sure you want to delete "${template.name}"?'),
+        title: Text(loc?.translate('delete_template_title') ?? 'Delete Template'),
+        content: Text(
+          (loc?.translate('delete_template_confirmation') ?? 'Are you sure you want to delete "{name}"?')
+              .replaceFirst('{name}', template.name),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(
+              loc?.delete ?? 'Delete',
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -411,8 +441,12 @@ class _TemplateChooserState extends State<TemplateChooser>
           Provider.of<TemplateService>(context, listen: false);
       await templateService.deleteCustomTemplate(template.id);
       if (mounted) {
+        final locAfter = AppLocalizations.of(context);
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Template "${template.name}" deleted')),
+          SnackBar(
+            content: Text((locAfter?.translate('template_deleted') ?? 'Template "{name}" deleted')
+                .replaceFirst('{name}', template.name)),
+          ),
         );
       }
     }
@@ -440,7 +474,7 @@ class _TemplateCard extends StatelessWidget {
         border: Border.all(color: Theme.of(context).colorScheme.outline),
         boxShadow: [AppTheme.shadowSm],
       ),
-      child: Material(
+          child: Material(
         color: Colors.transparent,
         child: InkWell(
           onTap: onTap,

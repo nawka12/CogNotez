@@ -8,6 +8,7 @@ import '../services/google_drive_service.dart';
 import '../services/encryption_service.dart';
 import '../services/notes_service.dart';
 import '../models/settings.dart';
+import '../l10n/app_localizations.dart';
 import 'about_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -25,23 +26,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   void initState() {
     super.initState();
-    _settingsService = SettingsService();
-    _loadSettings();
-  }
-
-  Future<void> _loadSettings() async {
-    await _settingsService.loadSettings();
-    setState(() {
-      _currentSettings = _settingsService.settings;
-      _isLoading = false;
-    });
+    _settingsService = Provider.of<SettingsService>(context, listen: false);
+    _currentSettings = _settingsService.settings;
+    _isLoading = false;
   }
 
   Future<void> _saveSettings() async {
     await _settingsService.saveSettings(_currentSettings);
     if (mounted) {
+      final loc = AppLocalizations.of(context);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Settings saved')),
+        SnackBar(content: Text(loc?.translate('settings_saved') ?? 'Settings saved')),
       );
     }
   }
@@ -55,9 +50,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final loc = AppLocalizations.of(context);
     if (_isLoading) {
       return Scaffold(
-        appBar: AppBar(title: const Text('Settings')),
+        appBar: AppBar(title: Text(loc?.translate('settings_title') ?? 'Settings')),
         body: const Center(child: CircularProgressIndicator()),
       );
     }
@@ -66,26 +62,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Settings'),
+        title: Text(loc?.translate('settings_title') ?? 'Settings'),
       ),
       body: ListView(
         children: [
           // Appearance Section
-          _buildSectionHeader('Appearance'),
+          _buildSectionHeader(loc?.translate('appearance_section') ?? 'Appearance'),
           ListTile(
             leading: const Icon(Icons.palette),
-            title: const Text('Theme'),
+            title: Text(loc?.translate('theme_title') ?? 'Theme'),
             subtitle: Text(_currentSettings.theme == 'system'
-                ? 'System default'
+                ? (loc?.translate('theme_system') ?? 'System default')
                 : _currentSettings.theme == 'light'
-                    ? 'Light'
-                    : 'Dark'),
+                    ? (loc?.translate('theme_light') ?? 'Light')
+                    : (loc?.translate('theme_dark') ?? 'Dark')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showThemeDialog(themeService),
           ),
           ListTile(
             leading: const Icon(Icons.language),
-            title: const Text('Language'),
+            title: Text(loc?.translate('language_title') ?? 'Language'),
             subtitle: Text(_getLanguageName(_currentSettings.language)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showLanguageDialog(),
@@ -94,13 +90,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(),
           
           // AI Configuration Section
-          _buildSectionHeader('AI Configuration'),
+          _buildSectionHeader(loc?.translate('ai_section') ?? 'AI Configuration'),
           ListTile(
             leading: const Icon(Icons.smart_toy),
-            title: const Text('AI Backend'),
+            title: Text(loc?.translate('ai_backend_title') ?? 'AI Backend'),
             subtitle: Text(_currentSettings.aiBackend == 'ollama'
-                ? 'Ollama'
-                : 'OpenRouter'),
+                ? (loc?.translate('ai_backend_ollama') ?? 'Ollama')
+                : (loc?.translate('ai_backend_openrouter') ?? 'OpenRouter')),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showAIBackendDialog(),
           ),
@@ -108,14 +104,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           if (_currentSettings.aiBackend == 'ollama') ...[
             ListTile(
               leading: const Icon(Icons.link),
-              title: const Text('Ollama Endpoint'),
+              title: Text(loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint'),
               subtitle: Text(_currentSettings.ollamaEndpoint),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showOllamaEndpointDialog(),
             ),
             ListTile(
               leading: const Icon(Icons.model_training),
-              title: const Text('Ollama Model'),
+              title: Text(loc?.translate('ollama_model_title') ?? 'Ollama Model'),
               subtitle: Text(_currentSettings.ollamaModel),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showOllamaModelDialog(),
@@ -123,16 +119,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ] else ...[
             ListTile(
               leading: const Icon(Icons.key),
-              title: const Text('OpenRouter API Key'),
+              title: Text(loc?.translate('openrouter_api_key_title') ?? 'OpenRouter API Key'),
               subtitle: Text(_currentSettings.openRouterApiKey?.isNotEmpty == true
                   ? '••••••••'
-                  : 'Not set'),
+                  : (loc?.translate('not_set') ?? 'Not set')),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showOpenRouterApiKeyDialog(),
             ),
             ListTile(
               leading: const Icon(Icons.model_training),
-              title: const Text('OpenRouter Model'),
+              title: Text(loc?.translate('openrouter_model_title') ?? 'OpenRouter Model'),
               subtitle: Text(_currentSettings.openRouterModel ?? 'openai/gpt-4o-mini'),
               trailing: const Icon(Icons.chevron_right),
               onTap: () => _showOpenRouterModelDialog(),
@@ -142,7 +138,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(),
           
           // Sync Settings Section
-          _buildSectionHeader('Sync & Backup'),
+          _buildSectionHeader(loc?.translate('sync_section') ?? 'Sync & Backup'),
           Consumer<GoogleDriveService>(
             builder: (context, driveService, child) {
               final status = driveService.status;
@@ -161,7 +157,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       subtitle: Text(status.userEmail ?? ''),
                       trailing: TextButton(
                         onPressed: () => _showDisconnectDialog(driveService),
-                        child: const Text('Disconnect'),
+                        child: Text(loc?.translate('disconnect') ?? 'Disconnect'),
                       ),
                     ),
                     
@@ -181,17 +177,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           status.hasRemoteBackup ? Icons.cloud_done : Icons.cloud_off,
                           color: status.hasRemoteBackup ? Colors.green : Colors.grey,
                         ),
-                        title: Text(status.hasRemoteBackup
-                            ? 'Remote backup available${status.isEncrypted ? ' (encrypted)' : ''}'
-                            : 'No remote backup'),
+                        title: Text(
+                          status.hasRemoteBackup
+                              ? (loc?.translate('remote_backup_available') ?? 'Remote backup available') +
+                                  (status.isEncrypted
+                                      ? ' (${loc?.translate('encrypted_label') ?? 'encrypted'})'
+                                      : '')
+                              : (loc?.translate('no_remote_backup') ?? 'No remote backup'),
+                        ),
                         subtitle: status.lastSync != null
-                            ? Text('Last sync: ${_formatLastSync(status.lastSync!)}')
+                            ? Text('${loc?.translate('last_sync_prefix') ?? 'Last sync:'} ${_formatLastSync(status.lastSync!)}')
                             : null,
                       ),
                       ListTile(
                         leading: const Icon(Icons.sync),
-                        title: const Text('Sync Now'),
-                        subtitle: const Text('Manually sync with Google Drive'),
+                        title: Text(loc?.translate('sync_now_title') ?? 'Sync Now'),
+                        subtitle: Text(loc?.translate('sync_now_subtitle') ?? 'Manually sync with Google Drive'),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _syncNow(driveService),
                       ),
@@ -201,7 +202,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (status.error != null)
                       ListTile(
                         leading: const Icon(Icons.error, color: Colors.red),
-                        title: const Text('Sync Error'),
+                        title: Text(loc?.translate('sync_error_title') ?? 'Sync Error'),
                         subtitle: Text(
                           status.error!,
                           style: const TextStyle(color: Colors.red),
@@ -209,7 +210,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         trailing: status.needsPassphrase
                             ? TextButton(
                                 onPressed: () => _showPassphraseDialog(driveService, isRequired: true),
-                                child: const Text('Enter Passphrase'),
+                                child: Text(loc?.translate('enter_passphrase_button') ?? 'Enter Passphrase'),
                               )
                             : null,
                       ),
@@ -217,17 +218,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     const Divider(),
                     
                     // End-to-End Encryption Section
-                    _buildSectionHeader('End-to-End Encryption'),
+                    _buildSectionHeader(loc?.translate('e2ee_section') ?? 'End-to-End Encryption'),
                     SwitchListTile(
                       secondary: Icon(
                         driveService.encryptionEnabled ? Icons.lock : Icons.lock_open,
                         color: driveService.encryptionEnabled ? Colors.green : null,
                       ),
-                      title: const Text('Enable E2EE'),
+                      title: Text(loc?.translate('enable_e2ee_title') ?? 'Enable E2EE'),
                       subtitle: Text(
                         driveService.encryptionEnabled
-                            ? (driveService.hasPassphrase ? 'Passphrase set' : 'Enter passphrase to sync')
-                            : 'Encrypt sync data with a passphrase',
+                            ? (driveService.hasPassphrase
+                                ? (loc?.translate('passphrase_set') ?? 'Passphrase set')
+                                : (loc?.translate('enter_passphrase_to_sync') ?? 'Enter passphrase to sync'))
+                            : (loc?.translate('encrypt_sync_data') ?? 'Encrypt sync data with a passphrase'),
                       ),
                       value: driveService.encryptionEnabled,
                       onChanged: (value) {
@@ -247,8 +250,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'Change Passphrase',
                         ),
                         subtitle: Text(driveService.hasPassphrase
-                            ? 'Update your E2EE passphrase'
-                            : 'Set your E2EE passphrase'),
+                            ? (loc?.translate('update_e2ee_passphrase') ?? 'Update your E2EE passphrase')
+                            : (loc?.translate('set_e2ee_passphrase') ?? 'Set your E2EE passphrase')),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _showPassphraseDialog(driveService),
                       ),
@@ -257,9 +260,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     Padding(
                       padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
                       child: Text(
-                        'End-to-end encryption protects your notes with a passphrase. '
-                        'Only you can decrypt your data. '
-                        'Use the same passphrase on all devices.',
+                        loc?.translate('e2ee_info') ??
+                            'End-to-end encryption protects your notes with a passphrase. '
+                                'Only you can decrypt your data. '
+                                'Use the same passphrase on all devices.',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -271,8 +275,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     // Auto sync settings
                     SwitchListTile(
                       secondary: const Icon(Icons.autorenew),
-                      title: const Text('Auto Sync'),
-                      subtitle: const Text('Automatically sync notes'),
+                      title: Text(loc?.translate('auto_sync_title') ?? 'Auto Sync'),
+                      subtitle: Text(loc?.translate('auto_sync_subtitle') ?? 'Automatically sync notes'),
                       value: _currentSettings.autoSync,
                       onChanged: (value) {
                         _updateSettings((s) => s.copyWith(autoSync: value));
@@ -282,8 +286,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     if (_currentSettings.autoSync)
                       ListTile(
                         leading: const Icon(Icons.timer),
-                        title: const Text('Sync Interval'),
-                        subtitle: Text('${_currentSettings.syncInterval ~/ 60000} minutes'),
+                        title: Text(loc?.translate('sync_interval_title') ?? 'Sync Interval'),
+                        subtitle: Text(
+                          (loc?.translate('sync_interval_minutes') ?? '{minutes} minutes')
+                              .replaceFirst('{minutes}', '${_currentSettings.syncInterval ~/ 60000}'),
+                        ),
                         trailing: const Icon(Icons.chevron_right),
                         onTap: () => _showSyncIntervalDialog(),
                       ),
@@ -323,25 +330,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(),
           
           // Local Backup Section
-          _buildSectionHeader('Local Backup'),
+          _buildSectionHeader(loc?.translate('local_backup_section') ?? 'Local Backup'),
           ListTile(
             leading: const Icon(Icons.backup),
-            title: const Text('Export Backup'),
-            subtitle: const Text('Save all notes and tags to a JSON file'),
+            title: Text(loc?.translate('export_backup_title') ?? 'Export Backup'),
+            subtitle: Text(loc?.translate('export_backup_subtitle') ?? 'Save all notes and tags to a JSON file'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _exportBackup(),
           ),
           ListTile(
             leading: const Icon(Icons.restore),
-            title: const Text('Import Backup'),
-            subtitle: const Text('Restore notes and tags from a backup file'),
+            title: Text(loc?.translate('import_backup_title') ?? 'Import Backup'),
+            subtitle: Text(loc?.translate('import_backup_subtitle') ?? 'Restore notes and tags from a backup file'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _importBackup(),
           ),
           ListTile(
             leading: const Icon(Icons.analytics),
-            title: const Text('Backup Statistics'),
-            subtitle: const Text('View data statistics'),
+            title: Text(loc?.translate('backup_stats_title') ?? 'Backup Statistics'),
+            subtitle: Text(loc?.translate('backup_stats_subtitle') ?? 'View data statistics'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showBackupStats(),
           ),
@@ -349,10 +356,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const Divider(),
           
           // About Section
-          _buildSectionHeader('About'),
+          _buildSectionHeader(loc?.translate('about_section') ?? 'About'),
           ListTile(
             leading: const Icon(Icons.info),
-            title: const Text('About CogNotez'),
+            title: Text(loc?.translate('about_cognotez_title') ?? 'About CogNotez'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
               Navigator.push(
@@ -391,15 +398,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showThemeDialog(ThemeService themeService) {
+    final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select Theme'),
+        title: Text(loc?.translate('select_theme_title') ?? 'Select Theme'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             RadioListTile<String>(
-              title: const Text('System default'),
+              title: Text(loc?.translate('theme_system') ?? 'System default'),
               value: 'system',
               groupValue: _currentSettings.theme,
               onChanged: (value) {
@@ -411,7 +419,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             RadioListTile<String>(
-              title: const Text('Light'),
+              title: Text(loc?.translate('theme_light') ?? 'Light'),
               value: 'light',
               groupValue: _currentSettings.theme,
               onChanged: (value) {
@@ -423,7 +431,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             RadioListTile<String>(
-              title: const Text('Dark'),
+              title: Text(loc?.translate('theme_dark') ?? 'Dark'),
               value: 'dark',
               groupValue: _currentSettings.theme,
               onChanged: (value) {
@@ -441,10 +449,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showLanguageDialog() {
+    final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select Language'),
+        title: Text(loc?.translate('select_language_title') ?? 'Select Language'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: ['en', 'es', 'id', 'ja', 'jv'].map((lang) {
@@ -455,6 +464,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
               onChanged: (value) {
                 if (value != null) {
                   _updateSettings((s) => s.copyWith(language: value));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text(
+                        (loc?.translate('language_changed_message') ?? 'Language changed to {language}')
+                            .replaceFirst('{language}', _getLanguageName(value)),
+                      ),
+                    ),
+                  );
                   Navigator.pop(context);
                 }
               },
@@ -466,16 +483,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showAIBackendDialog() {
+    final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Select AI Backend'),
+        title: Text(loc?.translate('select_ai_backend_title') ?? 'Select AI Backend'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             RadioListTile<String>(
-              title: const Text('Ollama'),
-              subtitle: const Text('Local AI models'),
+              title: Text(loc?.translate('ai_backend_ollama') ?? 'Ollama'),
+              subtitle: Text(loc?.translate('ai_backend_ollama_subtitle') ?? 'Local AI models'),
               value: 'ollama',
               groupValue: _currentSettings.aiBackend,
               onChanged: (value) {
@@ -486,8 +504,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
               },
             ),
             RadioListTile<String>(
-              title: const Text('OpenRouter'),
-              subtitle: const Text('Cloud AI models'),
+              title: Text(loc?.translate('ai_backend_openrouter') ?? 'OpenRouter'),
+              subtitle: Text(loc?.translate('ai_backend_openrouter_subtitle') ?? 'Cloud AI models'),
               value: 'openrouter',
               groupValue: _currentSettings.aiBackend,
               onChanged: (value) {
@@ -507,29 +525,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final controller = TextEditingController(text: _currentSettings.ollamaEndpoint);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ollama Endpoint'),
+      builder: (context) {
+        final loc = AppLocalizations.of(context);
+        return AlertDialog(
+        title: Text(loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'http://localhost:11434',
-            labelText: 'Endpoint URL',
+            labelText: loc?.translate('endpoint_url_label') ?? 'Endpoint URL',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () {
               _updateSettings((s) => s.copyWith(ollamaEndpoint: controller.text));
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(loc?.translate('save_button') ?? 'Save'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -537,29 +558,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final controller = TextEditingController(text: _currentSettings.ollamaModel);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Ollama Model'),
+      builder: (context) {
+        final loc = AppLocalizations.of(context);
+        return AlertDialog(
+        title: Text(loc?.translate('ollama_model_title') ?? 'Ollama Model'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'llama3.2:latest',
-            labelText: 'Model name',
+            labelText: loc?.translate('model_name_label') ?? 'Model name',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () {
               _updateSettings((s) => s.copyWith(ollamaModel: controller.text));
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(loc?.translate('save_button') ?? 'Save'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -567,30 +591,33 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final controller = TextEditingController(text: _currentSettings.openRouterApiKey ?? '');
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('OpenRouter API Key'),
+      builder: (context) {
+        final loc = AppLocalizations.of(context);
+        return AlertDialog(
+        title: Text(loc?.translate('openrouter_api_key_title') ?? 'OpenRouter API Key'),
         content: TextField(
           controller: controller,
           obscureText: true,
-          decoration: const InputDecoration(
-            hintText: 'Enter your API key',
-            labelText: 'API Key',
+          decoration: InputDecoration(
+            hintText: loc?.translate('enter_api_key_hint') ?? 'Enter your API key',
+            labelText: loc?.translate('api_key_label') ?? 'API Key',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () {
               _updateSettings((s) => s.copyWith(openRouterApiKey: controller.text.isEmpty ? null : controller.text));
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(loc?.translate('save_button') ?? 'Save'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -598,29 +625,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final controller = TextEditingController(text: _currentSettings.openRouterModel ?? 'openai/gpt-4o-mini');
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('OpenRouter Model'),
+      builder: (context) {
+        final loc = AppLocalizations.of(context);
+        return AlertDialog(
+        title: Text(loc?.translate('openrouter_model_title') ?? 'OpenRouter Model'),
         content: TextField(
           controller: controller,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: 'openai/gpt-4o-mini',
-            labelText: 'Model name',
+            labelText: loc?.translate('model_name_label') ?? 'Model name',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () {
               _updateSettings((s) => s.copyWith(openRouterModel: controller.text));
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(loc?.translate('save_button') ?? 'Save'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 
@@ -630,20 +660,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Sync Interval'),
+      builder: (context) {
+        final loc = AppLocalizations.of(context);
+        return AlertDialog(
+        title: Text(loc?.translate('sync_interval_title') ?? 'Sync Interval'),
         content: TextField(
           controller: controller,
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(
+          decoration: InputDecoration(
             hintText: '5',
-            labelText: 'Minutes',
+            labelText: loc?.translate('minutes_label') ?? 'Minutes',
           ),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () {
@@ -651,10 +683,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
               _updateSettings((s) => s.copyWith(syncInterval: minutes * 60000));
               Navigator.pop(context);
             },
-            child: const Text('Save'),
+            child: Text(loc?.translate('save_button') ?? 'Save'),
           ),
         ],
-      ),
+      );
+      },
     );
   }
 

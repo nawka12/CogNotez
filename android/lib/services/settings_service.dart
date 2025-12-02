@@ -1,8 +1,9 @@
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import '../models/settings.dart';
 
-class SettingsService {
+class SettingsService extends ChangeNotifier {
   static const String _settingsKey = 'app_settings';
   AppSettings? _settings;
   
@@ -27,6 +28,7 @@ class SettingsService {
     _settings = newSettings;
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_settingsKey, jsonEncode(newSettings.toJson()));
+    notifyListeners();
   }
   
   Future<void> updateSettings(AppSettings Function(AppSettings) update) async {
