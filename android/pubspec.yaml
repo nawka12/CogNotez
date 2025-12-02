@@ -14,6 +14,7 @@ dependencies:
   cupertino_icons: ^1.0.6
   flutter_markdown: ^0.6.18
   flutter_colorpicker: ^1.0.3
+  flutter_svg: ^2.0.9
   
   # State Management
   provider: ^6.1.1

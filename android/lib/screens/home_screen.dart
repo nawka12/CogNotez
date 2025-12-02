@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 import '../models/note.dart';
 import '../services/notes_service.dart';
 import '../services/theme_service.dart';
@@ -161,7 +162,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
                 onChanged: _onSearchChanged,
               )
-            : const Text('CogNotez'),
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  SvgPicture.asset(
+                    'assets/icon.svg',
+                    width: 28,
+                    height: 28,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text('CogNotez'),
+                ],
+              ),
         actions: [
           IconButton(
             icon: Icon(_isSearching ? Icons.close : Icons.search),
