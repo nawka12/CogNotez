@@ -20,6 +20,7 @@ jobs:
           node-version: '20.x'
           check-latest: true
           cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Verify Node.js version
         run: |
@@ -27,10 +28,13 @@ jobs:
           echo "NPM version: $(npm --version)"
 
       - name: Install dependencies
+        working-directory: desktop
         run: npm ci
 
       - name: Lint code
+        working-directory: desktop
         run: npm run lint || echo "No lint script found"
 
       - name: Build application
+        working-directory: desktop
         run: npm run dist

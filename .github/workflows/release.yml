@@ -26,6 +26,7 @@ jobs:
           node-version: '20.x'
           check-latest: true
           cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Verify Node.js version
         run: |
@@ -33,9 +34,11 @@ jobs:
           echo "NPM version: $(npm --version)"
 
       - name: Install dependencies
+        working-directory: desktop
         run: npm ci
 
       - name: Build application
+        working-directory: desktop
         run: npm run dist
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -43,16 +46,16 @@ jobs:
       - name: List build artifacts (Linux/macOS)
         if: runner.os != 'Windows'
         run: |
-          echo "=== Build artifacts in dist/ ==="
-          ls -la dist/ || echo "No dist directory found"
+          echo "=== Build artifacts in desktop/dist/ ==="
+          ls -la desktop/dist/ || echo "No dist directory found"
           echo "=== End of artifacts list ==="
 
       - name: List build artifacts (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "=== Build artifacts in dist/ ==="
-          if (Test-Path dist) {
-            Get-ChildItem dist/ -Force
+          echo "=== Build artifacts in desktop/dist/ ==="
+          if (Test-Path desktop/dist) {
+            Get-ChildItem desktop/dist/ -Force
           } else {
             echo "No dist directory found"
           }
@@ -63,10 +66,10 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            dist/*.AppImage
-            dist/*.dmg
-            dist/*.exe
-            dist/latest*.yml
+            desktop/dist/*.AppImage
+            desktop/dist/*.dmg
+            desktop/dist/*.exe
+            desktop/dist/latest*.yml
           generate_release_notes: true
           fail_on_unmatched_files: false
         env:
