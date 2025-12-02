@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../models/tag.dart';
 import 'database_service.dart';
@@ -10,6 +11,8 @@ class NotesService extends ChangeNotifier {
   List<Tag> _tags = [];
   String? _selectedFolder;
   String _searchQuery = '';
+  
+  static const int maxPinnedNotes = 3;
 
   NotesService(this._databaseService) {
     // Initialize with "all" folder selected
@@ -24,6 +27,7 @@ class NotesService extends ChangeNotifier {
 
   Future<void> loadNotes() async {
     _allNotes = await _databaseService.getAllNotes();
+    _sortNotes();
     _applyFilters();
     notifyListeners();
   }
@@ -54,6 +58,7 @@ class NotesService extends ChangeNotifier {
       await loadNotes();
     } else {
       _allNotes = await _databaseService.searchNotes(query);
+      _sortNotes();
       _applyFilters();
       notifyListeners();
     }
@@ -63,6 +68,17 @@ class NotesService extends ChangeNotifier {
     _selectedFolder = folder;
     _applyFilters();
     notifyListeners();
+  }
+
+  // Sort notes with pinned first, then by updated time
+  void _sortNotes() {
+    _allNotes.sort((a, b) {
+      // Pinned notes come first
+      if (a.isPinned && !b.isPinned) return -1;
+      if (!a.isPinned && b.isPinned) return 1;
+      // Then sort by updated time (most recent first)
+      return b.updatedAt.compareTo(a.updatedAt);
+    });
   }
 
   void _applyFilters() {
@@ -85,8 +101,65 @@ class NotesService extends ChangeNotifier {
   
   int getUntaggedNotesCount() => _allNotes.where((n) => n.tags.isEmpty).length;
   
-  int getTagNotesCount(String tagId) => 
+  int getTagNotesCount(String tagId) =>
       _allNotes.where((n) => n.tags.contains(tagId)).length;
+  
+  // Pin/unpin note functionality
+  int getPinnedNotesCount() => _allNotes.where((n) => n.isPinned).length;
+  
+  bool canPinNote() => getPinnedNotesCount() < maxPinnedNotes;
+  
+  Future<bool> togglePinNote(String noteId) async {
+    final noteIndex = _allNotes.indexWhere((n) => n.id == noteId);
+    if (noteIndex == -1) return false;
+    
+    final note = _allNotes[noteIndex];
+    
+    // If trying to pin and already at max, return false
+    if (!note.isPinned && !canPinNote()) {
+      return false;
+    }
+    
+    // Toggle pin status
+    final updatedNote = note.copyWith(
+      isPinned: !note.isPinned,
+      updatedAt: DateTime.now(),
+    );
+    
+    await _databaseService.updateNote(updatedNote);
+    await loadNotes();
+    return true;
+  }
+  
+  // Duplicate note functionality
+  Future<Note?> duplicateNote(String noteId) async {
+    final originalNote = _allNotes.firstWhere(
+      (n) => n.id == noteId,
+      orElse: () => throw Exception('Note not found'),
+    );
+    
+    final duplicatedNote = Note(
+      id: const Uuid().v4(),
+      title: '${originalNote.title} (Copy)',
+      content: originalNote.isPasswordProtected ? '' : originalNote.content,
+      createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
+      tags: List.from(originalNote.tags),
+      isPasswordProtected: originalNote.isPasswordProtected,
+      // Copy encryption data if password protected
+      encryptedContent: originalNote.encryptedContent,
+      encryptionSalt: originalNote.encryptionSalt,
+      encryptionIv: originalNote.encryptionIv,
+      metadata: originalNote.metadata != null
+          ? Map<String, dynamic>.from(originalNote.metadata!)
+          : null,
+      isPinned: false, // New copy starts unpinned
+    );
+    
+    await _databaseService.createNote(duplicatedNote);
+    await loadNotes();
+    return duplicatedNote;
+  }
 
   Future<void> createTag(Tag tag) async {
     await _databaseService.createTag(tag);

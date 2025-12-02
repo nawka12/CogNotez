@@ -4,6 +4,9 @@ import '../services/settings_service.dart';
 import '../services/theme_service.dart';
 import '../services/database_service.dart';
 import '../services/backup_service.dart';
+import '../services/google_drive_service.dart';
+import '../services/encryption_service.dart';
+import '../services/notes_service.dart';
 import '../models/settings.dart';
 import 'about_screen.dart';
 
@@ -136,57 +139,186 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
           
-          SwitchListTile(
-            secondary: const Icon(Icons.search),
-            title: const Text('Enable SearXNG'),
-            subtitle: const Text('Web search integration'),
-            value: _currentSettings.searxngEnabled,
-            onChanged: (value) {
-              _updateSettings((s) => s.copyWith(searxngEnabled: value));
-            },
-          ),
-          
-          if (_currentSettings.searxngEnabled)
-            ListTile(
-              leading: const Icon(Icons.link),
-              title: const Text('SearXNG URL'),
-              subtitle: Text(_currentSettings.searxngUrl),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showSearXNGUrlDialog(),
-            ),
-          
           const Divider(),
           
           // Sync Settings Section
           _buildSectionHeader('Sync & Backup'),
-          SwitchListTile(
-            secondary: const Icon(Icons.cloud),
-            title: const Text('Google Drive Sync'),
-            subtitle: const Text('Sync notes to Google Drive'),
-            value: _currentSettings.googleDriveSyncEnabled,
-            onChanged: (value) {
-              _updateSettings((s) => s.copyWith(googleDriveSyncEnabled: value));
+          Consumer<GoogleDriveService>(
+            builder: (context, driveService, child) {
+              final status = driveService.status;
+              
+              if (status.isConnected) {
+                return Column(
+                  children: [
+                    // Account info
+                    ListTile(
+                      leading: status.userPhotoUrl != null
+                          ? CircleAvatar(
+                              backgroundImage: NetworkImage(status.userPhotoUrl!),
+                            )
+                          : const CircleAvatar(child: Icon(Icons.person)),
+                      title: Text(status.userName ?? 'Connected'),
+                      subtitle: Text(status.userEmail ?? ''),
+                      trailing: TextButton(
+                        onPressed: () => _showDisconnectDialog(driveService),
+                        child: const Text('Disconnect'),
+                      ),
+                    ),
+                    
+                    // Sync status
+                    if (status.isSyncing)
+                      const ListTile(
+                        leading: SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        ),
+                        title: Text('Syncing...'),
+                      )
+                    else ...[
+                      ListTile(
+                        leading: Icon(
+                          status.hasRemoteBackup ? Icons.cloud_done : Icons.cloud_off,
+                          color: status.hasRemoteBackup ? Colors.green : Colors.grey,
+                        ),
+                        title: Text(status.hasRemoteBackup
+                            ? 'Remote backup available${status.isEncrypted ? ' (encrypted)' : ''}'
+                            : 'No remote backup'),
+                        subtitle: status.lastSync != null
+                            ? Text('Last sync: ${_formatLastSync(status.lastSync!)}')
+                            : null,
+                      ),
+                      ListTile(
+                        leading: const Icon(Icons.sync),
+                        title: const Text('Sync Now'),
+                        subtitle: const Text('Manually sync with Google Drive'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _syncNow(driveService),
+                      ),
+                    ],
+                    
+                    // Error display
+                    if (status.error != null)
+                      ListTile(
+                        leading: const Icon(Icons.error, color: Colors.red),
+                        title: const Text('Sync Error'),
+                        subtitle: Text(
+                          status.error!,
+                          style: const TextStyle(color: Colors.red),
+                        ),
+                        trailing: status.needsPassphrase
+                            ? TextButton(
+                                onPressed: () => _showPassphraseDialog(driveService, isRequired: true),
+                                child: const Text('Enter Passphrase'),
+                              )
+                            : null,
+                      ),
+                    
+                    const Divider(),
+                    
+                    // End-to-End Encryption Section
+                    _buildSectionHeader('End-to-End Encryption'),
+                    SwitchListTile(
+                      secondary: Icon(
+                        driveService.encryptionEnabled ? Icons.lock : Icons.lock_open,
+                        color: driveService.encryptionEnabled ? Colors.green : null,
+                      ),
+                      title: const Text('Enable E2EE'),
+                      subtitle: Text(
+                        driveService.encryptionEnabled
+                            ? (driveService.hasPassphrase ? 'Passphrase set' : 'Enter passphrase to sync')
+                            : 'Encrypt sync data with a passphrase',
+                      ),
+                      value: driveService.encryptionEnabled,
+                      onChanged: (value) {
+                        if (value) {
+                          // Show passphrase dialog when enabling
+                          _showPassphraseDialog(driveService, isEnabling: true);
+                        } else {
+                          // Confirm before disabling
+                          _showDisableEncryptionDialog(driveService);
+                        }
+                      },
+                    ),
+                    if (driveService.encryptionEnabled)
+                      ListTile(
+                        leading: const Icon(Icons.key),
+                        title: const Text(
+                          'Change Passphrase',
+                        ),
+                        subtitle: Text(driveService.hasPassphrase
+                            ? 'Update your E2EE passphrase'
+                            : 'Set your E2EE passphrase'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showPassphraseDialog(driveService),
+                      ),
+                    
+                    // Info about encryption
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Text(
+                        'End-to-end encryption protects your notes with a passphrase. '
+                        'Only you can decrypt your data. '
+                        'Use the same passphrase on all devices.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ),
+                    
+                    const Divider(),
+                    
+                    // Auto sync settings
+                    SwitchListTile(
+                      secondary: const Icon(Icons.autorenew),
+                      title: const Text('Auto Sync'),
+                      subtitle: const Text('Automatically sync notes'),
+                      value: _currentSettings.autoSync,
+                      onChanged: (value) {
+                        _updateSettings((s) => s.copyWith(autoSync: value));
+                      },
+                    ),
+                    
+                    if (_currentSettings.autoSync)
+                      ListTile(
+                        leading: const Icon(Icons.timer),
+                        title: const Text('Sync Interval'),
+                        subtitle: Text('${_currentSettings.syncInterval ~/ 60000} minutes'),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => _showSyncIntervalDialog(),
+                      ),
+                  ],
+                );
+              } else {
+                // Not connected
+                return Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.cloud_off),
+                      title: const Text('Google Drive'),
+                      subtitle: const Text('Not connected'),
+                      trailing: FilledButton.icon(
+                        onPressed: () => _connectGoogleDrive(driveService),
+                        icon: const Icon(Icons.login),
+                        label: const Text('Connect'),
+                      ),
+                    ),
+                    if (status.error != null)
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          status.error!,
+                          style: TextStyle(
+                            color: Theme.of(context).colorScheme.error,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                );
+              }
             },
           ),
-          
-          if (_currentSettings.googleDriveSyncEnabled) ...[
-            SwitchListTile(
-              secondary: const Icon(Icons.sync),
-              title: const Text('Auto Sync'),
-              subtitle: const Text('Automatically sync notes'),
-              value: _currentSettings.autoSync,
-              onChanged: (value) {
-                _updateSettings((s) => s.copyWith(autoSync: value));
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.timer),
-              title: const Text('Sync Interval'),
-              subtitle: Text('${_currentSettings.syncInterval ~/ 60000} minutes'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showSyncIntervalDialog(),
-            ),
-          ],
           
           const Divider(),
           
@@ -492,36 +624,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  void _showSearXNGUrlDialog() {
-    final controller = TextEditingController(text: _currentSettings.searxngUrl);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('SearXNG URL'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(
-            hintText: 'http://localhost:8080',
-            labelText: 'SearXNG URL',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              _updateSettings((s) => s.copyWith(searxngUrl: controller.text));
-              Navigator.pop(context);
-            },
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-  }
-
   void _showSyncIntervalDialog() {
     final controller = TextEditingController(
       text: '${_currentSettings.syncInterval ~/ 60000}',
@@ -554,6 +656,301 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  String _formatLastSync(DateTime lastSync) {
+    final now = DateTime.now();
+    final diff = now.difference(lastSync);
+    
+    if (diff.inMinutes < 1) {
+      return 'Just now';
+    } else if (diff.inMinutes < 60) {
+      return '${diff.inMinutes} minutes ago';
+    } else if (diff.inHours < 24) {
+      return '${diff.inHours} hours ago';
+    } else {
+      return '${diff.inDays} days ago';
+    }
+  }
+
+  Future<void> _connectGoogleDrive(GoogleDriveService driveService) async {
+    try {
+      final success = await driveService.signIn();
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Failed to connect to Google Drive')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showDisconnectDialog(GoogleDriveService driveService) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disconnect Google Drive'),
+        content: const Text(
+          'Are you sure you want to disconnect from Google Drive? '
+          'Your local notes will not be deleted, but sync will be disabled.'
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Disconnect'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await driveService.disconnect();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Disconnected from Google Drive')),
+        );
+      }
+    }
+  }
+
+  Future<void> _syncNow(GoogleDriveService driveService) async {
+    try {
+      final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final notesService = Provider.of<NotesService>(context, listen: false);
+      final backupService = BackupService(databaseService);
+      
+      // Get local data in desktop-compatible format
+      final localData = await backupService.exportToDesktopFormat();
+      
+      // Perform sync with media files included
+      final result = await driveService.syncWithMedia(
+        localData: localData,
+        applyData: (data) async {
+          // Import the synced data
+          await backupService.importFromDesktopFormat(data);
+        },
+        onProgress: (status) {
+          // Update status in real-time if needed
+          debugPrint('Sync progress: $status');
+        },
+      );
+
+      if (mounted) {
+        if (result.encryptionRequired) {
+          // Show passphrase dialog
+          _showPassphraseDialog(driveService, isRequired: true);
+        } else {
+          // Refresh notes list after successful sync
+          if (result.success && (result.notesDownloaded > 0 || result.action == 'download' || result.action == 'merge')) {
+            await notesService.loadNotes();
+            await notesService.loadTags();
+          }
+          
+          // Build sync message including media stats
+          String message = result.message;
+          if (result.success) {
+            final mediaStats = <String>[];
+            if (result.mediaUploaded > 0) {
+              mediaStats.add('${result.mediaUploaded} media uploaded');
+            }
+            if (result.mediaDownloaded > 0) {
+              mediaStats.add('${result.mediaDownloaded} media downloaded');
+            }
+            if (mediaStats.isNotEmpty) {
+              message = '$message (${mediaStats.join(', ')})';
+            }
+          }
+          
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(message),
+              backgroundColor: result.success ? Colors.green : Colors.red,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Sync failed: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _showPassphraseDialog(
+    GoogleDriveService driveService, {
+    bool isEnabling = false,
+    bool isRequired = false,
+  }) async {
+    final controller = TextEditingController();
+    final confirmController = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    bool obscureText = true;
+    
+    final result = await showDialog<String?>(
+      context: context,
+      barrierDismissible: !isRequired,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: Text(isRequired
+              ? 'Enter Passphrase'
+              : isEnabling
+                  ? 'Set E2EE Passphrase'
+                  : 'Change Passphrase'),
+          content: Form(
+            key: formKey,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (isRequired)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      'The cloud data is encrypted. Enter your passphrase to decrypt it.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                if (isEnabling)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 16),
+                    child: Text(
+                      'Choose a strong passphrase to encrypt your sync data. '
+                      'Remember it - there is no way to recover your data if you forget it.',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                TextFormField(
+                  controller: controller,
+                  obscureText: obscureText,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    labelText: 'Passphrase',
+                    hintText: 'Enter your passphrase',
+                    suffixIcon: IconButton(
+                      icon: Icon(obscureText ? Icons.visibility : Icons.visibility_off),
+                      onPressed: () => setState(() => obscureText = !obscureText),
+                    ),
+                  ),
+                  validator: (value) {
+                    if (value == null || value.isEmpty) {
+                      return 'Passphrase is required';
+                    }
+                    final validation = EncryptionService.validatePassphrase(value);
+                    if (!validation.isValid) {
+                      return validation.errors.first;
+                    }
+                    return null;
+                  },
+                ),
+                if (isEnabling) ...[
+                  const SizedBox(height: 16),
+                  TextFormField(
+                    controller: confirmController,
+                    obscureText: obscureText,
+                    decoration: const InputDecoration(
+                      labelText: 'Confirm Passphrase',
+                      hintText: 'Re-enter your passphrase',
+                    ),
+                    validator: (value) {
+                      if (value != controller.text) {
+                        return 'Passphrases do not match';
+                      }
+                      return null;
+                    },
+                  ),
+                ],
+              ],
+            ),
+          ),
+          actions: [
+            if (!isRequired)
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Cancel'),
+              ),
+            FilledButton(
+              onPressed: () {
+                if (formKey.currentState!.validate()) {
+                  Navigator.pop(context, controller.text);
+                }
+              },
+              child: Text(isEnabling ? 'Enable Encryption' : 'Confirm'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result != null && result.isNotEmpty) {
+      await driveService.updateEncryptionSettings(
+        enabled: true,
+        passphrase: result,
+      );
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isEnabling
+                ? 'End-to-end encryption enabled'
+                : 'Passphrase updated'),
+            backgroundColor: Colors.green,
+          ),
+        );
+        
+        // If passphrase was required for sync, retry sync
+        if (isRequired) {
+          _syncNow(driveService);
+        }
+      }
+    }
+  }
+
+  Future<void> _showDisableEncryptionDialog(GoogleDriveService driveService) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Disable Encryption'),
+        content: const Text(
+          'Are you sure you want to disable end-to-end encryption?\n\n'
+          'Your data will be synced without encryption. '
+          'Existing encrypted backups on Google Drive will remain encrypted '
+          'until the next sync overwrites them.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Disable'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true) {
+      await driveService.updateEncryptionSettings(enabled: false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('End-to-end encryption disabled')),
+        );
+      }
+    }
   }
 
   Future<void> _exportBackup() async {
@@ -619,12 +1016,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
     try {
       final databaseService = Provider.of<DatabaseService>(context, listen: false);
+      final notesService = Provider.of<NotesService>(context, listen: false);
       final backupService = BackupService(databaseService);
       
       final result = await backupService.importBackup();
       
       if (mounted) {
         if (result.success) {
+          // Refresh notes list after successful import
+          await notesService.loadNotes();
+          await notesService.loadTags();
+          
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(

@@ -14,6 +14,8 @@ class SearchFilters {
   final SortOption sortBy;
   final bool showPasswordProtected;
   final bool showUntaggedOnly;
+  final bool pinnedOnly;
+  final bool favoritesOnly;
 
   SearchFilters({
     this.query = '',
@@ -23,6 +25,8 @@ class SearchFilters {
     this.sortBy = SortOption.dateDesc,
     this.showPasswordProtected = true,
     this.showUntaggedOnly = false,
+    this.pinnedOnly = false,
+    this.favoritesOnly = false,
   });
 
   SearchFilters copyWith({
@@ -33,6 +37,8 @@ class SearchFilters {
     SortOption? sortBy,
     bool? showPasswordProtected,
     bool? showUntaggedOnly,
+    bool? pinnedOnly,
+    bool? favoritesOnly,
     bool clearDateFrom = false,
     bool clearDateTo = false,
   }) {
@@ -44,6 +50,8 @@ class SearchFilters {
       sortBy: sortBy ?? this.sortBy,
       showPasswordProtected: showPasswordProtected ?? this.showPasswordProtected,
       showUntaggedOnly: showUntaggedOnly ?? this.showUntaggedOnly,
+      pinnedOnly: pinnedOnly ?? this.pinnedOnly,
+      favoritesOnly: favoritesOnly ?? this.favoritesOnly,
     );
   }
 
@@ -91,6 +99,16 @@ class SearchFilters {
       filtered = filtered.where((note) => !note.isPasswordProtected).toList();
     }
 
+    // Pinned only filter
+    if (pinnedOnly) {
+      filtered = filtered.where((note) => note.isPinned).toList();
+    }
+
+    // Favorites only filter
+    if (favoritesOnly) {
+      filtered = filtered.where((note) => note.isFavorite).toList();
+    }
+
     // Sort
     switch (sortBy) {
       case SortOption.dateDesc:
@@ -123,6 +141,8 @@ class SearchFilters {
            dateTo != null ||
            !showPasswordProtected ||
            showUntaggedOnly ||
+           pinnedOnly ||
+           favoritesOnly ||
            sortBy != SortOption.dateDesc;
   }
 }
@@ -374,6 +394,20 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
             spacing: 8,
             runSpacing: 8,
             children: [
+              FilterChip(
+                label: const Text('Pinned only'),
+                selected: _filters.pinnedOnly,
+                onSelected: (selected) {
+                  _updateFilters(_filters.copyWith(pinnedOnly: selected));
+                },
+              ),
+              FilterChip(
+                label: const Text('Favorites only'),
+                selected: _filters.favoritesOnly,
+                onSelected: (selected) {
+                  _updateFilters(_filters.copyWith(favoritesOnly: selected));
+                },
+              ),
               FilterChip(
                 label: const Text('Show locked notes'),
                 selected: _filters.showPasswordProtected,

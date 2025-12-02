@@ -6,11 +6,11 @@ class AppSettings {
   String ollamaModel;
   String? openRouterApiKey;
   String? openRouterModel;
-  bool searxngEnabled;
-  String searxngUrl;
   bool googleDriveSyncEnabled;
   bool autoSync;
   int syncInterval; // in milliseconds
+  bool e2eeEnabled; // End-to-end encryption for cloud sync
+  String? e2eeSalt; // Deterministic salt derived from passphrase
 
   AppSettings({
     this.theme = 'system',
@@ -20,11 +20,11 @@ class AppSettings {
     this.ollamaModel = 'llama3.2:latest',
     this.openRouterApiKey,
     this.openRouterModel = 'openai/gpt-4o-mini',
-    this.searxngEnabled = false,
-    this.searxngUrl = 'http://localhost:8080',
     this.googleDriveSyncEnabled = false,
     this.autoSync = false,
     this.syncInterval = 300000, // 5 minutes
+    this.e2eeEnabled = false,
+    this.e2eeSalt,
   });
 
   Map<String, dynamic> toJson() {
@@ -36,11 +36,11 @@ class AppSettings {
       'ollama_model': ollamaModel,
       'openrouter_api_key': openRouterApiKey,
       'openrouter_model': openRouterModel,
-      'searxng_enabled': searxngEnabled,
-      'searxng_url': searxngUrl,
       'google_drive_sync_enabled': googleDriveSyncEnabled,
       'auto_sync': autoSync,
       'sync_interval': syncInterval,
+      'e2ee_enabled': e2eeEnabled,
+      'e2ee_salt': e2eeSalt,
     };
   }
 
@@ -53,11 +53,11 @@ class AppSettings {
       ollamaModel: json['ollama_model'] as String? ?? 'llama3.2:latest',
       openRouterApiKey: json['openrouter_api_key'] as String?,
       openRouterModel: json['openrouter_model'] as String? ?? 'openai/gpt-4o-mini',
-      searxngEnabled: json['searxng_enabled'] as bool? ?? false,
-      searxngUrl: json['searxng_url'] as String? ?? 'http://localhost:8080',
       googleDriveSyncEnabled: json['google_drive_sync_enabled'] as bool? ?? false,
       autoSync: json['auto_sync'] as bool? ?? false,
       syncInterval: json['sync_interval'] as int? ?? 300000,
+      e2eeEnabled: json['e2ee_enabled'] as bool? ?? false,
+      e2eeSalt: json['e2ee_salt'] as String?,
     );
   }
 
@@ -69,11 +69,11 @@ class AppSettings {
     String? ollamaModel,
     String? openRouterApiKey,
     String? openRouterModel,
-    bool? searxngEnabled,
-    String? searxngUrl,
     bool? googleDriveSyncEnabled,
     bool? autoSync,
     int? syncInterval,
+    bool? e2eeEnabled,
+    String? e2eeSalt,
   }) {
     return AppSettings(
       theme: theme ?? this.theme,
@@ -83,11 +83,11 @@ class AppSettings {
       ollamaModel: ollamaModel ?? this.ollamaModel,
       openRouterApiKey: openRouterApiKey ?? this.openRouterApiKey,
       openRouterModel: openRouterModel ?? this.openRouterModel,
-      searxngEnabled: searxngEnabled ?? this.searxngEnabled,
-      searxngUrl: searxngUrl ?? this.searxngUrl,
       googleDriveSyncEnabled: googleDriveSyncEnabled ?? this.googleDriveSyncEnabled,
       autoSync: autoSync ?? this.autoSync,
       syncInterval: syncInterval ?? this.syncInterval,
+      e2eeEnabled: e2eeEnabled ?? this.e2eeEnabled,
+      e2eeSalt: e2eeSalt ?? this.e2eeSalt,
     );
   }
 }

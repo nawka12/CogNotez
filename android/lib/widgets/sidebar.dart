@@ -1,56 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
+import '../screens/tag_management_screen.dart';
 
 class Sidebar extends StatelessWidget {
   final VoidCallback? onFolderSelected;
 
   const Sidebar({super.key, this.onFolderSelected});
-
-  void _showCreateTagDialog(BuildContext context) {
-    final textController = TextEditingController();
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Create Tag'),
-        content: TextField(
-          controller: textController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            labelText: 'Tag name',
-            hintText: 'Enter tag name',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              final name = textController.text.trim();
-              if (name.isNotEmpty) {
-                final notesService = Provider.of<NotesService>(context, listen: false);
-                final tag = Tag(
-                  id: const Uuid().v4(),
-                  name: name,
-                  createdAt: DateTime.now(),
-                );
-                await notesService.createTag(tag);
-                if (context.mounted) {
-                  Navigator.pop(context);
-                }
-              }
-            },
-            child: const Text('Create'),
-          ),
-        ],
-      ),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -104,9 +61,16 @@ class Sidebar extends StatelessWidget {
                         ),
                       ),
                       IconButton(
-                        icon: const Icon(Icons.add, size: 18),
-                        onPressed: () => _showCreateTagDialog(context),
-                        tooltip: 'Create tag',
+                        icon: const Icon(Icons.settings, size: 18),
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TagManagementScreen(),
+                            ),
+                          );
+                        },
+                        tooltip: 'Manage tags',
                         visualDensity: VisualDensity.compact,
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
@@ -115,43 +79,14 @@ class Sidebar extends StatelessWidget {
                   ),
                 ),
                 ...notesService.tags.map(
-                  (tag) => _FolderItem(
-                    icon: Icons.label,
-                    title: tag.name,
-                    folderId: tag.id,
+                  (tag) => _TagFolderItem(
+                    tag: tag,
                     count: notesService.getTagNotesCount(tag.id),
                     onTap: onFolderSelected,
-                    onLongPress: () => _showDeleteTagDialog(context, tag),
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _showDeleteTagDialog(BuildContext context, Tag tag) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Tag'),
-        content: Text('Are you sure you want to delete "${tag.name}"? This will not delete any notes.'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final notesService = Provider.of<NotesService>(context, listen: false);
-              await notesService.deleteTag(tag.id);
-              if (context.mounted) {
-                Navigator.pop(context);
-              }
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -165,7 +100,6 @@ class _FolderItem extends StatelessWidget {
   final String folderId;
   final int count;
   final VoidCallback? onTap;
-  final VoidCallback? onLongPress;
 
   const _FolderItem({
     required this.icon,
@@ -173,7 +107,6 @@ class _FolderItem extends StatelessWidget {
     required this.folderId,
     required this.count,
     this.onTap,
-    this.onLongPress,
   });
 
   @override
@@ -196,7 +129,48 @@ class _FolderItem extends StatelessWidget {
         notesService.setSelectedFolder(folderId);
         onTap?.call();
       },
-      onLongPress: onLongPress,
+    );
+  }
+}
+
+class _TagFolderItem extends StatelessWidget {
+  final Tag tag;
+  final int count;
+  final VoidCallback? onTap;
+
+  const _TagFolderItem({
+    required this.tag,
+    required this.count,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final notesService = Provider.of<NotesService>(context);
+    final isSelected = notesService.selectedFolder == tag.id;
+    final tagColor = tag.color != null
+        ? Color(int.parse(tag.color!.replaceFirst('#', '0xFF')))
+        : Theme.of(context).colorScheme.primary;
+
+    return ListTile(
+      leading: Icon(
+        Icons.label,
+        size: 20,
+        color: tagColor,
+      ),
+      title: Text(tag.name),
+      trailing: Text(
+        count.toString(),
+        style: TextStyle(
+          color: Colors.grey[600],
+          fontSize: 12,
+        ),
+      ),
+      selected: isSelected,
+      onTap: () {
+        notesService.setSelectedFolder(tag.id);
+        onTap?.call();
+      },
     );
   }
 }

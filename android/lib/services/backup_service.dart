@@ -39,19 +39,49 @@ class BackupData {
     for (final note in notes) {
       final wordCount = note.wordCount;
       final charCount = note.content.length;
+      
+      // Generate preview from content (first 200 chars, cleaned up)
+      String preview = '';
+      if (!note.isPasswordProtected && note.content.isNotEmpty) {
+        // Remove markdown headers and excessive whitespace
+        final cleanContent = note.content
+            .replaceAll(RegExp(r'^#+\s*', multiLine: true), '') // Remove markdown headers
+            .replaceAll(RegExp(r'\n+'), ' ') // Replace newlines with spaces
+            .replaceAll(RegExp(r'\s+'), ' ') // Collapse multiple spaces
+            .trim();
+        preview = cleanContent.length > 200
+            ? '${cleanContent.substring(0, 200)}...'
+            : cleanContent;
+      }
+      
+      // Restore desktop-specific fields from metadata if they were preserved
+      final metadata = note.metadata;
+      final category = metadata?['desktop_category'];
+      // Use native isFavorite field, fall back to metadata for backwards compatibility
+      final isFavorite = note.isFavorite || (metadata?['desktop_is_favorite'] as bool? ?? false);
+      final isArchived = metadata?['desktop_is_archived'] as bool? ?? false;
+      final collaboration = metadata?['desktop_collaboration'] as Map<String, dynamic>? ?? {
+        'is_shared': false,
+        'shared_with': <dynamic>[],
+        'last_edited_by': null,
+        'edit_history': <dynamic>[],
+        'google_drive_file_id': null,
+        'google_drive_share_link': null,
+      };
+      final passwordHash = metadata?['desktop_password_hash'] as String?;
 
       notesMap[note.id] = {
         'id': note.id,
         'title': note.title,
         'content': note.content,
-        'preview': '', // Android does not store a separate preview field
+        'preview': preview,
         'tags': note.tags,
-        'category': null,
-        'is_favorite': false,
-        'is_archived': false,
-        'pinned': false,
+        'category': category,
+        'is_favorite': isFavorite,
+        'is_archived': isArchived,
+        'pinned': note.isPinned,
         'password_protected': note.isPasswordProtected,
-        'password_hash': null,
+        'password_hash': passwordHash,
         'encrypted_content': note.encryptedContent,
         'word_count': wordCount,
         'char_count': charCount,
@@ -61,14 +91,7 @@ class BackupData {
         // are enough for its logic and match what it persists.
         'created': note.createdAt.toIso8601String(),
         'modified': note.updatedAt.toIso8601String(),
-        'collaboration': {
-          'is_shared': false,
-          'shared_with': <dynamic>[],
-          'last_edited_by': null,
-          'edit_history': <dynamic>[],
-          'google_drive_file_id': null,
-          'google_drive_share_link': null,
-        },
+        'collaboration': collaboration,
       };
     }
 
@@ -193,6 +216,43 @@ class BackupData {
             // and stores encrypted_content; Android uses isPasswordProtected + encryptedContent.
             final isPasswordProtected =
                 (n['password_protected'] as bool?) ?? (encryptedContent != null);
+            
+            // Desktop uses 'pinned' field for pinned notes
+            final isPinned = (n['pinned'] as bool?) ?? false;
+            
+            // Preserve desktop-specific fields in metadata so they survive
+            // round-trips between Android and desktop
+            final desktopMetadata = <String, dynamic>{};
+            
+            // Preserve category
+            if (n['category'] != null) {
+              desktopMetadata['desktop_category'] = n['category'];
+            }
+            
+            // Extract is_favorite to native field
+            final isFavorite = n['is_favorite'] as bool? ?? false;
+            
+            // Preserve is_archived
+            final isArchived = n['is_archived'] as bool? ?? false;
+            if (isArchived) {
+              desktopMetadata['desktop_is_archived'] = true;
+            }
+            
+            // Preserve password_hash (desktop uses different encryption)
+            if (n['password_hash'] != null) {
+              desktopMetadata['desktop_password_hash'] = n['password_hash'];
+            }
+            
+            // Preserve collaboration data
+            if (n['collaboration'] != null && n['collaboration'] is Map<String, dynamic>) {
+              final collab = n['collaboration'] as Map<String, dynamic>;
+              // Only preserve if there's meaningful collaboration data
+              if (collab['is_shared'] == true ||
+                  collab['google_drive_file_id'] != null ||
+                  (collab['shared_with'] is List && (collab['shared_with'] as List).isNotEmpty)) {
+                desktopMetadata['desktop_collaboration'] = collab;
+              }
+            }
 
             return Note(
               id: id,
@@ -211,7 +271,9 @@ class BackupData {
               // desktop envelopes specially during decryption.
               encryptionSalt: null,
               encryptionIv: null,
-              metadata: null,
+              metadata: desktopMetadata.isNotEmpty ? desktopMetadata : null,
+              isPinned: isPinned,
+              isFavorite: isFavorite,
             );
           })
           .whereType<Note>()
@@ -388,6 +450,87 @@ class BackupService {
       return BackupResult(
         success: false,
         message: 'Failed to restore backup: $e',
+        notesImported: 0,
+        tagsImported: 0,
+      );
+    }
+  }
+
+  /// Export data in desktop-compatible format for Google Drive sync
+  /// Returns a Map<String, dynamic> that can be serialized to JSON
+  Future<Map<String, dynamic>> exportToDesktopFormat() async {
+    final backup = await createBackup();
+    return backup.toDesktopCompatibleJson();
+  }
+
+  /// Import data from desktop-compatible format (used by Google Drive sync)
+  /// This performs a merge operation, keeping existing notes and adding new ones
+  Future<BackupResult> importFromDesktopFormat(Map<String, dynamic> data) async {
+    try {
+      final backup = BackupData.fromJson(data);
+
+      int notesImported = 0;
+      int tagsImported = 0;
+      int notesSkipped = 0;
+      int tagsSkipped = 0;
+      int notesUpdated = 0;
+
+      // Import tags first
+      final existingTags = await _databaseService.getAllTags();
+      final existingTagIds = existingTags.map((t) => t.id).toSet();
+      final existingTagNames = existingTags.map((t) => t.name.toLowerCase()).toSet();
+
+      for (final tag in backup.tags) {
+        if (existingTagIds.contains(tag.id)) {
+          tagsSkipped++;
+          continue;
+        }
+        
+        // Check if tag with same name exists
+        if (existingTagNames.contains(tag.name.toLowerCase())) {
+          tagsSkipped++;
+          continue;
+        }
+
+        await _databaseService.createTag(tag);
+        tagsImported++;
+      }
+
+      // Import notes with update support for sync
+      final existingNotes = await _databaseService.getAllNotes();
+      final existingNotesMap = {for (var n in existingNotes) n.id: n};
+
+      for (final note in backup.notes) {
+        if (existingNotesMap.containsKey(note.id)) {
+          // Note exists - check if incoming is newer
+          final existingNote = existingNotesMap[note.id]!;
+          if (note.updatedAt.isAfter(existingNote.updatedAt)) {
+            // Update existing note with newer data
+            await _databaseService.updateNote(note);
+            notesUpdated++;
+          } else {
+            notesSkipped++;
+          }
+          continue;
+        }
+
+        // New note - create it
+        await _databaseService.createNote(note);
+        notesImported++;
+      }
+
+      return BackupResult(
+        success: true,
+        message: 'Sync data imported successfully',
+        notesImported: notesImported,
+        tagsImported: tagsImported,
+        notesSkipped: notesSkipped + notesUpdated,
+        tagsSkipped: tagsSkipped,
+      );
+    } catch (e) {
+      return BackupResult(
+        success: false,
+        message: 'Failed to import sync data: $e',
         notesImported: 0,
         tagsImported: 0,
       );

@@ -1,12 +1,17 @@
+import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 import '../models/note.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
 import '../services/export_service.dart';
 import '../services/ai_service.dart';
 import '../services/settings_service.dart';
+import '../services/media_storage_service.dart';
 import '../widgets/find_replace_dialog.dart';
 import '../widgets/password_dialog.dart';
 
@@ -44,7 +49,7 @@ class NoteEditorScreen extends StatefulWidget {
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
 }
 
-class _NoteEditorScreenState extends State<NoteEditorScreen> {
+class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBindingObserver {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   ViewMode _viewMode = ViewMode.edit;
@@ -67,42 +72,138 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   int _historyIndex = -1;
   static const int _maxHistorySize = 50;
   bool _isRecordingHistory = true;
-  DateTime? _lastSaveTime;
+  DateTime? _lastHistorySaveTime;
+  
+  // Auto-save
+  Timer? _autoSaveTimer;
+  Timer? _typingPauseTimer;
+  static const Duration _autoSaveInterval = Duration(seconds: 15);
+  static const Duration _typingPauseDelay = Duration(milliseconds: 500);
+  bool _isSaving = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _isNew = widget.isNew;
     _currentNote = widget.note;
     _titleController = TextEditingController(text: widget.note.title);
     _contentController = TextEditingController(text: widget.note.content);
-    _titleController.addListener(_onChanged);
-    _contentController.addListener(_onChanged);
+    _titleController.addListener(_onTitleChanged);
+    _contentController.addListener(_onContentChanged);
     _saveState();
+    _startAutoSave();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _stopAutoSave();
     _titleController.dispose();
     _contentController.dispose();
     super.dispose();
   }
 
-  void _onChanged() {
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Auto-save when app goes to background
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.inactive ||
+        state == AppLifecycleState.detached) {
+      if (_hasChanges && !_isSaving) {
+        _performAutoSave();
+      }
+    }
+  }
+
+  void _startAutoSave() {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = Timer.periodic(_autoSaveInterval, (_) {
+      if (_hasChanges && !_isSaving && mounted) {
+        _performAutoSave();
+      }
+    });
+  }
+
+  void _stopAutoSave() {
+    _autoSaveTimer?.cancel();
+    _autoSaveTimer = null;
+    _typingPauseTimer?.cancel();
+    _typingPauseTimer = null;
+  }
+
+  Future<void> _performAutoSave() async {
+    if (_isSaving || !_hasChanges) return;
+    
+    _isSaving = true;
+    try {
+      final notesService = Provider.of<NotesService>(context, listen: false);
+      final updatedNote = _currentNote.copyWith(
+        title: _titleController.text,
+        content: _contentController.text,
+        updatedAt: DateTime.now(),
+      );
+
+      if (_isNew) {
+        await notesService.createNote(updatedNote);
+        _isNew = false;
+      } else {
+        await notesService.updateNote(updatedNote);
+      }
+
+      if (mounted) {
+        setState(() {
+          _hasChanges = false;
+          _currentNote = updatedNote;
+        });
+      }
+    } catch (e) {
+      // Silently fail auto-save to not interrupt user
+      debugPrint('Auto-save failed: $e');
+    } finally {
+      _isSaving = false;
+    }
+  }
+
+  void _onTitleChanged() {
+    _markChanged();
+    // Immediate auto-save for title changes
+    _typingPauseTimer?.cancel();
+    _typingPauseTimer = Timer(_typingPauseDelay, () {
+      if (_hasChanges && !_isSaving && mounted) {
+        _performAutoSave();
+      }
+    });
+  }
+
+  void _onContentChanged() {
+    _markChanged();
+    // Debounced auto-save for content changes
+    _typingPauseTimer?.cancel();
+    _typingPauseTimer = Timer(_typingPauseDelay, () {
+      if (_hasChanges && !_isSaving && mounted) {
+        _performAutoSave();
+      }
+    });
+    
+    // Also save to undo history after typing pause
+    _lastHistorySaveTime = DateTime.now();
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      if (_isRecordingHistory &&
+          mounted &&
+          _lastHistorySaveTime != null &&
+          DateTime.now().difference(_lastHistorySaveTime!).inMilliseconds >= 1000) {
+        _saveState();
+      }
+    });
+  }
+
+  void _markChanged() {
     if (!_hasChanges) {
       setState(() {
         _hasChanges = true;
       });
     }
-    _lastSaveTime = DateTime.now();
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      if (_isRecordingHistory && 
-          mounted && 
-          _lastSaveTime != null &&
-          DateTime.now().difference(_lastSaveTime!).inMilliseconds >= 1000) {
-        _saveState();
-      }
-    });
   }
   
   void _saveState() {
@@ -162,30 +263,40 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
     });
   }
 
-  Future<void> _saveNote() async {
-    final notesService = Provider.of<NotesService>(context, listen: false);
-    final updatedNote = _currentNote.copyWith(
-      title: _titleController.text,
-      content: _contentController.text,
-      updatedAt: DateTime.now(),
-    );
-
-    if (_isNew) {
-      await notesService.createNote(updatedNote);
-    } else {
-      await notesService.updateNote(updatedNote);
-    }
-
-    setState(() {
-      _hasChanges = false;
-      _isNew = false;
-      _currentNote = updatedNote;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Note saved')),
+  Future<void> _saveNote({bool showFeedback = true}) async {
+    if (_isSaving) return;
+    
+    _isSaving = true;
+    try {
+      final notesService = Provider.of<NotesService>(context, listen: false);
+      final updatedNote = _currentNote.copyWith(
+        title: _titleController.text,
+        content: _contentController.text,
+        updatedAt: DateTime.now(),
       );
+
+      if (_isNew) {
+        await notesService.createNote(updatedNote);
+      } else {
+        await notesService.updateNote(updatedNote);
+      }
+
+      setState(() {
+        _hasChanges = false;
+        _isNew = false;
+        _currentNote = updatedNote;
+      });
+
+      if (mounted && showFeedback) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note saved'),
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
+    } finally {
+      _isSaving = false;
     }
   }
 
@@ -825,6 +936,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
   }
 
   Widget _buildPreview() {
+    final mediaStorageService = MediaStorageService();
+    
     return Markdown(
       data: _contentController.text,
       selectable: true,
@@ -833,6 +946,102 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
         h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
         h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+      ),
+      imageBuilder: (uri, title, alt) {
+        // Handle custom cognotez-media URI scheme from desktop app
+        if (uri.scheme == 'cognotez-media') {
+          final mediaId = mediaStorageService.extractMediaId(uri.toString());
+          if (mediaId != null) {
+            return _MediaWidget(
+              mediaId: mediaId,
+              alt: alt,
+              mediaStorageService: mediaStorageService,
+            );
+          }
+          return _buildMediaPlaceholder(alt, 'Unknown media format');
+        }
+        
+        // Handle regular file URIs
+        if (uri.scheme == 'file') {
+          try {
+            return Image.file(
+              File.fromUri(uri),
+              errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(alt),
+            );
+          } catch (e) {
+            return _buildImagePlaceholder(alt);
+          }
+        }
+        
+        // Handle network images
+        if (uri.scheme == 'http' || uri.scheme == 'https') {
+          return Image.network(
+            uri.toString(),
+            errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(alt),
+          );
+        }
+        
+        // Fallback for other schemes
+        return _buildImagePlaceholder(alt);
+      },
+    );
+  }
+
+  Widget _buildImagePlaceholder(String? alt) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.broken_image, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              alt ?? 'Image not available',
+              style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMediaPlaceholder(String? alt, String message) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        border: Border.all(color: Colors.grey),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.image, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (alt != null && alt.isNotEmpty)
+                  Text(
+                    alt,
+                    style: TextStyle(color: Colors.grey[700]),
+                  ),
+                Text(
+                  message,
+                  style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1131,6 +1340,430 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> {
             Expanded(child: _buildContent()),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Widget that loads and displays media from MediaStorageService
+class _MediaWidget extends StatefulWidget {
+  final String mediaId;
+  final String? alt;
+  final MediaStorageService mediaStorageService;
+
+  const _MediaWidget({
+    required this.mediaId,
+    this.alt,
+    required this.mediaStorageService,
+  });
+
+  @override
+  State<_MediaWidget> createState() => _MediaWidgetState();
+}
+
+class _MediaWidgetState extends State<_MediaWidget> {
+  File? _mediaFile;
+  bool _isLoading = true;
+  String? _error;
+  String? _mimeType;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMedia();
+  }
+
+  Future<void> _loadMedia() async {
+    try {
+      final file = await widget.mediaStorageService.getMediaFile(widget.mediaId);
+      if (file != null && await file.exists()) {
+        // Determine MIME type from file extension
+        final extension = file.path.contains('.')
+            ? file.path.substring(file.path.lastIndexOf('.'))
+            : '';
+        final mimeType = widget.mediaStorageService.getMimeTypeFromExtension(extension);
+        
+        if (mounted) {
+          setState(() {
+            _mediaFile = file;
+            _mimeType = mimeType;
+            _isLoading = false;
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            _error = 'Media not synced yet. Please sync to download.';
+            _isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load media: $e';
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isLoading) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.grey.shade300),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 8),
+            Text('Loading media...'),
+          ],
+        ),
+      );
+    }
+
+    if (_error != null || _mediaFile == null) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.orange.shade300),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.orange.shade50,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cloud_download, color: Colors.orange.shade700),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.alt != null && widget.alt!.isNotEmpty)
+                    Text(
+                      widget.alt!,
+                      style: TextStyle(color: Colors.grey[700]),
+                    ),
+                  Text(
+                    _error ?? 'Media not available',
+                    style: TextStyle(
+                      color: Colors.orange.shade700,
+                      fontStyle: FontStyle.italic,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Display based on MIME type
+    if (_mimeType != null && widget.mediaStorageService.isImageMimeType(_mimeType!)) {
+      return GestureDetector(
+        onTap: () => _showFullScreenImage(context),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.file(
+              _mediaFile!,
+              fit: BoxFit.contain,
+              errorBuilder: (context, error, stackTrace) => _buildErrorWidget(),
+            ),
+          ),
+        ),
+      );
+    } else if (_mimeType != null && widget.mediaStorageService.isVideoMimeType(_mimeType!)) {
+      // Video player with chewie
+      return GestureDetector(
+        onTap: () => _showFullScreenVideo(context),
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            border: Border.all(color: Colors.blue.shade300),
+            borderRadius: BorderRadius.circular(8),
+            color: Colors.black,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Video thumbnail/preview
+              Container(
+                height: 200,
+                decoration: BoxDecoration(
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                  color: Colors.black,
+                ),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    const Icon(Icons.movie, color: Colors.white54, size: 64),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.play_arrow, color: Colors.white, size: 24),
+                          SizedBox(width: 4),
+                          Text('Tap to play', style: TextStyle(color: Colors.white)),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Video info bar
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.shade50,
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.video_file, color: Colors.blue.shade700, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        widget.alt ?? _mediaFile!.path.split('/').last,
+                        style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    } else if (_mimeType != null && widget.mediaStorageService.isAudioMimeType(_mimeType!)) {
+      // Audio placeholder
+      return Container(
+        padding: const EdgeInsets.all(16),
+        margin: const EdgeInsets.symmetric(vertical: 8),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.purple.shade300),
+          borderRadius: BorderRadius.circular(8),
+          color: Colors.purple.shade50,
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.audio_file, color: Colors.purple.shade700),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (widget.alt != null && widget.alt!.isNotEmpty)
+                    Text(widget.alt!, style: TextStyle(color: Colors.grey[700])),
+                  Text(
+                    'Audio file: ${_mediaFile!.path.split('/').last}',
+                    style: TextStyle(color: Colors.purple.shade700, fontSize: 12),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Fallback for unknown media type
+    return _buildErrorWidget();
+  }
+
+  Widget _buildErrorWidget() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.broken_image, color: Colors.grey[600]),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              widget.alt ?? 'Media not available',
+              style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullScreenImage(BuildContext context) {
+    if (_mediaFile == null) return;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => Scaffold(
+          backgroundColor: Colors.black,
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            iconTheme: const IconThemeData(color: Colors.white),
+          ),
+          body: Center(
+            child: InteractiveViewer(
+              panEnabled: true,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: Image.file(
+                _mediaFile!,
+                fit: BoxFit.contain,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFullScreenVideo(BuildContext context) {
+    if (_mediaFile == null) return;
+    
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => _VideoPlayerScreen(videoFile: _mediaFile!),
+      ),
+    );
+  }
+}
+
+/// Full screen video player screen
+class _VideoPlayerScreen extends StatefulWidget {
+  final File videoFile;
+
+  const _VideoPlayerScreen({required this.videoFile});
+
+  @override
+  State<_VideoPlayerScreen> createState() => _VideoPlayerScreenState();
+}
+
+class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
+  late VideoPlayerController _videoController;
+  ChewieController? _chewieController;
+  bool _isInitialized = false;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeVideo();
+  }
+
+  Future<void> _initializeVideo() async {
+    try {
+      _videoController = VideoPlayerController.file(widget.videoFile);
+      await _videoController.initialize();
+      
+      _chewieController = ChewieController(
+        videoPlayerController: _videoController,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: _videoController.value.aspectRatio,
+        errorBuilder: (context, errorMessage) {
+          return Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.error, color: Colors.red, size: 48),
+                const SizedBox(height: 8),
+                Text(
+                  errorMessage,
+                  style: const TextStyle(color: Colors.white),
+                  textAlign: TextAlign.center,
+                ),
+              ],
+            ),
+          );
+        },
+      );
+      
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load video: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _chewieController?.dispose();
+    _videoController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white),
+        title: Text(
+          widget.videoFile.path.split('/').last,
+          style: const TextStyle(color: Colors.white, fontSize: 14),
+        ),
+      ),
+      body: Center(
+        child: _error != null
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error, color: Colors.red, size: 48),
+                  const SizedBox(height: 16),
+                  Text(
+                    _error!,
+                    style: const TextStyle(color: Colors.white),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
+              )
+            : !_isInitialized
+                ? const CircularProgressIndicator(color: Colors.white)
+                : _chewieController != null
+                    ? Chewie(controller: _chewieController!)
+                    : const Text(
+                        'Failed to initialize video player',
+                        style: TextStyle(color: Colors.white),
+                      ),
       ),
     );
   }

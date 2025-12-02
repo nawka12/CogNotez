@@ -5,6 +5,8 @@ import 'screens/home_screen.dart';
 import 'services/theme_service.dart';
 import 'services/database_service.dart';
 import 'services/notes_service.dart';
+import 'services/google_drive_service.dart';
+import 'services/template_service.dart';
 import 'utils/app_theme.dart';
 
 void main() async {
@@ -14,11 +16,17 @@ void main() async {
   final databaseService = DatabaseService();
   await databaseService.initialize();
   
+  // Initialize template service
+  final templateService = TemplateService();
+  await templateService.initialize();
+  
   runApp(
     MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => ThemeService()),
         ChangeNotifierProvider(create: (_) => NotesService(databaseService)),
+        ChangeNotifierProvider(create: (_) => GoogleDriveService()),
+        ChangeNotifierProvider.value(value: templateService),
         Provider.value(value: databaseService),
       ],
       child: const CogNotezApp(),

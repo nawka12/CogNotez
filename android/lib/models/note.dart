@@ -10,6 +10,8 @@ class Note {
   String? encryptionSalt;
   String? encryptionIv;
   Map<String, dynamic>? metadata;
+  bool isPinned;
+  bool isFavorite;
 
   Note({
     required this.id,
@@ -23,6 +25,8 @@ class Note {
     this.encryptionSalt,
     this.encryptionIv,
     this.metadata,
+    this.isPinned = false,
+    this.isFavorite = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -38,6 +42,8 @@ class Note {
       'encryption_salt': encryptionSalt,
       'encryption_iv': encryptionIv,
       'metadata': metadata,
+      'is_pinned': isPinned,
+      'is_favorite': isFavorite,
     };
   }
 
@@ -54,6 +60,8 @@ class Note {
       encryptionSalt: json['encryption_salt'] as String?,
       encryptionIv: json['encryption_iv'] as String?,
       metadata: json['metadata'] as Map<String, dynamic>?,
+      isPinned: json['is_pinned'] as bool? ?? false,
+      isFavorite: json['is_favorite'] as bool? ?? false,
     );
   }
 
@@ -69,6 +77,8 @@ class Note {
     String? encryptionSalt,
     String? encryptionIv,
     Map<String, dynamic>? metadata,
+    bool? isPinned,
+    bool? isFavorite,
     bool clearEncryption = false,
   }) {
     return Note(
@@ -83,6 +93,8 @@ class Note {
       encryptionSalt: clearEncryption ? null : (encryptionSalt ?? this.encryptionSalt),
       encryptionIv: clearEncryption ? null : (encryptionIv ?? this.encryptionIv),
       metadata: metadata ?? this.metadata,
+      isPinned: isPinned ?? this.isPinned,
+      isFavorite: isFavorite ?? this.isFavorite,
     );
   }
 

@@ -22,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -48,6 +48,26 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE notes ADD COLUMN metadata TEXT');
       }
     }
+    
+    // Migration from version 2 to 3: Add pinned column
+    if (oldVersion < 3) {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
+      final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
+      
+      if (!columnNames.contains('is_pinned')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0');
+      }
+    }
+    
+    // Migration from version 3 to 4: Add favorite column
+    if (oldVersion < 4) {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
+      final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
+      
+      if (!columnNames.contains('is_favorite')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0');
+      }
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -63,7 +83,9 @@ class DatabaseHelper {
         encrypted_content TEXT,
         encryption_salt TEXT,
         encryption_iv TEXT,
-        metadata TEXT
+        metadata TEXT,
+        is_pinned INTEGER NOT NULL DEFAULT 0,
+        is_favorite INTEGER NOT NULL DEFAULT 0
       )
     ''');
 
@@ -132,6 +154,8 @@ class DatabaseHelper {
       encryptionSalt: row['encryption_salt'] as String?,
       encryptionIv: row['encryption_iv'] as String?,
       metadata: metadata,
+      isPinned: (row['is_pinned'] as int? ?? 0) == 1,
+      isFavorite: (row['is_favorite'] as int? ?? 0) == 1,
     );
   }
 
@@ -148,6 +172,8 @@ class DatabaseHelper {
       'encryption_salt': note.encryptionSalt,
       'encryption_iv': note.encryptionIv,
       'metadata': note.metadata != null ? jsonEncode(note.metadata) : null,
+      'is_pinned': note.isPinned ? 1 : 0,
+      'is_favorite': note.isFavorite ? 1 : 0,
     };
   }
 
@@ -177,7 +203,8 @@ class DatabaseHelper {
 
   Future<List<Note>> getAllNotes() async {
     final db = await database;
-    final notes = await db.query('notes', orderBy: 'updated_at DESC');
+    // Sort pinned notes first, then by updated_at
+    final notes = await db.query('notes', orderBy: 'is_pinned DESC, updated_at DESC');
     
     final List<Note> noteList = [];
     for (final noteMap in notes) {

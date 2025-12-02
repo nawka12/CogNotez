@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:uuid/uuid.dart';
 import '../models/note.dart';
 import '../services/notes_service.dart';
 import '../services/theme_service.dart';
@@ -9,6 +8,7 @@ import '../widgets/notes_list.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/advanced_search_panel.dart';
 import '../widgets/password_dialog.dart';
+import '../widgets/template_chooser.dart';
 import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -46,22 +46,19 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _createNewNote() async {
-    final note = Note(
-      id: const Uuid().v4(),
-      title: '',
-      content: '',
-      createdAt: DateTime.now(),
-      updatedAt: DateTime.now(),
-    );
-
-    await Navigator.push(
+    // Show template chooser
+    await TemplateChooser.show(
       context,
-      MaterialPageRoute(
-        builder: (context) => NoteEditorScreen(note: note, isNew: true),
-      ),
+      onNoteCreated: (note) async {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => NoteEditorScreen(note: note, isNew: true),
+          ),
+        );
+        await _refreshData();
+      },
     );
-    
-    await _refreshData();
   }
 
   Future<void> _openNote(Note note) async {
@@ -248,6 +245,10 @@ class _HomeScreenState extends State<HomeScreen> {
                         notes: filteredNotes,
                         onNoteSelected: _openNote,
                         onCreateNote: _createNewNote,
+                        onNoteDuplicated: (duplicatedNote) {
+                          // Open the duplicated note
+                          _openNote(duplicatedNote);
+                        },
                       );
                     },
                   ),

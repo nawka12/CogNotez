@@ -9,12 +9,14 @@ class NotesList extends StatelessWidget {
   final List<Note>? notes;
   final void Function(Note note)? onNoteSelected;
   final VoidCallback? onCreateNote;
+  final void Function(Note note)? onNoteDuplicated;
 
   const NotesList({
     super.key,
     this.notes,
     this.onNoteSelected,
     this.onCreateNote,
+    this.onNoteDuplicated,
   });
 
   @override
@@ -38,6 +40,7 @@ class NotesList extends StatelessWidget {
               return _NoteListItem(
                 note: note,
                 onTap: onNoteSelected,
+                onNoteDuplicated: onNoteDuplicated,
               );
             },
           ),
@@ -133,10 +136,12 @@ class NotesList extends StatelessWidget {
 class _NoteListItem extends StatelessWidget {
   final Note note;
   final void Function(Note note)? onTap;
+  final void Function(Note note)? onNoteDuplicated;
 
   const _NoteListItem({
     required this.note,
     this.onTap,
+    this.onNoteDuplicated,
   });
 
   @override
@@ -145,7 +150,7 @@ class _NoteListItem extends StatelessWidget {
     
     // For locked notes, show different preview
     final isLocked = note.isPasswordProtected && note.encryptedContent != null;
-    final preview = isLocked 
+    final preview = isLocked
         ? '🔒 This note is password protected'
         : note.content.length > 100
             ? '${note.content.substring(0, 100)}...'
@@ -172,10 +177,13 @@ class _NoteListItem extends StatelessWidget {
         child: const Icon(Icons.delete, color: Colors.white),
       ),
       secondaryBackground: Container(
-        color: Colors.orange,
+        color: Theme.of(context).colorScheme.primary,
         alignment: Alignment.centerRight,
         padding: const EdgeInsets.only(right: 20),
-        child: const Icon(Icons.archive, color: Colors.white),
+        child: Icon(
+          note.isPinned ? Icons.push_pin_outlined : Icons.push_pin,
+          color: Colors.white,
+        ),
       ),
       confirmDismiss: (direction) async {
         if (direction == DismissDirection.startToEnd) {
@@ -185,121 +193,277 @@ class _NoteListItem extends StatelessWidget {
           }
           return false;
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Archive feature coming soon')),
-          );
+          // Swipe right to toggle pin
+          await _togglePin(context);
           return false;
         }
       },
       onDismissed: (direction) {},
       child: Card(
         margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: ListTile(
-          leading: note.isPasswordProtected
-              ? Container(
-                  width: 40,
-                  height: 40,
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Icon(
-                    isLocked ? Icons.lock : Icons.lock_open,
-                    color: Theme.of(context).colorScheme.onPrimaryContainer,
-                    size: 20,
-                  ),
-                )
-              : null,
-          title: Text(
-            note.title.isEmpty ? 'Untitled' : note.title,
-            style: const TextStyle(fontWeight: FontWeight.w600),
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 4),
-              Text(
-                preview,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: isLocked ? Colors.grey[500] : Colors.grey[600],
-                  fontSize: 14,
-                  fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Icon(
-                    Icons.access_time,
-                    size: 12,
-                    color: Colors.grey[500],
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    DateFormatter.format(note.updatedAt),
-                    style: TextStyle(
-                      color: Colors.grey[500],
-                      fontSize: 12,
-                    ),
-                  ),
-                  if (note.wordCount > 0 && !isLocked) ...[
-                    const SizedBox(width: 12),
-                    Icon(
-                      Icons.text_fields,
-                      size: 12,
-                      color: Colors.grey[500],
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      '${note.wordCount} words',
-                      style: TextStyle(
-                        color: Colors.grey[500],
-                        fontSize: 12,
-                      ),
-                    ),
-                  ],
-                  if (tagNames.isNotEmpty) ...[
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Wrap(
-                        spacing: 4,
-                        runSpacing: 4,
-                        children: tagNames.take(3).map((tagName) {
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.primaryContainer,
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: Text(
-                              tagName,
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: Theme.of(context).colorScheme.onPrimaryContainer,
-                              ),
-                            ),
-                          );
-                        }).toList(),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
-          ),
+        child: InkWell(
           onTap: () {
             if (onTap != null) {
               onTap!(note);
             }
           },
-          onLongPress: () async {
-            await _showDeleteDialog(context);
-          },
+          onLongPress: () => _showContextMenu(context),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Leading icon
+                _buildLeadingIcon(context, isLocked),
+                const SizedBox(width: 12),
+                // Content
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Title row with pin indicator
+                      Row(
+                        children: [
+                          if (note.isPinned) ...[
+                            Icon(
+                              Icons.push_pin,
+                              size: 14,
+                              color: Theme.of(context).colorScheme.primary,
+                            ),
+                            const SizedBox(width: 4),
+                          ],
+                          Expanded(
+                            child: Text(
+                              note.title.isEmpty ? 'Untitled' : note.title,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w600,
+                                fontSize: 16,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        preview,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: isLocked ? Colors.grey[500] : Colors.grey[600],
+                          fontSize: 14,
+                          fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.access_time,
+                            size: 12,
+                            color: Colors.grey[500],
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            DateFormatter.format(note.updatedAt),
+                            style: TextStyle(
+                              color: Colors.grey[500],
+                              fontSize: 12,
+                            ),
+                          ),
+                          if (note.wordCount > 0 && !isLocked) ...[
+                            const SizedBox(width: 12),
+                            Icon(
+                              Icons.text_fields,
+                              size: 12,
+                              color: Colors.grey[500],
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              '${note.wordCount} words',
+                              style: TextStyle(
+                                color: Colors.grey[500],
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                          if (tagNames.isNotEmpty) ...[
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Wrap(
+                                spacing: 4,
+                                runSpacing: 4,
+                                children: tagNames.take(3).map((tagName) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: Theme.of(context).colorScheme.primaryContainer,
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                    child: Text(
+                                      tagName,
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
+  }
+
+  Widget _buildLeadingIcon(BuildContext context, bool isLocked) {
+    if (note.isPasswordProtected) {
+      return Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.primaryContainer,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(
+          isLocked ? Icons.lock : Icons.lock_open,
+          color: Theme.of(context).colorScheme.onPrimaryContainer,
+          size: 20,
+        ),
+      );
+    }
+    return const SizedBox.shrink();
+  }
+
+  Future<void> _showContextMenu(BuildContext context) async {
+    final notesService = Provider.of<NotesService>(context, listen: false);
+    final canPin = notesService.canPinNote();
+    
+    final result = await showModalBottomSheet<String>(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 40,
+              height: 4,
+              margin: const EdgeInsets.symmetric(vertical: 12),
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.open_in_new),
+              title: const Text('Open'),
+              onTap: () => Navigator.pop(context, 'open'),
+            ),
+            ListTile(
+              leading: Icon(note.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
+              title: Text(note.isPinned ? 'Unpin' : 'Pin'),
+              subtitle: !note.isPinned && !canPin
+                  ? const Text('Maximum 3 pinned notes', style: TextStyle(color: Colors.orange))
+                  : null,
+              enabled: note.isPinned || canPin,
+              onTap: () => Navigator.pop(context, 'pin'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.copy),
+              title: const Text('Duplicate'),
+              onTap: () => Navigator.pop(context, 'duplicate'),
+            ),
+            const Divider(),
+            ListTile(
+              leading: const Icon(Icons.delete, color: Colors.red),
+              title: const Text('Delete', style: TextStyle(color: Colors.red)),
+              onTap: () => Navigator.pop(context, 'delete'),
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+
+    if (result == null || !context.mounted) return;
+
+    switch (result) {
+      case 'open':
+        if (onTap != null) {
+          onTap!(note);
+        }
+        break;
+      case 'pin':
+        await _togglePin(context);
+        break;
+      case 'duplicate':
+        await _duplicateNote(context);
+        break;
+      case 'delete':
+        await _showDeleteDialog(context);
+        break;
+    }
+  }
+
+  Future<void> _togglePin(BuildContext context) async {
+    final notesService = Provider.of<NotesService>(context, listen: false);
+    final success = await notesService.togglePinNote(note.id);
+    
+    if (!success && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Cannot pin more than 3 notes'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } else if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(note.isPinned ? 'Note unpinned' : 'Note pinned'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _duplicateNote(BuildContext context) async {
+    final notesService = Provider.of<NotesService>(context, listen: false);
+    try {
+      final duplicated = await notesService.duplicateNote(note.id);
+      if (duplicated != null && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note duplicated'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 1),
+          ),
+        );
+        // Optionally open the duplicated note
+        if (onNoteDuplicated != null) {
+          onNoteDuplicated!(duplicated);
+        }
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to duplicate note: $e'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   Future<bool> _showDeleteDialog(BuildContext context) async {
@@ -307,25 +471,37 @@ class _NoteListItem extends StatelessWidget {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Delete Note'),
-        content: const Text('Are you sure you want to delete this note?'),
+        content: Text(
+          'Are you sure you want to delete "${note.title.isEmpty ? "Untitled" : note.title}"?\n\nThis action cannot be undone.',
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('Cancel'),
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context, true);
-            },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: FilledButton.styleFrom(
+              backgroundColor: Colors.red,
+            ),
+            child: const Text('Delete'),
           ),
         ],
       ),
     );
     
-    if (result == true) {
+    if (result == true && context.mounted) {
       final notesService = Provider.of<NotesService>(context, listen: false);
       await notesService.deleteNote(note.id);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Note deleted'),
+            behavior: SnackBarBehavior.floating,
+            duration: Duration(seconds: 1),
+          ),
+        );
+      }
       return true;
     }
     
