@@ -4,6 +4,7 @@ import '../models/note.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
 import '../utils/date_formatter.dart';
+import '../utils/app_theme.dart';
 
 class NotesList extends StatelessWidget {
   final List<Note>? notes;
@@ -52,11 +53,11 @@ class NotesList extends StatelessWidget {
   Widget _buildEmptyState(BuildContext context, NotesService notesService) {
     final selectedFolder = notesService.selectedFolder;
     final searchQuery = notesService.searchQuery;
-    
+
     String title;
     String message;
     IconData icon;
-    
+
     if (searchQuery.isNotEmpty || (notes != null && notesService.notes.isNotEmpty)) {
       title = 'No notes found';
       message = 'No notes match your filters';
@@ -90,38 +91,64 @@ class NotesList extends StatelessWidget {
         icon = Icons.folder_outlined;
       }
     }
-    
+
     return Center(
       child: Padding(
-        padding: const EdgeInsets.all(32.0),
+        padding: const EdgeInsets.all(AppTheme.spacing2Xl),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 96,
-              color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.3),
-            ),
-            const SizedBox(height: 24),
-            Text(
-              title,
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.grey[600],
-                fontWeight: FontWeight.w500,
+            // Animated icon with gradient
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.accentColor, AppTheme.primaryDark],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                boxShadow: [AppTheme.shadowAccent],
+              ),
+              child: Icon(
+                icon,
+                size: 40,
+                color: Colors.white,
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: AppTheme.spacingLg),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingSm),
             Text(
               message,
               textAlign: TextAlign.center,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.grey[500],
+              style: TextStyle(
+                fontSize: 16,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
             if (notesService.allNotes.isEmpty && onCreateNote != null) ...[
-              const SizedBox(height: 32),
-              FilledButton.icon(
+              const SizedBox(height: AppTheme.spacing2Xl),
+              ElevatedButton.icon(
                 onPressed: onCreateNote,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppTheme.accentColor,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: AppTheme.spacingLg, vertical: AppTheme.spacingSm),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                  ),
+                  elevation: 2,
+                  shadowColor: AppTheme.accentLight,
+                ),
                 icon: const Icon(Icons.add),
                 label: const Text('Create Note'),
               ),
@@ -199,126 +226,173 @@ class _NoteListItem extends StatelessWidget {
         }
       },
       onDismissed: (direction) {},
-      child: Card(
-        margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: InkWell(
-          onTap: () {
-            if (onTap != null) {
-              onTap!(note);
-            }
-          },
-          onLongPress: () => _showContextMenu(context),
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Leading icon
-                _buildLeadingIcon(context, isLocked),
-                const SizedBox(width: 12),
-                // Content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title row with pin indicator
-                      Row(
-                        children: [
-                          if (note.isPinned) ...[
-                            Icon(
-                              Icons.push_pin,
-                              size: 14,
-                              color: Theme.of(context).colorScheme.primary,
-                            ),
-                            const SizedBox(width: 4),
-                          ],
-                          Expanded(
-                            child: Text(
-                              note.title.isEmpty ? 'Untitled' : note.title,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w600,
-                                fontSize: 16,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm, vertical: AppTheme.spacingXs),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+          border: Border.all(color: Theme.of(context).colorScheme.outline),
+          boxShadow: [AppTheme.shadowXs],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: () {
+              if (onTap != null) {
+                onTap!(note);
+              }
+            },
+            onLongPress: () => _showContextMenu(context),
+            borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+            child: Padding(
+              padding: const EdgeInsets.all(AppTheme.spacingMd),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Leading icon
+                  _buildLeadingIcon(context, isLocked),
+                  const SizedBox(width: AppTheme.spacingSm),
+                  // Content
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Title row with pin indicator
+                        Row(
+                          children: [
+                            if (note.isPinned) ...[
+                              Container(
+                                padding: const EdgeInsets.all(AppTheme.spacingXs),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.accentLight,
+                                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                                  border: Border.all(color: AppTheme.accentColor),
+                                ),
+                                child: Icon(
+                                  Icons.push_pin,
+                                  size: 12,
+                                  color: AppTheme.accentColor,
+                                ),
                               ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        preview,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: isLocked ? Colors.grey[500] : Colors.grey[600],
-                          fontSize: 14,
-                          fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.access_time,
-                            size: 12,
-                            color: Colors.grey[500],
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            DateFormatter.format(note.updatedAt),
-                            style: TextStyle(
-                              color: Colors.grey[500],
-                              fontSize: 12,
-                            ),
-                          ),
-                          if (note.wordCount > 0 && !isLocked) ...[
-                            const SizedBox(width: 12),
-                            Icon(
-                              Icons.text_fields,
-                              size: 12,
-                              color: Colors.grey[500],
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              '${note.wordCount} words',
-                              style: TextStyle(
-                                color: Colors.grey[500],
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
-                          if (tagNames.isNotEmpty) ...[
-                            const SizedBox(width: 8),
+                              const SizedBox(width: AppTheme.spacingXs),
+                            ],
                             Expanded(
-                              child: Wrap(
-                                spacing: 4,
-                                runSpacing: 4,
-                                children: tagNames.take(3).map((tagName) {
-                                  return Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context).colorScheme.primaryContainer,
-                                      borderRadius: BorderRadius.circular(4),
+                              child: Text(
+                                note.title.isEmpty ? 'Untitled' : note.title,
+                                style: TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 16,
+                                  color: Theme.of(context).colorScheme.onSurface,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppTheme.spacingXs),
+                        Text(
+                          preview,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: isLocked ? Theme.of(context).colorScheme.onSurfaceVariant : Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontSize: 14,
+                            fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
+                          ),
+                        ),
+                        const SizedBox(height: AppTheme.spacingSm),
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXs, vertical: AppTheme.spacingXs),
+                              decoration: BoxDecoration(
+                                color: Theme.of(context).colorScheme.surfaceVariant,
+                                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                                border: Border.all(color: Theme.of(context).colorScheme.outline),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.access_time,
+                                    size: 12,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(width: AppTheme.spacingXs),
+                                  Text(
+                                    DateFormatter.format(note.updatedAt),
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
                                     ),
-                                    child: Text(
-                                      tagName,
+                                  ),
+                                ],
+                              ),
+                            ),
+                            if (note.wordCount > 0 && !isLocked) ...[
+                              const SizedBox(width: AppTheme.spacingSm),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXs, vertical: AppTheme.spacingXs),
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceVariant,
+                                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.text_fields,
+                                      size: 12,
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    ),
+                                    const SizedBox(width: AppTheme.spacingXs),
+                                    Text(
+                                      '${note.wordCount} words',
                                       style: TextStyle(
-                                        fontSize: 10,
-                                        color: Theme.of(context).colorScheme.onPrimaryContainer,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
                                       ),
                                     ),
-                                  );
-                                }).toList(),
+                                  ],
+                                ),
                               ),
-                            ),
+                            ],
+                            if (tagNames.isNotEmpty) ...[
+                              const SizedBox(width: AppTheme.spacingSm),
+                              Expanded(
+                                child: Wrap(
+                                  spacing: AppTheme.spacingXs,
+                                  runSpacing: AppTheme.spacingXs,
+                                  children: tagNames.take(3).map((tagName) {
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXs, vertical: AppTheme.spacingXs),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.accentLighter,
+                                        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
+                                        border: Border.all(color: AppTheme.accentColor),
+                                      ),
+                                      child: Text(
+                                        tagName,
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          color: AppTheme.accentColor,
+                                          fontWeight: FontWeight.w500,
+                                        ),
+                                      ),
+                                    );
+                                  }).toList(),
+                                ),
+                              ),
+                            ],
                           ],
-                        ],
-                      ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ),
@@ -329,16 +403,20 @@ class _NoteListItem extends StatelessWidget {
   Widget _buildLeadingIcon(BuildContext context, bool isLocked) {
     if (note.isPasswordProtected) {
       return Container(
-        width: 40,
-        height: 40,
+        width: 32,
+        height: 32,
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.primaryContainer,
-          borderRadius: BorderRadius.circular(8),
+          gradient: LinearGradient(
+            colors: [AppTheme.accentColor, AppTheme.primaryDark],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+          borderRadius: BorderRadius.circular(AppTheme.radiusMd),
         ),
         child: Icon(
           isLocked ? Icons.lock : Icons.lock_open,
-          color: Theme.of(context).colorScheme.onPrimaryContainer,
-          size: 20,
+          color: Colors.white,
+          size: 16,
         ),
       );
     }

@@ -798,27 +798,54 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     );
   }
 
-  void _showRemovePasswordDialog() {
+  void _showRemovePasswordDialog() async {
+    String? obtainedPassword;
+
     if (_currentPassword == null) {
-      _showMessage('Please enter the current password first');
-      return;
+      // If we don't have the current password, show unlock dialog first
+      obtainedPassword = await showDialog<String>(
+        context: context,
+        builder: (context) => PasswordDialog(
+          note: _currentNote,
+          isUnlocking: true,
+          onComplete: (updatedNote, password) {
+            // Store the password and close the dialog
+            obtainedPassword = password;
+            Navigator.pop(context, password);
+          },
+        ),
+      );
+
+      if (obtainedPassword == null) {
+        // User cancelled the unlock dialog
+        return;
+      }
+
+      // Now we have the password, proceed to remove protection
+      _currentPassword = obtainedPassword;
     }
-    
-    showDialog(
-      context: context,
-      builder: (context) => RemovePasswordDialog(
-        note: _currentNote,
-        currentPassword: _currentPassword!,
-        onComplete: (updatedNote) {
-          setState(() {
-            _currentNote = updatedNote;
-            _currentPassword = null;
-            _hasChanges = true;
-          });
-          _showMessage('Password protection removed');
-        },
-      ),
-    );
+
+    // Remove password protection directly
+    try {
+      final unlockedNote = _currentNote.copyWith(
+        isPasswordProtected: false,
+        clearEncryption: true,
+      );
+
+      setState(() {
+        _currentNote = unlockedNote;
+        _currentPassword = null;
+        _hasChanges = true;
+      });
+
+      // Save the changes to database immediately
+      final notesService = Provider.of<NotesService>(context, listen: false);
+      await notesService.updateNote(unlockedNote);
+
+      _showMessage('Password protection removed');
+    } catch (e) {
+      _showMessage('Failed to remove password protection: $e');
+    }
   }
 
   Future<void> _handleMenuAction(String action) async {

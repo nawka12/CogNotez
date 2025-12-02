@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../models/note.dart';
 import '../services/notes_service.dart';
 import '../services/theme_service.dart';
+import '../utils/app_theme.dart';
 import 'note_editor_screen.dart';
 import '../widgets/notes_list.dart';
 import '../widgets/sidebar.dart';
@@ -133,6 +134,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final themeService = Provider.of<ThemeService>(context);
     final isWideScreen = MediaQuery.of(context).size.width >= 600;
+    final isMobile = !isWideScreen;
 
     return Scaffold(
       key: _scaffoldKey,
@@ -143,64 +145,141 @@ class _HomeScreenState extends State<HomeScreen> {
             _scaffoldKey.currentState?.openDrawer();
           },
           tooltip: 'Menu',
+          style: IconButton.styleFrom(
+            padding: EdgeInsets.zero,
+            minimumSize: const Size(40, 40),
+          ),
         ),
         title: _isSearching
-            ? TextField(
-                controller: _searchController,
-                autofocus: true,
-                decoration: InputDecoration(
-                  hintText: 'Search notes...',
-                  border: InputBorder.none,
-                  suffixIcon: IconButton(
-                    icon: Icon(
-                      _showAdvancedSearch ? Icons.expand_less : Icons.tune,
-                      size: 20,
-                    ),
-                    onPressed: _toggleAdvancedSearch,
-                    tooltip: 'Advanced search',
-                  ),
+            ? Container(
+                height: isMobile ? 44 : 48,
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(isMobile ? AppTheme.radiusMd : AppTheme.radiusLg),
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
                 ),
-                onChanged: _onSearchChanged,
+                child: TextField(
+                  controller: _searchController,
+                  autofocus: true,
+                  decoration: InputDecoration(
+                    hintText: 'Search notes...',
+                    border: InputBorder.none,
+                    prefixIcon: Icon(Icons.search, size: isMobile ? 18 : 20),
+                    suffixIcon: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        if (!isMobile) ...[
+                          IconButton(
+                            icon: Icon(
+                              _showAdvancedSearch ? Icons.expand_less : Icons.tune,
+                              size: 20,
+                            ),
+                            onPressed: _toggleAdvancedSearch,
+                            tooltip: 'Advanced search',
+                          ),
+                        ],
+                        if (_searchController.text.isNotEmpty)
+                          IconButton(
+                            icon: Icon(Icons.clear, size: isMobile ? 18 : 20),
+                            onPressed: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                            },
+                            tooltip: 'Clear search',
+                          ),
+                      ],
+                    ),
+                    contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
+                  ),
+                  onChanged: _onSearchChanged,
+                ),
               )
             : Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   SvgPicture.asset(
                     'assets/icon.svg',
-                    width: 28,
-                    height: 28,
+                    width: 32,
+                    height: 32,
                   ),
                   const SizedBox(width: 8),
-                  const Text('CogNotez'),
+                  Text(
+                    'CogNotez',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      foreground: Paint()
+                        ..shader = LinearGradient(
+                          colors: [AppTheme.accentColor, AppTheme.primaryDark],
+                        ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                    ),
+                  ),
                 ],
               ),
         actions: [
-          IconButton(
-            icon: Icon(_isSearching ? Icons.close : Icons.search),
-            onPressed: _toggleSearch,
-            tooltip: 'Search',
-          ),
-          IconButton(
-            icon: Icon(
-              themeService.themeMode == ThemeMode.dark
-                  ? Icons.light_mode
-                  : Icons.dark_mode,
+          // Unified header toolbar - mobile adapted
+          Container(
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceVariant,
+              borderRadius: BorderRadius.circular(isMobile ? AppTheme.radiusLg : AppTheme.radiusXl),
+              border: Border.all(color: Theme.of(context).colorScheme.outline),
             ),
-            onPressed: () {
-              final newMode = themeService.themeMode == ThemeMode.dark
-                  ? ThemeMode.light
-                  : ThemeMode.dark;
-              themeService.setThemeMode(newMode);
-            },
-            tooltip: 'Toggle theme',
+            padding: EdgeInsets.all(isMobile ? 2 : 4),
+            child: Row(
+              children: [
+                // Theme toggle - mobile adapted
+                IconButton(
+                  icon: Icon(
+                    themeService.themeMode == ThemeMode.dark
+                        ? Icons.light_mode
+                        : Icons.dark_mode,
+                    size: isMobile ? 16 : 18,
+                  ),
+                  onPressed: () {
+                    final newMode = themeService.themeMode == ThemeMode.dark
+                        ? ThemeMode.light
+                        : ThemeMode.dark;
+                    themeService.setThemeMode(newMode);
+                  },
+                  tooltip: 'Toggle theme',
+                  style: IconButton.styleFrom(
+                    padding: EdgeInsets.all(isMobile ? 6 : 8),
+                    minimumSize: Size(isMobile ? 32 : 36, isMobile ? 32 : 36),
+                  ),
+                ),
+                // New note button with accent color - mobile adapted
+                ElevatedButton(
+                  onPressed: _createNewNote,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.accentColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(isMobile ? AppTheme.radiusMd : AppTheme.radiusLg),
+                    ),
+                    padding: EdgeInsets.symmetric(
+                      horizontal: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd,
+                      vertical: isMobile ? AppTheme.spacingXs : AppTheme.spacingSm,
+                    ),
+                    minimumSize: Size(isMobile ? 60 : 80, isMobile ? 32 : 36),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.add, size: isMobile ? 14 : 16),
+                      if (!isMobile) ...[
+                        const SizedBox(width: 6),
+                        const Text('New'),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
+          const SizedBox(width: 8),
+          // Settings button
           IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _createNewNote,
-            tooltip: 'New note',
-          ),
-          IconButton(
-            icon: const Icon(Icons.settings),
+            icon: const Icon(Icons.settings, size: 20),
             onPressed: () {
               Navigator.push(
                 context,

@@ -60,6 +60,16 @@ class CogNotezApp extends StatelessWidget {
             Locale('jv', ''),
           ],
           home: const HomeScreen(),
+          // Add responsive scaling for mobile devices
+          builder: (context, child) {
+            final mediaQueryData = MediaQuery.of(context);
+            final scale = mediaQueryData.size.width < 600 ? 0.9 : 1.0;
+
+            return MediaQuery(
+              data: mediaQueryData.copyWith(textScaleFactor: scale),
+              child: child!,
+            );
+          },
         );
       },
     );

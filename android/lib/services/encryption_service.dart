@@ -65,28 +65,34 @@ class EncryptionService {
     return base64Encode(salt);
   }
 
-  /// Encrypt text with password
-  static Map<String, String> encrypt(String text, String password) {
-    final salt = generateSalt();
-    final key = deriveKey(password, salt);
-    final iv = IV.fromSecureRandom(ivLength);
-    final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
-    
-    final encrypted = encrypter.encrypt(text, iv: iv);
-    
+  /// Encrypt text with password using desktop-compatible format
+  static Future<Map<String, String>> encrypt(String text, String password) async {
+    // Use the desktop-compatible sync data encryption format
+    final envelope = await encryptSyncData(
+      {'content': text},
+      password,
+    );
+
+    // Convert to the format expected by the desktop app
     return {
-      'encrypted_content': encrypted.base64,
-      'salt': salt,
-      'iv': iv.base64,
+      'encrypted_content': jsonEncode(envelope),
+      'salt': '', // These fields are kept for backward compatibility but not used
+      'iv': '',   // The actual salt and IV are inside the envelope
     };
   }
 
-  /// Decrypt text with password
-  static String decrypt(String encryptedBase64, String saltBase64, String ivBase64, String password) {
+  /// Decrypt text with password - handles both old and new formats
+  static Future<String> decrypt(String encryptedBase64, String saltBase64, String ivBase64, String password) async {
+    // First check if this is a desktop-compatible envelope format
+    if (isDesktopEnvelope(encryptedBase64)) {
+      return await decryptDesktopEnvelope(encryptedBase64, password);
+    }
+
+    // Fallback to old format for backward compatibility
     final key = deriveKey(password, saltBase64);
     final iv = IV.fromBase64(ivBase64);
     final encrypter = Encrypter(AES(key, mode: AESMode.gcm));
-    
+
     final encrypted = Encrypted.fromBase64(encryptedBase64);
     return encrypter.decrypt(encrypted, iv: iv);
   }

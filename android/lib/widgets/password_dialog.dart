@@ -84,7 +84,7 @@ class _PasswordDialogState extends State<PasswordDialog> {
           throw Exception('Note encryption data is missing');
         }
 
-        decryptedContent = EncryptionService.decrypt(
+        decryptedContent = await EncryptionService.decrypt(
           widget.note.encryptedContent!,
           widget.note.encryptionSalt!,
           widget.note.encryptionIv!,
@@ -113,7 +113,7 @@ class _PasswordDialogState extends State<PasswordDialog> {
     });
 
     try {
-      final encryptionResult = EncryptionService.encrypt(
+      final encryptionResult = await EncryptionService.encrypt(
         widget.note.content,
         password,
       );

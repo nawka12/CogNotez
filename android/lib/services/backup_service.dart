@@ -81,8 +81,9 @@ class BackupData {
         'is_archived': isArchived,
         'pinned': note.isPinned,
         'password_protected': note.isPasswordProtected,
-        'password_hash': passwordHash,
-        'encrypted_content': note.encryptedContent,
+        // When password protection is removed, ensure all encryption fields are cleared
+        'password_hash': note.isPasswordProtected ? passwordHash : null,
+        'encrypted_content': note.isPasswordProtected ? note.encryptedContent : null,
         'word_count': wordCount,
         'char_count': charCount,
         'created_at': note.createdAt.toIso8601String(),

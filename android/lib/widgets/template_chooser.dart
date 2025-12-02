@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/template.dart';
 import '../models/note.dart';
 import '../services/template_service.dart';
+import '../utils/app_theme.dart';
 
 class TemplateChooser extends StatefulWidget {
   final Function(Note) onNoteCreated;
@@ -127,47 +128,75 @@ class _TemplateChooserState extends State<TemplateChooser>
         return Container(
           decoration: BoxDecoration(
             color: Theme.of(context).colorScheme.surface,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(AppTheme.radiusXl)),
+            boxShadow: [AppTheme.shadowXl],
           ),
           child: Column(
             children: [
-              // Handle bar
+              // Handle bar with gradient
               Container(
-                margin: const EdgeInsets.only(top: 8),
+                margin: const EdgeInsets.only(top: AppTheme.spacingSm),
                 width: 40,
                 height: 4,
                 decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(2),
+                  gradient: LinearGradient(
+                    colors: [AppTheme.accentColor, AppTheme.primaryDark],
+                    begin: Alignment.centerLeft,
+                    end: Alignment.centerRight,
+                  ),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusFull),
                 ),
               ),
-              // Header
+              // Header with gradient title
               Padding(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppTheme.spacingLg),
                 child: Row(
                   children: [
-                    const Text(
+                    Text(
                       'Choose Template',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.bold,
+                        foreground: Paint()
+                          ..shader = LinearGradient(
+                            colors: [AppTheme.accentColor, AppTheme.primaryDark],
+                          ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
                       ),
                     ),
                     const Spacer(),
                     IconButton(
                       icon: const Icon(Icons.close),
                       onPressed: () => Navigator.pop(context),
+                      style: IconButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(36, 36),
+                      ),
                     ),
                   ],
                 ),
               ),
-              // Tab bar
-              TabBar(
-                controller: _tabController,
-                tabs: const [
-                  Tab(text: 'Built-in'),
-                  Tab(text: 'Custom'),
-                ],
+              // Modern tab bar
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingLg),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surfaceVariant,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusLg),
+                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                ),
+                child: TabBar(
+                  controller: _tabController,
+                  indicator: BoxDecoration(
+                    color: AppTheme.accentColor,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
+                  ),
+                  labelColor: Colors.white,
+                  unselectedLabelColor: Theme.of(context).colorScheme.onSurfaceVariant,
+                  indicatorSize: TabBarIndicatorSize.tab,
+                  tabs: const [
+                    Tab(text: 'Built-in'),
+                    Tab(text: 'Custom'),
+                  ],
+                ),
               ),
               // Tab content
               Expanded(
@@ -403,58 +432,93 @@ class _TemplateCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: onDelete != null ? onDelete : null,
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    template.icon,
-                    style: const TextStyle(fontSize: 24),
-                  ),
-                  if (onDelete != null) ...[
-                    const Spacer(),
-                    IconButton(
-                      icon: const Icon(Icons.delete_outline, size: 18),
-                      onPressed: onDelete,
-                      visualDensity: VisualDensity.compact,
-                      padding: EdgeInsets.zero,
-                      constraints: const BoxConstraints(),
-                      color: Colors.red[400],
+    return Container(
+      margin: const EdgeInsets.all(AppTheme.spacingSm),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+        border: Border.all(color: Theme.of(context).colorScheme.outline),
+        boxShadow: [AppTheme.shadowSm],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          onLongPress: onDelete != null ? onDelete : null,
+          borderRadius: BorderRadius.circular(AppTheme.radiusXl),
+          child: Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingMd),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Template icon
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [AppTheme.accentColor, AppTheme.primaryDark],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                  ],
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                template.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 14,
-                ),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 4),
-              Expanded(
-                child: Text(
-                  template.description,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusMd),
                   ),
-                  maxLines: 2,
+                  child: Center(
+                    child: Text(
+                      template.icon,
+                      style: const TextStyle(fontSize: 24, color: Colors.white),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: AppTheme.spacingSm),
+                // Template name
+                Text(
+                  template.name,
+                  style: TextStyle(
+                    fontWeight: FontWeight.w600,
+                    fontSize: 16,
+                    color: Theme.of(context).colorScheme.onSurface,
+                  ),
+                  maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),
-              ),
-            ],
+                const SizedBox(height: AppTheme.spacingXs),
+                // Template description
+                Expanded(
+                  child: Text(
+                    template.description,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                // Delete button (if available)
+                if (onDelete != null) ...[
+                  const SizedBox(height: AppTheme.spacingSm),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: Container(
+                      width: 32,
+                      height: 32,
+                      decoration: BoxDecoration(
+                        color: AppTheme.errorColor,
+                        borderRadius: BorderRadius.circular(AppTheme.radiusSm),
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.delete_outline, size: 16),
+                        onPressed: onDelete,
+                        padding: EdgeInsets.zero,
+                        constraints: const BoxConstraints(),
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
         ),
       ),
