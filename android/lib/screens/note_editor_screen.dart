@@ -15,7 +15,7 @@ import '../services/media_storage_service.dart';
 import '../widgets/find_replace_dialog.dart';
 import '../widgets/password_dialog.dart';
 
-enum ViewMode { edit, preview, split }
+enum ViewMode { edit, preview }
 
 class _EditorState {
   final String title;
@@ -313,6 +313,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Unsaved Changes'),
         content: const Text('You have unsaved changes. Do you want to discard them?'),
         actions: [
@@ -349,6 +350,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Manage Tags'),
           content: SizedBox(
             width: double.maxFinite,
@@ -509,10 +511,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     return showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(title),
         content: TextField(
           controller: controller,
-          decoration: InputDecoration(hintText: hint),
+          decoration: InputDecoration(
+            hintText: hint,
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
           autofocus: true,
           maxLines: 3,
         ),
@@ -534,6 +540,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(title),
         content: SingleChildScrollView(
           child: SelectableText(result),
@@ -559,6 +566,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('AI Edit Suggestion'),
         content: SingleChildScrollView(
           child: Column(
@@ -609,6 +617,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Generated Content'),
         content: SingleChildScrollView(
           child: SelectableText(content),
@@ -637,6 +646,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Suggested Tags'),
         content: SingleChildScrollView(
           child: Column(
@@ -653,13 +663,13 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                     (t) => t?.name.toLowerCase() == tagName.toLowerCase(),
                     orElse: () => null,
                   );
-                  final isAlreadyApplied = existingTag != null && 
+                  final isAlreadyApplied = existingTag != null &&
                       _currentNote.tags.contains(existingTag.id);
                   
                   return ActionChip(
                     label: Text(tagName),
-                    avatar: isAlreadyApplied 
-                        ? const Icon(Icons.check, size: 16) 
+                    avatar: isAlreadyApplied
+                        ? const Icon(Icons.check, size: 16)
                         : null,
                     onPressed: isAlreadyApplied ? null : () async {
                       // Find or create tag
@@ -1079,25 +1089,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
         return _buildEditor();
       case ViewMode.preview:
         return _buildPreview();
-      case ViewMode.split:
-        return Row(
-          children: [
-            Expanded(child: _buildEditor()),
-            const VerticalDivider(width: 1),
-            Expanded(child: _buildPreview()),
-          ],
-        );
     }
   }
 
   IconData _getViewModeIcon() {
     switch (_viewMode) {
       case ViewMode.edit:
-        return Icons.edit;
+        return Icons.visibility_outlined;
       case ViewMode.preview:
-        return Icons.preview;
-      case ViewMode.split:
-        return Icons.vertical_split;
+        return Icons.edit_outlined;
     }
   }
 
@@ -1108,9 +1108,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
           _viewMode = ViewMode.preview;
           break;
         case ViewMode.preview:
-          _viewMode = ViewMode.split;
-          break;
-        case ViewMode.split:
           _viewMode = ViewMode.edit;
           break;
       }
@@ -1122,8 +1119,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
       case ViewMode.edit:
         return 'Switch to Preview';
       case ViewMode.preview:
-        return 'Switch to Split View';
-      case ViewMode.split:
         return 'Switch to Edit';
     }
   }

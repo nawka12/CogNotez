@@ -59,86 +59,93 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
 
     final themeService = Provider.of<ThemeService>(context, listen: false);
+    final isLight = Theme.of(context).brightness == Brightness.light;
 
     return Scaffold(
+      backgroundColor: isLight ? const Color(0xFFF8FAFC) : null,
       appBar: AppBar(
         title: Text(loc?.translate('settings_title') ?? 'Settings'),
+        backgroundColor: isLight ? const Color(0xFFF8FAFC) : null,
+        elevation: 0,
       ),
       body: ListView(
+        padding: const EdgeInsets.only(bottom: 32),
         children: [
           // Appearance Section
-          _buildSectionHeader(loc?.translate('appearance_section') ?? 'Appearance'),
-          ListTile(
-            leading: const Icon(Icons.palette),
-            title: Text(loc?.translate('theme_title') ?? 'Theme'),
-            subtitle: Text(_currentSettings.theme == 'system'
-                ? (loc?.translate('theme_system') ?? 'System default')
-                : _currentSettings.theme == 'light'
-                    ? (loc?.translate('theme_light') ?? 'Light')
-                    : (loc?.translate('theme_dark') ?? 'Dark')),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showThemeDialog(themeService),
+          _buildSection(
+            title: loc?.translate('appearance_section') ?? 'Appearance',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.palette_outlined),
+                title: Text(loc?.translate('theme_title') ?? 'Theme'),
+                subtitle: Text(_currentSettings.theme == 'system'
+                    ? (loc?.translate('theme_system') ?? 'System default')
+                    : _currentSettings.theme == 'light'
+                        ? (loc?.translate('theme_light') ?? 'Light')
+                        : (loc?.translate('theme_dark') ?? 'Dark')),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showThemeDialog(themeService),
+              ),
+              ListTile(
+                leading: const Icon(Icons.language_outlined),
+                title: Text(loc?.translate('language_title') ?? 'Language'),
+                subtitle: Text(_getLanguageName(_currentSettings.language)),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showLanguageDialog(),
+              ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: Text(loc?.translate('language_title') ?? 'Language'),
-            subtitle: Text(_getLanguageName(_currentSettings.language)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showLanguageDialog(),
-          ),
-          
-          const Divider(),
           
           // AI Configuration Section
-          _buildSectionHeader(loc?.translate('ai_section') ?? 'AI Configuration'),
-          ListTile(
-            leading: const Icon(Icons.smart_toy),
-            title: Text(loc?.translate('ai_backend_title') ?? 'AI Backend'),
-            subtitle: Text(_currentSettings.aiBackend == 'ollama'
-                ? (loc?.translate('ai_backend_ollama') ?? 'Ollama')
-                : (loc?.translate('ai_backend_openrouter') ?? 'OpenRouter')),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showAIBackendDialog(),
+          _buildSection(
+            title: loc?.translate('ai_section') ?? 'AI Configuration',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.smart_toy_outlined),
+                title: Text(loc?.translate('ai_backend_title') ?? 'AI Backend'),
+                subtitle: Text(_currentSettings.aiBackend == 'ollama'
+                    ? (loc?.translate('ai_backend_ollama') ?? 'Ollama')
+                    : (loc?.translate('ai_backend_openrouter') ?? 'OpenRouter')),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showAIBackendDialog(),
+              ),
+              if (_currentSettings.aiBackend == 'ollama') ...[
+                ListTile(
+                  leading: const Icon(Icons.link),
+                  title: Text(loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint'),
+                  subtitle: Text(_currentSettings.ollamaEndpoint),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () => _showOllamaEndpointDialog(),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.model_training),
+                  title: Text(loc?.translate('ollama_model_title') ?? 'Ollama Model'),
+                  subtitle: Text(_currentSettings.ollamaModel),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () => _showOllamaModelDialog(),
+                ),
+              ] else ...[
+                ListTile(
+                  leading: const Icon(Icons.key),
+                  title: Text(loc?.translate('openrouter_api_key_title') ?? 'OpenRouter API Key'),
+                  subtitle: Text(_currentSettings.openRouterApiKey?.isNotEmpty == true
+                      ? '••••••••'
+                      : (loc?.translate('not_set') ?? 'Not set')),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () => _showOpenRouterApiKeyDialog(),
+                ),
+                ListTile(
+                  leading: const Icon(Icons.model_training),
+                  title: Text(loc?.translate('openrouter_model_title') ?? 'OpenRouter Model'),
+                  subtitle: Text(_currentSettings.openRouterModel ?? 'openai/gpt-4o-mini'),
+                  trailing: const Icon(Icons.chevron_right, size: 20),
+                  onTap: () => _showOpenRouterModelDialog(),
+                ),
+              ],
+            ],
           ),
           
-          if (_currentSettings.aiBackend == 'ollama') ...[
-            ListTile(
-              leading: const Icon(Icons.link),
-              title: Text(loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint'),
-              subtitle: Text(_currentSettings.ollamaEndpoint),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showOllamaEndpointDialog(),
-            ),
-            ListTile(
-              leading: const Icon(Icons.model_training),
-              title: Text(loc?.translate('ollama_model_title') ?? 'Ollama Model'),
-              subtitle: Text(_currentSettings.ollamaModel),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showOllamaModelDialog(),
-            ),
-          ] else ...[
-            ListTile(
-              leading: const Icon(Icons.key),
-              title: Text(loc?.translate('openrouter_api_key_title') ?? 'OpenRouter API Key'),
-              subtitle: Text(_currentSettings.openRouterApiKey?.isNotEmpty == true
-                  ? '••••••••'
-                  : (loc?.translate('not_set') ?? 'Not set')),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showOpenRouterApiKeyDialog(),
-            ),
-            ListTile(
-              leading: const Icon(Icons.model_training),
-              title: Text(loc?.translate('openrouter_model_title') ?? 'OpenRouter Model'),
-              subtitle: Text(_currentSettings.openRouterModel ?? 'openai/gpt-4o-mini'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () => _showOpenRouterModelDialog(),
-            ),
-          ],
-          
-          const Divider(),
-          
           // Sync Settings Section
-          _buildSectionHeader(loc?.translate('sync_section') ?? 'Sync & Backup'),
           Consumer<GoogleDriveService>(
             builder: (context, driveService, child) {
               final status = driveService.status;
@@ -146,162 +153,138 @@ class _SettingsScreenState extends State<SettingsScreen> {
               if (status.isConnected) {
                 return Column(
                   children: [
-                    // Account info
-                    ListTile(
-                      leading: status.userPhotoUrl != null
-                          ? CircleAvatar(
-                              backgroundImage: NetworkImage(status.userPhotoUrl!),
-                            )
-                          : const CircleAvatar(child: Icon(Icons.person)),
-                      title: Text(status.userName ?? 'Connected'),
-                      subtitle: Text(status.userEmail ?? ''),
-                      trailing: TextButton(
-                        onPressed: () => _showDisconnectDialog(driveService),
-                        child: Text(loc?.translate('disconnect') ?? 'Disconnect'),
-                      ),
+                    _buildSection(
+                      title: loc?.translate('sync_section') ?? 'Sync & Backup',
+                      children: [
+                        ListTile(
+                          leading: status.userPhotoUrl != null
+                              ? CircleAvatar(
+                                  backgroundImage: NetworkImage(status.userPhotoUrl!),
+                                  radius: 16,
+                                )
+                              : const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 20)),
+                          title: Text(status.userName ?? 'Connected'),
+                          subtitle: Text(status.userEmail ?? ''),
+                          trailing: TextButton(
+                            onPressed: () => _showDisconnectDialog(driveService),
+                            child: Text(loc?.translate('disconnect') ?? 'Disconnect'),
+                          ),
+                        ),
+                        if (status.isSyncing)
+                          const ListTile(
+                            leading: SizedBox(
+                              width: 24,
+                              height: 24,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                            title: Text('Syncing...'),
+                          )
+                        else ...[
+                          ListTile(
+                            leading: Icon(
+                              status.hasRemoteBackup ? Icons.cloud_done_outlined : Icons.cloud_off_outlined,
+                              color: status.hasRemoteBackup ? Colors.green : Colors.grey,
+                            ),
+                            title: Text(
+                              status.hasRemoteBackup
+                                  ? (loc?.translate('remote_backup_available') ?? 'Remote backup available') +
+                                      (status.isEncrypted
+                                          ? ' (${loc?.translate('encrypted_label') ?? 'encrypted'})'
+                                          : '')
+                                  : (loc?.translate('no_remote_backup') ?? 'No remote backup'),
+                            ),
+                            subtitle: status.lastSync != null
+                                ? Text('${loc?.translate('last_sync_prefix') ?? 'Last sync:'} ${_formatLastSync(status.lastSync!)}')
+                                : null,
+                          ),
+                          ListTile(
+                            leading: const Icon(Icons.sync),
+                            title: Text(loc?.translate('sync_now_title') ?? 'Sync Now'),
+                            subtitle: Text(loc?.translate('sync_now_subtitle') ?? 'Manually sync with Google Drive'),
+                            trailing: const Icon(Icons.chevron_right, size: 20),
+                            onTap: () => _syncNow(driveService),
+                          ),
+                        ],
+                      ],
                     ),
                     
-                    // Sync status
-                    if (status.isSyncing)
-                      const ListTile(
-                        leading: SizedBox(
-                          width: 24,
-                          height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2),
+                    _buildSection(
+                      title: loc?.translate('e2ee_section') ?? 'End-to-End Encryption',
+                      children: [
+                        SwitchListTile(
+                          secondary: Icon(
+                            driveService.encryptionEnabled ? Icons.lock_outlined : Icons.lock_open_outlined,
+                            color: driveService.encryptionEnabled ? Colors.green : null,
+                          ),
+                          title: Text(loc?.translate('enable_e2ee_title') ?? 'Enable E2EE'),
+                          subtitle: Text(
+                            driveService.encryptionEnabled
+                                ? (driveService.hasPassphrase
+                                    ? (loc?.translate('passphrase_set') ?? 'Passphrase set')
+                                    : (loc?.translate('enter_passphrase_to_sync') ?? 'Enter passphrase to sync'))
+                                : (loc?.translate('encrypt_sync_data') ?? 'Encrypt sync data with a passphrase'),
+                          ),
+                          value: driveService.encryptionEnabled,
+                          onChanged: (value) {
+                            if (value) {
+                              _showPassphraseDialog(driveService, isEnabling: true);
+                            } else {
+                              _showDisableEncryptionDialog(driveService);
+                            }
+                          },
                         ),
-                        title: Text('Syncing...'),
-                      )
-                    else ...[
-                      ListTile(
-                        leading: Icon(
-                          status.hasRemoteBackup ? Icons.cloud_done : Icons.cloud_off,
-                          color: status.hasRemoteBackup ? Colors.green : Colors.grey,
-                        ),
-                        title: Text(
-                          status.hasRemoteBackup
-                              ? (loc?.translate('remote_backup_available') ?? 'Remote backup available') +
-                                  (status.isEncrypted
-                                      ? ' (${loc?.translate('encrypted_label') ?? 'encrypted'})'
-                                      : '')
-                              : (loc?.translate('no_remote_backup') ?? 'No remote backup'),
-                        ),
-                        subtitle: status.lastSync != null
-                            ? Text('${loc?.translate('last_sync_prefix') ?? 'Last sync:'} ${_formatLastSync(status.lastSync!)}')
-                            : null,
-                      ),
-                      ListTile(
-                        leading: const Icon(Icons.sync),
-                        title: Text(loc?.translate('sync_now_title') ?? 'Sync Now'),
-                        subtitle: Text(loc?.translate('sync_now_subtitle') ?? 'Manually sync with Google Drive'),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _syncNow(driveService),
-                      ),
-                    ],
-                    
-                    // Error display
-                    if (status.error != null)
-                      ListTile(
-                        leading: const Icon(Icons.error, color: Colors.red),
-                        title: Text(loc?.translate('sync_error_title') ?? 'Sync Error'),
-                        subtitle: Text(
-                          status.error!,
-                          style: const TextStyle(color: Colors.red),
-                        ),
-                        trailing: status.needsPassphrase
-                            ? TextButton(
-                                onPressed: () => _showPassphraseDialog(driveService, isRequired: true),
-                                child: Text(loc?.translate('enter_passphrase_button') ?? 'Enter Passphrase'),
-                              )
-                            : null,
-                      ),
-                    
-                    const Divider(),
-                    
-                    // End-to-End Encryption Section
-                    _buildSectionHeader(loc?.translate('e2ee_section') ?? 'End-to-End Encryption'),
-                    SwitchListTile(
-                      secondary: Icon(
-                        driveService.encryptionEnabled ? Icons.lock : Icons.lock_open,
-                        color: driveService.encryptionEnabled ? Colors.green : null,
-                      ),
-                      title: Text(loc?.translate('enable_e2ee_title') ?? 'Enable E2EE'),
-                      subtitle: Text(
-                        driveService.encryptionEnabled
-                            ? (driveService.hasPassphrase
-                                ? (loc?.translate('passphrase_set') ?? 'Passphrase set')
-                                : (loc?.translate('enter_passphrase_to_sync') ?? 'Enter passphrase to sync'))
-                            : (loc?.translate('encrypt_sync_data') ?? 'Encrypt sync data with a passphrase'),
-                      ),
-                      value: driveService.encryptionEnabled,
-                      onChanged: (value) {
-                        if (value) {
-                          // Show passphrase dialog when enabling
-                          _showPassphraseDialog(driveService, isEnabling: true);
-                        } else {
-                          // Confirm before disabling
-                          _showDisableEncryptionDialog(driveService);
-                        }
-                      },
-                    ),
-                    if (driveService.encryptionEnabled)
-                      ListTile(
-                        leading: const Icon(Icons.key),
-                        title: const Text(
-                          'Change Passphrase',
-                        ),
-                        subtitle: Text(driveService.hasPassphrase
-                            ? (loc?.translate('update_e2ee_passphrase') ?? 'Update your E2EE passphrase')
-                            : (loc?.translate('set_e2ee_passphrase') ?? 'Set your E2EE passphrase')),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showPassphraseDialog(driveService),
-                      ),
-                    
-                    // Info about encryption
-                    Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-                      child: Text(
+                        if (driveService.encryptionEnabled)
+                          ListTile(
+                            leading: const Icon(Icons.key_outlined),
+                            title: const Text('Change Passphrase'),
+                            subtitle: Text(driveService.hasPassphrase
+                                ? (loc?.translate('update_e2ee_passphrase') ?? 'Update your E2EE passphrase')
+                                : (loc?.translate('set_e2ee_passphrase') ?? 'Set your E2EE passphrase')),
+                            trailing: const Icon(Icons.chevron_right, size: 20),
+                            onTap: () => _showPassphraseDialog(driveService),
+                          ),
+                      ],
+                      footer: Text(
                         loc?.translate('e2ee_info') ??
                             'End-to-end encryption protects your notes with a passphrase. '
                                 'Only you can decrypt your data. '
                                 'Use the same passphrase on all devices.',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
                       ),
                     ),
                     
-                    const Divider(),
-                    
-                    // Auto sync settings
-                    SwitchListTile(
-                      secondary: const Icon(Icons.autorenew),
-                      title: Text(loc?.translate('auto_sync_title') ?? 'Auto Sync'),
-                      subtitle: Text(loc?.translate('auto_sync_subtitle') ?? 'Automatically sync notes'),
-                      value: _currentSettings.autoSync,
-                      onChanged: (value) {
-                        _updateSettings((s) => s.copyWith(autoSync: value));
-                      },
-                    ),
-                    
-                    if (_currentSettings.autoSync)
-                      ListTile(
-                        leading: const Icon(Icons.timer),
-                        title: Text(loc?.translate('sync_interval_title') ?? 'Sync Interval'),
-                        subtitle: Text(
-                          (loc?.translate('sync_interval_minutes') ?? '{minutes} minutes')
-                              .replaceFirst('{minutes}', '${_currentSettings.syncInterval ~/ 60000}'),
+                    _buildSection(
+                      title: loc?.translate('auto_sync_title') ?? 'Auto Sync',
+                      children: [
+                        SwitchListTile(
+                          secondary: const Icon(Icons.autorenew),
+                          title: Text(loc?.translate('auto_sync_title') ?? 'Auto Sync'),
+                          subtitle: Text(loc?.translate('auto_sync_subtitle') ?? 'Automatically sync notes'),
+                          value: _currentSettings.autoSync,
+                          onChanged: (value) {
+                            _updateSettings((s) => s.copyWith(autoSync: value));
+                          },
                         ),
-                        trailing: const Icon(Icons.chevron_right),
-                        onTap: () => _showSyncIntervalDialog(),
-                      ),
+                        if (_currentSettings.autoSync)
+                          ListTile(
+                            leading: const Icon(Icons.timer_outlined),
+                            title: Text(loc?.translate('sync_interval_title') ?? 'Sync Interval'),
+                            subtitle: Text(
+                              (loc?.translate('sync_interval_minutes') ?? '{minutes} minutes')
+                                  .replaceFirst('{minutes}', '${_currentSettings.syncInterval ~/ 60000}'),
+                            ),
+                            trailing: const Icon(Icons.chevron_right, size: 20),
+                            onTap: () => _showSyncIntervalDialog(),
+                          ),
+                      ],
+                    ),
                   ],
                 );
               } else {
-                // Not connected
-                return Column(
+                return _buildSection(
+                  title: loc?.translate('sync_section') ?? 'Sync & Backup',
                   children: [
                     ListTile(
-                      leading: const Icon(Icons.cloud_off),
+                      leading: const Icon(Icons.cloud_off_outlined),
                       title: const Text('Google Drive'),
                       subtitle: const Text('Not connected'),
                       trailing: FilledButton.icon(
@@ -311,9 +294,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       ),
                     ),
                     if (status.error != null)
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        child: Text(
+                      ListTile(
+                        leading: const Icon(Icons.error_outline, color: Colors.red),
+                        title: Text(
                           status.error!,
                           style: TextStyle(
                             color: Theme.of(context).colorScheme.error,
@@ -327,62 +310,137 @@ class _SettingsScreenState extends State<SettingsScreen> {
             },
           ),
           
-          const Divider(),
-          
           // Local Backup Section
-          _buildSectionHeader(loc?.translate('local_backup_section') ?? 'Local Backup'),
-          ListTile(
-            leading: const Icon(Icons.backup),
-            title: Text(loc?.translate('export_backup_title') ?? 'Export Backup'),
-            subtitle: Text(loc?.translate('export_backup_subtitle') ?? 'Save all notes and tags to a JSON file'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _exportBackup(),
+          _buildSection(
+            title: loc?.translate('local_backup_section') ?? 'Local Backup',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.backup_outlined),
+                title: Text(loc?.translate('export_backup_title') ?? 'Export Backup'),
+                subtitle: Text(loc?.translate('export_backup_subtitle') ?? 'Save all notes and tags to a JSON file'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _exportBackup(),
+              ),
+              ListTile(
+                leading: const Icon(Icons.restore),
+                title: Text(loc?.translate('import_backup_title') ?? 'Import Backup'),
+                subtitle: Text(loc?.translate('import_backup_subtitle') ?? 'Restore notes and tags from a backup file'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _importBackup(),
+              ),
+              ListTile(
+                leading: const Icon(Icons.analytics_outlined),
+                title: Text(loc?.translate('backup_stats_title') ?? 'Backup Statistics'),
+                subtitle: Text(loc?.translate('backup_stats_subtitle') ?? 'View data statistics'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () => _showBackupStats(),
+              ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.restore),
-            title: Text(loc?.translate('import_backup_title') ?? 'Import Backup'),
-            subtitle: Text(loc?.translate('import_backup_subtitle') ?? 'Restore notes and tags from a backup file'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _importBackup(),
-          ),
-          ListTile(
-            leading: const Icon(Icons.analytics),
-            title: Text(loc?.translate('backup_stats_title') ?? 'Backup Statistics'),
-            subtitle: Text(loc?.translate('backup_stats_subtitle') ?? 'View data statistics'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showBackupStats(),
-          ),
-          
-          const Divider(),
           
           // About Section
-          _buildSectionHeader(loc?.translate('about_section') ?? 'About'),
-          ListTile(
-            leading: const Icon(Icons.info),
-            title: Text(loc?.translate('about_cognotez_title') ?? 'About CogNotez'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (context) => const AboutScreen()),
-              );
-            },
+          _buildSection(
+            title: loc?.translate('about_section') ?? 'About',
+            children: [
+              ListTile(
+                leading: const Icon(Icons.info_outline),
+                title: Text(loc?.translate('about_cognotez_title') ?? 'About CogNotez'),
+                trailing: const Icon(Icons.chevron_right, size: 20),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (context) => const AboutScreen()),
+                  );
+                },
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 
-  Widget _buildSectionHeader(String title) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
+  Widget _buildSection({
+    required String title,
+    required List<Widget> children,
+    Widget? footer,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 24, 20, 8),
+          child: Text(
+            title,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  color: Theme.of(context).colorScheme.primary,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 0.5,
+                ),
+          ),
+        ),
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          decoration: BoxDecoration(
+            color: Theme.of(context).brightness == Brightness.light
+                ? Colors.white
+                : const Color(0xFF1E293B),
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 16,
+                offset: const Offset(0, 4),
+              ),
+            ],
+            border: Border.all(
+              color: Theme.of(context).dividerColor.withOpacity(0.1),
             ),
-      ),
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(16),
+            child: Theme(
+              data: Theme.of(context).copyWith(
+                dividerColor: Colors.transparent,
+                listTileTheme: ListTileThemeData(
+                  dense: false,
+                  shape: const RoundedRectangleBorder(borderRadius: BorderRadius.zero),
+                  tileColor: Colors.transparent,
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  minVerticalPadding: 12,
+                  selectedTileColor: Theme.of(context).colorScheme.primary.withOpacity(0.08),
+                  iconColor: Theme.of(context).colorScheme.primary,
+                ),
+              ),
+              child: Column(
+                children: [
+                  for (int i = 0; i < children.length; i++) ...[
+                    children[i],
+                    if (i < children.length - 1)
+                      Divider(
+                        height: 1,
+                        indent: 60,
+                        endIndent: 0,
+                        color: Theme.of(context).dividerColor.withOpacity(0.2),
+                      ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        ),
+        if (footer != null)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(32, 12, 32, 0),
+            child: DefaultTextStyle(
+              style: Theme.of(context).textTheme.bodySmall!.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.4,
+                  ),
+              child: footer,
+            ),
+          ),
+      ],
     );
   }
 
@@ -402,6 +460,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('select_theme_title') ?? 'Select Theme'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -453,6 +512,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('select_language_title') ?? 'Select Language'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -487,6 +547,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('select_ai_backend_title') ?? 'Select AI Backend'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
@@ -528,12 +589,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         final loc = AppLocalizations.of(context);
         return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint'),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
             hintText: 'http://localhost:11434',
             labelText: loc?.translate('endpoint_url_label') ?? 'Endpoint URL',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -561,12 +624,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         final loc = AppLocalizations.of(context);
         return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('ollama_model_title') ?? 'Ollama Model'),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
             hintText: 'llama3.2:latest',
             labelText: loc?.translate('model_name_label') ?? 'Model name',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -594,6 +659,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         final loc = AppLocalizations.of(context);
         return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('openrouter_api_key_title') ?? 'OpenRouter API Key'),
         content: TextField(
           controller: controller,
@@ -601,6 +667,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: InputDecoration(
             hintText: loc?.translate('enter_api_key_hint') ?? 'Enter your API key',
             labelText: loc?.translate('api_key_label') ?? 'API Key',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -628,12 +695,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         final loc = AppLocalizations.of(context);
         return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('openrouter_model_title') ?? 'OpenRouter Model'),
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
             hintText: 'openai/gpt-4o-mini',
             labelText: loc?.translate('model_name_label') ?? 'Model name',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -663,6 +732,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (context) {
         final loc = AppLocalizations.of(context);
         return AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Text(loc?.translate('sync_interval_title') ?? 'Sync Interval'),
         content: TextField(
           controller: controller,
@@ -670,6 +740,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           decoration: InputDecoration(
             hintText: '5',
             labelText: loc?.translate('minutes_label') ?? 'Minutes',
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -727,6 +798,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Disconnect Google Drive'),
         content: const Text(
           'Are you sure you want to disconnect from Google Drive? '
@@ -835,6 +907,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       barrierDismissible: !isRequired,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: Text(isRequired
               ? 'Enter Passphrase'
               : isEnabling
@@ -870,6 +943,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: InputDecoration(
                     labelText: 'Passphrase',
                     hintText: 'Enter your passphrase',
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     suffixIcon: IconButton(
                       icon: Icon(obscureText ? Icons.visibility : Icons.visibility_off),
                       onPressed: () => setState(() => obscureText = !obscureText),
@@ -891,9 +965,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   TextFormField(
                     controller: confirmController,
                     obscureText: obscureText,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Confirm Passphrase',
                       hintText: 'Re-enter your passphrase',
+                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                     validator: (value) {
                       if (value != controller.text) {
@@ -953,6 +1028,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Disable Encryption'),
         content: const Text(
           'Are you sure you want to disable end-to-end encryption?\n\n'
@@ -994,8 +1070,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => const AlertDialog(
-          content: Row(
+        builder: (context) => AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          content: const Row(
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 16),
@@ -1027,6 +1104,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Import Backup'),
         content: const Text(
           'This will import notes and tags from a backup file. '
@@ -1093,6 +1171,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         showDialog(
           context: context,
           builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
             title: const Text('Backup Statistics'),
             content: Column(
               mainAxisSize: MainAxisSize.min,
@@ -1128,10 +1207,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
-          Text(label),
+          Text(label, style: Theme.of(context).textTheme.bodyMedium),
           Text(
             value,
-            style: const TextStyle(fontWeight: FontWeight.bold),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: Theme.of(context).colorScheme.primary,
+                ),
           ),
         ],
       ),
