@@ -231,8 +231,21 @@ class _NoteListItem extends StatelessWidget {
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
-          border: Border.all(color: Theme.of(context).colorScheme.outline),
+          border: Border.all(
+            color: note.isPinned
+                ? AppTheme.accentColor.withOpacity(0.3)
+                : Theme.of(context).colorScheme.outline,
+            width: note.isPinned ? 1.5 : 1.0,
+          ),
           boxShadow: [AppTheme.shadowXs],
+          // Add subtle gradient for pinned notes
+          gradient: note.isPinned
+              ? LinearGradient(
+                  colors: [AppTheme.accentLightest, Colors.transparent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
         ),
         child: Material(
           color: Colors.transparent,

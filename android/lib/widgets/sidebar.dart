@@ -283,4 +283,3 @@ class _TagFolderItem extends StatelessWidget {
     );
   }
 }
-

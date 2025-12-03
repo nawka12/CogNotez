@@ -218,6 +218,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
         actions: [
+          // Search button for non-searching state
+          if (!_isSearching)
+            IconButton(
+              icon: Icon(Icons.search, size: isMobile ? 20 : 22),
+              onPressed: _toggleSearch,
+              tooltip: 'Search',
+              style: IconButton.styleFrom(
+                padding: EdgeInsets.all(isMobile ? 6 : 8),
+                minimumSize: Size(isMobile ? 36 : 40, isMobile ? 36 : 40),
+              ),
+            ),
           // Unified header toolbar - mobile adapted
           Container(
             decoration: BoxDecoration(
