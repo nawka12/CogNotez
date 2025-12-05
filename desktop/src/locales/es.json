@@ -764,6 +764,8 @@
     "internetConnectionAndApiKey": "conexión a internet y clave API",
     "ensureOllamaRunning": "Por favor, asegúrate de que Ollama esté ejecutándose (\"ollama serve\") y que un modelo esté cargado.",
     "checkInternetAndApiKey": "Por favor, verifica tu conexión a internet y tu clave API de OpenRouter en Configuración de IA.",
+    "modelSwitcherLoadFailed": "No se pudo abrir el selector de modelos",
+    "modelSwitchFailed": "No se pudo cambiar el modelo",
     "failedToCreateBackup": "Error al crear respaldo",
     "databaseFileNotFound": "Archivo de base de datos no encontrado. Por favor, asegúrate de que la aplicación haya sido usada para crear notas.",
     "cannotWriteToLocation": "No se puede escribir en la ubicación seleccionada. Por favor, elige un directorio diferente.",
@@ -780,6 +782,15 @@
     "cannotRestoreToLocation": "No se puede restaurar a la ubicación de la base de datos. Por favor, verifica los permisos del archivo.",
     "backupFileCorrupted": "El archivo de respaldo parece estar corrupto o vacío. Por favor, selecciona un respaldo diferente.",
     "permissionDeniedRestore": "Permiso denegado. Por favor, verifica los permisos del archivo o ejecuta como administrador."
+  },
+  "modelSwitcher": {
+    "title": "Selector rápido de modelos",
+    "statusConnected": "El backend de IA está conectado. Usa flechas y Enter para cambiar.",
+    "statusOffline": "El backend puede estar sin conexión. Usando la lista de modelos en caché.",
+    "current": "Actual",
+    "currentFallback": "Modelo actual (caché)",
+    "noResults": "No hay modelos que coincidan. Revisa Configuración de IA si faltan.",
+    "switched": "Cambiado a {model} en {backend}"
   },
   "keyboard": {
     "shortcuts": "Atajos de Teclado",
@@ -812,6 +823,7 @@
     "rewriteSelectedText": "Reescribir texto seleccionado",
     "extractKeyPoints": "Extraer puntos clave",
     "generateTagsForSelection": "Generar etiquetas para selección",
+    "quickModelSwitcher": "Abrir selector rápido de modelos",
     "showThisHelpDialog": "Mostrar este diálogo de ayuda",
     "closeMenusDialogs": "Cerrar menús/diálogos",
     "showAIContextMenu": "Mostrar menú contextual de IA en texto seleccionado"

@@ -764,6 +764,8 @@
     "internetConnectionAndApiKey": "sambungan internet lan kunci API",
     "ensureOllamaRunning": "Mangga pastikake Ollama lagi mlaku (\"ollama serve\") lan model dimuat.",
     "checkInternetAndApiKey": "Mangga mriksa sambungan internet lan kunci API OpenRouter sampeyan ing Setelan AI.",
+    "modelSwitcherLoadFailed": "Ora bisa mbukak pemilih model",
+    "modelSwitchFailed": "Ora bisa ngalih model",
     "failedToCreateBackup": "Gagal gawe cadangan",
     "databaseFileNotFound": "File database ora ditemokake. Mangga pastikake aplikasi wis digunakake kanggo gawe cathetan.",
     "cannotWriteToLocation": "Ora bisa nulis menyang lokasi sing dipilih. Mangga pilih direktori liyane.",
@@ -780,6 +782,15 @@
     "cannotRestoreToLocation": "Ora bisa mulihake menyang lokasi database. Mangga mriksa ijin file.",
     "backupFileCorrupted": "File cadangan katon rusak utawa kosong. Mangga pilih cadangan liyane.",
     "permissionDeniedRestore": "Ijin ditolak. Mangga mriksa ijin file utawa jaluk minangka administrator."
+  },
+  "modelSwitcher": {
+    "title": "Pamilih model cepet",
+    "statusConnected": "Backend AI nyambung. Gunakna panah banjur Enter kanggo ngalih.",
+    "statusOffline": "Backend bisa wae offline. Nggunakake dhaptar model cache.",
+    "current": "Saiki",
+    "currentFallback": "Model saiki (cache)",
+    "noResults": "Ora ana model sing cocog. Priksa Setelan AI yen ana sing ilang.",
+    "switched": "Wis ngalih menyang {model} ing {backend}"
   },
   "keyboard": {
     "shortcuts": "Pintasan Keyboard",
@@ -812,6 +823,7 @@
     "rewriteSelectedText": "Tulis maneh teks sing dipilih",
     "extractKeyPoints": "Ekstrak poin penting",
     "generateTagsForSelection": "Gawe tag kanggo pilihan",
+    "quickModelSwitcher": "Bukak pamilih model cepet",
     "showThisHelpDialog": "Tampilaken dialog pitulung iki",
     "closeMenusDialogs": "Tutup menu/dialog",
     "showAIContextMenu": "Tampilaken menu konteks AI ing teks sing dipilih"

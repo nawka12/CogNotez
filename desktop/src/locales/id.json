@@ -764,6 +764,8 @@
     "internetConnectionAndApiKey": "koneksi internet dan kunci API",
     "ensureOllamaRunning": "Silakan pastikan Ollama berjalan (\"ollama serve\") dan model dimuat.",
     "checkInternetAndApiKey": "Silakan periksa koneksi internet dan kunci API OpenRouter Anda di Pengaturan AI.",
+    "modelSwitcherLoadFailed": "Tidak dapat membuka pengalih model",
+    "modelSwitchFailed": "Tidak dapat mengganti model",
     "failedToCreateBackup": "Gagal membuat cadangan",
     "databaseFileNotFound": "File database tidak ditemukan. Silakan pastikan aplikasi telah digunakan untuk membuat catatan.",
     "cannotWriteToLocation": "Tidak dapat menulis ke lokasi yang dipilih. Silakan pilih direktori yang berbeda.",
@@ -780,6 +782,15 @@
     "cannotRestoreToLocation": "Tidak dapat memulihkan ke lokasi database. Silakan periksa izin file.",
     "backupFileCorrupted": "File cadangan tampaknya rusak atau kosong. Silakan pilih cadangan yang berbeda.",
     "permissionDeniedRestore": "Izin ditolak. Silakan periksa izin file atau jalankan sebagai administrator."
+  },
+  "modelSwitcher": {
+    "title": "Pengalih model cepat",
+    "statusConnected": "Backend AI terhubung. Gunakan panah lalu Enter untuk mengganti.",
+    "statusOffline": "Backend mungkin offline. Menggunakan daftar model cache.",
+    "current": "Saat ini",
+    "currentFallback": "Model saat ini (cache)",
+    "noResults": "Tidak ada model yang cocok. Cek Pengaturan AI jika ada yang hilang.",
+    "switched": "Berhasil ganti ke {model} di {backend}"
   },
   "keyboard": {
     "shortcuts": "Pintasan Keyboard",
@@ -812,6 +823,7 @@
     "rewriteSelectedText": "Tulis ulang teks yang dipilih",
     "extractKeyPoints": "Ekstrak poin penting",
     "generateTagsForSelection": "Buat tag untuk pilihan",
+    "quickModelSwitcher": "Buka pengalih model cepat",
     "showThisHelpDialog": "Tampilkan dialog bantuan ini",
     "closeMenusDialogs": "Tutup menu/dialog",
     "showAIContextMenu": "Tampilkan menu konteks AI pada teks yang dipilih"

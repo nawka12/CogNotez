@@ -764,6 +764,8 @@
     "internetConnectionAndApiKey": "internet connection and API key",
     "ensureOllamaRunning": "Please ensure Ollama is running (\"ollama serve\") and a model is loaded.",
     "checkInternetAndApiKey": "Please check your internet connection and OpenRouter API key in AI Settings.",
+    "modelSwitcherLoadFailed": "Could not open model switcher",
+    "modelSwitchFailed": "Could not switch model",
     "failedToCreateBackup": "Failed to create backup",
     "databaseFileNotFound": "Database file not found. Please ensure the application has been used to create notes.",
     "cannotWriteToLocation": "Cannot write to the selected location. Please choose a different directory.",
@@ -780,6 +782,15 @@
     "cannotRestoreToLocation": "Cannot restore to the database location. Please check file permissions.",
     "backupFileCorrupted": "The backup file appears to be corrupted or empty. Please select a different backup.",
     "permissionDeniedRestore": "Permission denied. Please check file permissions or run as administrator."
+  },
+  "modelSwitcher": {
+    "title": "Quick Model Switcher",
+    "statusConnected": "AI backend is connected. Use arrows then Enter to switch.",
+    "statusOffline": "Backend might be offline. Using cached model list.",
+    "current": "Current",
+    "currentFallback": "Current model (cached)",
+    "noResults": "No models match your search. Check AI Settings if models are missing.",
+    "switched": "Switched to {model} on {backend}"
   },
   "keyboard": {
     "shortcuts": "Keyboard Shortcuts",
@@ -812,6 +823,7 @@
     "rewriteSelectedText": "Rewrite selected text",
     "extractKeyPoints": "Extract key points",
     "generateTagsForSelection": "Generate tags for selection",
+    "quickModelSwitcher": "Open quick model switcher",
     "showThisHelpDialog": "Show this help dialog",
     "closeMenusDialogs": "Close menus/dialogs",
     "showAIContextMenu": "Show AI context menu on selected text"

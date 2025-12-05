@@ -1,24 +1,8 @@
 // Main application entry point for CogNotez
 const { ipcRenderer } = require('electron');
 
-// Import marked library for markdown rendering
-const { marked } = require('marked');
-
-// Configure marked options for better rendering
-marked.setOptions({
-    breaks: true,
-    gfm: true,
-    headerIds: false,
-    mangle: false
-});
-
-// Enhanced markdown renderer using marked library
-function renderMarkdown(text) {
-    if (!text) return '';
-
-    // Use marked library for comprehensive markdown rendering
-    return marked.parse(text);
-}
+// Shared helpers
+const { t, setSafeInnerHTML, renderMarkdown } = require('./js/shared');
 
 // Find and Replace Dialog
 class FindReplaceDialog {
@@ -39,7 +23,6 @@ class FindReplaceDialog {
         const dialog = document.createElement('div');
         dialog.id = 'find-replace-dialog';
         dialog.className = 'find-replace-dialog';
-        const t = (key) => window.i18n ? window.i18n.t(key) : key;
         const findReplaceTitle = t('findReplace.findReplace');
         const findLabel = t('findReplace.find');
         const replaceLabel = t('findReplace.replace');
@@ -445,7 +428,7 @@ class FindReplaceDialog {
                     console.warn('[Preview] Failed to process media URLs in clearHighlights:', error);
                 }
             }
-            preview.innerHTML = marked.parse(content);
+            setSafeInnerHTML(preview, renderMarkdown(content));
         }
     }
 
@@ -468,11 +451,11 @@ class FindReplaceDialog {
             }
 
             // Parse markdown to HTML
-            const html = marked.parse(content);
+            const html = renderMarkdown(content);
             
             // Create a temporary container
             const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
+            setSafeInnerHTML(tempDiv, html);
             
             // Build the search pattern from find settings
             let searchText = this.findText;
@@ -610,7 +593,7 @@ class FindReplaceDialog {
                     // Ignore
                 }
             }
-            preview.innerHTML = marked.parse(content);
+            setSafeInnerHTML(preview, renderMarkdown(content));
         }
     }
 
@@ -971,6 +954,22 @@ class CogNotezApp {
         this.syncScrollEnabled = true;
         this.syncScrollTimeout = null;
         this.syncScrollSource = null; // Track which pane initiated scroll
+
+        // Quick model switcher state (desktop)
+        this.modelSwitcher = {
+            isOpen: false,
+            activeBackend: null,
+            items: [],
+            allItems: [],
+            selectedIndex: -1,
+            overlay: null,
+            input: null,
+            list: null,
+            status: null,
+            empty: null,
+            backendLabel: null,
+            hint: null
+        };
 
         // AI operation cancellation
         this.currentAIAbortController = null;
@@ -1447,6 +1446,9 @@ class CogNotezApp {
         // Note title
         document.getElementById('note-title').addEventListener('input', () => this.updateNoteTitle());
 
+        // Quick model switcher (desktop)
+        this.setupModelSwitcher();
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => this.handleKeyboardShortcuts(e));
     }
@@ -1867,8 +1869,9 @@ class CogNotezApp {
         const preview = document.getElementById('markdown-preview');
 
         if (!editor.value.trim()) {
-            const startWritingText = window.i18n ? window.i18n.t('editor.startWriting') : 'Start writing your note...';
-            preview.innerHTML = `<p style="color: var(--text-tertiary); font-style: italic;">${startWritingText}</p>`;
+            const startWritingText = t('editor.startWriting', 'Start writing your note...');
+            const safeStart = this.escapeHtml(startWritingText);
+            setSafeInnerHTML(preview, `<p style="color: var(--text-tertiary); font-style: italic;">${safeStart}</p>`);
             return;
         }
 
@@ -1885,7 +1888,7 @@ class CogNotezApp {
 
         // Render markdown and sanitize for security
         const renderedHTML = renderMarkdown(content);
-        preview.innerHTML = renderedHTML;
+        setSafeInnerHTML(preview, renderedHTML);
         
         // Setup horizontal scroll functionality
         this.setupHorizontalScroll(preview);
@@ -4054,43 +4057,63 @@ class CogNotezApp {
     createModal(title, content, buttons = []) {
         const modal = document.createElement('div');
         modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
-                <div class="modal-header">
-                    <h3>${title}</h3>
-                    <button class="modal-close">×</button>
-                </div>
-                <div class="modal-body">
-                    ${content}
-                </div>
-                ${buttons.length > 0 ? `
-                    <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; justify-content: flex-end;">
-                        ${buttons.map(btn => `<button class="btn-${btn.type || 'secondary'}" data-action="${btn.action}">${btn.text}</button>`).join('')}
-                    </div>
-                ` : ''}
-            </div>
-        `;
 
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.maxWidth = '600px';
+
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+
+        const titleEl = document.createElement('h3');
+        titleEl.textContent = title;
+        header.appendChild(titleEl);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'modal-close';
+        closeBtn.textContent = '×';
+        header.appendChild(closeBtn);
+
+        const body = document.createElement('div');
+        body.className = 'modal-body';
+        setSafeInnerHTML(body, content);
+
+        modalContent.appendChild(header);
+        modalContent.appendChild(body);
+
+        if (buttons.length > 0) {
+            const footer = document.createElement('div');
+            footer.className = 'modal-footer';
+            footer.style.padding = '16px 20px';
+            footer.style.borderTop = '1px solid var(--border-color)';
+            footer.style.display = 'flex';
+            footer.style.gap = '12px';
+            footer.style.justifyContent = 'flex-end';
+
+            buttons.forEach(btn => {
+                const btnElement = document.createElement('button');
+                btnElement.className = `btn-${btn.type || 'secondary'}`;
+                btnElement.dataset.action = btn.action;
+                btnElement.textContent = btn.text;
+                btnElement.addEventListener('click', () => {
+                    if (btn.callback) btn.callback();
+                    this.closeModal(modal);
+                });
+                footer.appendChild(btnElement);
+            });
+
+            modalContent.appendChild(footer);
+        }
+
+        modal.appendChild(modalContent);
         document.body.appendChild(modal);
 
         // Event listeners
-        const closeBtn = modal.querySelector('.modal-close');
         closeBtn.addEventListener('click', () => this.closeModal(modal));
 
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
                 this.closeModal(modal);
-            }
-        });
-
-        // Button actions
-        buttons.forEach(btn => {
-            const btnElement = modal.querySelector(`[data-action="${btn.action}"]`);
-            if (btnElement) {
-                btnElement.addEventListener('click', () => {
-                    if (btn.callback) btn.callback();
-                    this.closeModal(modal);
-                });
             }
         });
 
@@ -4511,7 +4534,7 @@ Please provide a helpful response based on the note content and conversation his
 
         // Render markdown for assistant messages, use plain text for user messages
         if (type === 'assistant') {
-            bubble.innerHTML = renderMarkdown(message);
+            setSafeInnerHTML(bubble, renderMarkdown(message));
         } else {
             bubble.textContent = message;
         }
@@ -6133,9 +6156,337 @@ Please provide a helpful response based on the note content and conversation his
         });
     }
 
+    setupModelSwitcher() {
+        const overlay = document.getElementById('model-switcher');
+        if (!overlay) return;
+
+        this.modelSwitcher.overlay = overlay;
+        this.modelSwitcher.input = document.getElementById('model-switcher-input');
+        this.modelSwitcher.list = document.getElementById('model-switcher-list');
+        this.modelSwitcher.status = document.getElementById('model-switcher-status');
+        this.modelSwitcher.empty = document.getElementById('model-switcher-empty');
+        this.modelSwitcher.backendLabel = document.getElementById('model-switcher-backend');
+        this.modelSwitcher.hint = document.getElementById('model-switcher-hint');
+
+        const closeBtn = document.getElementById('model-switcher-close');
+        const updateHint = () => {
+            if (!this.modelSwitcher.hint) return;
+            const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
+            this.modelSwitcher.hint.textContent = isMac ? '⌘⇧Space' : 'Ctrl+Shift+Space';
+        };
+        updateHint();
+
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) {
+                this.closeModelSwitcher();
+            }
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => this.closeModelSwitcher());
+        }
+
+        if (this.modelSwitcher.input) {
+            this.modelSwitcher.input.addEventListener('input', (e) => this.applyModelSwitcherFilter(this.modelSwitcher.allItems, e.target.value));
+            this.modelSwitcher.input.addEventListener('keydown', (e) => this.handleModelSwitcherKeys(e));
+        }
+
+        overlay.addEventListener('keydown', (e) => {
+            if (!this.modelSwitcher.isOpen) return;
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeModelSwitcher();
+            }
+        });
+    }
+
+    async openModelSwitcher(prefill = '') {
+        if (!this.modelSwitcher.overlay || !this.modelSwitcher.input) return;
+        if (this.uiManager && this.uiManager.isMobile && this.uiManager.isMobile()) return;
+
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+
+        if (!this.aiManager) {
+            this.showNotification(t('notifications.aiNotAvailable'), 'error');
+            return;
+        }
+
+        this.modelSwitcher.activeBackend = this.aiManager.backend;
+
+        try {
+            this.modelSwitcher.overlay.classList.remove('hidden');
+            this.modelSwitcher.overlay.setAttribute('aria-hidden', 'false');
+            this.modelSwitcher.isOpen = true;
+
+            if (this.modelSwitcher.backendLabel) {
+                this.modelSwitcher.backendLabel.textContent = this.formatBackendLabel(this.modelSwitcher.activeBackend);
+            }
+
+            this.modelSwitcher.input.value = prefill || '';
+            setTimeout(() => {
+                this.modelSwitcher.input.focus();
+                this.modelSwitcher.input.select();
+            }, 0);
+
+            await this.refreshModelSwitcherList(prefill || '');
+        } catch (error) {
+            console.error('Failed to open model switcher:', error);
+            this.showNotification(error.message || t('notifications.modelSwitcherLoadFailed', 'Could not open model switcher'), 'error');
+            this.closeModelSwitcher();
+        }
+    }
+
+    closeModelSwitcher() {
+        if (!this.modelSwitcher.overlay) return;
+        this.modelSwitcher.overlay.classList.add('hidden');
+        this.modelSwitcher.overlay.setAttribute('aria-hidden', 'true');
+        this.modelSwitcher.isOpen = false;
+        this.modelSwitcher.items = [];
+        this.modelSwitcher.allItems = [];
+        this.modelSwitcher.selectedIndex = -1;
+    }
+
+    async refreshModelSwitcherList(query = '') {
+        if (!this.aiManager) return;
+
+        const backend = this.aiManager.backend;
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+
+        if (this.modelSwitcher.backendLabel) {
+            this.modelSwitcher.backendLabel.textContent = this.formatBackendLabel(backend);
+        }
+
+        if (this.modelSwitcher.status) {
+            const statusText = this.aiManager.isConnected
+                ? t('modelSwitcher.statusConnected', `${this.formatBackendLabel(backend)} is connected. Use arrows then Enter to switch.`)
+                : t('modelSwitcher.statusOffline', `${this.formatBackendLabel(backend)} might be offline. Using cached model list.`);
+            this.modelSwitcher.status.textContent = statusText;
+        }
+
+        try {
+            if (!Array.isArray(this.aiManager.availableModels) || this.aiManager.availableModels.length === 0) {
+                await this.aiManager.loadAvailableModels();
+            }
+
+            const items = this.buildModelSwitcherItems(backend);
+            this.modelSwitcher.allItems = items;
+            this.applyModelSwitcherFilter(items, query);
+        } catch (error) {
+            console.error('Failed to load models for switcher:', error);
+            const fallbackItems = this.buildModelSwitcherItems(backend, true);
+            this.modelSwitcher.allItems = fallbackItems;
+            this.applyModelSwitcherFilter(fallbackItems, query);
+            const message = error.message || t('notifications.modelSwitcherLoadFailed', 'Could not load models. Check your AI settings.');
+            if (this.modelSwitcher.status) {
+                this.modelSwitcher.status.textContent = message;
+            }
+            this.showNotification(message, 'error');
+        }
+    }
+
+    buildModelSwitcherItems(backend, fallbackOnly = false) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+        const items = [];
+        const currentModel = backend === 'ollama' ? this.aiManager.ollamaModel : this.aiManager.openRouterModel;
+
+        if (!fallbackOnly && Array.isArray(this.aiManager.availableModels)) {
+            for (const model of this.aiManager.availableModels) {
+                const id = backend === 'ollama' ? model.name : model.id;
+                if (!id) continue;
+                const label = backend === 'ollama' ? model.name : (model.name || model.id);
+
+                const details = [];
+                if (backend === 'ollama') {
+                    if (model.details?.parameter_size) details.push(model.details.parameter_size);
+                    if (model.details?.family) details.push(model.details.family);
+                } else {
+                    if (model.description) details.push(model.description);
+                    if (model.context_length) details.push(`${model.context_length} ctx`);
+                }
+
+                items.push({
+                    id,
+                    label,
+                    backend,
+                    description: details.join(' • '),
+                    isCurrent: currentModel === id
+                });
+            }
+        }
+
+        if (currentModel && !items.some(item => item.id === currentModel)) {
+            items.unshift({
+                id: currentModel,
+                label: currentModel,
+                backend,
+                description: t('modelSwitcher.currentFallback', 'Current model (cached)'),
+                isCurrent: true
+            });
+        }
+
+        return items;
+    }
+
+    applyModelSwitcherFilter(items = [], query = '') {
+        const normalized = (query || '').trim().toLowerCase();
+        const filtered = normalized
+            ? items.filter(item =>
+                item.label.toLowerCase().includes(normalized) ||
+                (item.description && item.description.toLowerCase().includes(normalized)))
+            : items;
+
+        this.modelSwitcher.items = filtered;
+
+        // Prefer highlighting the current model when opening or filtering
+        const currentModelId = this.modelSwitcher.activeBackend === 'ollama'
+            ? this.aiManager?.ollamaModel
+            : this.aiManager?.openRouterModel;
+        const currentIndex = filtered.findIndex(item => item.id === currentModelId);
+
+        if (filtered.length === 0) {
+            this.modelSwitcher.selectedIndex = -1;
+        } else if (currentIndex >= 0) {
+            this.modelSwitcher.selectedIndex = currentIndex;
+        } else {
+            this.modelSwitcher.selectedIndex = 0;
+        }
+
+        this.renderModelSwitcherList();
+    }
+
+    renderModelSwitcherList() {
+        const listEl = this.modelSwitcher.list;
+        if (!listEl) return;
+
+        listEl.innerHTML = '';
+
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+
+        if (this.modelSwitcher.items.length === 0) {
+            if (this.modelSwitcher.empty) {
+                this.modelSwitcher.empty.classList.remove('hidden');
+                this.modelSwitcher.empty.textContent = t('modelSwitcher.noResults', 'No models match your search. Check AI Settings if models are missing.');
+            }
+            return;
+        }
+
+        if (this.modelSwitcher.empty) {
+            this.modelSwitcher.empty.classList.add('hidden');
+        }
+
+        this.modelSwitcher.items.forEach((item, index) => {
+            const row = document.createElement('div');
+            row.className = `model-switcher-item ${index === this.modelSwitcher.selectedIndex ? 'active' : ''}`;
+            row.dataset.index = index;
+            row.innerHTML = `
+                <div class="model-switcher-meta">
+                    <span class="model-switcher-name">${item.label}</span>
+                    <span class="model-switcher-pill">${this.formatBackendLabel(item.backend)}</span>
+                    ${item.isCurrent ? `<span class="model-switcher-pill current">${t('modelSwitcher.current', 'Current')}</span>` : ''}
+                </div>
+                <div class="model-switcher-desc">${item.description || ''}</div>
+            `;
+
+            row.addEventListener('click', () => this.selectModelSwitcherItem(index));
+            listEl.appendChild(row);
+        });
+
+        this.scrollActiveModelIntoView();
+    }
+
+    handleModelSwitcherKeys(e) {
+        if (!this.modelSwitcher.isOpen) return;
+
+        switch (e.key) {
+            case 'ArrowDown':
+                e.preventDefault();
+                if (this.modelSwitcher.selectedIndex < this.modelSwitcher.items.length - 1) {
+                    this.modelSwitcher.selectedIndex++;
+                    this.renderModelSwitcherList();
+                }
+                break;
+            case 'ArrowUp':
+                e.preventDefault();
+                if (this.modelSwitcher.selectedIndex > 0) {
+                    this.modelSwitcher.selectedIndex--;
+                    this.renderModelSwitcherList();
+                }
+                break;
+            case 'Enter':
+                e.preventDefault();
+                this.selectModelSwitcherItem(this.modelSwitcher.selectedIndex);
+                break;
+            case 'Tab':
+                // Keep focus inside the input while open
+                e.preventDefault();
+                this.modelSwitcher.input?.focus();
+                break;
+        }
+    }
+
+    scrollActiveModelIntoView() {
+        const listEl = this.modelSwitcher.list;
+        if (!listEl) return;
+        const active = listEl.querySelector('.model-switcher-item.active');
+        if (active && active.scrollIntoView) {
+            active.scrollIntoView({ block: 'nearest' });
+        }
+    }
+
+    async selectModelSwitcherItem(index) {
+        if (!this.aiManager) return;
+        const item = this.modelSwitcher.items[index];
+        if (!item) return;
+
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+
+        try {
+            if (item.backend === 'ollama') {
+                await this.aiManager.updateOllamaModel(item.id);
+            } else {
+                await this.aiManager.updateOpenRouterModel(item.id);
+            }
+
+            const successMsg = t('modelSwitcher.switched', 'Switched to {model} on {backend}')
+                .replace('{model}', item.label)
+                .replace('{backend}', this.formatBackendLabel(item.backend));
+            this.showNotification(successMsg, 'success');
+            this.closeModelSwitcher();
+        } catch (error) {
+            console.error('Failed to switch model:', error);
+            this.showNotification(error.message || t('notifications.modelSwitchFailed', 'Could not switch model'), 'error');
+        }
+    }
+
+    formatBackendLabel(backend) {
+        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+        if (backend === 'openrouter') {
+            return t('settings.ai.backendOpenRouter', 'OpenRouter');
+        }
+        return t('settings.ai.backendOllama', 'Ollama');
+    }
+
     handleKeyboardShortcuts(e) {
         const isMac = navigator.platform.toUpperCase().indexOf('MAC') >= 0;
         const cmdOrCtrl = e.ctrlKey || (isMac && e.metaKey);
+
+        // When model switcher is open, keep keyboard focus inside it
+        if (this.modelSwitcher.isOpen) {
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                this.closeModelSwitcher();
+            }
+            return;
+        }
+
+        // Spotlight-like quick switcher (desktop)
+        if (cmdOrCtrl && e.shiftKey && (e.code === 'Space' || (e.key && e.key.toLowerCase() === 'm'))) {
+            if (!this.uiManager || !this.uiManager.isMobile || !this.uiManager.isMobile()) {
+                e.preventDefault();
+                this.openModelSwitcher();
+                return;
+            }
+        }
 
         if (cmdOrCtrl) {
             switch (e.key) {
@@ -6272,6 +6623,7 @@ Please provide a helpful response based on the note content and conversation his
             { key: 'Ctrl+Shift+T', description: t('keyboard.generateTagsForSelection') },
 
             // Other shortcuts
+            { key: 'Ctrl+Shift+Space', description: t('keyboard.quickModelSwitcher', 'Open quick model switcher') },
             { key: 'F1', description: t('keyboard.showThisHelpDialog') },
             { key: 'Escape', description: t('keyboard.closeMenusDialogs') },
             { key: 'Right-click', description: t('keyboard.showAIContextMenu') }
@@ -9004,23 +9356,26 @@ Please provide a helpful response based on the note content and conversation his
             const { ipcRenderer } = require('electron');
             const message = (payload && payload.message) || 'Cloud data is encrypted. Enter your passphrase to decrypt.';
 
+            const modalTitle = t('modals.encryptedDataDetected', 'Encrypted Cloud Data');
+            const safeMessage = this.escapeHtml(message);
+            const passphraseLabel = t('settings.sync.passphraseLabel', 'Passphrase');
+            const passphrasePlaceholder = t('placeholder.enterEncryptionPassphrase', 'Enter your passphrase');
+
             const content = `
                 <div style="max-width: 520px;">
-                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-lock"></i> Encrypted Cloud Data</h4>
-                    <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 0.95rem;">${message}</p>
+                    <h4 style="margin: 0 0 12px 0; color: var(--text-primary);"><i class="fas fa-lock"></i> ${modalTitle}</h4>
+                    <p style="margin: 0 0 12px 0; color: var(--text-secondary); font-size: 0.95rem;">${safeMessage}</p>
                     <div style="margin-top: 12px;">
-                        <label for="modal-passphrase-input" style="display: block; margin-bottom: 6px; color: var(--text-primary); font-weight: 500;">Passphrase</label>
-                        const t = (key) => window.i18n ? window.i18n.t(key) : key;
-                        <input type="password" id="modal-passphrase-input" placeholder="${t('placeholder.enterEncryptionPassphrase')}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
+                        <label for="modal-passphrase-input" style="display: block; margin-bottom: 6px; color: var(--text-primary); font-weight: 500;">${passphraseLabel}</label>
+                        <input type="password" id="modal-passphrase-input" placeholder="${passphrasePlaceholder}" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-color);">
                         <div id="modal-passphrase-error" style="margin-top: 6px; font-size: 0.85rem; color: var(--error-color);"></div>
                     </div>
                 </div>
             `;
 
-            const t = (key) => window.i18n ? window.i18n.t(key) : key;
-            const modal = this.createModal(t('modals.encryptedDataDetected'), content, [
-                { text: t('modals.cancel'), type: 'secondary', action: 'cancel-passphrase' },
-                { text: t('modals.decrypt'), type: 'primary', action: 'confirm-passphrase' }
+            const modal = this.createModal(modalTitle, content, [
+                { text: t('modals.cancel', 'Cancel'), type: 'secondary', action: 'cancel-passphrase' },
+                { text: t('modals.decrypt', 'Decrypt'), type: 'primary', action: 'confirm-passphrase' }
             ]);
 
             const input = modal.querySelector('#modal-passphrase-input');
@@ -9029,16 +9384,14 @@ Please provide a helpful response based on the note content and conversation his
             const onConfirm = async () => {
                 const passphrase = input.value;
                 if (!passphrase || passphrase.length < 8) {
-                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
-                    errorText.textContent = t('encryption.passphraseMinLength');
+                    errorText.textContent = t('encryption.passphraseMinLength', 'Passphrase must be at least 8 characters');
                     return;
                 }
 
                 // Derive salt from passphrase
                 const saltResult = await ipcRenderer.invoke('derive-salt-from-passphrase', passphrase);
                 if (!saltResult.success) {
-                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
-                    errorText.textContent = saltResult.error || t('encryption.failedToDeriveSalt', { error: '' }).replace(': ', '');
+                    errorText.textContent = saltResult.error || t('encryption.failedToDeriveSalt', undefined, { error: '' }).replace(': ', '');
                     return;
                 }
 
@@ -9055,12 +9408,10 @@ Please provide a helpful response based on the note content and conversation his
 
                 // Retry sync now that passphrase is set for this session
                 modal.remove();
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 this.showNotification(t('settings.sync.passphraseSetRetrying'), 'info');
                 try {
                     await this.manualSync();
                 } catch (e) {
-                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
                     this.showNotification(t('settings.sync.syncFailedAfterPassphrase'), 'error');
                 }
             };

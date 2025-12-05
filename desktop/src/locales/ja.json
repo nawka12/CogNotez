@@ -764,6 +764,8 @@
     "internetConnectionAndApiKey": "インターネット接続とAPIキー",
     "ensureOllamaRunning": "Ollamaが実行中（\"ollama serve\"）でモデルが読み込まれていることを確認してください。",
     "checkInternetAndApiKey": "AI設定でインターネット接続とOpenRouter APIキーを確認してください。",
+    "modelSwitcherLoadFailed": "モデルスイッチャーを開けませんでした",
+    "modelSwitchFailed": "モデルの切り替えに失敗しました",
     "failedToCreateBackup": "バックアップの作成に失敗しました",
     "databaseFileNotFound": "データベースファイルが見つかりません。アプリケーションを使用してノートを作成したことを確認してください。",
     "cannotWriteToLocation": "選択した場所に書き込めません。別のディレクトリを選択してください。",
@@ -780,6 +782,15 @@
     "cannotRestoreToLocation": "データベースの場所に復元できません。ファイル権限を確認してください。",
     "backupFileCorrupted": "バックアップファイルが破損しているか空のようです。別のバックアップを選択してください。",
     "permissionDeniedRestore": "権限が拒否されました。ファイル権限を確認するか、管理者として実行してください。"
+  },
+  "modelSwitcher": {
+    "title": "クイックモデルスイッチャー",
+    "statusConnected": "バックエンドは接続されています。矢印キーとEnterで切り替えできます。",
+    "statusOffline": "バックエンドがオフラインかもしれません。キャッシュされた一覧を使用します。",
+    "current": "現在",
+    "currentFallback": "現在のモデル（キャッシュ）",
+    "noResults": "一致するモデルがありません。AI設定を確認してください。",
+    "switched": "{backend} で {model} に切り替えました"
   },
   "keyboard": {
     "shortcuts": "キーボードショートカット",
@@ -812,6 +823,7 @@
     "rewriteSelectedText": "選択したテキストを書き直す",
     "extractKeyPoints": "キーポイントを抽出",
     "generateTagsForSelection": "選択にタグを生成",
+    "quickModelSwitcher": "クイックモデルスイッチャーを開く",
     "showThisHelpDialog": "このヘルプダイアログを表示",
     "closeMenusDialogs": "メニュー/ダイアログを閉じる",
     "showAIContextMenu": "選択したテキストでAIコンテキストメニューを表示"

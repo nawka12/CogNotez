@@ -461,6 +461,31 @@
             </div>
         </div>
 
+        <!-- Quick Model Switcher (desktop) -->
+        <div id="model-switcher" class="model-switcher hidden" aria-hidden="true">
+            <div class="model-switcher-container">
+                <div class="model-switcher-header">
+                    <div class="model-switcher-title">
+                        <i class="fas fa-magnifying-glass"></i>
+                        <span data-i18n="modelSwitcher.title">Quick Model Switcher</span>
+                        <span id="model-switcher-backend" class="model-switcher-pill muted"></span>
+                    </div>
+                    <button id="model-switcher-close" class="model-switcher-close" aria-label="Close">&times;</button>
+                </div>
+
+                <div class="model-switcher-search">
+                    <i class="fas fa-search"></i>
+                    <input id="model-switcher-input" type="text" placeholder="Type a model name..." autocomplete="off" spellcheck="false">
+                    <span id="model-switcher-hint" class="model-switcher-hint"></span>
+                </div>
+
+                <div id="model-switcher-status" class="model-switcher-status"></div>
+
+                <div id="model-switcher-list" class="model-switcher-list"></div>
+                <div id="model-switcher-empty" class="model-switcher-empty hidden"></div>
+            </div>
+        </div>
+
     </div>
 
     <script src="./js/i18n.js"></script>
