@@ -1,6 +1,6 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
-![Version](https://img.shields.io/badge/version-2.1.5-blue.svg)
+![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -42,6 +42,7 @@ An offline-first, privacy-focused note-taking application that leverages local L
 - **Text Rewriting**: Rewrite content in different styles
 - **Key Points Extraction**: Automatically extract main points from text
 - **Tag Generation**: AI-suggested tags for better organization
+- **Quick Model Switcher**: Search and swap between Ollama or OpenRouter models instantly
 - **Web Scraping**: Extract content from websites, Reddit, and Fandom wikis
 - **Web Search Integration**: Optional SearXNG integration for enhanced AI queries
 
@@ -141,6 +142,10 @@ For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 **Right-click anywhere** (no selection) for:
 - **✨ Generate with AI** (`Ctrl+Shift+G`)
 
+**Quick Model Switcher**:
+- Press `Ctrl+Shift+Space` to open a searchable model switcher
+- Quickly swap between Ollama and OpenRouter models without opening settings
+
 ### Keyboard Shortcuts
 
 | Shortcut | Action |
@@ -161,6 +166,7 @@ For detailed setup, see [Google Drive Sync Setup](GOOGLE_DRIVE_SYNC.md).
 | `Ctrl+Shift+W` | Rewrite selected text |
 | `Ctrl+Shift+K` | Extract key points |
 | `Ctrl+Shift+T` | Generate tags |
+| `Ctrl+Shift+Space` | Open quick model switcher |
 | `F1` | Show keyboard shortcuts help |
 | `Escape` | Close menus/dialogs |
 
@@ -261,7 +267,12 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.1.5 (Current)
+### v2.2.0 (Current)
+- Added Quick Model Switcher for rapid AI model changes (Ollama/OpenRouter) with search and keyboard support
+- Updated UI text and localization to cover new model-switching actions
+- Bumped desktop app version metadata to 2.2.0
+
+### v2.1.5
 - Refactored Find & Replace dialog for improved internationalization and UI updates
 - Enhanced UI responsiveness with dynamic disclaimer messages based on current mode (edit, preview, split)
 - Improved functionality to prevent replacements in preview-only mode
