@@ -748,6 +748,22 @@ class GoogleDriveService extends ChangeNotifier {
     int remoteAdded = 0;
     int conflicts = 0;
 
+    // Timestamp when remote backup was created/exported. We use this to infer
+    // deletions: if a note is missing remotely and the remote export is newer
+    // than the note's last update, treat it as deleted and drop it locally.
+    DateTime? remoteExportedAt;
+    final remoteMetadata = remoteData['metadata'];
+    if (remoteMetadata is Map<String, dynamic>) {
+      final exportedAt = remoteMetadata['exportedAt']?.toString();
+      final lastBackup = remoteMetadata['lastBackup']?.toString();
+      final created = remoteMetadata['created']?.toString();
+      final lastMerge = remoteMetadata['lastMerge']?.toString();
+      remoteExportedAt = DateTime.tryParse(exportedAt ?? '') ??
+          DateTime.tryParse(lastBackup ?? '') ??
+          DateTime.tryParse(lastMerge ?? '') ??
+          DateTime.tryParse(created ?? '');
+    }
+
     // Merge notes
     final localNotes = Map<String, dynamic>.from(localData['notes'] as Map<String, dynamic>? ?? {});
     final remoteNotes = remoteData['notes'] as Map<String, dynamic>? ?? {};
@@ -795,6 +811,30 @@ class GoogleDriveService extends ChangeNotifier {
     for (final entry in remoteNoteTags.entries) {
       if (!localNoteTags.containsKey(entry.key)) {
         localNoteTags[entry.key] = entry.value;
+      }
+    }
+
+    // Handle remote deletions: if a note exists locally but is absent in
+    // remote data, and the remote export is newer than the note's last update,
+    // treat it as deleted and drop it from the merged dataset so it does not
+    // get re-uploaded.
+    if (remoteNotes.isNotEmpty && remoteExportedAt != null) {
+      final notesToRemove = <String>{};
+      for (final entry in localNotes.entries) {
+        final noteId = entry.key;
+        if (remoteNotes.containsKey(noteId)) continue;
+
+        final localNote = entry.value as Map<String, dynamic>;
+        final localUpdated = DateTime.tryParse(localNote['updated_at']?.toString() ?? '') ?? DateTime(1970);
+
+        if (remoteExportedAt.isAfter(localUpdated)) {
+          notesToRemove.add(noteId);
+        }
+      }
+
+      for (final noteId in notesToRemove) {
+        localNotes.remove(noteId);
+        localNoteTags.remove(noteId);
       }
     }
 

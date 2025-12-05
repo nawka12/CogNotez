@@ -299,11 +299,18 @@ class DatabaseHelper {
   // Search notes
   Future<List<Note>> searchNotes(String query) async {
     final db = await database;
+    final searchTerm = '%${query.toLowerCase()}%';
+    // Search title/content and tag names (desktop parity), keep pinned first
     final notes = await db.rawQuery('''
-      SELECT * FROM notes
-      WHERE title LIKE ? OR content LIKE ?
-      ORDER BY updated_at DESC
-    ''', ['%$query%', '%$query%']);
+      SELECT DISTINCT n.*
+      FROM notes n
+      LEFT JOIN note_tags nt ON n.id = nt.note_id
+      LEFT JOIN tags t ON nt.tag_id = t.id
+      WHERE LOWER(n.title) LIKE ? 
+         OR LOWER(n.content) LIKE ? 
+         OR LOWER(COALESCE(t.name, '')) LIKE ?
+      ORDER BY n.is_pinned DESC, n.updated_at DESC
+    ''', [searchTerm, searchTerm, searchTerm]);
     
     final List<Note> noteList = [];
     for (final noteMap in notes) {

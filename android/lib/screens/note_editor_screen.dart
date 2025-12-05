@@ -300,6 +300,26 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     }
   }
 
+  Future<void> _toggleFavorite() async {
+    if (_isSaving) return;
+
+    setState(() {
+      _currentNote = _currentNote.copyWith(isFavorite: !_currentNote.isFavorite);
+      _hasChanges = true;
+    });
+
+    await _saveNote(showFeedback: false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_currentNote.isFavorite ? 'Added to favorites' : 'Removed from favorites'),
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
   Note _getCurrentNote() {
     return _currentNote.copyWith(
       title: _titleController.text,
@@ -1168,6 +1188,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
               icon: Icon(_getViewModeIcon()),
               onPressed: _cycleViewMode,
               tooltip: _getViewModeTooltip(),
+            ),
+            // Favorite toggle
+            IconButton(
+              icon: Icon(
+                _currentNote.isFavorite ? Icons.star : Icons.star_border,
+                color: _currentNote.isFavorite
+                    ? Theme.of(context).colorScheme.secondary
+                    : null,
+              ),
+              onPressed: _toggleFavorite,
+              tooltip: _currentNote.isFavorite ? 'Remove favorite' : 'Add to favorites',
             ),
             // Save button
             IconButton(

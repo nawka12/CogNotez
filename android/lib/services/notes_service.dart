@@ -130,6 +130,22 @@ class NotesService extends ChangeNotifier {
     await loadNotes();
     return true;
   }
+
+  // Favorite/unfavorite note
+  Future<bool> toggleFavorite(String noteId) async {
+    final noteIndex = _allNotes.indexWhere((n) => n.id == noteId);
+    if (noteIndex == -1) return false;
+
+    final note = _allNotes[noteIndex];
+    final updatedNote = note.copyWith(
+      isFavorite: !note.isFavorite,
+      updatedAt: DateTime.now(),
+    );
+
+    await _databaseService.updateNote(updatedNote);
+    await loadNotes();
+    return updatedNote.isFavorite;
+  }
   
   // Duplicate note functionality
   Future<Note?> duplicateNote(String noteId) async {

@@ -301,6 +301,19 @@ class _NoteListItem extends StatelessWidget {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            IconButton(
+                              icon: Icon(
+                                note.isFavorite ? Icons.star : Icons.star_border,
+                                size: 18,
+                                color: note.isFavorite
+                                    ? AppTheme.accentColor
+                                    : Theme.of(context).colorScheme.onSurfaceVariant,
+                              ),
+                              tooltip: note.isFavorite ? 'Remove favorite' : 'Add to favorites',
+                              padding: EdgeInsets.zero,
+                              constraints: const BoxConstraints(),
+                              onPressed: () => _toggleFavorite(context),
+                            ),
                           ],
                         ),
                         const SizedBox(height: AppTheme.spacingXs),
@@ -470,6 +483,11 @@ class _NoteListItem extends StatelessWidget {
               onTap: () => Navigator.pop(context, 'pin'),
             ),
             ListTile(
+              leading: Icon(note.isFavorite ? Icons.star : Icons.star_border),
+              title: Text(note.isFavorite ? 'Unfavorite' : 'Favorite'),
+              onTap: () => Navigator.pop(context, 'favorite'),
+            ),
+            ListTile(
               leading: const Icon(Icons.copy),
               title: const Text('Duplicate'),
               onTap: () => Navigator.pop(context, 'duplicate'),
@@ -497,6 +515,9 @@ class _NoteListItem extends StatelessWidget {
       case 'pin':
         await _togglePin(context);
         break;
+      case 'favorite':
+        await _toggleFavorite(context);
+        break;
       case 'duplicate':
         await _duplicateNote(context);
         break;
@@ -521,6 +542,21 @@ class _NoteListItem extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(note.isPinned ? 'Note unpinned' : 'Note pinned'),
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 1),
+        ),
+      );
+    }
+  }
+
+  Future<void> _toggleFavorite(BuildContext context) async {
+    final notesService = Provider.of<NotesService>(context, listen: false);
+    final isFavorite = await notesService.toggleFavorite(note.id);
+
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(isFavorite ? 'Added to favorites' : 'Removed from favorites'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 1),
         ),
