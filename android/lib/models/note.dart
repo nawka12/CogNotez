@@ -11,7 +11,6 @@ class Note {
   String? encryptionIv;
   Map<String, dynamic>? metadata;
   bool isPinned;
-  bool isFavorite;
   int wordCount;
   int charCount;
   Map<String, dynamic>? collaboration;
@@ -29,7 +28,6 @@ class Note {
     this.encryptionIv,
     this.metadata,
     this.isPinned = false,
-    this.isFavorite = false,
     this.wordCount = 0,
     this.charCount = 0,
     this.collaboration,
@@ -49,7 +47,6 @@ class Note {
       'encryption_iv': encryptionIv,
       'metadata': metadata,
       'is_pinned': isPinned,
-      'is_favorite': isFavorite,
       'word_count': wordCount,
       'char_count': charCount,
       'collaboration': collaboration,
@@ -70,7 +67,6 @@ class Note {
       encryptionIv: json['encryption_iv'] as String?,
       metadata: json['metadata'] as Map<String, dynamic>?,
       isPinned: json['is_pinned'] as bool? ?? false,
-      isFavorite: json['is_favorite'] as bool? ?? false,
       wordCount: json['word_count'] as int? ?? 0,
       charCount: json['char_count'] as int? ?? 0,
       collaboration: json['collaboration'] as Map<String, dynamic>?,
@@ -90,7 +86,6 @@ class Note {
     String? encryptionIv,
     Map<String, dynamic>? metadata,
     bool? isPinned,
-    bool? isFavorite,
     int? wordCount,
     int? charCount,
     Map<String, dynamic>? collaboration,
@@ -104,12 +99,14 @@ class Note {
       updatedAt: updatedAt ?? this.updatedAt,
       tags: tags ?? this.tags,
       isPasswordProtected: isPasswordProtected ?? this.isPasswordProtected,
-      encryptedContent: clearEncryption ? null : (encryptedContent ?? this.encryptedContent),
-      encryptionSalt: clearEncryption ? null : (encryptionSalt ?? this.encryptionSalt),
-      encryptionIv: clearEncryption ? null : (encryptionIv ?? this.encryptionIv),
+      encryptedContent:
+          clearEncryption ? null : (encryptedContent ?? this.encryptedContent),
+      encryptionSalt:
+          clearEncryption ? null : (encryptionSalt ?? this.encryptionSalt),
+      encryptionIv:
+          clearEncryption ? null : (encryptionIv ?? this.encryptionIv),
       metadata: metadata ?? this.metadata,
       isPinned: isPinned ?? this.isPinned,
-      isFavorite: isFavorite ?? this.isFavorite,
       wordCount: wordCount ?? this.wordCount,
       charCount: charCount ?? this.charCount,
       collaboration: collaboration ?? this.collaboration,
@@ -121,6 +118,6 @@ class Note {
   //   return content.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
   // }
 
-  bool get isLocked => isPasswordProtected && encryptedContent != null && content.isEmpty;
+  bool get isLocked =>
+      isPasswordProtected && encryptedContent != null && content.isEmpty;
 }
-

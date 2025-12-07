@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/note.dart';
 import '../services/encryption_service.dart';
 import '../l10n/app_localizations.dart';
+import 'styled_dialog.dart';
 
 class PasswordDialog extends StatefulWidget {
   final Note note;
@@ -37,9 +38,10 @@ class _PasswordDialogState extends State<PasswordDialog> {
   Future<void> _handleSubmit() async {
     final loc = AppLocalizations.of(context);
     final password = _passwordController.text;
-    
+
     if (password.isEmpty) {
-      setState(() => _error = loc?.translate('password_required') ?? 'Password is required');
+      setState(() => _error =
+          loc?.translate('password_required') ?? 'Password is required');
       return;
     }
 
@@ -49,11 +51,13 @@ class _PasswordDialogState extends State<PasswordDialog> {
     } else {
       // Setting new password
       if (_confirmController.text != password) {
-        setState(() => _error = loc?.translate('passwords_do_not_match') ?? 'Passwords do not match');
+        setState(() => _error = loc?.translate('passwords_do_not_match') ??
+            'Passwords do not match');
         return;
       }
       if (password.length < 4) {
-        setState(() => _error = loc?.translate('password_too_short') ?? 'Password must be at least 4 characters');
+        setState(() => _error = loc?.translate('password_too_short') ??
+            'Password must be at least 4 characters');
         return;
       }
       await _lockNote(password);
@@ -103,7 +107,8 @@ class _PasswordDialogState extends State<PasswordDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() {
-        _error = loc?.translate('password_incorrect_or_failed') ?? 'Incorrect password or decryption failed';
+        _error = loc?.translate('password_incorrect_or_failed') ??
+            'Incorrect password or decryption failed';
         _isLoading = false;
       });
     }
@@ -133,7 +138,8 @@ class _PasswordDialogState extends State<PasswordDialog> {
       if (mounted) Navigator.pop(context);
     } catch (e) {
       setState(() {
-        _error = loc?.translate('password_encrypt_failed') ?? 'Failed to encrypt note: $e';
+        _error = loc?.translate('password_encrypt_failed') ??
+            'Failed to encrypt note: $e';
         _isLoading = false;
       });
     }
@@ -142,17 +148,16 @@ class _PasswordDialogState extends State<PasswordDialog> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(
-        widget.isUnlocking
-            ? (loc?.translate('unlock_note') ?? 'Unlock Note')
-            : (loc?.translate('set_password') ?? 'Set Password'),
-      ),
+    return StyledDialog(
+      title: widget.isUnlocking
+          ? (loc?.translate('unlock_note') ?? 'Unlock Note')
+          : (loc?.translate('set_password') ?? 'Set Password'),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           if (widget.isUnlocking)
-            Text(loc?.translate('unlock_note_description') ?? 'Enter the password to unlock this note.')
+            Text(loc?.translate('unlock_note_description') ??
+                'Enter the password to unlock this note.')
           else
             Text(
               loc?.translate('set_password_description') ??
@@ -167,8 +172,10 @@ class _PasswordDialogState extends State<PasswordDialog> {
               labelText: loc?.translate('password_label') ?? 'Password',
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                icon: Icon(
+                    _obscurePassword ? Icons.visibility : Icons.visibility_off),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
             onSubmitted: (_) {
@@ -183,11 +190,15 @@ class _PasswordDialogState extends State<PasswordDialog> {
               controller: _confirmController,
               obscureText: _obscureConfirm,
               decoration: InputDecoration(
-                labelText: loc?.translate('confirm_password_label') ?? 'Confirm Password',
+                labelText: loc?.translate('confirm_password_label') ??
+                    'Confirm Password',
                 border: const OutlineInputBorder(),
                 suffixIcon: IconButton(
-                  icon: Icon(_obscureConfirm ? Icons.visibility : Icons.visibility_off),
-                  onPressed: () => setState(() => _obscureConfirm = !_obscureConfirm),
+                  icon: Icon(_obscureConfirm
+                      ? Icons.visibility
+                      : Icons.visibility_off),
+                  onPressed: () =>
+                      setState(() => _obscureConfirm = !_obscureConfirm),
                 ),
               ),
               onSubmitted: (_) => _handleSubmit(),
@@ -218,7 +229,8 @@ class _PasswordDialogState extends State<PasswordDialog> {
               : Text(
                   widget.isUnlocking
                       ? (loc?.translate('unlock_action') ?? 'Unlock')
-                      : (loc?.translate('set_password_action') ?? 'Set Password'),
+                      : (loc?.translate('set_password_action') ??
+                          'Set Password'),
                 ),
         ),
       ],
@@ -256,9 +268,10 @@ class _RemovePasswordDialogState extends State<RemovePasswordDialog> {
   void _handleSubmit() {
     final loc = AppLocalizations.of(context);
     final password = _passwordController.text;
-    
+
     if (password != widget.currentPassword) {
-      setState(() => _error = loc?.translate('incorrect_password') ?? 'Incorrect password');
+      setState(() => _error =
+          loc?.translate('incorrect_password') ?? 'Incorrect password');
       return;
     }
 
@@ -274,8 +287,8 @@ class _RemovePasswordDialogState extends State<RemovePasswordDialog> {
   @override
   Widget build(BuildContext context) {
     final loc = AppLocalizations.of(context);
-    return AlertDialog(
-      title: Text(loc?.translate('remove_password_title') ?? 'Remove Password'),
+    return StyledDialog(
+      title: loc?.translate('remove_password_title') ?? 'Remove Password',
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -289,11 +302,14 @@ class _RemovePasswordDialogState extends State<RemovePasswordDialog> {
             obscureText: _obscurePassword,
             autofocus: true,
             decoration: InputDecoration(
-              labelText: loc?.translate('current_password_label') ?? 'Current Password',
+              labelText: loc?.translate('current_password_label') ??
+                  'Current Password',
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
-                icon: Icon(_obscurePassword ? Icons.visibility : Icons.visibility_off),
-                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
+                icon: Icon(
+                    _obscurePassword ? Icons.visibility : Icons.visibility_off),
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
             ),
             onSubmitted: (_) => _handleSubmit(),
@@ -314,7 +330,8 @@ class _RemovePasswordDialogState extends State<RemovePasswordDialog> {
         ),
         FilledButton(
           onPressed: _handleSubmit,
-          child: Text(loc?.translate('remove_password_action') ?? 'Remove Password'),
+          child: Text(
+              loc?.translate('remove_password_action') ?? 'Remove Password'),
         ),
       ],
     );

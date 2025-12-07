@@ -5,6 +5,7 @@ import '../models/tag.dart';
 import '../services/notes_service.dart';
 import '../utils/date_formatter.dart';
 import '../utils/app_theme.dart';
+import 'styled_dialog.dart';
 
 class NotesList extends StatelessWidget {
   final List<Note>? notes;
@@ -25,7 +26,7 @@ class NotesList extends StatelessWidget {
     return Consumer<NotesService>(
       builder: (context, notesService, _) {
         final displayNotes = notes ?? notesService.notes;
-        
+
         if (displayNotes.isEmpty) {
           return _buildEmptyState(context, notesService);
         }
@@ -58,7 +59,8 @@ class NotesList extends StatelessWidget {
     String message;
     IconData icon;
 
-    if (searchQuery.isNotEmpty || (notes != null && notesService.notes.isNotEmpty)) {
+    if (searchQuery.isNotEmpty ||
+        (notes != null && notesService.notes.isNotEmpty)) {
       title = 'No notes found';
       message = 'No notes match your filters';
       icon = Icons.search_off;
@@ -78,9 +80,9 @@ class NotesList extends StatelessWidget {
       icon = Icons.description_outlined;
     } else {
       final tag = notesService.tags.cast<Tag?>().firstWhere(
-        (t) => t?.id == selectedFolder,
-        orElse: () => null,
-      );
+            (t) => t?.id == selectedFolder,
+            orElse: () => null,
+          );
       if (tag != null) {
         title = 'No notes with this tag';
         message = 'No notes are tagged with "${tag.name}"';
@@ -142,7 +144,9 @@ class NotesList extends StatelessWidget {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppTheme.accentColor,
                   foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: AppTheme.spacingLg, vertical: AppTheme.spacingSm),
+                  padding: EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingLg,
+                      vertical: AppTheme.spacingSm),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(AppTheme.radiusFull),
                   ),
@@ -174,7 +178,7 @@ class _NoteListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final notesService = Provider.of<NotesService>(context, listen: false);
-    
+
     // For locked notes, show different preview
     final isLocked = note.isPasswordProtected && note.encryptedContent != null;
     final preview = isLocked
@@ -187,9 +191,9 @@ class _NoteListItem extends StatelessWidget {
     List<String> tagNames = [];
     for (final tagId in note.tags) {
       final tag = notesService.tags.cast<Tag?>().firstWhere(
-        (t) => t?.id == tagId,
-        orElse: () => null,
-      );
+            (t) => t?.id == tagId,
+            orElse: () => null,
+          );
       if (tag != null) {
         tagNames.add(tag.name);
       }
@@ -227,7 +231,8 @@ class _NoteListItem extends StatelessWidget {
       },
       onDismissed: (direction) {},
       child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: AppTheme.spacingSm, vertical: AppTheme.spacingXs),
+        margin: const EdgeInsets.symmetric(
+            horizontal: AppTheme.spacingSm, vertical: AppTheme.spacingXs),
         decoration: BoxDecoration(
           color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(AppTheme.radiusLg),
@@ -275,11 +280,14 @@ class _NoteListItem extends StatelessWidget {
                           children: [
                             if (note.isPinned) ...[
                               Container(
-                                padding: const EdgeInsets.all(AppTheme.spacingXs),
+                                padding:
+                                    const EdgeInsets.all(AppTheme.spacingXs),
                                 decoration: BoxDecoration(
                                   color: AppTheme.accentLight,
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusSm),
-                                  border: Border.all(color: AppTheme.accentColor),
+                                  borderRadius:
+                                      BorderRadius.circular(AppTheme.radiusSm),
+                                  border:
+                                      Border.all(color: AppTheme.accentColor),
                                 ),
                                 child: Icon(
                                   Icons.push_pin,
@@ -295,24 +303,12 @@ class _NoteListItem extends StatelessWidget {
                                 style: TextStyle(
                                   fontWeight: FontWeight.w600,
                                   fontSize: 16,
-                                  color: Theme.of(context).colorScheme.onSurface,
+                                  color:
+                                      Theme.of(context).colorScheme.onSurface,
                                 ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            IconButton(
-                              icon: Icon(
-                                note.isFavorite ? Icons.star : Icons.star_border,
-                                size: 18,
-                                color: note.isFavorite
-                                    ? AppTheme.accentColor
-                                    : Theme.of(context).colorScheme.onSurfaceVariant,
-                              ),
-                              tooltip: note.isFavorite ? 'Remove favorite' : 'Add to favorites',
-                              padding: EdgeInsets.zero,
-                              constraints: const BoxConstraints(),
-                              onPressed: () => _toggleFavorite(context),
                             ),
                           ],
                         ),
@@ -322,33 +318,49 @@ class _NoteListItem extends StatelessWidget {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            color: isLocked ? Theme.of(context).colorScheme.onSurfaceVariant : Theme.of(context).colorScheme.onSurfaceVariant,
+                            color: isLocked
+                                ? Theme.of(context).colorScheme.onSurfaceVariant
+                                : Theme.of(context)
+                                    .colorScheme
+                                    .onSurfaceVariant,
                             fontSize: 14,
-                            fontStyle: isLocked ? FontStyle.italic : FontStyle.normal,
+                            fontStyle:
+                                isLocked ? FontStyle.italic : FontStyle.normal,
                           ),
                         ),
                         const SizedBox(height: AppTheme.spacingSm),
                         Row(
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXs, vertical: AppTheme.spacingXs),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: AppTheme.spacingXs,
+                                  vertical: AppTheme.spacingXs),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.surfaceVariant,
-                                borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                                border: Border.all(color: Theme.of(context).colorScheme.outline),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .surfaceVariant,
+                                borderRadius:
+                                    BorderRadius.circular(AppTheme.radiusMd),
+                                border: Border.all(
+                                    color:
+                                        Theme.of(context).colorScheme.outline),
                               ),
                               child: Row(
                                 children: [
                                   Icon(
                                     Icons.access_time,
                                     size: 12,
-                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
                                   ),
                                   const SizedBox(width: AppTheme.spacingXs),
                                   Text(
                                     DateFormatter.format(note.updatedAt),
                                     style: TextStyle(
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                       fontSize: 11,
                                       fontWeight: FontWeight.w500,
                                     ),
@@ -359,24 +371,36 @@ class _NoteListItem extends StatelessWidget {
                             if (note.wordCount > 0 && !isLocked) ...[
                               const SizedBox(width: AppTheme.spacingSm),
                               Container(
-                                padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXs, vertical: AppTheme.spacingXs),
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: AppTheme.spacingXs,
+                                    vertical: AppTheme.spacingXs),
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surfaceVariant,
-                                  borderRadius: BorderRadius.circular(AppTheme.radiusMd),
-                                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                                  color: Theme.of(context)
+                                      .colorScheme
+                                      .surfaceVariant,
+                                  borderRadius:
+                                      BorderRadius.circular(AppTheme.radiusMd),
+                                  border: Border.all(
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .outline),
                                 ),
                                 child: Row(
                                   children: [
                                     Icon(
                                       Icons.text_fields,
                                       size: 12,
-                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurfaceVariant,
                                     ),
                                     const SizedBox(width: AppTheme.spacingXs),
                                     Text(
                                       '${note.wordCount} words',
                                       style: TextStyle(
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurfaceVariant,
                                         fontSize: 11,
                                         fontWeight: FontWeight.w500,
                                       ),
@@ -393,11 +417,15 @@ class _NoteListItem extends StatelessWidget {
                                   runSpacing: AppTheme.spacingXs,
                                   children: tagNames.take(3).map((tagName) {
                                     return Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: AppTheme.spacingXs, vertical: AppTheme.spacingXs),
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: AppTheme.spacingXs,
+                                          vertical: AppTheme.spacingXs),
                                       decoration: BoxDecoration(
                                         color: AppTheme.accentLighter,
-                                        borderRadius: BorderRadius.circular(AppTheme.radiusFull),
-                                        border: Border.all(color: AppTheme.accentColor),
+                                        borderRadius: BorderRadius.circular(
+                                            AppTheme.radiusFull),
+                                        border: Border.all(
+                                            color: AppTheme.accentColor),
                                       ),
                                       child: Text(
                                         tagName,
@@ -452,7 +480,7 @@ class _NoteListItem extends StatelessWidget {
   Future<void> _showContextMenu(BuildContext context) async {
     final notesService = Provider.of<NotesService>(context, listen: false);
     final canPin = notesService.canPinNote();
-    
+
     final result = await showModalBottomSheet<String>(
       context: context,
       builder: (context) => SafeArea(
@@ -474,18 +502,15 @@ class _NoteListItem extends StatelessWidget {
               onTap: () => Navigator.pop(context, 'open'),
             ),
             ListTile(
-              leading: Icon(note.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
+              leading: Icon(
+                  note.isPinned ? Icons.push_pin_outlined : Icons.push_pin),
               title: Text(note.isPinned ? 'Unpin' : 'Pin'),
               subtitle: !note.isPinned && !canPin
-                  ? const Text('Maximum 3 pinned notes', style: TextStyle(color: Colors.orange))
+                  ? const Text('Maximum 3 pinned notes',
+                      style: TextStyle(color: Colors.orange))
                   : null,
               enabled: note.isPinned || canPin,
               onTap: () => Navigator.pop(context, 'pin'),
-            ),
-            ListTile(
-              leading: Icon(note.isFavorite ? Icons.star : Icons.star_border),
-              title: Text(note.isFavorite ? 'Unfavorite' : 'Favorite'),
-              onTap: () => Navigator.pop(context, 'favorite'),
             ),
             ListTile(
               leading: const Icon(Icons.copy),
@@ -515,9 +540,6 @@ class _NoteListItem extends StatelessWidget {
       case 'pin':
         await _togglePin(context);
         break;
-      case 'favorite':
-        await _toggleFavorite(context);
-        break;
       case 'duplicate':
         await _duplicateNote(context);
         break;
@@ -530,7 +552,7 @@ class _NoteListItem extends StatelessWidget {
   Future<void> _togglePin(BuildContext context) async {
     final notesService = Provider.of<NotesService>(context, listen: false);
     final success = await notesService.togglePinNote(note.id);
-    
+
     if (!success && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -542,21 +564,6 @@ class _NoteListItem extends StatelessWidget {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(note.isPinned ? 'Note unpinned' : 'Note pinned'),
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
-  Future<void> _toggleFavorite(BuildContext context) async {
-    final notesService = Provider.of<NotesService>(context, listen: false);
-    final isFavorite = await notesService.toggleFavorite(note.id);
-
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(isFavorite ? 'Added to favorites' : 'Removed from favorites'),
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 1),
         ),
@@ -596,11 +603,11 @@ class _NoteListItem extends StatelessWidget {
   Future<bool> _showDeleteDialog(BuildContext context) async {
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Note'),
-        content: Text(
-          'Are you sure you want to delete "${note.title.isEmpty ? "Untitled" : note.title}"?\n\nThis action cannot be undone.',
-        ),
+      builder: (context) => StyledDialog(
+        title: 'Delete Note',
+        message:
+            'Are you sure you want to delete "${note.title.isEmpty ? "Untitled" : note.title}"?\n\nThis action cannot be undone.',
+        isDestructive: true,
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -616,7 +623,7 @@ class _NoteListItem extends StatelessWidget {
         ],
       ),
     );
-    
+
     if (result == true && context.mounted) {
       final notesService = Provider.of<NotesService>(context, listen: false);
       await notesService.deleteNote(note.id);
@@ -631,7 +638,7 @@ class _NoteListItem extends StatelessWidget {
       }
       return true;
     }
-    
+
     return false;
   }
 }

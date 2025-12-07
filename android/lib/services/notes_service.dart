@@ -11,7 +11,7 @@ class NotesService extends ChangeNotifier {
   List<Tag> _tags = [];
   String? _selectedFolder;
   String _searchQuery = '';
-  
+
   static const int maxPinnedNotes = 3;
 
   NotesService(this._databaseService) {
@@ -89,7 +89,9 @@ class NotesService extends ChangeNotifier {
       if (_selectedFolder == 'untagged') {
         filtered = filtered.where((note) => note.tags.isEmpty).toList();
       } else {
-        filtered = filtered.where((note) => note.tags.contains(_selectedFolder)).toList();
+        filtered = filtered
+            .where((note) => note.tags.contains(_selectedFolder))
+            .toList();
       }
     }
 
@@ -98,62 +100,46 @@ class NotesService extends ChangeNotifier {
 
   // Helper methods for sidebar counts
   int getTotalNotesCount() => _allNotes.length;
-  
+
   int getUntaggedNotesCount() => _allNotes.where((n) => n.tags.isEmpty).length;
-  
+
   int getTagNotesCount(String tagId) =>
       _allNotes.where((n) => n.tags.contains(tagId)).length;
-  
+
   // Pin/unpin note functionality
   int getPinnedNotesCount() => _allNotes.where((n) => n.isPinned).length;
-  
+
   bool canPinNote() => getPinnedNotesCount() < maxPinnedNotes;
-  
+
   Future<bool> togglePinNote(String noteId) async {
     final noteIndex = _allNotes.indexWhere((n) => n.id == noteId);
     if (noteIndex == -1) return false;
-    
+
     final note = _allNotes[noteIndex];
-    
+
     // If trying to pin and already at max, return false
     if (!note.isPinned && !canPinNote()) {
       return false;
     }
-    
+
     // Toggle pin status
     final updatedNote = note.copyWith(
       isPinned: !note.isPinned,
       updatedAt: DateTime.now(),
     );
-    
+
     await _databaseService.updateNote(updatedNote);
     await loadNotes();
     return true;
   }
 
-  // Favorite/unfavorite note
-  Future<bool> toggleFavorite(String noteId) async {
-    final noteIndex = _allNotes.indexWhere((n) => n.id == noteId);
-    if (noteIndex == -1) return false;
-
-    final note = _allNotes[noteIndex];
-    final updatedNote = note.copyWith(
-      isFavorite: !note.isFavorite,
-      updatedAt: DateTime.now(),
-    );
-
-    await _databaseService.updateNote(updatedNote);
-    await loadNotes();
-    return updatedNote.isFavorite;
-  }
-  
   // Duplicate note functionality
   Future<Note?> duplicateNote(String noteId) async {
     final originalNote = _allNotes.firstWhere(
       (n) => n.id == noteId,
       orElse: () => throw Exception('Note not found'),
     );
-    
+
     final duplicatedNote = Note(
       id: const Uuid().v4(),
       title: '${originalNote.title} (Copy)',
@@ -171,7 +157,7 @@ class NotesService extends ChangeNotifier {
           : null,
       isPinned: false, // New copy starts unpinned
     );
-    
+
     await _databaseService.createNote(duplicatedNote);
     await loadNotes();
     return duplicatedNote;
@@ -193,4 +179,3 @@ class NotesService extends ChangeNotifier {
     await loadNotes();
   }
 }
-

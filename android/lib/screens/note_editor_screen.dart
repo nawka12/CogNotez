@@ -5,6 +5,9 @@ import 'package:provider/provider.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:uuid/uuid.dart';
+import 'package:path/path.dart' as path;
 import '../models/note.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
@@ -14,6 +17,8 @@ import '../services/settings_service.dart';
 import '../services/media_storage_service.dart';
 import '../widgets/find_replace_dialog.dart';
 import '../widgets/password_dialog.dart';
+import '../widgets/styled_dialog.dart';
+import '../widgets/ai_conversation_panel.dart';
 import '../l10n/app_localizations.dart';
 
 import 'package:markdown/markdown.dart' as md;
@@ -85,6 +90,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
   static const Duration _typingPauseDelay = Duration(milliseconds: 500);
   bool _isSaving = false;
 
+  // Track previous text values to avoid triggering on cursor-only changes
+  String _lastTitleText = '';
+  String _lastContentText = '';
+
   @override
   void initState() {
     super.initState();
@@ -93,8 +102,16 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     _currentNote = widget.note;
     _titleController = TextEditingController(text: widget.note.title);
     _contentController = TextEditingController(text: widget.note.content);
+    
+    // Initialize last text values
+    _lastTitleText = widget.note.title;
+    _lastContentText = widget.note.content;
+    
     _titleController.addListener(_onTitleChanged);
     _contentController.addListener(_onContentChanged);
+    // Default default view mode: Edit for new notes, Preview for existing
+    _viewMode = _isNew ? ViewMode.edit : ViewMode.preview;
+
     _saveState();
     _startAutoSave();
   }
@@ -170,6 +187,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
   }
 
   void _onTitleChanged() {
+    // Only trigger if actual text changed (not just cursor/selection)
+    final currentText = _titleController.text;
+    if (currentText == _lastTitleText) return;
+    _lastTitleText = currentText;
+
     _markChanged();
     // Immediate auto-save for title changes
     _typingPauseTimer?.cancel();
@@ -181,6 +203,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
   }
 
   void _onContentChanged() {
+    // Only trigger if actual text changed (not just cursor/selection)
+    final currentText = _contentController.text;
+    if (currentText == _lastContentText) return;
+    _lastContentText = currentText;
+
     _markChanged();
     // Debounced auto-save for content changes
     _typingPauseTimer?.cancel();
@@ -244,6 +271,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     _isRecordingHistory = false;
     _historyIndex--;
     final state = _history[_historyIndex];
+    
+    // Update last text before setting controller to prevent listener from triggering
+    _lastTitleText = state.title;
+    _lastContentText = state.content;
+    
     _titleController.text = state.title;
     _contentController.text = state.content;
     _isRecordingHistory = true;
@@ -259,6 +291,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     _isRecordingHistory = false;
     _historyIndex++;
     final state = _history[_historyIndex];
+    
+    // Update last text before setting controller to prevent listener from triggering
+    _lastTitleText = state.title;
+    _lastContentText = state.content;
+    
     _titleController.text = state.title;
     _contentController.text = state.content;
     _isRecordingHistory = true;
@@ -305,29 +342,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     }
   }
 
-  Future<void> _toggleFavorite() async {
-    if (_isSaving) return;
-
-    setState(() {
-      _currentNote =
-          _currentNote.copyWith(isFavorite: !_currentNote.isFavorite);
-      _hasChanges = true;
-    });
-
-    await _saveNote(showFeedback: false);
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_currentNote.isFavorite
-              ? 'Added to favorites'
-              : 'Removed from favorites'),
-          duration: const Duration(seconds: 1),
-        ),
-      );
-    }
-  }
-
   Note _getCurrentNote() {
     return _currentNote.copyWith(
       title: _titleController.text,
@@ -340,11 +354,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
 
     final result = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Unsaved Changes'),
-        content: const Text(
-            'You have unsaved changes. Do you want to discard them?'),
+      builder: (context) => StyledDialog(
+        title: 'Unsaved Changes',
+        message: 'You have unsaved changes. Do you want to discard them?',
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -378,10 +390,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: const Text('Manage Tags'),
+        builder: (context, setDialogState) => StyledDialog(
+          title: 'Manage Tags',
           content: SizedBox(
             width: double.maxFinite,
             child: Column(
@@ -557,9 +567,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     final controller = TextEditingController();
     return showDialog<String>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title),
+      builder: (context) => StyledDialog(
+        title: title,
         content: TextField(
           controller: controller,
           decoration: InputDecoration(
@@ -586,9 +595,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
   void _showAIResultDialog(String title, String result) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(title),
+      builder: (context) => StyledDialog(
+        title: title,
         content: SingleChildScrollView(
           child: SelectableText(result),
         ),
@@ -612,9 +620,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
   void _showAIEditApprovalDialog(String original, String edited) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('AI Edit Suggestion'),
+      builder: (context) => StyledDialog(
+        title: 'AI Edit Suggestion',
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -665,9 +672,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
   void _showAIInsertDialog(String content) {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Generated Content'),
+      builder: (context) => StyledDialog(
+        title: 'Generated Content',
         content: SingleChildScrollView(
           child: SelectableText(content),
         ),
@@ -694,9 +700,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
 
     await showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Suggested Tags'),
+      builder: (context) => StyledDialog(
+        title: 'Suggested Tags',
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -775,6 +780,17 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // AI Chat option
+            ListTile(
+              leading: const Icon(Icons.chat),
+              title: Text(loc?.ai_assistant ?? 'AI Assistant'),
+              subtitle: const Text('Open AI conversation panel'),
+              onTap: () {
+                Navigator.pop(context);
+                _showAIConversation();
+              },
+            ),
+            const Divider(),
             ListTile(
               leading: const Icon(Icons.summarize),
               title: Text(loc?.translate('summarize') ?? 'Summarize'),
@@ -786,18 +802,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
               onTap: () {
                 Navigator.pop(context);
                 _performAIAction('summarize');
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.question_answer),
-              title: Text(loc?.translate('ask_ai_title') ?? 'Ask AI'),
-              subtitle: Text(selectedText.isEmpty
-                  ? (loc?.translate('ask_about_note') ?? 'Ask about the note')
-                  : (loc?.translate('ask_about_selection') ??
-                      'Ask about selection')),
-              onTap: () {
-                Navigator.pop(context);
-                _performAIAction('ask');
               },
             ),
             if (selectedText.isNotEmpty) ...[
@@ -858,6 +862,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
           ],
         ),
       ),
+    );
+  }
+
+  void _showAIConversation() {
+    final selectedText = _getSelectedText();
+    showAIConversationPanel(
+      context,
+      noteContext: _contentController.text,
+      selectedText: selectedText.isNotEmpty ? selectedText : null,
     );
   }
 
@@ -945,6 +958,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
             _showFindReplace = !_showFindReplace;
           });
           break;
+        case 'insert_image':
+          await _insertImage();
+          break;
+        case 'insert_video':
+          await _insertVideo();
+          break;
         case 'ai_menu':
           _showAIContextMenu();
           break;
@@ -1010,17 +1029,181 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     }
   }
 
+  /// Insert an image from the device
+  Future<void> _insertImage() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.image,
+        allowMultiple: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      for (final file in result.files) {
+        if (file.path == null) continue;
+
+        final sourceFile = File(file.path!);
+        if (!await sourceFile.exists()) continue;
+
+        // Generate unique ID for the media file
+        final fileId = const Uuid().v4().replaceAll('-', '').substring(0, 16);
+        final extension = path.extension(file.name).toLowerCase();
+
+        // Copy file to media directory
+        final mediaService = MediaStorageService();
+        final bytes = await sourceFile.readAsBytes();
+        await mediaService.saveMediaFile(fileId, bytes, extension: extension);
+
+        // Insert markdown image syntax at cursor position
+        final cursorPos = _contentController.selection.baseOffset;
+        final currentText = _contentController.text;
+
+        // Use markdown syntax for images
+        final imageMarkdown = '\n![${file.name}](cognotez-media://$fileId)\n';
+
+        final newText = cursorPos >= 0
+            ? currentText.substring(0, cursorPos) +
+                imageMarkdown +
+                currentText.substring(cursorPos)
+            : currentText + imageMarkdown;
+
+        setState(() {
+          _contentController.text = newText;
+          _contentController.selection = TextSelection.collapsed(
+            offset: cursorPos >= 0
+                ? cursorPos + imageMarkdown.length
+                : newText.length,
+          );
+          _hasChanges = true;
+        });
+
+        // Record in history
+        _saveState();
+      }
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(result.files.length == 1
+                ? 'Image inserted'
+                : '${result.files.length} images inserted'),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to insert image: $e')),
+        );
+      }
+    }
+  }
+
+  /// Insert a video from the device
+  Future<void> _insertVideo() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.video,
+        allowMultiple: false,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.first;
+      if (file.path == null) return;
+
+      final sourceFile = File(file.path!);
+      if (!await sourceFile.exists()) return;
+
+      // Check file size (limit to 100MB for videos)
+      final fileSize = await sourceFile.length();
+      const maxSize = 100 * 1024 * 1024; // 100MB
+      if (fileSize > maxSize) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Video file is too large (max 100MB)'),
+            ),
+          );
+        }
+        return;
+      }
+
+      // Generate unique ID for the media file
+      final fileId = const Uuid().v4().replaceAll('-', '').substring(0, 16);
+      final extension = path.extension(file.name).toLowerCase();
+
+      // Copy file to media directory
+      final mediaService = MediaStorageService();
+      final bytes = await sourceFile.readAsBytes();
+      await mediaService.saveMediaFile(fileId, bytes, extension: extension);
+
+      // Insert HTML video tag at cursor position (for better control)
+      final cursorPos = _contentController.selection.baseOffset;
+      final currentText = _contentController.text;
+
+      // Use HTML video tag for videos
+      final videoHtml =
+          '\n<video src="cognotez-media://$fileId" alt="${file.name}" width="100%"></video>\n';
+
+      final newText = cursorPos >= 0
+          ? currentText.substring(0, cursorPos) +
+              videoHtml +
+              currentText.substring(cursorPos)
+          : currentText + videoHtml;
+
+      setState(() {
+        _contentController.text = newText;
+        _contentController.selection = TextSelection.collapsed(
+          offset:
+              cursorPos >= 0 ? cursorPos + videoHtml.length : newText.length,
+        );
+        _hasChanges = true;
+      });
+
+      // Record in history
+      _saveState();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Video inserted')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to insert video: $e')),
+        );
+      }
+    }
+  }
+
   Widget _buildEditor() {
     return TextField(
       controller: _contentController,
       maxLines: null,
       expands: true,
+      textAlign: TextAlign.start,
+      textAlignVertical: TextAlignVertical.top,
       decoration: const InputDecoration(
         hintText: 'Start writing your note...',
         border: InputBorder.none,
         contentPadding: EdgeInsets.all(16),
       ),
-      style: const TextStyle(fontSize: 16),
+      style: const TextStyle(fontSize: 16, height: 1.5),
+      // Enable smooth text selection
+      enableInteractiveSelection: true,
+      // Use standard Material selection controls for better handle visibility
+      selectionControls: MaterialTextSelectionControls(),
+      // Improve selection appearance
+      cursorWidth: 2.0,
+      cursorRadius: const Radius.circular(2),
+      // Magnifier is enabled by default on supported platforms
+      // Better scroll behavior that doesn't conflict with selection
+      scrollPhysics: const ClampingScrollPhysics(),
+      // Keyboard configuration
+      keyboardType: TextInputType.multiline,
+      textInputAction: TextInputAction.newline,
       contextMenuBuilder: (context, editableTextState) {
         final List<ContextMenuButtonItem> buttonItems =
             editableTextState.contextMenuButtonItems;
@@ -1125,20 +1308,22 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
     // Preprocess content to convert HTML img tags to markdown syntax
     final processedContent = _preprocessMediaContent(_contentController.text);
 
-    return Markdown(
-      data: processedContent,
-      selectable: true,
-      extensionSet: md.ExtensionSet.gitHubWeb,
-      builders: {
-        'video': _VideoElementBuilder(context),
-      },
-      styleSheet: MarkdownStyleSheet(
-        p: const TextStyle(fontSize: 16),
-        h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-        h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-      ),
-      imageBuilder: (uri, title, alt) {
+    // Wrap in SelectionArea to enable multi-line text selection
+    return SelectionArea(
+      child: Markdown(
+        data: processedContent,
+        selectable: true,
+        extensionSet: md.ExtensionSet.gitHubWeb,
+        builders: {
+          'video': _VideoElementBuilder(context),
+        },
+        styleSheet: MarkdownStyleSheet(
+          p: const TextStyle(fontSize: 16),
+          h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+          h2: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          h3: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        imageBuilder: (uri, title, alt) {
         // Handle custom cognotez-media URI scheme from desktop app
         if (uri.scheme == 'cognotez-media') {
           // Extract type and dimensions from query parameters (added by preprocessing)
@@ -1196,6 +1381,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
         // Fallback for other schemes
         return _buildImagePlaceholder(alt);
       },
+      ),
     );
   }
 
@@ -1348,19 +1534,6 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
               onPressed: _cycleViewMode,
               tooltip: _getViewModeTooltip(),
             ),
-            // Favorite toggle
-            IconButton(
-              icon: Icon(
-                _currentNote.isFavorite ? Icons.star : Icons.star_border,
-                color: _currentNote.isFavorite
-                    ? Theme.of(context).colorScheme.secondary
-                    : null,
-              ),
-              onPressed: _toggleFavorite,
-              tooltip: _currentNote.isFavorite
-                  ? 'Remove favorite'
-                  : 'Add to favorites',
-            ),
             // Save button
             IconButton(
               icon: Icon(
@@ -1406,6 +1579,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen>
                         Icon(Icons.find_replace, size: 20),
                         SizedBox(width: 8),
                         Text('Find & Replace'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuDivider(),
+                  // Media insertion
+                  const PopupMenuItem(
+                    value: 'insert_image',
+                    child: Row(
+                      children: [
+                        Icon(Icons.image, size: 20),
+                        SizedBox(width: 8),
+                        Text('Insert Image'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'insert_video',
+                    child: Row(
+                      children: [
+                        Icon(Icons.videocam, size: 20),
+                        SizedBox(width: 8),
+                        Text('Insert Video'),
                       ],
                     ),
                   ),

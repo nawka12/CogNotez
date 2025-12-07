@@ -39,13 +39,14 @@ class BackupData {
     for (final note in notes) {
       final wordCount = note.wordCount;
       final charCount = note.content.length;
-      
+
       // Generate preview from content (first 200 chars, cleaned up)
       String preview = '';
       if (!note.isPasswordProtected && note.content.isNotEmpty) {
         // Remove markdown headers and excessive whitespace
         final cleanContent = note.content
-            .replaceAll(RegExp(r'^#+\s*', multiLine: true), '') // Remove markdown headers
+            .replaceAll(RegExp(r'^#+\s*', multiLine: true),
+                '') // Remove markdown headers
             .replaceAll(RegExp(r'\n+'), ' ') // Replace newlines with spaces
             .replaceAll(RegExp(r'\s+'), ' ') // Collapse multiple spaces
             .trim();
@@ -53,21 +54,21 @@ class BackupData {
             ? '${cleanContent.substring(0, 200)}...'
             : cleanContent;
       }
-      
+
       // Restore desktop-specific fields from metadata if they were preserved
       final metadata = note.metadata;
       final category = metadata?['desktop_category'];
-      // Use native isFavorite field, fall back to metadata for backwards compatibility
-      final isFavorite = note.isFavorite || (metadata?['desktop_is_favorite'] as bool? ?? false);
       final isArchived = metadata?['desktop_is_archived'] as bool? ?? false;
-      final collaboration = metadata?['desktop_collaboration'] as Map<String, dynamic>? ?? {
-        'is_shared': false,
-        'shared_with': <dynamic>[],
-        'last_edited_by': null,
-        'edit_history': <dynamic>[],
-        'google_drive_file_id': null,
-        'google_drive_share_link': null,
-      };
+      final collaboration =
+          metadata?['desktop_collaboration'] as Map<String, dynamic>? ??
+              {
+                'is_shared': false,
+                'shared_with': <dynamic>[],
+                'last_edited_by': null,
+                'edit_history': <dynamic>[],
+                'google_drive_file_id': null,
+                'google_drive_share_link': null,
+              };
       final passwordHash = metadata?['desktop_password_hash'] as String?;
 
       notesMap[note.id] = {
@@ -77,13 +78,14 @@ class BackupData {
         'preview': preview,
         'tags': note.tags,
         'category': category,
-        'is_favorite': isFavorite,
+        'is_favorite': false,  // Deprecated: favorites feature removed
         'is_archived': isArchived,
         'pinned': note.isPinned,
         'password_protected': note.isPasswordProtected,
         // When password protection is removed, ensure all encryption fields are cleared
         'password_hash': note.isPasswordProtected ? passwordHash : null,
-        'encrypted_content': note.isPasswordProtected ? note.encryptedContent : null,
+        'encrypted_content':
+            note.isPasswordProtected ? note.encryptedContent : null,
         'word_count': wordCount,
         'char_count': charCount,
         'created_at': note.createdAt.toIso8601String(),
@@ -169,8 +171,9 @@ class BackupData {
           ? DateTime.tryParse(exportedAt) ?? DateTime.now()
           : DateTime.now();
 
-      final desktopNotesMap =
-          (notesField is Map<String, dynamic>) ? notesField : <String, dynamic>{};
+      final desktopNotesMap = (notesField is Map<String, dynamic>)
+          ? notesField
+          : <String, dynamic>{};
       final desktopTagsMap =
           (tagsField is Map<String, dynamic>) ? tagsField : <String, dynamic>{};
 
@@ -202,7 +205,8 @@ class BackupData {
               return null;
             }
 
-            final createdAtStr = n['created_at'] as String? ?? n['created']?.toString();
+            final createdAtStr =
+                n['created_at'] as String? ?? n['created']?.toString();
             final updatedAtStr =
                 n['updated_at'] as String? ?? n['modified']?.toString();
 
@@ -215,42 +219,41 @@ class BackupData {
 
             // Desktop marks password-protected notes with password_protected flag
             // and stores encrypted_content; Android uses isPasswordProtected + encryptedContent.
-            final isPasswordProtected =
-                (n['password_protected'] as bool?) ?? (encryptedContent != null);
-            
+            final isPasswordProtected = (n['password_protected'] as bool?) ??
+                (encryptedContent != null);
+
             // Desktop uses 'pinned' field for pinned notes
             final isPinned = (n['pinned'] as bool?) ?? false;
-            
+
             // Preserve desktop-specific fields in metadata so they survive
             // round-trips between Android and desktop
             final desktopMetadata = <String, dynamic>{};
-            
+
             // Preserve category
             if (n['category'] != null) {
               desktopMetadata['desktop_category'] = n['category'];
             }
-            
-            // Extract is_favorite to native field
-            final isFavorite = n['is_favorite'] as bool? ?? false;
-            
+
             // Preserve is_archived
             final isArchived = n['is_archived'] as bool? ?? false;
             if (isArchived) {
               desktopMetadata['desktop_is_archived'] = true;
             }
-            
+
             // Preserve password_hash (desktop uses different encryption)
             if (n['password_hash'] != null) {
               desktopMetadata['desktop_password_hash'] = n['password_hash'];
             }
-            
+
             // Preserve collaboration data
-            if (n['collaboration'] != null && n['collaboration'] is Map<String, dynamic>) {
+            if (n['collaboration'] != null &&
+                n['collaboration'] is Map<String, dynamic>) {
               final collab = n['collaboration'] as Map<String, dynamic>;
               // Only preserve if there's meaningful collaboration data
               if (collab['is_shared'] == true ||
                   collab['google_drive_file_id'] != null ||
-                  (collab['shared_with'] is List && (collab['shared_with'] as List).isNotEmpty)) {
+                  (collab['shared_with'] is List &&
+                      (collab['shared_with'] as List).isNotEmpty)) {
                 desktopMetadata['desktop_collaboration'] = collab;
               }
             }
@@ -274,7 +277,6 @@ class BackupData {
               encryptionIv: null,
               metadata: desktopMetadata.isNotEmpty ? desktopMetadata : null,
               isPinned: isPinned,
-              isFavorite: isFavorite,
             );
           })
           .whereType<Note>()
@@ -315,7 +317,8 @@ class BackupData {
     }
 
     return BackupData(
-      version: (json['version'] is String) ? json['version'] as String : '1.0.0',
+      version:
+          (json['version'] is String) ? json['version'] as String : '1.0.0',
       createdAt: DateTime.parse(rawCreatedAt),
       notes: rawNotes
           .whereType<Map<String, dynamic>>()
@@ -354,12 +357,13 @@ class BackupService {
     // Use desktop‑compatible JSON so that backups are interchangeable between
     // Android and the Electron desktop app.
     final json = jsonEncode(backup.toDesktopCompatibleJson());
-    
+
     final directory = await getApplicationDocumentsDirectory();
-    final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
+    final timestamp =
+        DateTime.now().toIso8601String().replaceAll(':', '-').split('.').first;
     final fileName = 'cognotez_backup_$timestamp.json';
     final file = File('${directory.path}/$fileName');
-    
+
     await file.writeAsString(json);
 
     if (share) {
@@ -389,12 +393,13 @@ class BackupService {
 
     final file = File(result.files.first.path!);
     final jsonString = await file.readAsString();
-    
+
     return await restoreFromJson(jsonString);
   }
 
   /// Restore from JSON string
-  Future<BackupResult> restoreFromJson(String jsonString, {bool merge = true}) async {
+  Future<BackupResult> restoreFromJson(String jsonString,
+      {bool merge = true}) async {
     try {
       final json = jsonDecode(jsonString) as Map<String, dynamic>;
       final backup = BackupData.fromJson(json);
@@ -407,14 +412,15 @@ class BackupService {
       // Import tags first
       final existingTags = await _databaseService.getAllTags();
       final existingTagIds = existingTags.map((t) => t.id).toSet();
-      final existingTagNames = existingTags.map((t) => t.name.toLowerCase()).toSet();
+      final existingTagNames =
+          existingTags.map((t) => t.name.toLowerCase()).toSet();
 
       for (final tag in backup.tags) {
         if (merge && existingTagIds.contains(tag.id)) {
           tagsSkipped++;
           continue;
         }
-        
+
         // Check if tag with same name exists
         if (merge && existingTagNames.contains(tag.name.toLowerCase())) {
           tagsSkipped++;
@@ -466,7 +472,8 @@ class BackupService {
 
   /// Import data from desktop-compatible format (used by Google Drive sync)
   /// This performs a merge operation, keeping existing notes and adding new ones
-  Future<BackupResult> importFromDesktopFormat(Map<String, dynamic> data) async {
+  Future<BackupResult> importFromDesktopFormat(
+      Map<String, dynamic> data) async {
     try {
       final backup = BackupData.fromJson(data);
 
@@ -479,14 +486,15 @@ class BackupService {
       // Import tags first
       final existingTags = await _databaseService.getAllTags();
       final existingTagIds = existingTags.map((t) => t.id).toSet();
-      final existingTagNames = existingTags.map((t) => t.name.toLowerCase()).toSet();
+      final existingTagNames =
+          existingTags.map((t) => t.name.toLowerCase()).toSet();
 
       for (final tag in backup.tags) {
         if (existingTagIds.contains(tag.id)) {
           tagsSkipped++;
           continue;
         }
-        
+
         // Check if tag with same name exists
         if (existingTagNames.contains(tag.name.toLowerCase())) {
           tagsSkipped++;
@@ -542,10 +550,10 @@ class BackupService {
   Future<BackupStats> getBackupStats() async {
     final notes = await _databaseService.getAllNotes();
     final tags = await _databaseService.getAllTags();
-    
+
     int totalWords = 0;
     int protectedNotes = 0;
-    
+
     for (final note in notes) {
       totalWords += note.wordCount;
       if (note.isPasswordProtected) protectedNotes++;

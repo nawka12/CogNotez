@@ -10,6 +10,7 @@ import '../services/notes_service.dart';
 import '../services/ai_service.dart';
 import '../models/settings.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/styled_dialog.dart';
 import 'about_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
@@ -575,9 +576,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(loc?.translate('select_theme_title') ?? 'Select Theme'),
+      builder: (context) => StyledDialog(
+        title: loc?.translate('select_theme_title') ?? 'Select Theme',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -627,10 +627,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title:
-            Text(loc?.translate('select_language_title') ?? 'Select Language'),
+      builder: (context) => StyledDialog(
+        title: loc?.translate('select_language_title') ?? 'Select Language',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: ['en', 'es', 'id', 'ja', 'jv'].map((lang) {
@@ -665,10 +663,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-            loc?.translate('select_ai_backend_title') ?? 'Select AI Backend'),
+      builder: (context) => StyledDialog(
+        title: loc?.translate('select_ai_backend_title') ?? 'Select AI Backend',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -712,11 +708,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         final loc = AppLocalizations.of(context);
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(
-              loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint'),
+        return StyledDialog(
+          title: loc?.translate('ollama_endpoint_title') ?? 'Ollama Endpoint',
           content: TextField(
             controller: controller,
             decoration: InputDecoration(
@@ -752,10 +745,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         final loc = AppLocalizations.of(context);
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(loc?.translate('ollama_model_title') ?? 'Ollama Model'),
+        return StyledDialog(
+          title: loc?.translate('ollama_model_title') ?? 'Ollama Model',
           content: TextField(
             controller: controller,
             decoration: InputDecoration(
@@ -791,11 +782,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         final loc = AppLocalizations.of(context);
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(loc?.translate('openrouter_api_key_title') ??
-              'OpenRouter API Key'),
+        return StyledDialog(
+          title: loc?.translate('openrouter_api_key_title') ??
+              'OpenRouter API Key',
           content: TextField(
             controller: controller,
             obscureText: true,
@@ -846,10 +835,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         final loc = AppLocalizations.of(context);
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(loc?.translate('searxng_url_title') ?? 'SearXNG URL'),
+        return StyledDialog(
+          title: loc?.translate('searxng_url_title') ?? 'SearXNG URL',
           content: TextField(
             controller: controller,
             decoration: InputDecoration(
@@ -884,11 +871,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         final loc = AppLocalizations.of(context);
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title:
-              Text(loc?.translate('max_results_title') ?? 'Max Search Results'),
+        return StyledDialog(
+          title: loc?.translate('max_results_title') ?? 'Max Search Results',
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
@@ -926,10 +910,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) {
         final loc = AppLocalizations.of(context);
-        return AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(loc?.translate('sync_interval_title') ?? 'Sync Interval'),
+        return StyledDialog(
+          title: loc?.translate('sync_interval_title') ?? 'Sync Interval',
           content: TextField(
             controller: controller,
             keyboardType: TextInputType.number,
@@ -996,13 +978,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final loc = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(loc?.translate('disconnect_google_drive_title') ??
-            'Disconnect Google Drive'),
-        content: Text(loc?.translate('disconnect_google_drive_message') ??
+      builder: (context) => StyledDialog(
+        title: loc?.translate('disconnect_google_drive_title') ??
+            'Disconnect Google Drive',
+        message: loc?.translate('disconnect_google_drive_message') ??
             'Are you sure you want to disconnect from Google Drive? '
-                'Your local notes will not be deleted, but sync will be disabled.'),
+                'Your local notes will not be deleted, but sync will be disabled.',
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1109,14 +1090,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       barrierDismissible: !isRequired,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          title: Text(isRequired
+        builder: (context, setState) => StyledDialog(
+          title: isRequired
               ? 'Enter Passphrase'
               : isEnabling
                   ? 'Set E2EE Passphrase'
-                  : 'Change Passphrase'),
+                  : 'Change Passphrase',
           content: Form(
             key: formKey,
             child: Column(
@@ -1239,17 +1218,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final loc = AppLocalizations.of(context);
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Text(
-            loc?.translate('disable_encryption_title') ?? 'Disable Encryption'),
-        content: Text(
-          loc?.translate('disable_encryption_message') ??
-              'Are you sure you want to disable end-to-end encryption?\n\n'
-                  'Your data will be synced without encryption. '
-                  'Existing encrypted backups on Google Drive will remain encrypted '
-                  'until the next sync overwrites them.',
-        ),
+      builder: (context) => StyledDialog(
+        title:
+            loc?.translate('disable_encryption_title') ?? 'Disable Encryption',
+        isDestructive: true,
+        message: loc?.translate('disable_encryption_message') ??
+            'Are you sure you want to disable end-to-end encryption?\n\n'
+                'Your data will be synced without encryption. '
+                'Existing encrypted backups on Google Drive will remain encrypted '
+                'until the next sync overwrites them.',
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1285,16 +1262,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
       showDialog(
         context: context,
         barrierDismissible: false,
-        builder: (context) => AlertDialog(
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-          content: const Row(
+        builder: (context) => StyledDialog(
+          title: 'Creating backup...',
+          content: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
               CircularProgressIndicator(),
               SizedBox(width: 16),
-              Text('Creating backup...'),
+              Text('Please wait...'),
             ],
           ),
+          actions: [], // No actions for loading dialog
         ),
       );
 
@@ -1319,12 +1297,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _importBackup() async {
     final confirmed = await showDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('Import Backup'),
-        content:
-            const Text('This will import notes and tags from a backup file. '
-                'Existing items with the same IDs will be skipped. Continue?'),
+      builder: (context) => StyledDialog(
+        title: 'Import Backup',
+        message: 'This will import notes and tags from a backup file. '
+            'Existing items with the same IDs will be skipped. Continue?',
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -1386,10 +1362,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       if (mounted) {
         showDialog(
           context: context,
-          builder: (context) => AlertDialog(
-            shape:
-                RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Backup Statistics'),
+          builder: (context) => StyledDialog(
+            title: 'Backup Statistics',
             content: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,

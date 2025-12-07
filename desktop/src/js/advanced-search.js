@@ -9,7 +9,6 @@ class AdvancedSearchManager {
             tags: [],
             dateFrom: null,
             dateTo: null,
-            favoritesOnly: false,
             pinnedOnly: false,
             protectedOnly: false,
             sortBy: 'updated_at',
@@ -142,7 +141,6 @@ class AdvancedSearchManager {
             .map(opt => opt.value);
         const dateFrom = document.getElementById('filter-date-from')?.value || null;
         const dateTo = document.getElementById('filter-date-to')?.value || null;
-        const favoritesOnly = document.getElementById('filter-favorites')?.checked || false;
         const pinnedOnly = document.getElementById('filter-pinned')?.checked || false;
         const protectedOnly = document.getElementById('filter-protected')?.checked || false;
         const sortValue = document.getElementById('filter-sort')?.value || 'updated_at_desc';
@@ -156,7 +154,6 @@ class AdvancedSearchManager {
             tags: filterTags,
             dateFrom: dateFrom ? new Date(dateFrom) : null,
             dateTo: dateTo ? new Date(dateTo) : null,
-            favoritesOnly,
             pinnedOnly,
             protectedOnly,
             sortBy,
@@ -191,11 +188,6 @@ class AdvancedSearchManager {
             // Add text search if provided
             if (this.currentFilters.text) {
                 options.search = this.currentFilters.text;
-            }
-
-            // Add favorites filter if checked
-            if (this.currentFilters.favoritesOnly) {
-                options.isFavorite = true;
             }
 
             // Get all notes first
@@ -311,9 +303,6 @@ class AdvancedSearchManager {
         const dateTo = document.getElementById('filter-date-to');
         if (dateTo) dateTo.value = '';
 
-        const favoritesCheck = document.getElementById('filter-favorites');
-        if (favoritesCheck) favoritesCheck.checked = false;
-
         const pinnedCheck = document.getElementById('filter-pinned');
         if (pinnedCheck) pinnedCheck.checked = false;
 
@@ -329,7 +318,6 @@ class AdvancedSearchManager {
             tags: [],
             dateFrom: null,
             dateTo: null,
-            favoritesOnly: false,
             pinnedOnly: false,
             protectedOnly: false,
             sortBy: 'updated_at',
@@ -364,7 +352,6 @@ class AdvancedSearchManager {
             parts.push(`Date: ${from} to ${to}`);
         }
 
-        if (this.currentFilters.favoritesOnly) parts.push('Favorites');
         if (this.currentFilters.pinnedOnly) parts.push('Pinned');
         if (this.currentFilters.protectedOnly) parts.push('Protected');
 
@@ -376,7 +363,6 @@ class AdvancedSearchManager {
             this.currentFilters.tags.length > 0 ||
             this.currentFilters.dateFrom !== null ||
             this.currentFilters.dateTo !== null ||
-            this.currentFilters.favoritesOnly ||
             this.currentFilters.pinnedOnly ||
             this.currentFilters.protectedOnly;
     }

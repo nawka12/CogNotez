@@ -240,7 +240,6 @@ class DatabaseManager {
             preview: noteData.preview || '',
             tags: noteData.tags || [],
             category: noteData.category || null,
-            is_favorite: noteData.is_favorite || false,
             is_archived: noteData.is_archived || false,
             pinned: noteData.pinned || false,
             password_protected: noteData.password_protected || false,
@@ -320,10 +319,6 @@ class DatabaseManager {
             });
         }
 
-        if (options.isFavorite !== undefined) {
-            notes = notes.filter(note => note.is_favorite === options.isFavorite);
-        }
-
         // Sorting - pinned notes always come first
         const sortBy = options.sortBy || 'updated_at';
         const sortOrder = options.sortOrder || 'DESC';
@@ -396,10 +391,6 @@ class DatabaseManager {
 
         if (noteData.category !== undefined) {
             note.category = noteData.category;
-        }
-
-        if (noteData.isFavorite !== undefined) {
-            note.is_favorite = noteData.isFavorite;
         }
 
         if (noteData.is_archived !== undefined) {
@@ -746,7 +737,6 @@ class DatabaseManager {
         const notes = Object.values(this.data.notes);
         const noteStats = {
             total_notes: notes.length,
-            favorite_notes: notes.filter(n => n.is_favorite).length,
             archived_notes: notes.filter(n => n.is_archived).length,
             total_words: notes.reduce((sum, n) => sum + (n.word_count || 0), 0),
             total_chars: notes.reduce((sum, n) => sum + (n.char_count || 0), 0)
@@ -1303,7 +1293,7 @@ class DatabaseManager {
 
     hasContentChanged(localNote, remoteNote) {
         // Compare relevant fields
-        const fieldsToCompare = ['title', 'content', 'tags', 'is_favorite', 'is_archived'];
+        const fieldsToCompare = ['title', 'content', 'tags', 'is_archived'];
 
         for (const field of fieldsToCompare) {
             if (JSON.stringify(localNote[field]) !== JSON.stringify(remoteNote[field])) {

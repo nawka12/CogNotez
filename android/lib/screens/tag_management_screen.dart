@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
 import '../l10n/app_localizations.dart';
+import '../widgets/styled_dialog.dart';
 
 class TagManagementScreen extends StatefulWidget {
   const TagManagementScreen({super.key});
@@ -161,8 +162,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(loc?.translate('create_tag_title') ?? 'Create Tag'),
+        builder: (context, setState) => StyledDialog(
+          title: loc?.translate('create_tag_title') ?? 'Create Tag',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -273,8 +274,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: Text(loc?.translate('edit_tag_title') ?? 'Edit Tag'),
+        builder: (context, setState) => StyledDialog(
+          title: loc?.translate('edit_tag_title') ?? 'Edit Tag',
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -382,8 +383,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
-        title: Text(loc?.translate('delete_tag_title') ?? 'Delete Tag'),
+      builder: (context) => StyledDialog(
+        title: loc?.translate('delete_tag_title') ?? 'Delete Tag',
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,

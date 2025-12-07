@@ -43,10 +43,9 @@ Android version of CogNotez - An AI-powered note-taking application built with F
   - [x] Network image support (http/https)
   - [x] Local file URI support
   - [x] Media storage service for managing local media files
+  - [x] **Media Insertion UI** - Insert images and videos directly from device
 
 #### Unimplemented ❌
-- [ ] Media insertion UI (currently supports displaying synced media)
-- [ ] AI-generated templates
 - [ ] Note import/export for standalone note files
 - [ ] Network status indicators
 - [ ] Complete translation coverage across all screens
@@ -59,6 +58,7 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] **Custom Templates** - Create your own templates from scratch
 - [x] **Template Management** - View, create, and delete custom templates
 - [x] Auto-date substitution in templates
+- [x] **AI-Generated Templates** - Generate templates using AI with custom descriptions
 
 ### AI Features
 
@@ -66,9 +66,10 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] AI service structure (Ollama/OpenRouter support)
 - [x] AI service methods (summarize, askQuestion, editText, etc.)
 - [x] AI settings configuration UI (in Settings screen)
+- [x] **AI Conversation Panel** - Full chat interface for conversing with AI
+- [x] **AI Loading Overlay** - Animated loading screen when AI is processing
 
 #### Unimplemented ❌
-- [ ] AI conversation panel
 - [ ] Cancel AI operations
 
 #### Implemented (Editor Integration) ✅
@@ -97,7 +98,6 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] Sort options (by date, title, word count)
 - [x] Filter by password-protected
 - [x] Filter by untagged notes
-- [x] Filter by favorites
 - [x] Filter by pinned
 
 #### Implemented ✅
@@ -139,9 +139,9 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] **Network Images** - Support for http/https image URLs
 - [x] **Local File URIs** - Support for file:// image paths
 - [x] **Media File Management** - Automatic media file storage and retrieval
+- [x] **Media Insertion UI** - Add images and videos directly from device
 
 #### Unimplemented ❌
-- [ ] Media insertion UI (add images/videos directly from device)
 - [ ] Audio file support in preview
 
 ### Export & Sharing
@@ -172,13 +172,13 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] **Pin Indicator** - Visual indicator for pinned notes in list
 - [x] **Context Menu** - Long-press bottom sheet with quick actions
 - [x] **Google Drive Sync UI** - Connection status, manual sync, account info
+- [x] **Splash Screen** - Animated loading screen with progress indicator
+- [x] **Loading Animations** - Smooth animations for AI operations and app startup
+- [x] **Onboarding Screen** - First-launch welcome screens with feature highlights
+- [x] **Error Handling UI** - Error views, banners, and snackbars for better error feedback
 
 #### Unimplemented ❌
-- [ ] Splash screen
-- [ ] Loading animations
-- [ ] Help text and onboarding
-- [ ] Error handling UI
-- [ ] Split view (edit and preview side-by-side)
+- [ ] Split view (edit and preview side-by-side) - Not ideal for mobile screens
 - [ ] App icon and branding
 
 ## Getting Started
@@ -347,6 +347,13 @@ The project has a solid foundation with:
 
 ### Recent Additions
 
+- **AI Conversation Panel**: Full chat interface for conversing with AI assistant
+- **Splash Screen**: Beautiful animated loading screen with progress indicator
+- **Onboarding**: First-launch welcome screens highlighting key features
+- **Error Handling UI**: Comprehensive error views, banners, and snackbars
+- **AI Loading Overlay**: Animated loading screen when AI is processing
+- **Media Insertion UI**: Insert images and videos directly from device into notes
+- **AI-Generated Templates**: Generate custom templates using AI
 - **Rich Media Support**: Images and videos in notes with full-screen viewing, desktop-compatible media handling, and media storage service
 - **Note Templates**: 10 built-in templates plus custom template support with template chooser UI
 - **Tag Management UI**: Full-featured tag management with create, edit, delete, and color customization
@@ -364,20 +371,12 @@ The project has a solid foundation with:
 
 ### Next Priorities
 
-1. **Core Note-Taking Enhancements**
-   - Media insertion UI (add images/videos directly from Android)
-   - AI-generated templates
+1. **AI Integration**
+   - Cancel AI operations
 
-2. **AI Integration**
-   - AI conversation panel
-   - Loading indicators for AI operations
-   - AI edit approval system
-
-3. **Polish & UX**
-   - Splash screen
-   - Error handling UI
+2. **Polish & UX**
    - App icon and branding
-   - Internationalization
+   - Complete internationalization
 
 ## Contributing
 

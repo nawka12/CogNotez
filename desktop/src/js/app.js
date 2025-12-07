@@ -972,7 +972,7 @@ class CogNotezApp {
         if (!editor.value.trim()) {
             const startWritingText = t('editor.startWriting', 'Start writing your note...');
             const safeStart = this.escapeHtml(startWritingText);
-            setSafeInnerHTML(preview, `< p style = "color: var(--text-tertiary); font-style: italic;" > ${safeStart}</p > `);
+            setSafeInnerHTML(preview, `<p style="color: var(--text-tertiary); font-style: italic;">${safeStart}</p>`);
             return;
         }
 
@@ -2059,19 +2059,19 @@ class CogNotezApp {
 
         switch (lang) {
             case 'id': // Indonesian: DD/MM/YYYY, 24-hour
-                dateStr = `${day} /${month}/${year} `;
+                dateStr = `${day}/${month}/${year} `;
                 if (includeTime) {
                     timeStr = `${String(hours).padStart(2, '0')}:${minutes} `;
                 }
                 break;
             case 'ja': // Japanese: YYYY/MM/DD, 24-hour
-                dateStr = `${year} /${month}/${day} `;
+                dateStr = `${year}/${month}/${day} `;
                 if (includeTime) {
                     timeStr = `${String(hours).padStart(2, '0')}:${minutes} `;
                 }
                 break;
             default: // English: MM/DD/YYYY, 12-hour with AM/PM
-                dateStr = `${month} /${day}/${year} `;
+                dateStr = `${month}/${day}/${year} `;
                 if (includeTime) {
                     const hours12 = hours % 12 || 12;
                     const ampm = hours >= 12 ? 'PM' : 'AM';
@@ -4907,7 +4907,6 @@ Please provide a helpful response based on the note content and conversation his
                     created: note.created,
                     modified: note.modified,
                     tags: note.tags || [],
-                    is_favorite: note.is_favorite || false,
                     is_archived: note.is_archived || false,
                     word_count: note.word_count || 0,
                     char_count: note.char_count || 0

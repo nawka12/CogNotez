@@ -4,7 +4,14 @@ import '../models/note.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
 
-enum SortOption { dateDesc, dateAsc, titleAsc, titleDesc, wordCountDesc, wordCountAsc }
+enum SortOption {
+  dateDesc,
+  dateAsc,
+  titleAsc,
+  titleDesc,
+  wordCountDesc,
+  wordCountAsc
+}
 
 class SearchFilters {
   final String query;
@@ -15,7 +22,6 @@ class SearchFilters {
   final bool showPasswordProtected;
   final bool showUntaggedOnly;
   final bool pinnedOnly;
-  final bool favoritesOnly;
 
   SearchFilters({
     this.query = '',
@@ -26,7 +32,6 @@ class SearchFilters {
     this.showPasswordProtected = true,
     this.showUntaggedOnly = false,
     this.pinnedOnly = false,
-    this.favoritesOnly = false,
   });
 
   SearchFilters copyWith({
@@ -38,7 +43,6 @@ class SearchFilters {
     bool? showPasswordProtected,
     bool? showUntaggedOnly,
     bool? pinnedOnly,
-    bool? favoritesOnly,
     bool clearDateFrom = false,
     bool clearDateTo = false,
   }) {
@@ -48,10 +52,10 @@ class SearchFilters {
       dateFrom: clearDateFrom ? null : (dateFrom ?? this.dateFrom),
       dateTo: clearDateTo ? null : (dateTo ?? this.dateTo),
       sortBy: sortBy ?? this.sortBy,
-      showPasswordProtected: showPasswordProtected ?? this.showPasswordProtected,
+      showPasswordProtected:
+          showPasswordProtected ?? this.showPasswordProtected,
       showUntaggedOnly: showUntaggedOnly ?? this.showUntaggedOnly,
       pinnedOnly: pinnedOnly ?? this.pinnedOnly,
-      favoritesOnly: favoritesOnly ?? this.favoritesOnly,
     );
   }
 
@@ -63,7 +67,7 @@ class SearchFilters {
       final searchLower = query.toLowerCase();
       filtered = filtered.where((note) {
         return note.title.toLowerCase().contains(searchLower) ||
-               note.content.toLowerCase().contains(searchLower);
+            note.content.toLowerCase().contains(searchLower);
       }).toList();
     }
 
@@ -82,15 +86,16 @@ class SearchFilters {
     // Date range filter
     if (dateFrom != null) {
       filtered = filtered.where((note) {
-        return note.updatedAt.isAfter(dateFrom!) || 
-               note.updatedAt.isAtSameMomentAs(dateFrom!);
+        return note.updatedAt.isAfter(dateFrom!) ||
+            note.updatedAt.isAtSameMomentAs(dateFrom!);
       }).toList();
     }
     if (dateTo != null) {
-      final endOfDay = DateTime(dateTo!.year, dateTo!.month, dateTo!.day, 23, 59, 59);
+      final endOfDay =
+          DateTime(dateTo!.year, dateTo!.month, dateTo!.day, 23, 59, 59);
       filtered = filtered.where((note) {
-        return note.updatedAt.isBefore(endOfDay) || 
-               note.updatedAt.isAtSameMomentAs(endOfDay);
+        return note.updatedAt.isBefore(endOfDay) ||
+            note.updatedAt.isAtSameMomentAs(endOfDay);
       }).toList();
     }
 
@@ -104,11 +109,6 @@ class SearchFilters {
       filtered = filtered.where((note) => note.isPinned).toList();
     }
 
-    // Favorites only filter
-    if (favoritesOnly) {
-      filtered = filtered.where((note) => note.isFavorite).toList();
-    }
-
     // Sort
     switch (sortBy) {
       case SortOption.dateDesc:
@@ -118,10 +118,12 @@ class SearchFilters {
         filtered.sort((a, b) => a.updatedAt.compareTo(b.updatedAt));
         break;
       case SortOption.titleAsc:
-        filtered.sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+        filtered.sort(
+            (a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
         break;
       case SortOption.titleDesc:
-        filtered.sort((a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
+        filtered.sort(
+            (a, b) => b.title.toLowerCase().compareTo(a.title.toLowerCase()));
         break;
       case SortOption.wordCountDesc:
         filtered.sort((a, b) => b.wordCount.compareTo(a.wordCount));
@@ -136,14 +138,13 @@ class SearchFilters {
 
   bool get hasActiveFilters {
     return query.isNotEmpty ||
-           selectedTagIds.isNotEmpty ||
-           dateFrom != null ||
-           dateTo != null ||
-           !showPasswordProtected ||
-           showUntaggedOnly ||
-           pinnedOnly ||
-           favoritesOnly ||
-           sortBy != SortOption.dateDesc;
+        selectedTagIds.isNotEmpty ||
+        dateFrom != null ||
+        dateTo != null ||
+        !showPasswordProtected ||
+        showUntaggedOnly ||
+        pinnedOnly ||
+        sortBy != SortOption.dateDesc;
   }
 }
 
@@ -195,7 +196,7 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
       firstDate: DateTime(2000),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    
+
     if (picked != null) {
       if (isFrom) {
         _updateFilters(_filters.copyWith(dateFrom: picked));
@@ -277,14 +278,15 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
             ],
           ),
           const Divider(),
-          
+
           // Search field
           TextField(
             controller: _searchController,
             decoration: InputDecoration(
               hintText: 'Search notes...',
               prefixIcon: const Icon(Icons.search),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
+              border:
+                  OutlineInputBorder(borderRadius: BorderRadius.circular(8)),
               isDense: true,
               suffixIcon: _searchController.text.isNotEmpty
                   ? IconButton(
@@ -303,7 +305,8 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
           const SizedBox(height: 16),
 
           // Tags filter
-          const Text('Filter by tags:', style: TextStyle(fontWeight: FontWeight.w500)),
+          const Text('Filter by tags:',
+              style: TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -328,7 +331,8 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
           const SizedBox(height: 16),
 
           // Date range
-          const Text('Date range:', style: TextStyle(fontWeight: FontWeight.w500)),
+          const Text('Date range:',
+              style: TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
           Row(
             children: [
@@ -336,7 +340,7 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
                 child: OutlinedButton.icon(
                   onPressed: () => _selectDate(true),
                   icon: const Icon(Icons.calendar_today, size: 16),
-                  label: Text(_filters.dateFrom != null 
+                  label: Text(_filters.dateFrom != null
                       ? _formatDate(_filters.dateFrom!)
                       : 'From'),
                 ),
@@ -344,7 +348,8 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
               if (_filters.dateFrom != null)
                 IconButton(
                   icon: const Icon(Icons.clear, size: 16),
-                  onPressed: () => _updateFilters(_filters.copyWith(clearDateFrom: true)),
+                  onPressed: () =>
+                      _updateFilters(_filters.copyWith(clearDateFrom: true)),
                 ),
               const SizedBox(width: 8),
               const Text('to'),
@@ -353,7 +358,7 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
                 child: OutlinedButton.icon(
                   onPressed: () => _selectDate(false),
                   icon: const Icon(Icons.calendar_today, size: 16),
-                  label: Text(_filters.dateTo != null 
+                  label: Text(_filters.dateTo != null
                       ? _formatDate(_filters.dateTo!)
                       : 'To'),
                 ),
@@ -361,7 +366,8 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
               if (_filters.dateTo != null)
                 IconButton(
                   icon: const Icon(Icons.clear, size: 16),
-                  onPressed: () => _updateFilters(_filters.copyWith(clearDateTo: true)),
+                  onPressed: () =>
+                      _updateFilters(_filters.copyWith(clearDateTo: true)),
                 ),
             ],
           ),
@@ -388,7 +394,8 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
           const SizedBox(height: 16),
 
           // Additional filters
-          const Text('Additional filters:', style: TextStyle(fontWeight: FontWeight.w500)),
+          const Text('Additional filters:',
+              style: TextStyle(fontWeight: FontWeight.w500)),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
@@ -402,17 +409,11 @@ class _AdvancedSearchPanelState extends State<AdvancedSearchPanel> {
                 },
               ),
               FilterChip(
-                label: const Text('Favorites only'),
-                selected: _filters.favoritesOnly,
-                onSelected: (selected) {
-                  _updateFilters(_filters.copyWith(favoritesOnly: selected));
-                },
-              ),
-              FilterChip(
                 label: const Text('Show locked notes'),
                 selected: _filters.showPasswordProtected,
                 onSelected: (selected) {
-                  _updateFilters(_filters.copyWith(showPasswordProtected: selected));
+                  _updateFilters(
+                      _filters.copyWith(showPasswordProtected: selected));
                 },
               ),
               FilterChip(

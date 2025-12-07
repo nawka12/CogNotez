@@ -19,6 +19,7 @@ class AppLocalizations {
       'all_notes': 'All Notes',
       'untagged': 'Untagged',
       'tags': 'Tags',
+      'folders': 'Folders',
       'search_notes': 'Search notes...',
       'new_note': 'New Note',
       'untitled_note': 'Untitled note...',
@@ -141,6 +142,20 @@ class AppLocalizations {
       'delete_template_title': 'Delete Template',
       'delete_template_confirmation':
           'Are you sure you want to delete "{name}"?',
+      'generate_with_ai': 'Generate with AI',
+      'generating': 'Generating...',
+      'generate_ai_template': 'Generate AI Template',
+      'describe_template':
+          'Describe the template you want to create:',
+      'ai_template_hint':
+          'e.g., A template for bug reports with sections for steps to reproduce, expected behavior, actual behavior, and environment details',
+      'suggestions': 'Suggestions:',
+      'generate': 'Generate',
+      'please_enter_description': 'Please enter a description',
+      'ai_not_configured':
+          'AI is not configured. Please set up AI in Settings.',
+      'ai_template_generated': 'AI template generated! Review and save it.',
+      'ai_template_generation_failed': 'Failed to generate template: {error}',
       // Tag management
       'manage_tags_title': 'Manage Tags',
       'create_tag_title': 'Create Tag',
@@ -274,6 +289,35 @@ class AppLocalizations {
       'model_id_label': 'Model ID',
       'model_examples':
           'Examples: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet',
+      // AI Conversation Panel
+      'ai_assistant': 'AI Assistant',
+      'ai_welcome_message':
+          "Hello! I'm your AI assistant. I can help you with your notes - ask me questions, get summaries, or just chat about anything!",
+      'ai_ask_anything': 'Ask me anything...',
+      'new_chat': 'New Chat',
+      // Splash Screen
+      'app_subtitle': 'AI-Powered Note Taking',
+      'starting_up': 'Starting up...',
+      'initializing_database': 'Initializing database...',
+      'loading_settings': 'Loading settings...',
+      'preparing_services': 'Preparing services...',
+      'loading_notes': 'Loading notes...',
+      'almost_ready': 'Almost ready...',
+      'ready': 'Ready!',
+      // Error handling
+      'error_occurred': 'An error occurred',
+      'retry': 'Retry',
+      'error_loading_notes': 'Failed to load notes',
+      'error_saving_note': 'Failed to save note',
+      'error_network': 'Network error. Please check your connection.',
+      'error_unknown': 'Something went wrong. Please try again.',
+      // Onboarding
+      'welcome_to_cognotez': 'Welcome to CogNotez',
+      'onboarding_note_1': 'Create and organize notes with tags',
+      'onboarding_note_2': 'Use AI to summarize, edit, and enhance your notes',
+      'onboarding_note_3': 'Sync across devices with Google Drive',
+      'get_started': 'Get Started',
+      'skip': 'Skip',
     },
     'es': {
       'app_title': 'CogNotez',
@@ -408,6 +452,20 @@ class AppLocalizations {
           'Crea una desde cero o guarda notas como plantillas',
       'delete_template_title': 'Eliminar plantilla',
       'delete_template_confirmation': '¿Seguro que quieres eliminar "{name}"?',
+      'generate_with_ai': 'Generar con IA',
+      'generating': 'Generando...',
+      'generate_ai_template': 'Generar plantilla con IA',
+      'describe_template':
+          'Describe la plantilla que quieres crear:',
+      'ai_template_hint':
+          'p.ej., Una plantilla para informes de errores con secciones para pasos a reproducir, comportamiento esperado, comportamiento real y detalles del entorno',
+      'suggestions': 'Sugerencias:',
+      'generate': 'Generar',
+      'please_enter_description': 'Por favor ingresa una descripción',
+      'ai_not_configured':
+          'La IA no está configurada. Configura la IA en Ajustes.',
+      'ai_template_generated': '¡Plantilla IA generada! Revísala y guárdala.',
+      'ai_template_generation_failed': 'Error al generar plantilla: {error}',
       // Tag management
       'manage_tags_title': 'Administrar etiquetas',
       'create_tag_title': 'Crear etiqueta',
@@ -543,6 +601,35 @@ class AppLocalizations {
       'model_id_label': 'ID del Modelo',
       'model_examples':
           'Ejemplos: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet',
+      // AI Conversation Panel
+      'ai_assistant': 'Asistente IA',
+      'ai_welcome_message':
+          '¡Hola! Soy tu asistente de IA. Puedo ayudarte con tus notas - haz preguntas, obtén resúmenes, ¡o simplemente charla sobre cualquier cosa!',
+      'ai_ask_anything': 'Pregúntame lo que quieras...',
+      'new_chat': 'Nueva Conversación',
+      // Splash Screen
+      'app_subtitle': 'Notas con IA',
+      'starting_up': 'Iniciando...',
+      'initializing_database': 'Inicializando base de datos...',
+      'loading_settings': 'Cargando configuración...',
+      'preparing_services': 'Preparando servicios...',
+      'loading_notes': 'Cargando notas...',
+      'almost_ready': 'Casi listo...',
+      'ready': '¡Listo!',
+      // Error handling
+      'error_occurred': 'Ocurrió un error',
+      'retry': 'Reintentar',
+      'error_loading_notes': 'Error al cargar notas',
+      'error_saving_note': 'Error al guardar nota',
+      'error_network': 'Error de red. Por favor verifica tu conexión.',
+      'error_unknown': 'Algo salió mal. Por favor intenta de nuevo.',
+      // Onboarding
+      'welcome_to_cognotez': 'Bienvenido a CogNotez',
+      'onboarding_note_1': 'Crea y organiza notas con etiquetas',
+      'onboarding_note_2': 'Usa IA para resumir, editar y mejorar tus notas',
+      'onboarding_note_3': 'Sincroniza entre dispositivos con Google Drive',
+      'get_started': 'Comenzar',
+      'skip': 'Omitir',
     },
     'id': {
       'app_title': 'CogNotez',
@@ -673,6 +760,20 @@ class AppLocalizations {
       'delete_template_title': 'Hapus Template',
       'delete_template_confirmation':
           'Apakah Anda yakin ingin menghapus "{name}"?',
+      'generate_with_ai': 'Buat dengan AI',
+      'generating': 'Membuat...',
+      'generate_ai_template': 'Buat Template AI',
+      'describe_template':
+          'Jelaskan template yang ingin Anda buat:',
+      'ai_template_hint':
+          'misalnya, Template untuk laporan bug dengan bagian langkah reproduksi, perilaku yang diharapkan, perilaku aktual, dan detail lingkungan',
+      'suggestions': 'Saran:',
+      'generate': 'Buat',
+      'please_enter_description': 'Silakan masukkan deskripsi',
+      'ai_not_configured':
+          'AI tidak dikonfigurasi. Silakan atur AI di Pengaturan.',
+      'ai_template_generated': 'Template AI dibuat! Tinjau dan simpan.',
+      'ai_template_generation_failed': 'Gagal membuat template: {error}',
       // Tag management
       'manage_tags_title': 'Kelola Tag',
       'create_tag_title': 'Buat Tag',
@@ -807,6 +908,35 @@ class AppLocalizations {
       'model_id_label': 'ID Model',
       'model_examples':
           'Contoh: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet',
+      // AI Conversation Panel
+      'ai_assistant': 'Asisten AI',
+      'ai_welcome_message':
+          'Halo! Saya asisten AI Anda. Saya bisa membantu dengan catatan Anda - ajukan pertanyaan, dapatkan ringkasan, atau ngobrol tentang apa saja!',
+      'ai_ask_anything': 'Tanya apa saja...',
+      'new_chat': 'Obrolan Baru',
+      // Splash Screen
+      'app_subtitle': 'Catatan Berbasis AI',
+      'starting_up': 'Memulai...',
+      'initializing_database': 'Menginisialisasi database...',
+      'loading_settings': 'Memuat pengaturan...',
+      'preparing_services': 'Menyiapkan layanan...',
+      'loading_notes': 'Memuat catatan...',
+      'almost_ready': 'Hampir siap...',
+      'ready': 'Siap!',
+      // Error handling
+      'error_occurred': 'Terjadi kesalahan',
+      'retry': 'Coba Lagi',
+      'error_loading_notes': 'Gagal memuat catatan',
+      'error_saving_note': 'Gagal menyimpan catatan',
+      'error_network': 'Kesalahan jaringan. Periksa koneksi Anda.',
+      'error_unknown': 'Terjadi kesalahan. Silakan coba lagi.',
+      // Onboarding
+      'welcome_to_cognotez': 'Selamat Datang di CogNotez',
+      'onboarding_note_1': 'Buat dan atur catatan dengan tag',
+      'onboarding_note_2': 'Gunakan AI untuk meringkas, mengedit, dan meningkatkan catatan',
+      'onboarding_note_3': 'Sinkronkan antar perangkat dengan Google Drive',
+      'get_started': 'Mulai',
+      'skip': 'Lewati',
     },
     'ja': {
       'app_title': 'CogNotez',
@@ -933,6 +1063,18 @@ class AppLocalizations {
       'no_custom_templates_description': '最初から作成するか、ノートをテンプレートとして保存してください',
       'delete_template_title': 'テンプレートを削除',
       'delete_template_confirmation': '「{name}」を削除してもよろしいですか？',
+      'generate_with_ai': 'AIで生成',
+      'generating': '生成中...',
+      'generate_ai_template': 'AIテンプレートを生成',
+      'describe_template': '作成したいテンプレートを説明してください：',
+      'ai_template_hint':
+          '例：再現手順、期待される動作、実際の動作、環境の詳細のセクションを含むバグレポート用テンプレート',
+      'suggestions': '提案：',
+      'generate': '生成',
+      'please_enter_description': '説明を入力してください',
+      'ai_not_configured': 'AIが設定されていません。設定でAIを設定してください。',
+      'ai_template_generated': 'AIテンプレートが生成されました！確認して保存してください。',
+      'ai_template_generation_failed': 'テンプレートの生成に失敗しました: {error}',
       // Tag management
       'manage_tags_title': 'タグを管理',
       'create_tag_title': 'タグを作成',
@@ -1061,6 +1203,35 @@ class AppLocalizations {
       'fetch_models_failed': 'モデルを取得できませんでした。モデルIDを手動で入力してください。',
       'model_id_label': 'モデルID',
       'model_examples': '例: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet',
+      // AI Conversation Panel
+      'ai_assistant': 'AIアシスタント',
+      'ai_welcome_message':
+          'こんにちは！私はあなたのAIアシスタントです。ノートに関する質問、要約の取得、または何でも気軽に話しかけてください！',
+      'ai_ask_anything': '何でも聞いてください...',
+      'new_chat': '新しいチャット',
+      // Splash Screen
+      'app_subtitle': 'AI搭載ノートアプリ',
+      'starting_up': '起動中...',
+      'initializing_database': 'データベースを初期化中...',
+      'loading_settings': '設定を読み込み中...',
+      'preparing_services': 'サービスを準備中...',
+      'loading_notes': 'ノートを読み込み中...',
+      'almost_ready': 'もうすぐです...',
+      'ready': '準備完了！',
+      // Error handling
+      'error_occurred': 'エラーが発生しました',
+      'retry': '再試行',
+      'error_loading_notes': 'ノートの読み込みに失敗しました',
+      'error_saving_note': 'ノートの保存に失敗しました',
+      'error_network': 'ネットワークエラー。接続を確認してください。',
+      'error_unknown': '問題が発生しました。もう一度お試しください。',
+      // Onboarding
+      'welcome_to_cognotez': 'CogNotezへようこそ',
+      'onboarding_note_1': 'タグでノートを作成・整理',
+      'onboarding_note_2': 'AIでノートを要約・編集・改善',
+      'onboarding_note_3': 'Googleドライブで複数デバイス間で同期',
+      'get_started': '始める',
+      'skip': 'スキップ',
     },
     'jv': {
       'app_title': 'CogNotez',
@@ -1192,6 +1363,19 @@ class AppLocalizations {
           'Gawe saka wiwitan utawa simpen cathetan dadi template',
       'delete_template_title': 'Busak Template',
       'delete_template_confirmation': 'Sampeyan yakin arep mbusak "{name}"?',
+      'generate_with_ai': 'Gawe nganggo AI',
+      'generating': 'Nggawe...',
+      'generate_ai_template': 'Gawe Template AI',
+      'describe_template': 'Jelasna template sing arep digawe:',
+      'ai_template_hint':
+          'umpamane, Template kanggo laporan bug kanthi bagian langkah reproduksi, prilaku sing dikarepake, prilaku nyata, lan rincian lingkungan',
+      'suggestions': 'Saran:',
+      'generate': 'Gawe',
+      'please_enter_description': 'Mangga lebokna katerangan',
+      'ai_not_configured':
+          'AI durung dikonfigurasi. Mangga atur AI ing Pengaturan.',
+      'ai_template_generated': 'Template AI digawe! Tinjau lan simpen.',
+      'ai_template_generation_failed': 'Gagal nggawe template: {error}',
       // Tag management
       'manage_tags_title': 'Ngatur Tag',
       'create_tag_title': 'Gawe Tag',
@@ -1325,6 +1509,35 @@ class AppLocalizations {
       'model_id_label': 'ID Model',
       'model_examples':
           'Conto: openai/gpt-4o-mini, anthropic/claude-3.5-sonnet',
+      // AI Conversation Panel
+      'ai_assistant': 'Asisten AI',
+      'ai_welcome_message':
+          'Halo! Aku asisten AI sampeyan. Aku bisa mbantu karo cathetan sampeyan - takon apa wae, entuk ringkasan, utawa ngobrol bebas!',
+      'ai_ask_anything': 'Takon apa wae...',
+      'new_chat': 'Obrolan Anyar',
+      // Splash Screen
+      'app_subtitle': 'Cathetan Berbasis AI',
+      'starting_up': 'Miwiti...',
+      'initializing_database': 'Nggawe database...',
+      'loading_settings': 'Mbukak setelan...',
+      'preparing_services': 'Nyiapake layanan...',
+      'loading_notes': 'Mbukak cathetan...',
+      'almost_ready': 'Meh rampung...',
+      'ready': 'Siap!',
+      // Error handling
+      'error_occurred': 'Ana kesalahan',
+      'retry': 'Coba Maneh',
+      'error_loading_notes': 'Gagal mbukak cathetan',
+      'error_saving_note': 'Gagal nyimpen cathetan',
+      'error_network': 'Kesalahan jaringan. Cek koneksi sampeyan.',
+      'error_unknown': 'Ana masalah. Coba maneh.',
+      // Onboarding
+      'welcome_to_cognotez': 'Sugeng Rawuh ing CogNotez',
+      'onboarding_note_1': 'Gawe lan atur cathetan nganggo tag',
+      'onboarding_note_2': 'Nggunakake AI kanggo ngringkes, nyunting, lan nambah cathetan',
+      'onboarding_note_3': 'Sinkronake antarane piranti nganggo Google Drive',
+      'get_started': 'Miwiti',
+      'skip': 'Lewati',
     },
   };
 
@@ -1339,6 +1552,7 @@ class AppLocalizations {
   String get allNotes => translate('all_notes');
   String get untagged => translate('untagged');
   String get tags => translate('tags');
+  String get folders => translate('folders');
   String get searchNotes => translate('search_notes');
   String get newNote => translate('new_note');
   String get untitledNote => translate('untitled_note');
@@ -1357,6 +1571,40 @@ class AppLocalizations {
   String get settings => translate('settings');
   String get collapseSidebar => translate('collapse_sidebar');
   String get manageTags => translate('manage_tags');
+
+  // AI Conversation Panel
+  String get ai_assistant => translate('ai_assistant');
+  String get ai_welcome_message => translate('ai_welcome_message');
+  String get ai_ask_anything => translate('ai_ask_anything');
+  String get new_chat => translate('new_chat');
+  String get ai_not_configured => translate('ai_not_configured');
+  String get ai_processing => translate('ai_processing');
+
+  // Splash Screen
+  String get app_subtitle => translate('app_subtitle');
+  String get starting_up => translate('starting_up');
+  String get initializing_database => translate('initializing_database');
+  String get loading_settings => translate('loading_settings');
+  String get preparing_services => translate('preparing_services');
+  String get loading_notes => translate('loading_notes');
+  String get almost_ready => translate('almost_ready');
+  String get ready => translate('ready');
+
+  // Error handling
+  String get error_occurred => translate('error_occurred');
+  String get retry => translate('retry');
+  String get error_loading_notes => translate('error_loading_notes');
+  String get error_saving_note => translate('error_saving_note');
+  String get error_network => translate('error_network');
+  String get error_unknown => translate('error_unknown');
+
+  // Onboarding
+  String get welcome_to_cognotez => translate('welcome_to_cognotez');
+  String get onboarding_note_1 => translate('onboarding_note_1');
+  String get onboarding_note_2 => translate('onboarding_note_2');
+  String get onboarding_note_3 => translate('onboarding_note_3');
+  String get get_started => translate('get_started');
+  String get skip => translate('skip');
 }
 
 class _AppLocalizationsDelegate

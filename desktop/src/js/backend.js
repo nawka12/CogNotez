@@ -555,7 +555,6 @@ class BackendAPI {
                             preview: this.generatePreview(content),
                             tags: [],
                             category: null,
-                            is_favorite: false,
                             is_archived: false,
                             word_count: this.calculateWordCount(content),
                             char_count: content.length,
@@ -847,7 +846,6 @@ class BackendAPI {
             totalNotes: notes.length,
             totalWords: notes.reduce((sum, note) => sum + (note.word_count || 0), 0),
             totalChars: notes.reduce((sum, note) => sum + (note.char_count || 0), 0),
-            favoriteNotes: notes.filter(note => note.is_favorite).length,
             archivedNotes: notes.filter(note => note.is_archived).length,
             recentNotes: notes.filter(note => {
                 const daysSinceModified = (Date.now() - new Date(note.modified || note.updated_at)) / (1000 * 60 * 60 * 24);
@@ -864,7 +862,6 @@ Generated on: ${new Date(report.generatedAt).toLocaleDateString()}
 - **Total Notes**: ${report.totalNotes}
 - **Total Words**: ${report.totalWords.toLocaleString()}
 - **Total Characters**: ${report.totalChars.toLocaleString()}
-- **Favorite Notes**: ${report.favoriteNotes}
 - **Archived Notes**: ${report.archivedNotes}
 - **Recent Notes (7 days)**: ${report.recentNotes}
 

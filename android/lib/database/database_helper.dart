@@ -34,7 +34,7 @@ class DatabaseHelper {
       // Check if columns exist before adding them
       final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
       final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
-      
+
       if (!columnNames.contains('encryption_salt')) {
         await db.execute('ALTER TABLE notes ADD COLUMN encryption_salt TEXT');
       }
@@ -48,24 +48,26 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE notes ADD COLUMN metadata TEXT');
       }
     }
-    
+
     // Migration from version 2 to 3: Add pinned column
     if (oldVersion < 3) {
       final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
       final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
-      
+
       if (!columnNames.contains('is_pinned')) {
-        await db.execute('ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0');
+        await db.execute(
+            'ALTER TABLE notes ADD COLUMN is_pinned INTEGER NOT NULL DEFAULT 0');
       }
     }
-    
+
     // Migration from version 3 to 4: Add favorite column
     if (oldVersion < 4) {
       final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
       final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
-      
+
       if (!columnNames.contains('is_favorite')) {
-        await db.execute('ALTER TABLE notes ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0');
+        await db.execute(
+            'ALTER TABLE notes ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0');
       }
     }
 
@@ -73,12 +75,14 @@ class DatabaseHelper {
     if (oldVersion < 5) {
       final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
       final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
-      
+
       if (!columnNames.contains('word_count')) {
-        await db.execute('ALTER TABLE notes ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0');
+        await db.execute(
+            'ALTER TABLE notes ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0');
       }
       if (!columnNames.contains('char_count')) {
-        await db.execute('ALTER TABLE notes ADD COLUMN char_count INTEGER NOT NULL DEFAULT 0');
+        await db.execute(
+            'ALTER TABLE notes ADD COLUMN char_count INTEGER NOT NULL DEFAULT 0');
       }
       if (!columnNames.contains('collaboration')) {
         await db.execute('ALTER TABLE notes ADD COLUMN collaboration TEXT');
@@ -154,7 +158,8 @@ class DatabaseHelper {
     Map<String, dynamic>? metadata;
     if (row['metadata'] != null) {
       try {
-        metadata = jsonDecode(row['metadata'] as String) as Map<String, dynamic>;
+        metadata =
+            jsonDecode(row['metadata'] as String) as Map<String, dynamic>;
       } catch (e) {
         // If metadata can't be parsed, set to null
         metadata = null;
@@ -164,12 +169,13 @@ class DatabaseHelper {
     Map<String, dynamic>? collaboration;
     if (row['collaboration'] != null) {
       try {
-        collaboration = jsonDecode(row['collaboration'] as String) as Map<String, dynamic>;
+        collaboration =
+            jsonDecode(row['collaboration'] as String) as Map<String, dynamic>;
       } catch (e) {
         collaboration = null;
       }
     }
-    
+
     return Note(
       id: row['id'] as String,
       title: row['title'] as String,
@@ -183,7 +189,6 @@ class DatabaseHelper {
       encryptionIv: row['encryption_iv'] as String?,
       metadata: metadata,
       isPinned: (row['is_pinned'] as int? ?? 0) == 1,
-      isFavorite: (row['is_favorite'] as int? ?? 0) == 1,
       wordCount: row['word_count'] as int? ?? 0,
       charCount: row['char_count'] as int? ?? 0,
       collaboration: collaboration,
@@ -204,22 +209,24 @@ class DatabaseHelper {
       'encryption_iv': note.encryptionIv,
       'metadata': note.metadata != null ? jsonEncode(note.metadata) : null,
       'is_pinned': note.isPinned ? 1 : 0,
-      'is_favorite': note.isFavorite ? 1 : 0,
+      'is_favorite': 0,  // Deprecated: favorites feature removed
       'word_count': note.wordCount,
       'char_count': note.charCount,
-      'collaboration': note.collaboration != null ? jsonEncode(note.collaboration) : null,
+      'collaboration':
+          note.collaboration != null ? jsonEncode(note.collaboration) : null,
     };
   }
 
   // Notes CRUD
   Future<String> insertNote(Note note) async {
     final db = await database;
-    
+
     // Create note map without tags (tags are stored in junction table)
     final noteMap = _noteToDbRow(note);
-    
-    await db.insert('notes', noteMap, conflictAlgorithm: ConflictAlgorithm.replace);
-    
+
+    await db.insert('notes', noteMap,
+        conflictAlgorithm: ConflictAlgorithm.replace);
+
     // Insert tags in junction table
     await db.delete('note_tags', where: 'note_id = ?', whereArgs: [note.id]);
     if (note.tags.isNotEmpty) {
@@ -231,15 +238,16 @@ class DatabaseHelper {
         );
       }
     }
-    
+
     return note.id;
   }
 
   Future<List<Note>> getAllNotes() async {
     final db = await database;
     // Sort pinned notes first, then by updated_at
-    final notes = await db.query('notes', orderBy: 'is_pinned DESC, updated_at DESC');
-    
+    final notes =
+        await db.query('notes', orderBy: 'is_pinned DESC, updated_at DESC');
+
     final List<Note> noteList = [];
     for (final noteMap in notes) {
       // Load tags for this note
@@ -251,16 +259,16 @@ class DatabaseHelper {
       final tags = tagMaps.map((map) => map['tag_id'] as String).toList();
       noteList.add(_noteFromDbRow(noteMap, tags));
     }
-    
+
     return noteList;
   }
 
   Future<Note?> getNoteById(String id) async {
     final db = await database;
     final notes = await db.query('notes', where: 'id = ?', whereArgs: [id]);
-    
+
     if (notes.isEmpty) return null;
-    
+
     // Load tags
     final tagMaps = await db.query(
       'note_tags',
@@ -268,19 +276,20 @@ class DatabaseHelper {
       whereArgs: [id],
     );
     final tags = tagMaps.map((map) => map['tag_id'] as String).toList();
-    
+
     return _noteFromDbRow(notes.first, tags);
   }
 
   Future<int> updateNote(Note note) async {
     final db = await database;
-    
+
     // Create note map without tags (tags are stored in junction table)
     final noteMap = _noteToDbRow(note);
-    
+
     // Update note
-    final result = await db.update('notes', noteMap, where: 'id = ?', whereArgs: [note.id]);
-    
+    final result = await db
+        .update('notes', noteMap, where: 'id = ?', whereArgs: [note.id]);
+
     // Update tags
     await db.delete('note_tags', where: 'note_id = ?', whereArgs: [note.id]);
     for (final tagId in note.tags) {
@@ -290,7 +299,7 @@ class DatabaseHelper {
         conflictAlgorithm: ConflictAlgorithm.replace,
       );
     }
-    
+
     return result;
   }
 
@@ -303,7 +312,8 @@ class DatabaseHelper {
   // Tags CRUD
   Future<String> insertTag(Tag tag) async {
     final db = await database;
-    await db.insert('tags', tag.toJson(), conflictAlgorithm: ConflictAlgorithm.replace);
+    await db.insert('tags', tag.toJson(),
+        conflictAlgorithm: ConflictAlgorithm.replace);
     return tag.id;
   }
 
@@ -322,7 +332,8 @@ class DatabaseHelper {
 
   Future<int> updateTag(Tag tag) async {
     final db = await database;
-    return await db.update('tags', tag.toJson(), where: 'id = ?', whereArgs: [tag.id]);
+    return await db
+        .update('tags', tag.toJson(), where: 'id = ?', whereArgs: [tag.id]);
   }
 
   Future<int> deleteTag(String id) async {
@@ -345,7 +356,7 @@ class DatabaseHelper {
          OR LOWER(COALESCE(t.name, '')) LIKE ?
       ORDER BY n.is_pinned DESC, n.updated_at DESC
     ''', [searchTerm, searchTerm, searchTerm]);
-    
+
     final List<Note> noteList = [];
     for (final noteMap in notes) {
       final tagMaps = await db.query(
@@ -356,7 +367,7 @@ class DatabaseHelper {
       final tags = tagMaps.map((map) => map['tag_id'] as String).toList();
       noteList.add(_noteFromDbRow(noteMap, tags));
     }
-    
+
     return noteList;
   }
 
@@ -372,7 +383,8 @@ class DatabaseHelper {
 
   Future<String?> getSetting(String key) async {
     final db = await database;
-    final settings = await db.query('settings', where: 'key = ?', whereArgs: [key]);
+    final settings =
+        await db.query('settings', where: 'key = ?', whereArgs: [key]);
     if (settings.isEmpty) return null;
     return settings.first['value'] as String?;
   }
@@ -382,4 +394,3 @@ class DatabaseHelper {
     await db.close();
   }
 }
-
