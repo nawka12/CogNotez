@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:chewie/chewie.dart';
 import '../models/note.dart';
@@ -14,15 +14,18 @@ import '../services/settings_service.dart';
 import '../services/media_storage_service.dart';
 import '../widgets/find_replace_dialog.dart';
 import '../widgets/password_dialog.dart';
+import '../l10n/app_localizations.dart';
+
+import 'package:markdown/markdown.dart' as md;
 
 enum ViewMode { edit, preview }
 
 class _EditorState {
   final String title;
   final String content;
-  
+
   _EditorState({required this.title, required this.content});
-  
+
   @override
   bool operator ==(Object other) {
     if (identical(this, other)) return true;
@@ -30,7 +33,7 @@ class _EditorState {
         other.title == title &&
         other.content == content;
   }
-  
+
   @override
   int get hashCode => title.hashCode ^ content.hashCode;
 }
@@ -49,7 +52,8 @@ class NoteEditorScreen extends StatefulWidget {
   State<NoteEditorScreen> createState() => _NoteEditorScreenState();
 }
 
-class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBindingObserver {
+class _NoteEditorScreenState extends State<NoteEditorScreen>
+    with WidgetsBindingObserver {
   late TextEditingController _titleController;
   late TextEditingController _contentController;
   ViewMode _viewMode = ViewMode.edit;
@@ -57,23 +61,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
   bool _isNew = false;
   late Note _currentNote;
   final ExportService _exportService = ExportService();
-  
+
   // Find & Replace
   bool _showFindReplace = false;
-  
+
   // AI features
   bool _isAiLoading = false;
-  
+
   // Password protection
   String? _currentPassword;
-  
+
   // Undo/Redo history
   final List<_EditorState> _history = [];
   int _historyIndex = -1;
   static const int _maxHistorySize = 50;
   bool _isRecordingHistory = true;
   DateTime? _lastHistorySaveTime;
-  
+
   // Auto-save
   Timer? _autoSaveTimer;
   Timer? _typingPauseTimer;
@@ -134,7 +138,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
 
   Future<void> _performAutoSave() async {
     if (_isSaving || !_hasChanges) return;
-    
+
     _isSaving = true;
     try {
       final notesService = Provider.of<NotesService>(context, listen: false);
@@ -185,14 +189,15 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
         _performAutoSave();
       }
     });
-    
+
     // Also save to undo history after typing pause
     _lastHistorySaveTime = DateTime.now();
     Future.delayed(const Duration(milliseconds: 1000), () {
       if (_isRecordingHistory &&
           mounted &&
           _lastHistorySaveTime != null &&
-          DateTime.now().difference(_lastHistorySaveTime!).inMilliseconds >= 1000) {
+          DateTime.now().difference(_lastHistorySaveTime!).inMilliseconds >=
+              1000) {
         _saveState();
       }
     });
@@ -205,59 +210,59 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
       });
     }
   }
-  
+
   void _saveState() {
     if (!_isRecordingHistory) return;
-    
+
     final state = _EditorState(
       title: _titleController.text,
       content: _contentController.text,
     );
-    
+
     if (_historyIndex < _history.length - 1) {
       _history.removeRange(_historyIndex + 1, _history.length);
     }
-    
-    if (_history.isEmpty || 
+
+    if (_history.isEmpty ||
         (_historyIndex >= 0 && _history[_historyIndex] != state)) {
       _history.add(state);
       _historyIndex = _history.length - 1;
-      
+
       if (_history.length > _maxHistorySize) {
         _history.removeAt(0);
         _historyIndex--;
       }
     }
   }
-  
+
   bool get _canUndo => _historyIndex > 0;
   bool get _canRedo => _historyIndex < _history.length - 1;
-  
+
   void _undo() {
     if (!_canUndo) return;
-    
+
     _isRecordingHistory = false;
     _historyIndex--;
     final state = _history[_historyIndex];
     _titleController.text = state.title;
     _contentController.text = state.content;
     _isRecordingHistory = true;
-    
+
     setState(() {
       _hasChanges = true;
     });
   }
-  
+
   void _redo() {
     if (!_canRedo) return;
-    
+
     _isRecordingHistory = false;
     _historyIndex++;
     final state = _history[_historyIndex];
     _titleController.text = state.title;
     _contentController.text = state.content;
     _isRecordingHistory = true;
-    
+
     setState(() {
       _hasChanges = true;
     });
@@ -265,7 +270,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
 
   Future<void> _saveNote({bool showFeedback = true}) async {
     if (_isSaving) return;
-    
+
     _isSaving = true;
     try {
       final notesService = Provider.of<NotesService>(context, listen: false);
@@ -304,7 +309,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     if (_isSaving) return;
 
     setState(() {
-      _currentNote = _currentNote.copyWith(isFavorite: !_currentNote.isFavorite);
+      _currentNote =
+          _currentNote.copyWith(isFavorite: !_currentNote.isFavorite);
       _hasChanges = true;
     });
 
@@ -313,7 +319,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(_currentNote.isFavorite ? 'Added to favorites' : 'Removed from favorites'),
+          content: Text(_currentNote.isFavorite
+              ? 'Added to favorites'
+              : 'Removed from favorites'),
           duration: const Duration(seconds: 1),
         ),
       );
@@ -329,13 +337,14 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
 
   Future<bool> _onWillPop() async {
     if (!_hasChanges) return true;
-    
+
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text('Unsaved Changes'),
-        content: const Text('You have unsaved changes. Do you want to discard them?'),
+        content: const Text(
+            'You have unsaved changes. Do you want to discard them?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -357,7 +366,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
         ],
       ),
     );
-    
+
     return result ?? false;
   }
 
@@ -370,7 +379,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           title: const Text('Manage Tags'),
           content: SizedBox(
             width: double.maxFinite,
@@ -380,22 +390,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                 if (allTags.isEmpty)
                   const Padding(
                     padding: EdgeInsets.all(16.0),
-                    child: Text('No tags available. Create tags in the main screen.'),
+                    child: Text(
+                        'No tags available. Create tags in the main screen.'),
                   )
                 else
                   ...allTags.map((tag) => CheckboxListTile(
-                    title: Text(tag.name),
-                    value: selectedTagIds.contains(tag.id),
-                    onChanged: (checked) {
-                      setDialogState(() {
-                        if (checked == true) {
-                          selectedTagIds.add(tag.id);
-                        } else {
-                          selectedTagIds.remove(tag.id);
-                        }
-                      });
-                    },
-                  )),
+                        title: Text(tag.name),
+                        value: selectedTagIds.contains(tag.id),
+                        onChanged: (checked) {
+                          setDialogState(() {
+                            if (checked == true) {
+                              selectedTagIds.add(tag.id);
+                            } else {
+                              selectedTagIds.remove(tag.id);
+                            }
+                          });
+                        },
+                      )),
               ],
             ),
           ),
@@ -439,24 +450,31 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     final selection = _contentController.selection;
     if (selection.isValid && selection.start != selection.end) {
       final text = _contentController.text;
-      final newContent = text.substring(0, selection.start) + newText + text.substring(selection.end);
+      final newContent = text.substring(0, selection.start) +
+          newText +
+          text.substring(selection.end);
       _contentController.text = newContent;
-      _contentController.selection = TextSelection.collapsed(offset: selection.start + newText.length);
+      _contentController.selection =
+          TextSelection.collapsed(offset: selection.start + newText.length);
     }
   }
 
   void _insertText(String text) {
     final selection = _contentController.selection;
     final currentText = _contentController.text;
-    final insertPosition = selection.isValid ? selection.start : currentText.length;
-    final newContent = currentText.substring(0, insertPosition) + text + currentText.substring(insertPosition);
+    final insertPosition =
+        selection.isValid ? selection.start : currentText.length;
+    final newContent = currentText.substring(0, insertPosition) +
+        text +
+        currentText.substring(insertPosition);
     _contentController.text = newContent;
-    _contentController.selection = TextSelection.collapsed(offset: insertPosition + text.length);
+    _contentController.selection =
+        TextSelection.collapsed(offset: insertPosition + text.length);
   }
 
   Future<void> _performAIAction(String action) async {
     final selectedText = _getSelectedText();
-    
+
     setState(() {
       _isAiLoading = true;
     });
@@ -467,14 +485,18 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
 
       switch (action) {
         case 'summarize':
-          final textToSummarize = selectedText.isNotEmpty ? selectedText : _contentController.text;
+          final textToSummarize =
+              selectedText.isNotEmpty ? selectedText : _contentController.text;
           result = await aiService.summarize(textToSummarize);
           _showAIResultDialog('Summary', result);
           break;
         case 'ask':
-          final question = await _showInputDialog('Ask AI', 'Enter your question:');
+          final question =
+              await _showInputDialog('Ask AI', 'Enter your question:');
           if (question != null && question.isNotEmpty) {
-            final context = selectedText.isNotEmpty ? selectedText : _contentController.text;
+            final context = selectedText.isNotEmpty
+                ? selectedText
+                : _contentController.text;
             result = await aiService.askQuestion(context, question);
             _showAIResultDialog('AI Response', result);
           }
@@ -484,7 +506,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             _showMessage('Please select text to edit');
             break;
           }
-          final instruction = await _showInputDialog('Edit with AI', 'How should I edit this text?');
+          final instruction = await _showInputDialog(
+              'Edit with AI', 'How should I edit this text?');
           if (instruction != null && instruction.isNotEmpty) {
             result = await aiService.editText(selectedText, instruction);
             _showAIEditApprovalDialog(selectedText, result);
@@ -495,24 +518,28 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             _showMessage('Please select text to rewrite');
             break;
           }
-          result = await aiService.editText(selectedText, 'Rewrite this text to improve clarity and readability while maintaining the original meaning.');
+          result = await aiService.editText(selectedText,
+              'Rewrite this text to improve clarity and readability while maintaining the original meaning.');
           _showAIEditApprovalDialog(selectedText, result);
           break;
         case 'generate':
-          final prompt = await _showInputDialog('Generate Content', 'What would you like me to generate?');
+          final prompt = await _showInputDialog(
+              'Generate Content', 'What would you like me to generate?');
           if (prompt != null && prompt.isNotEmpty) {
             result = await aiService.generateContent(prompt);
             _showAIInsertDialog(result);
           }
           break;
         case 'keypoints':
-          final textToAnalyze = selectedText.isNotEmpty ? selectedText : _contentController.text;
+          final textToAnalyze =
+              selectedText.isNotEmpty ? selectedText : _contentController.text;
           final points = await aiService.extractKeyPoints(textToAnalyze);
           result = points.map((p) => '• $p').join('\n');
           _showAIResultDialog('Key Points', result);
           break;
         case 'tags':
-          final textToAnalyze = selectedText.isNotEmpty ? selectedText : _contentController.text;
+          final textToAnalyze =
+              selectedText.isNotEmpty ? selectedText : _contentController.text;
           final tags = await aiService.generateTags(textToAnalyze);
           _showGeneratedTagsDialog(tags);
           break;
@@ -593,7 +620,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text('Original:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Original:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               Container(
                 padding: const EdgeInsets.all(8),
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -603,7 +631,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                 ),
                 child: Text(original),
               ),
-              const Text('Suggested:', style: TextStyle(fontWeight: FontWeight.bold)),
+              const Text('Suggested:',
+                  style: TextStyle(fontWeight: FontWeight.bold)),
               Container(
                 padding: const EdgeInsets.all(8),
                 margin: const EdgeInsets.symmetric(vertical: 8),
@@ -662,7 +691,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
   void _showGeneratedTagsDialog(List<String> suggestedTags) async {
     final notesService = Provider.of<NotesService>(context, listen: false);
     final existingTags = notesService.tags;
-    
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -680,32 +709,38 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                 runSpacing: 8,
                 children: suggestedTags.map((tagName) {
                   final existingTag = existingTags.cast<Tag?>().firstWhere(
-                    (t) => t?.name.toLowerCase() == tagName.toLowerCase(),
-                    orElse: () => null,
-                  );
+                        (t) => t?.name.toLowerCase() == tagName.toLowerCase(),
+                        orElse: () => null,
+                      );
                   final isAlreadyApplied = existingTag != null &&
                       _currentNote.tags.contains(existingTag.id);
-                  
+
                   return ActionChip(
                     label: Text(tagName),
                     avatar: isAlreadyApplied
                         ? const Icon(Icons.check, size: 16)
                         : null,
-                    onPressed: isAlreadyApplied ? null : () async {
-                      // Find or create tag
-                      Tag? tag = existingTag;
-                      if (tag == null) {
-                        // Would need to create the tag - for now just show message
-                        _showMessage('Tag "$tagName" would be created and applied');
-                      } else {
-                        setState(() {
-                          final newTags = List<String>.from(_currentNote.tags)..add(tag.id);
-                          _currentNote = _currentNote.copyWith(tags: newTags);
-                          _hasChanges = true;
-                        });
-                      }
-                      Navigator.pop(context);
-                    },
+                    onPressed: isAlreadyApplied
+                        ? null
+                        : () async {
+                            // Find or create tag
+                            Tag? tag = existingTag;
+                            if (tag == null) {
+                              // Would need to create the tag - for now just show message
+                              _showMessage(
+                                  'Tag "$tagName" would be created and applied');
+                            } else {
+                              setState(() {
+                                final newTags =
+                                    List<String>.from(_currentNote.tags)
+                                      ..add(tag.id);
+                                _currentNote =
+                                    _currentNote.copyWith(tags: newTags);
+                                _hasChanges = true;
+                              });
+                            }
+                            Navigator.pop(context);
+                          },
                   );
                 }).toList(),
               ),
@@ -732,7 +767,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
 
   void _showAIContextMenu() {
     final selectedText = _getSelectedText();
-    
+    final loc = AppLocalizations.of(context);
+
     showModalBottomSheet(
       context: context,
       builder: (context) => SafeArea(
@@ -741,8 +777,12 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
           children: [
             ListTile(
               leading: const Icon(Icons.summarize),
-              title: const Text('Summarize'),
-              subtitle: Text(selectedText.isEmpty ? 'Summarize entire note' : 'Summarize selection'),
+              title: Text(loc?.translate('summarize') ?? 'Summarize'),
+              subtitle: Text(selectedText.isEmpty
+                  ? (loc?.translate('summarize_entire_note') ??
+                      'Summarize entire note')
+                  : (loc?.translate('summarize_selection') ??
+                      'Summarize selection')),
               onTap: () {
                 Navigator.pop(context);
                 _performAIAction('summarize');
@@ -750,8 +790,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             ),
             ListTile(
               leading: const Icon(Icons.question_answer),
-              title: const Text('Ask AI'),
-              subtitle: Text(selectedText.isEmpty ? 'Ask about the note' : 'Ask about selection'),
+              title: Text(loc?.translate('ask_ai_title') ?? 'Ask AI'),
+              subtitle: Text(selectedText.isEmpty
+                  ? (loc?.translate('ask_about_note') ?? 'Ask about the note')
+                  : (loc?.translate('ask_about_selection') ??
+                      'Ask about selection')),
               onTap: () {
                 Navigator.pop(context);
                 _performAIAction('ask');
@@ -760,8 +803,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             if (selectedText.isNotEmpty) ...[
               ListTile(
                 leading: const Icon(Icons.edit),
-                title: const Text('Edit with AI'),
-                subtitle: const Text('Transform selected text'),
+                title: Text(loc?.translate('edit_with_ai') ?? 'Edit with AI'),
+                subtitle: Text(loc?.translate('transform_selected_text') ??
+                    'Transform selected text'),
                 onTap: () {
                   Navigator.pop(context);
                   _performAIAction('edit');
@@ -769,8 +813,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
               ),
               ListTile(
                 leading: const Icon(Icons.refresh),
-                title: const Text('Rewrite'),
-                subtitle: const Text('Improve clarity'),
+                title: Text(loc?.translate('rewrite') ?? 'Rewrite'),
+                subtitle: Text(
+                    loc?.translate('improve_clarity') ?? 'Improve clarity'),
                 onTap: () {
                   Navigator.pop(context);
                   _performAIAction('rewrite');
@@ -779,8 +824,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             ],
             ListTile(
               leading: const Icon(Icons.auto_awesome),
-              title: const Text('Generate Content'),
-              subtitle: const Text('Create new content with AI'),
+              title: Text(
+                  loc?.translate('generate_content') ?? 'Generate Content'),
+              subtitle: Text(loc?.translate('create_new_content_ai') ??
+                  'Create new content with AI'),
               onTap: () {
                 Navigator.pop(context);
                 _performAIAction('generate');
@@ -788,8 +835,11 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             ),
             ListTile(
               leading: const Icon(Icons.list),
-              title: const Text('Extract Key Points'),
-              subtitle: Text(selectedText.isEmpty ? 'From entire note' : 'From selection'),
+              title: Text(
+                  loc?.translate('extract_key_points') ?? 'Extract Key Points'),
+              subtitle: Text(selectedText.isEmpty
+                  ? (loc?.translate('from_entire_note') ?? 'From entire note')
+                  : (loc?.translate('from_selection') ?? 'From selection')),
               onTap: () {
                 Navigator.pop(context);
                 _performAIAction('keypoints');
@@ -797,8 +847,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             ),
             ListTile(
               leading: const Icon(Icons.label),
-              title: const Text('Suggest Tags'),
-              subtitle: const Text('Generate tags with AI'),
+              title: Text(loc?.translate('suggest_tags') ?? 'Suggest Tags'),
+              subtitle: Text(loc?.translate('generate_tags_ai') ??
+                  'Generate tags with AI'),
               onTap: () {
                 Navigator.pop(context);
                 _performAIAction('tags');
@@ -880,7 +931,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
 
   Future<void> _handleMenuAction(String action) async {
     final note = _getCurrentNote();
-    
+
     try {
       switch (action) {
         case 'undo':
@@ -971,8 +1022,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
       ),
       style: const TextStyle(fontSize: 16),
       contextMenuBuilder: (context, editableTextState) {
-        final List<ContextMenuButtonItem> buttonItems = editableTextState.contextMenuButtonItems;
-        
+        final List<ContextMenuButtonItem> buttonItems =
+            editableTextState.contextMenuButtonItems;
+
         // Add AI button if text is selected
         buttonItems.add(
           ContextMenuButtonItem(
@@ -983,7 +1035,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             },
           ),
         );
-        
+
         return AdaptiveTextSelectionToolbar.buttonItems(
           anchors: editableTextState.contextMenuAnchors,
           buttonItems: buttonItems,
@@ -992,12 +1044,94 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
     );
   }
 
+  /// Preprocess markdown content to convert HTML <img> and <video> tags with
+  /// cognotez-media URLs to standard markdown syntax. This is needed because
+  /// flutter_markdown_plus doesn't reliably handle raw HTML tags via MarkdownElementBuilder.
+  String _preprocessMediaContent(String content) {
+    var result = content;
+
+    // Pattern to match <img> tags with cognotez-media:// src
+    final imgTagPattern = RegExp(
+      r'''<img\s+[^>]*src\s*=\s*["']?(cognotez-media://[a-z0-9]+)["']?[^>]*>''',
+      caseSensitive: false,
+    );
+
+    result = result.replaceAllMapped(imgTagPattern, (match) {
+      final fullTag = match.group(0)!;
+      final src = match.group(1)!;
+
+      // Extract width attribute
+      final widthMatch =
+          RegExp(r'''width\s*=\s*["']?(\d+)["']?''', caseSensitive: false)
+              .firstMatch(fullTag);
+      final width = widthMatch?.group(1);
+
+      // Extract height attribute
+      final heightMatch =
+          RegExp(r'''height\s*=\s*["']?(\d+)["']?''', caseSensitive: false)
+              .firstMatch(fullTag);
+      final height = heightMatch?.group(1);
+
+      // Extract alt attribute
+      final altMatch =
+          RegExp(r'''alt\s*=\s*["']([^"']*)["']''', caseSensitive: false)
+              .firstMatch(fullTag);
+      final alt = altMatch?.group(1) ?? 'image';
+
+      // Build the URL with optional dimension query parameters
+      String url = src;
+      final params = <String>[];
+      if (width != null) params.add('w=$width');
+      if (height != null) params.add('h=$height');
+      if (params.isNotEmpty) {
+        url = '$src?${params.join('&')}';
+      }
+
+      // Return standard markdown image syntax
+      return '![$alt]($url)';
+    });
+
+    // Pattern to match <video> tags with <source src="cognotez-media://..."> inside
+    // Format: <video...><source src="cognotez-media://xxx" ...>...</video>
+    final videoWithSourcePattern = RegExp(
+      r'''<video[^>]*>[\s\S]*?<source[^>]*src\s*=\s*["']?(cognotez-media://[a-z0-9]+)["']?[^>]*>[\s\S]*?</video>''',
+      caseSensitive: false,
+    );
+
+    result = result.replaceAllMapped(videoWithSourcePattern, (match) {
+      final src = match.group(1)!;
+      String url = '$src?type=video';
+      return '![video]($url)';
+    });
+
+    // Also handle video tags with src directly on video element (older format)
+    final videoDirectSrcPattern = RegExp(
+      r'''<video[^>]*src\s*=\s*["']?(cognotez-media://[a-z0-9]+)["']?[^>]*>[\s\S]*?</video>''',
+      caseSensitive: false,
+    );
+
+    result = result.replaceAllMapped(videoDirectSrcPattern, (match) {
+      final src = match.group(1)!;
+      String url = '$src?type=video';
+      return '![video]($url)';
+    });
+
+    return result;
+  }
+
   Widget _buildPreview() {
     final mediaStorageService = MediaStorageService();
-    
+
+    // Preprocess content to convert HTML img tags to markdown syntax
+    final processedContent = _preprocessMediaContent(_contentController.text);
+
     return Markdown(
-      data: _contentController.text,
+      data: processedContent,
       selectable: true,
+      extensionSet: md.ExtensionSet.gitHubWeb,
+      builders: {
+        'video': _VideoElementBuilder(context),
+      },
       styleSheet: MarkdownStyleSheet(
         p: const TextStyle(fontSize: 16),
         h1: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
@@ -1007,37 +1141,58 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
       imageBuilder: (uri, title, alt) {
         // Handle custom cognotez-media URI scheme from desktop app
         if (uri.scheme == 'cognotez-media') {
-          final mediaId = mediaStorageService.extractMediaId(uri.toString());
-          if (mediaId != null) {
-            return _MediaWidget(
+          // Extract type and dimensions from query parameters (added by preprocessing)
+          final mediaType = uri.queryParameters['type'];
+          final widthStr = uri.queryParameters['w'];
+          final heightStr = uri.queryParameters['h'];
+          final width = widthStr != null ? double.tryParse(widthStr) : null;
+          final height = heightStr != null ? double.tryParse(heightStr) : null;
+
+          // Extract media ID (host part of the URI, without query params)
+          final mediaId = uri.host;
+          if (mediaId.isNotEmpty) {
+            // Check if this is a video (indicated by type=video in query params)
+            final isVideo = mediaType == 'video';
+
+            Widget widget = _MediaWidget(
               mediaId: mediaId,
               alt: alt,
               mediaStorageService: mediaStorageService,
+              forceVideo: isVideo,
             );
+
+            // Wrap in SizedBox if dimensions are specified
+            if (width != null || height != null) {
+              widget = SizedBox(width: width, height: height, child: widget);
+            }
+
+            return widget;
           }
           return _buildMediaPlaceholder(alt, 'Unknown media format');
         }
-        
+
         // Handle regular file URIs
         if (uri.scheme == 'file') {
           try {
             return Image.file(
               File.fromUri(uri),
-              errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(alt),
+              errorBuilder: (context, error, stackTrace) =>
+                  _buildImagePlaceholder(alt),
             );
           } catch (e) {
             return _buildImagePlaceholder(alt);
           }
         }
-        
+
         // Handle network images
         if (uri.scheme == 'http' || uri.scheme == 'https') {
           return Image.network(
             uri.toString(),
-            errorBuilder: (context, error, stackTrace) => _buildImagePlaceholder(alt),
+            errorBuilder: (context, error, stackTrace) =>
+                _buildImagePlaceholder(alt),
           );
         }
-        
+
         // Fallback for other schemes
         return _buildImagePlaceholder(alt);
       },
@@ -1060,7 +1215,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
           Flexible(
             child: Text(
               alt ?? 'Image not available',
-              style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+              style: TextStyle(
+                  color: Colors.grey[600], fontStyle: FontStyle.italic),
             ),
           ),
         ],
@@ -1093,7 +1249,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                   ),
                 Text(
                   message,
-                  style: TextStyle(color: Colors.grey[500], fontStyle: FontStyle.italic, fontSize: 12),
+                  style: TextStyle(
+                      color: Colors.grey[500],
+                      fontStyle: FontStyle.italic,
+                      fontSize: 12),
                 ),
               ],
             ),
@@ -1147,7 +1306,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
   Widget build(BuildContext context) {
     final notesService = Provider.of<NotesService>(context, listen: false);
     final canSave = _hasChanges || _isNew;
-    
+
     return PopScope(
       // Let the system/back stack pop normally when there are no unsaved
       // changes. When there ARE unsaved changes, intercept back and route
@@ -1198,7 +1357,9 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                     : null,
               ),
               onPressed: _toggleFavorite,
-              tooltip: _currentNote.isFavorite ? 'Remove favorite' : 'Add to favorites',
+              tooltip: _currentNote.isFavorite
+                  ? 'Remove favorite'
+                  : 'Add to favorites',
             ),
             // Save button
             IconButton(
@@ -1256,7 +1417,7 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                   enabled: !_isAiLoading,
                   child: Row(
                     children: [
-                      _isAiLoading 
+                      _isAiLoading
                           ? const SizedBox(
                               width: 20,
                               height: 20,
@@ -1275,7 +1436,8 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
                     children: [
                       const Icon(Icons.label_outline, size: 20),
                       const SizedBox(width: 8),
-                      Text('Tags${_currentNote.tags.isNotEmpty ? ' (${_currentNote.tags.length})' : ''}'),
+                      Text(
+                          'Tags${_currentNote.tags.isNotEmpty ? ' (${_currentNote.tags.length})' : ''}'),
                     ],
                   ),
                 ),
@@ -1357,7 +1519,10 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
               FindReplaceDialog(
                 contentController: _contentController,
                 onClose: () => setState(() => _showFindReplace = false),
-                onReplace: (find, replace, {useRegex = false, caseSensitive = false, replaceAll = false}) {
+                onReplace: (find, replace,
+                    {useRegex = false,
+                    caseSensitive = false,
+                    replaceAll = false}) {
                   // Handled internally by FindReplaceDialog
                 },
               ),
@@ -1365,21 +1530,23 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
             if (_currentNote.tags.isNotEmpty)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Wrap(
                   spacing: 8,
                   runSpacing: 4,
                   children: _currentNote.tags.map((tagId) {
                     final tag = notesService.tags.cast<Tag?>().firstWhere(
-                      (t) => t?.id == tagId,
-                      orElse: () => null,
-                    );
+                          (t) => t?.id == tagId,
+                          orElse: () => null,
+                        );
                     return Chip(
                       label: Text(tag?.name ?? 'Unknown'),
                       deleteIcon: const Icon(Icons.close, size: 16),
                       onDeleted: () {
                         setState(() {
-                          final newTags = List<String>.from(_currentNote.tags)..remove(tagId);
+                          final newTags = List<String>.from(_currentNote.tags)
+                            ..remove(tagId);
                           _currentNote = _currentNote.copyWith(tags: newTags);
                           _hasChanges = true;
                         });
@@ -1398,17 +1565,127 @@ class _NoteEditorScreenState extends State<NoteEditorScreen> with WidgetsBinding
   }
 }
 
+class _VideoElementBuilder extends MarkdownElementBuilder {
+  final BuildContext context;
+
+  _VideoElementBuilder(this.context);
+
+  @override
+  Widget? visitElement(md.Element element, TextStyle? preferredStyle) {
+    final src = element.attributes['src'];
+    if (src == null) return null;
+
+    final widthStr = element.attributes['width'];
+    final heightStr = element.attributes['height'];
+    final width = widthStr != null ? double.tryParse(widthStr) : null;
+    final height = heightStr != null ? double.tryParse(heightStr) : null;
+
+    return Container(
+      width: width,
+      height: height ?? 200,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      color: Colors.black,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          const Icon(Icons.movie, color: Colors.white54, size: 48),
+          IconButton(
+            icon: const Icon(Icons.play_circle_fill,
+                color: Colors.white, size: 48),
+            onPressed: () {
+              // Launch full screen video
+              // We need a helper for this, reusing _showFullScreenVideo logic would be ideal
+              // but that is bound to _MediaWidgetState.
+              // For now, let's implement a simple direct player launch
+              _launchVideo(context, src);
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _launchVideo(BuildContext context, String url) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => _FullScreenVideoPlayer(url: url),
+      ),
+    );
+  }
+}
+
+class _FullScreenVideoPlayer extends StatefulWidget {
+  final String url;
+  const _FullScreenVideoPlayer({required this.url});
+
+  @override
+  State<_FullScreenVideoPlayer> createState() => _FullScreenVideoPlayerState();
+}
+
+class _FullScreenVideoPlayerState extends State<_FullScreenVideoPlayer> {
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+
+  @override
+  void initState() {
+    super.initState();
+    _initializePlayer();
+  }
+
+  Future<void> _initializePlayer() async {
+    _videoPlayerController =
+        VideoPlayerController.networkUrl(Uri.parse(widget.url));
+    await _videoPlayerController.initialize();
+
+    setState(() {
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: _videoPlayerController.value.aspectRatio,
+      );
+    });
+  }
+
+  @override
+  void dispose() {
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Center(
+        child: _chewieController != null &&
+                _chewieController!.videoPlayerController.value.isInitialized
+            ? Chewie(controller: _chewieController!)
+            : const CircularProgressIndicator(),
+      ),
+    );
+  }
+}
+
 /// Widget that loads and displays media from MediaStorageService
 class _MediaWidget extends StatefulWidget {
   final String mediaId;
   final String? alt;
   final MediaStorageService mediaStorageService;
+  final bool forceVideo;
 
-  const _MediaWidget({
+  _MediaWidget({
     required this.mediaId,
     this.alt,
     required this.mediaStorageService,
-  });
+    bool? forceVideo,
+  }) : forceVideo = forceVideo ?? false;
 
   @override
   State<_MediaWidget> createState() => _MediaWidgetState();
@@ -1428,14 +1705,16 @@ class _MediaWidgetState extends State<_MediaWidget> {
 
   Future<void> _loadMedia() async {
     try {
-      final file = await widget.mediaStorageService.getMediaFile(widget.mediaId);
+      final file =
+          await widget.mediaStorageService.getMediaFile(widget.mediaId);
       if (file != null && await file.exists()) {
         // Determine MIME type from file extension
         final extension = file.path.contains('.')
             ? file.path.substring(file.path.lastIndexOf('.'))
             : '';
-        final mimeType = widget.mediaStorageService.getMimeTypeFromExtension(extension);
-        
+        final mimeType =
+            widget.mediaStorageService.getMimeTypeFromExtension(extension);
+
         if (mounted) {
           setState(() {
             _mediaFile = file;
@@ -1526,8 +1805,15 @@ class _MediaWidgetState extends State<_MediaWidget> {
       );
     }
 
-    // Display based on MIME type
-    if (_mimeType != null && widget.mediaStorageService.isImageMimeType(_mimeType!)) {
+    // Display based on MIME type or forceVideo flag
+    final isVideo = widget.forceVideo ||
+        (_mimeType != null &&
+            widget.mediaStorageService.isVideoMimeType(_mimeType!));
+    final isImage = !widget.forceVideo &&
+        (_mimeType != null &&
+            widget.mediaStorageService.isImageMimeType(_mimeType!));
+
+    if (isImage) {
       return GestureDetector(
         onTap: () => _showFullScreenImage(context),
         child: Container(
@@ -1542,7 +1828,7 @@ class _MediaWidgetState extends State<_MediaWidget> {
           ),
         ),
       );
-    } else if (_mimeType != null && widget.mediaStorageService.isVideoMimeType(_mimeType!)) {
+    } else if (isVideo) {
       // Video player with chewie
       return GestureDetector(
         onTap: () => _showFullScreenVideo(context),
@@ -1560,7 +1846,8 @@ class _MediaWidgetState extends State<_MediaWidget> {
               Container(
                 height: 200,
                 decoration: BoxDecoration(
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(8)),
                   color: Colors.black,
                 ),
                 child: Stack(
@@ -1568,7 +1855,8 @@ class _MediaWidgetState extends State<_MediaWidget> {
                   children: [
                     const Icon(Icons.movie, color: Colors.white54, size: 64),
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
                       decoration: BoxDecoration(
                         color: Colors.black54,
                         borderRadius: BorderRadius.circular(20),
@@ -1578,7 +1866,8 @@ class _MediaWidgetState extends State<_MediaWidget> {
                         children: [
                           Icon(Icons.play_arrow, color: Colors.white, size: 24),
                           SizedBox(width: 4),
-                          Text('Tap to play', style: TextStyle(color: Colors.white)),
+                          Text('Tap to play',
+                              style: TextStyle(color: Colors.white)),
                         ],
                       ),
                     ),
@@ -1590,16 +1879,19 @@ class _MediaWidgetState extends State<_MediaWidget> {
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.blue.shade50,
-                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(8)),
+                  borderRadius:
+                      const BorderRadius.vertical(bottom: Radius.circular(8)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.video_file, color: Colors.blue.shade700, size: 20),
+                    Icon(Icons.video_file,
+                        color: Colors.blue.shade700, size: 20),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         widget.alt ?? _mediaFile!.path.split('/').last,
-                        style: TextStyle(color: Colors.blue.shade700, fontSize: 12),
+                        style: TextStyle(
+                            color: Colors.blue.shade700, fontSize: 12),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -1610,7 +1902,8 @@ class _MediaWidgetState extends State<_MediaWidget> {
           ),
         ),
       );
-    } else if (_mimeType != null && widget.mediaStorageService.isAudioMimeType(_mimeType!)) {
+    } else if (_mimeType != null &&
+        widget.mediaStorageService.isAudioMimeType(_mimeType!)) {
       // Audio placeholder
       return Container(
         padding: const EdgeInsets.all(16),
@@ -1631,10 +1924,12 @@ class _MediaWidgetState extends State<_MediaWidget> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   if (widget.alt != null && widget.alt!.isNotEmpty)
-                    Text(widget.alt!, style: TextStyle(color: Colors.grey[700])),
+                    Text(widget.alt!,
+                        style: TextStyle(color: Colors.grey[700])),
                   Text(
                     'Audio file: ${_mediaFile!.path.split('/').last}',
-                    style: TextStyle(color: Colors.purple.shade700, fontSize: 12),
+                    style:
+                        TextStyle(color: Colors.purple.shade700, fontSize: 12),
                   ),
                 ],
               ),
@@ -1664,7 +1959,8 @@ class _MediaWidgetState extends State<_MediaWidget> {
           Flexible(
             child: Text(
               widget.alt ?? 'Media not available',
-              style: TextStyle(color: Colors.grey[600], fontStyle: FontStyle.italic),
+              style: TextStyle(
+                  color: Colors.grey[600], fontStyle: FontStyle.italic),
             ),
           ),
         ],
@@ -1674,7 +1970,7 @@ class _MediaWidgetState extends State<_MediaWidget> {
 
   void _showFullScreenImage(BuildContext context) {
     if (_mediaFile == null) return;
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => Scaffold(
@@ -1702,7 +1998,7 @@ class _MediaWidgetState extends State<_MediaWidget> {
 
   void _showFullScreenVideo(BuildContext context) {
     if (_mediaFile == null) return;
-    
+
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (context) => _VideoPlayerScreen(videoFile: _mediaFile!),
@@ -1737,7 +2033,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
     try {
       _videoController = VideoPlayerController.file(widget.videoFile);
       await _videoController.initialize();
-      
+
       _chewieController = ChewieController(
         videoPlayerController: _videoController,
         autoPlay: true,
@@ -1760,7 +2056,7 @@ class _VideoPlayerScreenState extends State<_VideoPlayerScreen> {
           );
         },
       );
-      
+
       if (mounted) {
         setState(() {
           _isInitialized = true;

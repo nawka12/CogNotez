@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/tag.dart';
 import '../services/notes_service.dart';
+import '../l10n/app_localizations.dart';
 
 class TagManagementScreen extends StatefulWidget {
   const TagManagementScreen({super.key});
@@ -39,10 +40,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   Widget build(BuildContext context) {
     final notesService = Provider.of<NotesService>(context);
     final tags = notesService.tags;
+    final loc = AppLocalizations.of(context);
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Manage Tags'),
+        title: Text(loc?.translate('manage_tags_title') ?? 'Manage Tags'),
         actions: [
           IconButton(
             icon: const Icon(Icons.add),
@@ -63,12 +65,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   ),
                   const SizedBox(height: 16),
                   Text(
-                    'No tags yet',
+                    loc?.translate('no_tags_yet') ?? 'No tags yet',
                     style: Theme.of(context).textTheme.titleLarge,
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'Create tags to organize your notes',
+                    loc?.translate('create_tags_description') ??
+                        'Create tags to organize your notes',
                     style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                           color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
@@ -77,7 +80,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   FilledButton.icon(
                     onPressed: () => _showCreateTagDialog(context),
                     icon: const Icon(Icons.add),
-                    label: const Text('Create Tag'),
+                    label: Text(
+                        loc?.translate('create_tag_button') ?? 'Create Tag'),
                   ),
                 ],
               ),
@@ -98,7 +102,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   ),
                   title: Text(tag.name),
                   subtitle: Text(
-                    '$noteCount ${noteCount == 1 ? 'note' : 'notes'}',
+                    '$noteCount ${noteCount == 1 ? (loc?.translate('note_singular') ?? 'note') : (loc?.translate('notes_plural') ?? 'notes')}',
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   trailing: PopupMenuButton<String>(
@@ -113,23 +117,24 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                       }
                     },
                     itemBuilder: (context) => [
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'edit',
                         child: Row(
                           children: [
-                            Icon(Icons.edit),
-                            SizedBox(width: 8),
-                            Text('Edit'),
+                            const Icon(Icons.edit),
+                            const SizedBox(width: 8),
+                            Text(loc?.translate('edit') ?? 'Edit'),
                           ],
                         ),
                       ),
-                      const PopupMenuItem(
+                      PopupMenuItem(
                         value: 'delete',
                         child: Row(
                           children: [
-                            Icon(Icons.delete, color: Colors.red),
-                            SizedBox(width: 8),
-                            Text('Delete', style: TextStyle(color: Colors.red)),
+                            const Icon(Icons.delete, color: Colors.red),
+                            const SizedBox(width: 8),
+                            Text(loc?.translate('delete') ?? 'Delete',
+                                style: const TextStyle(color: Colors.red)),
                           ],
                         ),
                       ),
@@ -151,12 +156,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   void _showCreateTagDialog(BuildContext context) {
     final textController = TextEditingController();
     Color? selectedColor;
+    final loc = AppLocalizations.of(context);
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Create Tag'),
+          title: Text(loc?.translate('create_tag_title') ?? 'Create Tag'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -164,13 +170,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               TextField(
                 controller: textController,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Tag name',
-                  hintText: 'Enter tag name',
+                decoration: InputDecoration(
+                  labelText: loc?.translate('tag_name_label') ?? 'Tag name',
+                  hintText: loc?.translate('tag_name_hint') ?? 'Enter tag name',
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Color (optional)'),
+              Text(loc?.translate('color_optional') ?? 'Color (optional)'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -191,7 +197,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           width: selectedColor == null ? 3 : 1,
                         ),
                       ),
-                      child: const Icon(Icons.block, size: 20, color: Colors.grey),
+                      child:
+                          const Icon(Icons.block, size: 20, color: Colors.grey),
                     ),
                   ),
                   // Color options
@@ -211,7 +218,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                             ),
                           ),
                           child: selectedColor == color
-                              ? const Icon(Icons.check, color: Colors.white, size: 20)
+                              ? const Icon(Icons.check,
+                                  color: Colors.white, size: 20)
                               : null,
                         ),
                       )),
@@ -222,13 +230,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(loc?.cancel ?? 'Cancel'),
             ),
             FilledButton(
               onPressed: () async {
                 final name = textController.text.trim();
                 if (name.isNotEmpty) {
-                  final notesService = Provider.of<NotesService>(context, listen: false);
+                  final notesService =
+                      Provider.of<NotesService>(context, listen: false);
                   final tag = Tag(
                     id: const Uuid().v4(),
                     name: name,
@@ -246,7 +255,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   }
                 }
               },
-              child: const Text('Create'),
+              child: Text(loc?.translate('create_button') ?? 'Create'),
             ),
           ],
         ),
@@ -259,12 +268,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
     Color? selectedColor = tag.color != null
         ? Color(int.parse(tag.color!.replaceFirst('#', '0xFF')))
         : null;
+    final loc = AppLocalizations.of(context);
 
     showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setState) => AlertDialog(
-          title: const Text('Edit Tag'),
+          title: Text(loc?.translate('edit_tag_title') ?? 'Edit Tag'),
           content: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,13 +282,13 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
               TextField(
                 controller: textController,
                 autofocus: true,
-                decoration: const InputDecoration(
-                  labelText: 'Tag name',
-                  hintText: 'Enter tag name',
+                decoration: InputDecoration(
+                  labelText: loc?.translate('tag_name_label') ?? 'Tag name',
+                  hintText: loc?.translate('tag_name_hint') ?? 'Enter tag name',
                 ),
               ),
               const SizedBox(height: 16),
-              const Text('Color (optional)'),
+              Text(loc?.translate('color_optional') ?? 'Color (optional)'),
               const SizedBox(height: 8),
               Wrap(
                 spacing: 8,
@@ -299,13 +309,15 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           width: selectedColor == null ? 3 : 1,
                         ),
                       ),
-                      child: const Icon(Icons.block, size: 20, color: Colors.grey),
+                      child:
+                          const Icon(Icons.block, size: 20, color: Colors.grey),
                     ),
                   ),
                   // Color options
                   ...tagColors.map((color) {
                     final isSelected = selectedColor != null &&
-                        (selectedColor!.value & 0xFFFFFF) == (color.value & 0xFFFFFF);
+                        (selectedColor!.value & 0xFFFFFF) ==
+                            (color.value & 0xFFFFFF);
                     return GestureDetector(
                       onTap: () => setState(() => selectedColor = color),
                       child: Container(
@@ -322,7 +334,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                           ),
                         ),
                         child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white, size: 20)
+                            ? const Icon(Icons.check,
+                                color: Colors.white, size: 20)
                             : null,
                       ),
                     );
@@ -334,13 +347,14 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
+              child: Text(loc?.cancel ?? 'Cancel'),
             ),
             FilledButton(
               onPressed: () async {
                 final name = textController.text.trim();
                 if (name.isNotEmpty) {
-                  final notesService = Provider.of<NotesService>(context, listen: false);
+                  final notesService =
+                      Provider.of<NotesService>(context, listen: false);
                   final updatedTag = tag.copyWith(
                     name: name,
                     color: selectedColor != null
@@ -356,7 +370,7 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                   }
                 }
               },
-              child: const Text('Save'),
+              child: Text(loc?.translate('save') ?? 'Save'),
             ),
           ],
         ),
@@ -365,10 +379,11 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
   }
 
   void _showDeleteTagDialog(BuildContext context, Tag tag, int noteCount) {
+    final loc = AppLocalizations.of(context);
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Delete Tag'),
+        title: Text(loc?.translate('delete_tag_title') ?? 'Delete Tag'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -393,11 +408,12 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
+            child: Text(loc?.cancel ?? 'Cancel'),
           ),
           TextButton(
             onPressed: () async {
-              final notesService = Provider.of<NotesService>(context, listen: false);
+              final notesService =
+                  Provider.of<NotesService>(context, listen: false);
               await notesService.deleteTag(tag.id);
               if (context.mounted) {
                 Navigator.pop(context);
@@ -406,7 +422,8 @@ class _TagManagementScreenState extends State<TagManagementScreen> {
                 );
               }
             },
-            child: const Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(loc?.translate('delete') ?? 'Delete',
+                style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),

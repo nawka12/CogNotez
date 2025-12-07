@@ -11,6 +11,11 @@ class AppSettings {
   int syncInterval; // in milliseconds
   bool e2eeEnabled; // End-to-end encryption for cloud sync
   String? e2eeSalt; // Deterministic salt derived from passphrase
+  
+  // SearXNG Configuration
+  String? searxngUrl;
+  bool searxngEnabled;
+  int searxngMaxResults;
 
   AppSettings({
     this.theme = 'system',
@@ -25,6 +30,9 @@ class AppSettings {
     this.syncInterval = 300000, // 5 minutes
     this.e2eeEnabled = false,
     this.e2eeSalt,
+    this.searxngUrl = 'http://localhost:8080',
+    this.searxngEnabled = false,
+    this.searxngMaxResults = 5,
   });
 
   Map<String, dynamic> toJson() {
@@ -41,6 +49,9 @@ class AppSettings {
       'sync_interval': syncInterval,
       'e2ee_enabled': e2eeEnabled,
       'e2ee_salt': e2eeSalt,
+      'searxng_url': searxngUrl,
+      'searxng_enabled': searxngEnabled,
+      'searxng_max_results': searxngMaxResults,
     };
   }
 
@@ -58,6 +69,9 @@ class AppSettings {
       syncInterval: json['sync_interval'] as int? ?? 300000,
       e2eeEnabled: json['e2ee_enabled'] as bool? ?? false,
       e2eeSalt: json['e2ee_salt'] as String?,
+      searxngUrl: json['searxng_url'] as String? ?? 'http://localhost:8080',
+      searxngEnabled: json['searxng_enabled'] as bool? ?? false,
+      searxngMaxResults: json['searxng_max_results'] as int? ?? 5,
     );
   }
 
@@ -74,6 +88,9 @@ class AppSettings {
     int? syncInterval,
     bool? e2eeEnabled,
     String? e2eeSalt,
+    String? searxngUrl,
+    bool? searxngEnabled,
+    int? searxngMaxResults,
   }) {
     return AppSettings(
       theme: theme ?? this.theme,
@@ -88,6 +105,9 @@ class AppSettings {
       syncInterval: syncInterval ?? this.syncInterval,
       e2eeEnabled: e2eeEnabled ?? this.e2eeEnabled,
       e2eeSalt: e2eeSalt ?? this.e2eeSalt,
+      searxngUrl: searxngUrl ?? this.searxngUrl,
+      searxngEnabled: searxngEnabled ?? this.searxngEnabled,
+      searxngMaxResults: searxngMaxResults ?? this.searxngMaxResults,
     );
   }
 }

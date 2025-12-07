@@ -1,9 +1,14 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import '../models/note.dart';
 import '../services/notes_service.dart';
 import '../services/theme_service.dart';
+import '../services/google_drive_service.dart';
+import '../services/settings_service.dart';
+import '../services/database_service.dart';
+import '../services/backup_service.dart';
 import '../utils/app_theme.dart';
 import '../l10n/app_localizations.dart';
 import 'note_editor_screen.dart';
@@ -28,18 +33,115 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _showAdvancedSearch = false;
   SearchFilters _searchFilters = SearchFilters();
 
+  // Auto sync timer
+  Timer? _autoSyncTimer;
+  bool _isAutoSyncing = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _refreshData();
+      _setupAutoSync();
     });
   }
 
   @override
   void dispose() {
+    _autoSyncTimer?.cancel();
     _searchController.dispose();
     super.dispose();
+  }
+
+  /// Setup auto sync timer based on settings
+  void _setupAutoSync() {
+    final settingsService =
+        Provider.of<SettingsService>(context, listen: false);
+    settingsService.addListener(_onSettingsChanged);
+    _updateAutoSyncTimer();
+  }
+
+  /// Handle settings changes
+  void _onSettingsChanged() {
+    _updateAutoSyncTimer();
+  }
+
+  /// Update the auto sync timer based on current settings
+  void _updateAutoSyncTimer() {
+    _autoSyncTimer?.cancel();
+    _autoSyncTimer = null;
+
+    final settingsService =
+        Provider.of<SettingsService>(context, listen: false);
+    final settings = settingsService.settings;
+
+    if (!settings.autoSync) {
+      debugPrint('[AutoSync] Auto sync disabled');
+      return;
+    }
+
+    final intervalMs = settings.syncInterval;
+    if (intervalMs <= 0) {
+      debugPrint('[AutoSync] Invalid sync interval: $intervalMs');
+      return;
+    }
+
+    debugPrint(
+        '[AutoSync] Starting auto sync timer with interval: ${intervalMs ~/ 60000} minutes');
+    _autoSyncTimer = Timer.periodic(Duration(milliseconds: intervalMs), (_) {
+      _performAutoSync();
+    });
+  }
+
+  /// Perform auto sync with Google Drive
+  Future<void> _performAutoSync() async {
+    if (_isAutoSyncing) {
+      debugPrint('[AutoSync] Sync already in progress, skipping');
+      return;
+    }
+
+    final driveService =
+        Provider.of<GoogleDriveService>(context, listen: false);
+    if (!driveService.status.isConnected) {
+      debugPrint('[AutoSync] Not connected to Google Drive, skipping');
+      return;
+    }
+
+    if (driveService.status.isSyncing) {
+      debugPrint('[AutoSync] Manual sync in progress, skipping');
+      return;
+    }
+
+    _isAutoSyncing = true;
+    debugPrint('[AutoSync] Starting automatic sync...');
+
+    try {
+      final databaseService =
+          Provider.of<DatabaseService>(context, listen: false);
+      final notesService = Provider.of<NotesService>(context, listen: false);
+      final backupService = BackupService(databaseService);
+
+      // Get local data in desktop-compatible format
+      final localData = await backupService.exportToDesktopFormat();
+
+      // Perform sync with media files
+      final result = await driveService.syncWithMedia(
+        localData: localData,
+        applyData: (data) async {
+          // Import the synced data
+          await backupService.importFromDesktopFormat(data);
+          // Reload notes to reflect changes
+          await notesService.loadNotes();
+          await notesService.loadTags();
+        },
+      );
+
+      debugPrint('[AutoSync] Auto sync completed: ${result.message}');
+    } catch (e) {
+      debugPrint('[AutoSync] Auto sync failed: $e');
+    } finally {
+      _isAutoSyncing = false;
+    }
   }
 
   Future<void> _refreshData() async {
@@ -89,14 +191,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!mounted) return;
-    
+
     await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => NoteEditorScreen(note: note, isNew: false),
       ),
     );
-    
+
     await _refreshData();
   }
 
@@ -140,30 +242,35 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       key: _scaffoldKey,
       appBar: AppBar(
-        leading: isWideScreen ? null : IconButton(
-          icon: const Icon(Icons.menu),
-          onPressed: () {
-            _scaffoldKey.currentState?.openDrawer();
-          },
-          tooltip: AppLocalizations.of(context)?.menu ?? 'Menu',
-          style: IconButton.styleFrom(
-            padding: EdgeInsets.zero,
-            minimumSize: const Size(40, 40),
-          ),
-        ),
+        leading: isWideScreen
+            ? null
+            : IconButton(
+                icon: const Icon(Icons.menu),
+                onPressed: () {
+                  _scaffoldKey.currentState?.openDrawer();
+                },
+                tooltip: AppLocalizations.of(context)?.menu ?? 'Menu',
+                style: IconButton.styleFrom(
+                  padding: EdgeInsets.zero,
+                  minimumSize: const Size(40, 40),
+                ),
+              ),
         title: _isSearching
             ? Container(
                 height: isMobile ? 44 : 48,
                 decoration: BoxDecoration(
                   color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(isMobile ? AppTheme.radiusMd : AppTheme.radiusLg),
-                  border: Border.all(color: Theme.of(context).colorScheme.outline),
+                  borderRadius: BorderRadius.circular(
+                      isMobile ? AppTheme.radiusMd : AppTheme.radiusLg),
+                  border:
+                      Border.all(color: Theme.of(context).colorScheme.outline),
                 ),
                 child: TextField(
                   controller: _searchController,
                   autofocus: true,
                   decoration: InputDecoration(
-                    hintText: AppLocalizations.of(context)?.searchNotes ?? 'Search notes...',
+                    hintText: AppLocalizations.of(context)?.searchNotes ??
+                        'Search notes...',
                     border: InputBorder.none,
                     prefixIcon: Icon(Icons.search, size: isMobile ? 18 : 20),
                     suffixIcon: Row(
@@ -172,11 +279,15 @@ class _HomeScreenState extends State<HomeScreen> {
                         if (!isMobile) ...[
                           IconButton(
                             icon: Icon(
-                              _showAdvancedSearch ? Icons.expand_less : Icons.tune,
+                              _showAdvancedSearch
+                                  ? Icons.expand_less
+                                  : Icons.tune,
                               size: 20,
                             ),
                             onPressed: _toggleAdvancedSearch,
-                            tooltip: AppLocalizations.of(context)?.searchNotes ?? 'Advanced search',
+                            tooltip:
+                                AppLocalizations.of(context)?.searchNotes ??
+                                    'Advanced search',
                           ),
                         ],
                         if (_searchController.text.isNotEmpty)
@@ -186,11 +297,14 @@ class _HomeScreenState extends State<HomeScreen> {
                               _searchController.clear();
                               _onSearchChanged('');
                             },
-                            tooltip: AppLocalizations.of(context)?.cancel ?? 'Clear search',
+                            tooltip: AppLocalizations.of(context)?.cancel ??
+                                'Clear search',
                           ),
                       ],
                     ),
-                    contentPadding: EdgeInsets.symmetric(horizontal: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
+                    contentPadding: EdgeInsets.symmetric(
+                        horizontal:
+                            isMobile ? AppTheme.spacingSm : AppTheme.spacingMd),
                   ),
                   onChanged: _onSearchChanged,
                 ),
@@ -212,7 +326,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       foreground: Paint()
                         ..shader = LinearGradient(
                           colors: [AppTheme.accentColor, AppTheme.primaryDark],
-                        ).createShader(const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
+                        ).createShader(
+                            const Rect.fromLTWH(0.0, 0.0, 200.0, 70.0)),
                     ),
                   ),
                 ],
@@ -221,77 +336,31 @@ class _HomeScreenState extends State<HomeScreen> {
           // Search button for non-searching state
           if (!_isSearching)
             IconButton(
-              icon: Icon(Icons.search, size: isMobile ? 20 : 22),
+              icon: Icon(Icons.search, size: isMobile ? 22 : 24),
               onPressed: _toggleSearch,
-              tooltip: 'Search',
-              style: IconButton.styleFrom(
-                padding: EdgeInsets.all(isMobile ? 6 : 8),
-                minimumSize: Size(isMobile ? 36 : 40, isMobile ? 36 : 40),
-              ),
+              tooltip: AppLocalizations.of(context)?.searchNotes ?? 'Search',
             ),
-          // Unified header toolbar - mobile adapted
-          Container(
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surfaceVariant,
-              borderRadius: BorderRadius.circular(isMobile ? AppTheme.radiusLg : AppTheme.radiusXl),
-              border: Border.all(color: Theme.of(context).colorScheme.outline),
+          // Theme toggle
+          IconButton(
+            icon: Icon(
+              themeService.themeMode == ThemeMode.dark
+                  ? Icons.light_mode
+                  : Icons.dark_mode,
+              size: isMobile ? 22 : 24,
             ),
-            padding: EdgeInsets.all(isMobile ? 2 : 4),
-            child: Row(
-              children: [
-                // Theme toggle - mobile adapted
-                IconButton(
-                  icon: Icon(
-                    themeService.themeMode == ThemeMode.dark
-                        ? Icons.light_mode
-                        : Icons.dark_mode,
-                    size: isMobile ? 16 : 18,
-                  ),
-                  onPressed: () {
-                    final newMode = themeService.themeMode == ThemeMode.dark
-                        ? ThemeMode.light
-                        : ThemeMode.dark;
-                    themeService.setThemeMode(newMode);
-                  },
-                  tooltip: AppLocalizations.of(context)?.edit ?? 'Toggle theme',
-                  style: IconButton.styleFrom(
-                    padding: EdgeInsets.all(isMobile ? 6 : 8),
-                    minimumSize: Size(isMobile ? 32 : 36, isMobile ? 32 : 36),
-                  ),
-                ),
-                // New note button with accent color - mobile adapted
-                ElevatedButton(
-                  onPressed: _createNewNote,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppTheme.accentColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(isMobile ? AppTheme.radiusMd : AppTheme.radiusLg),
-                    ),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: isMobile ? AppTheme.spacingSm : AppTheme.spacingMd,
-                      vertical: isMobile ? AppTheme.spacingXs : AppTheme.spacingSm,
-                    ),
-                    minimumSize: Size(isMobile ? 60 : 80, isMobile ? 32 : 36),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.add, size: isMobile ? 14 : 16),
-                      if (!isMobile) ...[
-                        const SizedBox(width: 6),
-                        Text(AppLocalizations.of(context)?.newNote ?? 'New'),
-                      ],
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            onPressed: () {
+              final newMode = themeService.themeMode == ThemeMode.dark
+                  ? ThemeMode.light
+                  : ThemeMode.dark;
+              themeService.setThemeMode(newMode);
+            },
+            tooltip: themeService.themeMode == ThemeMode.dark
+                ? 'Switch to light mode'
+                : 'Switch to dark mode',
           ),
-          const SizedBox(width: 8),
           // Settings button
           IconButton(
-            icon: const Icon(Icons.settings, size: 20),
+            icon: Icon(Icons.settings, size: isMobile ? 22 : 24),
             onPressed: () {
               Navigator.push(
                 context,
@@ -300,17 +369,20 @@ class _HomeScreenState extends State<HomeScreen> {
             },
             tooltip: AppLocalizations.of(context)?.settings ?? 'Settings',
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      drawer: isWideScreen ? null : Drawer(
-        child: SafeArea(
-          child: Sidebar(
-            onFolderSelected: () {
-              Navigator.pop(context);
-            },
-          ),
-        ),
-      ),
+      drawer: isWideScreen
+          ? null
+          : Drawer(
+              child: SafeArea(
+                child: Sidebar(
+                  onFolderSelected: () {
+                    Navigator.pop(context);
+                  },
+                ),
+              ),
+            ),
       body: Column(
         children: [
           // Advanced search panel
@@ -343,7 +415,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       final filteredNotes = _searchFilters.hasActiveFilters
                           ? _getFilteredNotes(notesService)
                           : notesService.notes;
-                      
+
                       return NotesList(
                         notes: filteredNotes,
                         onNoteSelected: _openNote,

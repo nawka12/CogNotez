@@ -12,6 +12,9 @@ class Note {
   Map<String, dynamic>? metadata;
   bool isPinned;
   bool isFavorite;
+  int wordCount;
+  int charCount;
+  Map<String, dynamic>? collaboration;
 
   Note({
     required this.id,
@@ -27,6 +30,9 @@ class Note {
     this.metadata,
     this.isPinned = false,
     this.isFavorite = false,
+    this.wordCount = 0,
+    this.charCount = 0,
+    this.collaboration,
   });
 
   Map<String, dynamic> toJson() {
@@ -44,6 +50,9 @@ class Note {
       'metadata': metadata,
       'is_pinned': isPinned,
       'is_favorite': isFavorite,
+      'word_count': wordCount,
+      'char_count': charCount,
+      'collaboration': collaboration,
     };
   }
 
@@ -62,6 +71,9 @@ class Note {
       metadata: json['metadata'] as Map<String, dynamic>?,
       isPinned: json['is_pinned'] as bool? ?? false,
       isFavorite: json['is_favorite'] as bool? ?? false,
+      wordCount: json['word_count'] as int? ?? 0,
+      charCount: json['char_count'] as int? ?? 0,
+      collaboration: json['collaboration'] as Map<String, dynamic>?,
     );
   }
 
@@ -79,6 +91,9 @@ class Note {
     Map<String, dynamic>? metadata,
     bool? isPinned,
     bool? isFavorite,
+    int? wordCount,
+    int? charCount,
+    Map<String, dynamic>? collaboration,
     bool clearEncryption = false,
   }) {
     return Note(
@@ -95,12 +110,16 @@ class Note {
       metadata: metadata ?? this.metadata,
       isPinned: isPinned ?? this.isPinned,
       isFavorite: isFavorite ?? this.isFavorite,
+      wordCount: wordCount ?? this.wordCount,
+      charCount: charCount ?? this.charCount,
+      collaboration: collaboration ?? this.collaboration,
     );
   }
 
-  int get wordCount {
-    return content.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
-  }
+  // Deprecated: use stored property wordCount instead, or keep as fallback
+  // int get wordCount {
+  //   return content.split(RegExp(r'\s+')).where((word) => word.isNotEmpty).length;
+  // }
 
   bool get isLocked => isPasswordProtected && encryptedContent != null && content.isEmpty;
 }

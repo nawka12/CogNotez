@@ -22,7 +22,7 @@ class DatabaseHelper {
 
     return await openDatabase(
       path,
-      version: 4,
+      version: 5,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -68,6 +68,22 @@ class DatabaseHelper {
         await db.execute('ALTER TABLE notes ADD COLUMN is_favorite INTEGER NOT NULL DEFAULT 0');
       }
     }
+
+    // Migration from version 4 to 5: Add word_count, char_count, collaboration
+    if (oldVersion < 5) {
+      final tableInfo = await db.rawQuery('PRAGMA table_info(notes)');
+      final columnNames = tableInfo.map((col) => col['name'] as String).toSet();
+      
+      if (!columnNames.contains('word_count')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN word_count INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!columnNames.contains('char_count')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN char_count INTEGER NOT NULL DEFAULT 0');
+      }
+      if (!columnNames.contains('collaboration')) {
+        await db.execute('ALTER TABLE notes ADD COLUMN collaboration TEXT');
+      }
+    }
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -85,7 +101,10 @@ class DatabaseHelper {
         encryption_iv TEXT,
         metadata TEXT,
         is_pinned INTEGER NOT NULL DEFAULT 0,
-        is_favorite INTEGER NOT NULL DEFAULT 0
+        is_favorite INTEGER NOT NULL DEFAULT 0,
+        word_count INTEGER NOT NULL DEFAULT 0,
+        char_count INTEGER NOT NULL DEFAULT 0,
+        collaboration TEXT
       )
     ''');
 
@@ -141,6 +160,15 @@ class DatabaseHelper {
         metadata = null;
       }
     }
+
+    Map<String, dynamic>? collaboration;
+    if (row['collaboration'] != null) {
+      try {
+        collaboration = jsonDecode(row['collaboration'] as String) as Map<String, dynamic>;
+      } catch (e) {
+        collaboration = null;
+      }
+    }
     
     return Note(
       id: row['id'] as String,
@@ -156,6 +184,9 @@ class DatabaseHelper {
       metadata: metadata,
       isPinned: (row['is_pinned'] as int? ?? 0) == 1,
       isFavorite: (row['is_favorite'] as int? ?? 0) == 1,
+      wordCount: row['word_count'] as int? ?? 0,
+      charCount: row['char_count'] as int? ?? 0,
+      collaboration: collaboration,
     );
   }
 
@@ -174,6 +205,9 @@ class DatabaseHelper {
       'metadata': note.metadata != null ? jsonEncode(note.metadata) : null,
       'is_pinned': note.isPinned ? 1 : 0,
       'is_favorite': note.isFavorite ? 1 : 0,
+      'word_count': note.wordCount,
+      'char_count': note.charCount,
+      'collaboration': note.collaboration != null ? jsonEncode(note.collaboration) : null,
     };
   }
 

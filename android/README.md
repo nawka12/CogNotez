@@ -20,6 +20,7 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] Unified notes list with filtering across all folder types
 - [x] Search functionality
 - [x] Theme system (Light/Dark mode)
+- [x] Localization with language picker (en, es, id, ja, jv; many strings still English)
 - [x] Data models (Note, Tag, Settings)
 - [x] Database layer with SQLite
 - [x] State management with Provider
@@ -32,7 +33,6 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] **Swipe Gestures** - Swipe left to delete, swipe right to pin/unpin
 - [x] **Desktop-Compatible Backups** - Full JSON backup/restore compatible with desktop version
 - [x] **Find & Replace** - With regex support and case sensitivity options
-- [x] **Split View Mode** - Edit and preview side-by-side
 
 #### Implemented ✅
 - [x] **Rich Media Support** - Images and videos in notes
@@ -49,8 +49,7 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [ ] AI-generated templates
 - [ ] Note import/export for standalone note files
 - [ ] Network status indicators
-- [ ] Full internationalization (currently structure only)
-- [ ] Language selector UI
+- [ ] Complete translation coverage across all screens
 
 ### Note Templates
 
@@ -70,8 +69,6 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 
 #### Unimplemented ❌
 - [ ] AI conversation panel
-- [ ] AI edit approval system
-- [ ] Loading indicators for AI operations
 - [ ] Cancel AI operations
 
 #### Implemented (Editor Integration) ✅
@@ -84,6 +81,8 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [x] Generate content with AI
 - [x] Extract key points
 - [x] Generate tags with AI
+- [x] AI edit approval dialog (review & apply suggested edits)
+- [x] Loading indicator while AI actions run
 
 ### Organization & Search
 
@@ -179,6 +178,7 @@ Android version of CogNotez - An AI-powered note-taking application built with F
 - [ ] Loading animations
 - [ ] Help text and onboarding
 - [ ] Error handling UI
+- [ ] Split view (edit and preview side-by-side)
 - [ ] App icon and branding
 
 ## Getting Started

@@ -31,6 +31,7 @@ class GoogleAuthClient extends http.BaseClient {
 class SyncStatus {
   final bool isConnected;
   final bool isSyncing;
+  final bool isInitializing;
   final DateTime? lastSync;
   final String? userEmail;
   final String? userName;
@@ -44,6 +45,7 @@ class SyncStatus {
   SyncStatus({
     this.isConnected = false,
     this.isSyncing = false,
+    this.isInitializing = false,
     this.lastSync,
     this.userEmail,
     this.userName,
@@ -58,6 +60,7 @@ class SyncStatus {
   SyncStatus copyWith({
     bool? isConnected,
     bool? isSyncing,
+    bool? isInitializing,
     DateTime? lastSync,
     String? userEmail,
     String? userName,
@@ -71,6 +74,7 @@ class SyncStatus {
     return SyncStatus(
       isConnected: isConnected ?? this.isConnected,
       isSyncing: isSyncing ?? this.isSyncing,
+      isInitializing: isInitializing ?? this.isInitializing,
       lastSync: lastSync ?? this.lastSync,
       userEmail: userEmail ?? this.userEmail,
       userName: userName ?? this.userName,
@@ -87,7 +91,8 @@ class SyncStatus {
 /// Sync result information
 class SyncResult {
   final bool success;
-  final String action; // 'upload', 'download', 'merge', 'none', 'error', 'encryption_required'
+  final String
+      action; // 'upload', 'download', 'merge', 'none', 'error', 'encryption_required'
   final String message;
   final int notesUploaded;
   final int notesDownloaded;
@@ -120,6 +125,7 @@ class GoogleDriveService extends ChangeNotifier {
   static const String _e2eeEnabledKey = 'e2ee_enabled';
   static const String _e2eeSaltKey = 'e2ee_salt';
   static const String _e2eePassphraseKey = 'e2ee_passphrase';
+  static const String _lastSyncKey = 'last_sync_timestamp';
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
@@ -140,9 +146,9 @@ class GoogleDriveService extends ChangeNotifier {
   String? _appFolderId;
   String? _remoteFileId;
   String? _mediaFolderId;
-  
+
   final MediaStorageService _mediaStorageService = MediaStorageService();
-  
+
   SyncStatus _status = SyncStatus();
   SyncStatus get status => _status;
 
@@ -154,9 +160,10 @@ class GoogleDriveService extends ChangeNotifier {
   bool _encryptionEnabled = false;
   String? _encryptionPassphrase;
   String? _encryptionSalt;
-  
+
   bool get encryptionEnabled => _encryptionEnabled;
-  bool get hasPassphrase => _encryptionPassphrase != null && _encryptionPassphrase!.isNotEmpty;
+  bool get hasPassphrase =>
+      _encryptionPassphrase != null && _encryptionPassphrase!.isNotEmpty;
 
   GoogleDriveService() {
     _initialize();
@@ -168,14 +175,16 @@ class GoogleDriveService extends ChangeNotifier {
       final prefs = await SharedPreferences.getInstance();
       _encryptionEnabled = prefs.getBool(_e2eeEnabledKey) ?? false;
       _encryptionSalt = prefs.getString(_e2eeSaltKey);
-      
+
       // Load passphrase from secure storage
       if (_encryptionEnabled) {
-        _encryptionPassphrase = await _secureStorage.read(key: _e2eePassphraseKey);
+        _encryptionPassphrase =
+            await _secureStorage.read(key: _e2eePassphraseKey);
       }
-      
-      debugPrint('[GoogleDriveService] Loaded E2EE settings: enabled=$_encryptionEnabled, hasSalt=${_encryptionSalt != null}, hasPassphrase=$hasPassphrase');
-      
+
+      debugPrint(
+          '[GoogleDriveService] Loaded E2EE settings: enabled=$_encryptionEnabled, hasSalt=${_encryptionSalt != null}, hasPassphrase=$hasPassphrase');
+
       _updateStatus(_status.copyWith(
         encryptionEnabled: _encryptionEnabled,
         needsPassphrase: _encryptionEnabled && !hasPassphrase,
@@ -195,15 +204,17 @@ class GoogleDriveService extends ChangeNotifier {
       } else {
         await prefs.remove(_e2eeSaltKey);
       }
-      
+
       // Save passphrase to secure storage
       if (_encryptionPassphrase != null && _encryptionPassphrase!.isNotEmpty) {
-        await _secureStorage.write(key: _e2eePassphraseKey, value: _encryptionPassphrase);
+        await _secureStorage.write(
+            key: _e2eePassphraseKey, value: _encryptionPassphrase);
       } else {
         await _secureStorage.delete(key: _e2eePassphraseKey);
       }
-      
-      debugPrint('[GoogleDriveService] Saved E2EE settings: enabled=$_encryptionEnabled, hasPassphrase=$hasPassphrase');
+
+      debugPrint(
+          '[GoogleDriveService] Saved E2EE settings: enabled=$_encryptionEnabled, hasPassphrase=$hasPassphrase');
     } catch (e) {
       debugPrint('[GoogleDriveService] Failed to save E2EE settings: $e');
     }
@@ -223,16 +234,17 @@ class GoogleDriveService extends ChangeNotifier {
       _encryptionPassphrase = null;
       _encryptionSalt = null;
     }
-    
+
     // Persist E2EE settings
     await _saveE2EESettings();
-    
+
     _updateStatus(_status.copyWith(
       encryptionEnabled: _encryptionEnabled,
       needsPassphrase: _encryptionEnabled && !hasPassphrase,
     ));
-    
-    debugPrint('[GoogleDriveService] Encryption settings updated: enabled=$_encryptionEnabled, hasPassphrase=$hasPassphrase');
+
+    debugPrint(
+        '[GoogleDriveService] Encryption settings updated: enabled=$_encryptionEnabled, hasPassphrase=$hasPassphrase');
   }
 
   /// Clear encryption passphrase (for security)
@@ -241,10 +253,16 @@ class GoogleDriveService extends ChangeNotifier {
   }
 
   Future<void> _initialize() async {
+    // Set initializing flag so UI can show loading state
+    _updateStatus(_status.copyWith(isInitializing: true));
+
     try {
       // Load E2EE settings first
       await _loadE2EESettings();
-      
+
+      // Load lastSync timestamp for deletion inference
+      await _loadLastSync();
+
       // Try to sign in silently (restore previous session)
       final account = await _googleSignIn.signInSilently();
       if (account != null) {
@@ -252,6 +270,36 @@ class GoogleDriveService extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('[GoogleDriveService] Silent sign-in failed: $e');
+    } finally {
+      // Clear initializing flag when done
+      _updateStatus(_status.copyWith(isInitializing: false));
+    }
+  }
+
+  /// Load last sync timestamp from persistent storage
+  Future<void> _loadLastSync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSyncStr = prefs.getString(_lastSyncKey);
+      if (lastSyncStr != null) {
+        _lastSync = DateTime.tryParse(lastSyncStr);
+        debugPrint('[GoogleDriveService] Loaded lastSync: $_lastSync');
+      }
+    } catch (e) {
+      debugPrint('[GoogleDriveService] Failed to load lastSync: $e');
+    }
+  }
+
+  /// Save last sync timestamp to persistent storage
+  Future<void> _saveLastSync() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      if (_lastSync != null) {
+        await prefs.setString(_lastSyncKey, _lastSync!.toIso8601String());
+        debugPrint('[GoogleDriveService] Saved lastSync: $_lastSync');
+      }
+    } catch (e) {
+      debugPrint('[GoogleDriveService] Failed to save lastSync: $e');
     }
   }
 
@@ -259,7 +307,7 @@ class GoogleDriveService extends ChangeNotifier {
   Future<bool> signIn() async {
     try {
       _updateStatus(_status.copyWith(error: null));
-      
+
       final account = await _googleSignIn.signIn();
       if (account == null) {
         _updateStatus(_status.copyWith(error: 'Sign in cancelled'));
@@ -309,14 +357,14 @@ class GoogleDriveService extends ChangeNotifier {
 
   Future<void> _setupDriveApi(GoogleSignInAccount account) async {
     _currentUser = account;
-    
+
     final authHeaders = await account.authHeaders;
     final authenticateClient = GoogleAuthClient(authHeaders);
     _driveApi = drive.DriveApi(authenticateClient);
 
     // Ensure app folder exists
     await _ensureAppFolder();
-    
+
     // Ensure media folder exists
     await _ensureMediaFolder();
 
@@ -340,7 +388,8 @@ class GoogleDriveService extends ChangeNotifier {
 
     try {
       // Search for existing folder
-      final query = "name='$_appFolderName' and mimeType='application/vnd.google-apps.folder' and trashed=false";
+      final query =
+          "name='$_appFolderName' and mimeType='application/vnd.google-apps.folder' and trashed=false";
       final result = await _driveApi!.files.list(
         q: query,
         spaces: 'drive',
@@ -349,7 +398,8 @@ class GoogleDriveService extends ChangeNotifier {
 
       if (result.files != null && result.files!.isNotEmpty) {
         _appFolderId = result.files!.first.id;
-        debugPrint('[GoogleDriveService] Found existing app folder: $_appFolderId');
+        debugPrint(
+            '[GoogleDriveService] Found existing app folder: $_appFolderId');
       } else {
         // Create folder
         final folder = drive.File()
@@ -372,7 +422,8 @@ class GoogleDriveService extends ChangeNotifier {
 
     try {
       // Search for existing media folder
-      final query = "name='$_mediaFolderName' and mimeType='application/vnd.google-apps.folder' and '$_appFolderId' in parents and trashed=false";
+      final query =
+          "name='$_mediaFolderName' and mimeType='application/vnd.google-apps.folder' and '$_appFolderId' in parents and trashed=false";
       final result = await _driveApi!.files.list(
         q: query,
         spaces: 'drive',
@@ -381,7 +432,8 @@ class GoogleDriveService extends ChangeNotifier {
 
       if (result.files != null && result.files!.isNotEmpty) {
         _mediaFolderId = result.files!.first.id;
-        debugPrint('[GoogleDriveService] Found existing media folder: $_mediaFolderId');
+        debugPrint(
+            '[GoogleDriveService] Found existing media folder: $_mediaFolderId');
       } else {
         // Create media folder inside app folder
         final folder = drive.File()
@@ -391,7 +443,8 @@ class GoogleDriveService extends ChangeNotifier {
 
         final created = await _driveApi!.files.create(folder);
         _mediaFolderId = created.id;
-        debugPrint('[GoogleDriveService] Created media folder: $_mediaFolderId');
+        debugPrint(
+            '[GoogleDriveService] Created media folder: $_mediaFolderId');
       }
     } catch (e) {
       debugPrint('[GoogleDriveService] Failed to ensure media folder: $e');
@@ -403,7 +456,8 @@ class GoogleDriveService extends ChangeNotifier {
     if (_driveApi == null || _appFolderId == null) return false;
 
     try {
-      final query = "name='$_backupFileName' and '$_appFolderId' in parents and trashed=false";
+      final query =
+          "name='$_backupFileName' and '$_appFolderId' in parents and trashed=false";
       final result = await _driveApi!.files.list(
         q: query,
         spaces: 'drive',
@@ -426,24 +480,39 @@ class GoogleDriveService extends ChangeNotifier {
   }
 
   /// Calculate content checksum for comparison
+  /// Matches desktop's createContentOnlySnapshot + calculateContentChecksum logic
   String _calculateChecksum(Map<String, dynamic> data) {
-    // Create content-only snapshot (exclude sync metadata)
+    // Create content-only snapshot (exclude sync state and volatile metadata)
+    // This must match the desktop implementation exactly for consistent checksums
+    final metadata = data['metadata'] as Map<String, dynamic>? ?? {};
     final snapshot = {
       'notes': data['notes'] ?? {},
+      'ai_conversations': data['ai_conversations'] ?? {},
       'tags': data['tags'] ?? {},
       'note_tags': data['note_tags'] ?? {},
       'metadata': {
-        ...(data['metadata'] as Map<String, dynamic>? ?? {}),
-        'exportVersion': (data['metadata'] as Map<String, dynamic>?)?['exportVersion'] ?? '1.0',
-      }..remove('exportedAt')..remove('exportedForSync'),
+        ...metadata,
+        'exportVersion': metadata['exportVersion'] ?? '1.0',
+      }
+        // Remove all volatile/timestamp fields that change between syncs
+        ..remove('exportedAt')
+        ..remove('exportedForSync')
+        ..remove('lastMerge')
+        ..remove('lastBackup')
+        ..remove('created')
+        ..remove('version'),
     };
-    
+
     final str = jsonEncode(snapshot);
+
+    // Simple 32-bit rolling hash to match JavaScript's behavior
+    // JavaScript's bitwise operations work on 32-bit signed integers
     int hash = 0;
     for (int i = 0; i < str.length; i++) {
       final char = str.codeUnitAt(i);
       hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
+      // Mask to 32-bit and convert to signed to match JavaScript behavior
+      hash = (hash & 0xFFFFFFFF).toSigned(32);
     }
     return hash.toRadixString(16);
   }
@@ -457,14 +526,14 @@ class GoogleDriveService extends ChangeNotifier {
 
     try {
       final checksum = _calculateChecksum(data);
-      
+
       // Encrypt data if encryption is enabled
       dynamic dataToUpload = data;
       if (_encryptionEnabled) {
         if (_encryptionPassphrase == null || _encryptionPassphrase!.isEmpty) {
           throw Exception('Encryption is enabled but no passphrase is set');
         }
-        
+
         debugPrint('[GoogleDriveService] Encrypting data before upload...');
         dataToUpload = await EncryptionService.encryptSyncData(
           data,
@@ -473,7 +542,7 @@ class GoogleDriveService extends ChangeNotifier {
         );
         debugPrint('[GoogleDriveService] Data encrypted successfully');
       }
-      
+
       final jsonData = jsonEncode(dataToUpload);
       final bytes = utf8.encode(jsonData);
 
@@ -507,13 +576,15 @@ class GoogleDriveService extends ChangeNotifier {
 
       _remoteChecksum = checksum;
       _lastSync = DateTime.now();
+      await _saveLastSync(); // Persist for deletion inference
       _updateStatus(_status.copyWith(
         lastSync: _lastSync,
         hasRemoteBackup: true,
         isEncrypted: _encryptionEnabled,
       ));
 
-      debugPrint('[GoogleDriveService] Upload successful, checksum: $checksum, encrypted: $_encryptionEnabled');
+      debugPrint(
+          '[GoogleDriveService] Upload successful, checksum: $checksum, encrypted: $_encryptionEnabled');
       return true;
     } catch (e) {
       debugPrint('[GoogleDriveService] Upload failed: $e');
@@ -531,7 +602,7 @@ class GoogleDriveService extends ChangeNotifier {
 
     try {
       debugPrint('[GoogleDriveService] Downloading backup');
-      
+
       final response = await _driveApi!.files.get(
         _remoteFileId!,
         downloadOptions: drive.DownloadOptions.fullMedia,
@@ -544,37 +615,42 @@ class GoogleDriveService extends ChangeNotifier {
 
       final jsonString = utf8.decode(bytes);
       var data = jsonDecode(jsonString) as Map<String, dynamic>;
-      
+
       // Check if data is encrypted
       final isEncrypted = EncryptionService.isEncryptedSyncData(data);
-      debugPrint('[GoogleDriveService] Downloaded data isEncrypted: $isEncrypted');
-      
+      debugPrint(
+          '[GoogleDriveService] Downloaded data isEncrypted: $isEncrypted');
+
       if (isEncrypted) {
         _updateStatus(_status.copyWith(isEncrypted: true));
-        
+
         if (_encryptionPassphrase == null || _encryptionPassphrase!.isEmpty) {
           // Data is encrypted but we don't have a passphrase
           _updateStatus(_status.copyWith(needsPassphrase: true));
-          throw EncryptionRequiredException('Cloud data is encrypted. Please enter your E2EE passphrase.');
+          throw EncryptionRequiredException(
+              'Cloud data is encrypted. Please enter your E2EE passphrase.');
         }
-        
+
         debugPrint('[GoogleDriveService] Decrypting downloaded data...');
         try {
-          data = await EncryptionService.decryptSyncData(data, _encryptionPassphrase!);
+          data = await EncryptionService.decryptSyncData(
+              data, _encryptionPassphrase!);
           debugPrint('[GoogleDriveService] Data decrypted successfully');
           _updateStatus(_status.copyWith(needsPassphrase: false));
         } catch (e) {
           debugPrint('[GoogleDriveService] Decryption failed: $e');
           _updateStatus(_status.copyWith(needsPassphrase: true));
-          throw EncryptionRequiredException('Decryption failed. Please check your passphrase.');
+          throw EncryptionRequiredException(
+              'Decryption failed. Please check your passphrase.');
         }
       } else {
-        _updateStatus(_status.copyWith(isEncrypted: false, needsPassphrase: false));
+        _updateStatus(
+            _status.copyWith(isEncrypted: false, needsPassphrase: false));
       }
-      
+
       _remoteChecksum = _calculateChecksum(data);
       debugPrint('[GoogleDriveService] Download successful');
-      
+
       return data;
     } catch (e) {
       if (e is EncryptionRequiredException) {
@@ -653,7 +729,8 @@ class GoogleDriveService extends ChangeNotifier {
         result = SyncResult(
           success: true,
           action: 'upload',
-          message: 'Uploaded ${_countNotes(localData)} notes to Google Drive${_encryptionEnabled ? " (encrypted)" : ""}',
+          message:
+              'Uploaded ${_countNotes(localData)} notes to Google Drive${_encryptionEnabled ? " (encrypted)" : ""}',
           notesUploaded: _countNotes(localData),
         );
       } else if (localChecksum == remoteChecksum) {
@@ -666,29 +743,33 @@ class GoogleDriveService extends ChangeNotifier {
         );
       } else if (_isLocalEmpty(localData) && !_isLocalEmpty(remoteData)) {
         // Local is empty, remote has data - download
-        debugPrint('[GoogleDriveService] Local empty - downloading remote data');
+        debugPrint(
+            '[GoogleDriveService] Local empty - downloading remote data');
         await applyData(remoteData);
         result = SyncResult(
           success: true,
           action: 'download',
-          message: 'Downloaded ${_countNotes(remoteData)} notes from Google Drive',
+          message:
+              'Downloaded ${_countNotes(remoteData)} notes from Google Drive',
           notesDownloaded: _countNotes(remoteData),
         );
       } else {
         // Both have data - merge
         debugPrint('[GoogleDriveService] Merging local and remote data');
-        final mergeResult = _mergeData(localData, remoteData);
-        
+        final mergeResult =
+            _mergeData(localData, remoteData, lastSync: _lastSync);
+
         // Apply merged data locally
         await applyData(mergeResult.data);
-        
+
         // Upload merged data to cloud
         await uploadData(mergeResult.data);
-        
+
         result = SyncResult(
           success: true,
           action: 'merge',
-          message: 'Merged data: ${mergeResult.localAdded} local notes, ${mergeResult.remoteAdded} remote notes${_encryptionEnabled ? " (encrypted)" : ""}',
+          message:
+              'Merged data: ${mergeResult.localAdded} local notes, ${mergeResult.remoteAdded} remote notes${_encryptionEnabled ? " (encrypted)" : ""}',
           notesUploaded: mergeResult.localAdded,
           notesDownloaded: mergeResult.remoteAdded,
           conflicts: mergeResult.conflicts,
@@ -697,6 +778,7 @@ class GoogleDriveService extends ChangeNotifier {
       }
 
       _lastSync = DateTime.now();
+      await _saveLastSync(); // Persist for deletion inference
       _updateStatus(_status.copyWith(
         isSyncing: false,
         lastSync: _lastSync,
@@ -742,11 +824,24 @@ class GoogleDriveService extends ChangeNotifier {
   }
 
   /// Merge local and remote data
-  _MergeResult _mergeData(Map<String, dynamic> localData, Map<String, dynamic> remoteData) {
+  /// [lastSync] is used for bi-directional deletion inference:
+  /// - If a note exists remotely but not locally, and remote wasn't modified after lastSync,
+  ///   it means the note was deleted locally -> omit from merged (let deletion propagate)
+  /// - If a note exists locally but not remotely, and local wasn't modified after lastSync,
+  ///   it means the note was deleted remotely -> remove from merged (existing logic)
+  _MergeResult _mergeData(
+      Map<String, dynamic> localData, Map<String, dynamic> remoteData,
+      {DateTime? lastSync}) {
     final mergedData = Map<String, dynamic>.from(localData);
     int localAdded = 0;
     int remoteAdded = 0;
     int conflicts = 0;
+
+    // Debug: Log lastSync and note counts for troubleshooting
+    final localNoteCount = (localData['notes'] as Map?)?.length ?? 0;
+    final remoteNoteCount = (remoteData['notes'] as Map?)?.length ?? 0;
+    debugPrint(
+        '[GoogleDriveService] _mergeData: lastSync=$lastSync, localNotes=$localNoteCount, remoteNotes=$remoteNoteCount');
 
     // Timestamp when remote backup was created/exported. We use this to infer
     // deletions: if a note is missing remotely and the remote export is newer
@@ -765,7 +860,8 @@ class GoogleDriveService extends ChangeNotifier {
     }
 
     // Merge notes
-    final localNotes = Map<String, dynamic>.from(localData['notes'] as Map<String, dynamic>? ?? {});
+    final localNotes = Map<String, dynamic>.from(
+        localData['notes'] as Map<String, dynamic>? ?? {});
     final remoteNotes = remoteData['notes'] as Map<String, dynamic>? ?? {};
 
     for (final entry in remoteNotes.entries) {
@@ -773,14 +869,35 @@ class GoogleDriveService extends ChangeNotifier {
       final remoteNote = entry.value as Map<String, dynamic>;
 
       if (!localNotes.containsKey(noteId)) {
-        // Note only exists in remote - add to local
+        // Note only exists in remote - check if it was deleted locally
+        if (lastSync != null) {
+          final remoteUpdated =
+              DateTime.tryParse(remoteNote['updated_at']?.toString() ?? '') ??
+                  DateTime(1970);
+
+          // If remote note wasn't modified after lastSync, it means:
+          // - We had this note before (we synced it)
+          // - It's not in local anymore
+          // - It must have been deleted locally
+          // -> Don't add to merged data (let deletion propagate to remote)
+          if (!remoteUpdated.isAfter(lastSync)) {
+            debugPrint(
+                '[GoogleDriveService] Note $noteId appears deleted locally - not re-adding from remote');
+            continue;
+          }
+        }
+        // New remote note (modified after lastSync or no lastSync) - add to local
         localNotes[noteId] = remoteNote;
         remoteAdded++;
       } else {
         // Note exists in both - use newer version
         final localNote = localNotes[noteId] as Map<String, dynamic>;
-        final localUpdated = DateTime.tryParse(localNote['updated_at']?.toString() ?? '') ?? DateTime(1970);
-        final remoteUpdated = DateTime.tryParse(remoteNote['updated_at']?.toString() ?? '') ?? DateTime(1970);
+        final localUpdated =
+            DateTime.tryParse(localNote['updated_at']?.toString() ?? '') ??
+                DateTime(1970);
+        final remoteUpdated =
+            DateTime.tryParse(remoteNote['updated_at']?.toString() ?? '') ??
+                DateTime(1970);
 
         if (remoteUpdated.isAfter(localUpdated)) {
           // Remote is newer
@@ -795,7 +912,8 @@ class GoogleDriveService extends ChangeNotifier {
     }
 
     // Merge tags
-    final localTags = Map<String, dynamic>.from(localData['tags'] as Map<String, dynamic>? ?? {});
+    final localTags = Map<String, dynamic>.from(
+        localData['tags'] as Map<String, dynamic>? ?? {});
     final remoteTags = remoteData['tags'] as Map<String, dynamic>? ?? {};
 
     for (final entry in remoteTags.entries) {
@@ -805,8 +923,10 @@ class GoogleDriveService extends ChangeNotifier {
     }
 
     // Merge note_tags
-    final localNoteTags = Map<String, dynamic>.from(localData['note_tags'] as Map<String, dynamic>? ?? {});
-    final remoteNoteTags = remoteData['note_tags'] as Map<String, dynamic>? ?? {};
+    final localNoteTags = Map<String, dynamic>.from(
+        localData['note_tags'] as Map<String, dynamic>? ?? {});
+    final remoteNoteTags =
+        remoteData['note_tags'] as Map<String, dynamic>? ?? {};
 
     for (final entry in remoteNoteTags.entries) {
       if (!localNoteTags.containsKey(entry.key)) {
@@ -825,7 +945,9 @@ class GoogleDriveService extends ChangeNotifier {
         if (remoteNotes.containsKey(noteId)) continue;
 
         final localNote = entry.value as Map<String, dynamic>;
-        final localUpdated = DateTime.tryParse(localNote['updated_at']?.toString() ?? '') ?? DateTime(1970);
+        final localUpdated =
+            DateTime.tryParse(localNote['updated_at']?.toString() ?? '') ??
+                DateTime(1970);
 
         if (remoteExportedAt.isAfter(localUpdated)) {
           notesToRemove.add(noteId);
@@ -845,6 +967,10 @@ class GoogleDriveService extends ChangeNotifier {
       ...(localData['metadata'] as Map<String, dynamic>? ?? {}),
       'lastMerge': DateTime.now().toIso8601String(),
     };
+
+    // Debug: Log final merged note count
+    debugPrint(
+        '[GoogleDriveService] _mergeData result: mergedNotes=${localNotes.length}, localAdded=$localAdded, remoteAdded=$remoteAdded');
 
     return _MergeResult(
       data: mergedData,
@@ -914,13 +1040,13 @@ class GoogleDriveService extends ChangeNotifier {
   Set<String> _extractMediaFileIds(Map<String, dynamic> data) {
     final mediaIds = <String>{};
     final notes = data['notes'] as Map<String, dynamic>? ?? {};
-    
+
     for (final noteData in notes.values) {
       final note = noteData as Map<String, dynamic>;
       final content = note['content'] as String? ?? '';
       mediaIds.addAll(_mediaStorageService.extractMediaIdsFromContent(content));
     }
-    
+
     return mediaIds;
   }
 
@@ -929,7 +1055,7 @@ class GoogleDriveService extends ChangeNotifier {
     if (_driveApi == null || _mediaFolderId == null) return {};
 
     final files = <String, RemoteMediaFile>{};
-    
+
     try {
       String? pageToken;
       do {
@@ -948,7 +1074,7 @@ class GoogleDriveService extends ChangeNotifier {
               final mediaId = file.name!.contains('.')
                   ? file.name!.substring(0, file.name!.lastIndexOf('.'))
                   : file.name!;
-              
+
               files[mediaId] = RemoteMediaFile(
                 id: file.id!,
                 name: file.name!,
@@ -960,11 +1086,12 @@ class GoogleDriveService extends ChangeNotifier {
             }
           }
         }
-        
+
         pageToken = result.nextPageToken;
       } while (pageToken != null);
 
-      debugPrint('[GoogleDriveService] Found ${files.length} remote media files');
+      debugPrint(
+          '[GoogleDriveService] Found ${files.length} remote media files');
     } catch (e) {
       debugPrint('[GoogleDriveService] Failed to list remote media files: $e');
     }
@@ -973,18 +1100,21 @@ class GoogleDriveService extends ChangeNotifier {
   }
 
   /// Upload a media file to Google Drive
-  Future<bool> uploadMediaFile(String mediaId, Uint8List data, {String? extension, String? mimeType}) async {
+  Future<bool> uploadMediaFile(String mediaId, Uint8List data,
+      {String? extension, String? mimeType}) async {
     if (_driveApi == null || _mediaFolderId == null) {
-      debugPrint('[GoogleDriveService] Cannot upload media: not connected or no media folder');
+      debugPrint(
+          '[GoogleDriveService] Cannot upload media: not connected or no media folder');
       return false;
     }
 
     try {
       final fileName = extension != null ? '$mediaId$extension' : mediaId;
       final contentType = mimeType ?? 'application/octet-stream';
-      
+
       // Check if file already exists
-      final query = "name='$fileName' and '$_mediaFolderId' in parents and trashed=false";
+      final query =
+          "name='$fileName' and '$_mediaFolderId' in parents and trashed=false";
       final existing = await _driveApi!.files.list(
         q: query,
         spaces: 'drive',
@@ -1021,7 +1151,8 @@ class GoogleDriveService extends ChangeNotifier {
 
       return true;
     } catch (e) {
-      debugPrint('[GoogleDriveService] Failed to upload media file $mediaId: $e');
+      debugPrint(
+          '[GoogleDriveService] Failed to upload media file $mediaId: $e');
       return false;
     }
   }
@@ -1041,17 +1172,20 @@ class GoogleDriveService extends ChangeNotifier {
         bytes.addAll(chunk);
       }
 
-      debugPrint('[GoogleDriveService] Downloaded media file: ${bytes.length} bytes');
+      debugPrint(
+          '[GoogleDriveService] Downloaded media file: ${bytes.length} bytes');
       return Uint8List.fromList(bytes);
     } catch (e) {
-      debugPrint('[GoogleDriveService] Failed to download media file $driveFileId: $e');
+      debugPrint(
+          '[GoogleDriveService] Failed to download media file $driveFileId: $e');
       return null;
     }
   }
 
   /// Sync media files between local and remote
   /// Returns a tuple of (uploaded count, downloaded count)
-  Future<({int uploaded, int downloaded})> syncMediaFiles(Map<String, dynamic> data, {
+  Future<({int uploaded, int downloaded})> syncMediaFiles(
+    Map<String, dynamic> data, {
     void Function(String status)? onProgress,
   }) async {
     if (!_status.isConnected || _mediaFolderId == null) {
@@ -1064,19 +1198,22 @@ class GoogleDriveService extends ChangeNotifier {
 
     try {
       onProgress?.call('Scanning media files...');
-      
+
       // Extract all media IDs referenced in notes
       final referencedMediaIds = _extractMediaFileIds(data);
-      debugPrint('[GoogleDriveService] Found ${referencedMediaIds.length} media references in notes');
+      debugPrint(
+          '[GoogleDriveService] Found ${referencedMediaIds.length} media references in notes');
 
       // Get list of remote media files
       final remoteFiles = await listRemoteMediaFiles();
-      debugPrint('[GoogleDriveService] Found ${remoteFiles.length} remote media files');
+      debugPrint(
+          '[GoogleDriveService] Found ${remoteFiles.length} remote media files');
 
       // Get list of local media files
       final localFiles = await _mediaStorageService.listLocalMediaFiles();
       final localMediaIds = localFiles.map((f) => f.id).toSet();
-      debugPrint('[GoogleDriveService] Found ${localFiles.length} local media files');
+      debugPrint(
+          '[GoogleDriveService] Found ${localFiles.length} local media files');
 
       // Upload local files that aren't in remote (and are referenced in notes)
       for (final localFile in localFiles) {
@@ -1084,10 +1221,10 @@ class GoogleDriveService extends ChangeNotifier {
         if (!referencedMediaIds.contains(localFile.id)) {
           continue;
         }
-        
+
         if (!remoteFiles.containsKey(localFile.id)) {
           onProgress?.call('Uploading media: ${localFile.name}');
-          
+
           final file = await _mediaStorageService.getMediaFile(localFile.id);
           if (file != null) {
             final data = await file.readAsBytes();
@@ -1097,7 +1234,7 @@ class GoogleDriveService extends ChangeNotifier {
             final mimeType = extension != null
                 ? _mediaStorageService.getMimeTypeFromExtension(extension)
                 : 'application/octet-stream';
-            
+
             final success = await uploadMediaFile(
               localFile.id,
               data,
@@ -1113,27 +1250,29 @@ class GoogleDriveService extends ChangeNotifier {
       for (final entry in remoteFiles.entries) {
         final mediaId = entry.key;
         final remoteFile = entry.value;
-        
+
         // Only sync files that are referenced in notes
         if (!referencedMediaIds.contains(mediaId)) {
           continue;
         }
-        
+
         if (!localMediaIds.contains(mediaId)) {
           onProgress?.call('Downloading media: ${remoteFile.name}');
-          
+
           final data = await downloadMediaFile(remoteFile.id);
           if (data != null) {
             final extension = remoteFile.name.contains('.')
                 ? remoteFile.name.substring(remoteFile.name.lastIndexOf('.'))
                 : null;
-            await _mediaStorageService.saveMediaFile(mediaId, data, extension: extension);
+            await _mediaStorageService.saveMediaFile(mediaId, data,
+                extension: extension);
             downloaded++;
           }
         }
       }
 
-      debugPrint('[GoogleDriveService] Media sync complete: $uploaded uploaded, $downloaded downloaded');
+      debugPrint(
+          '[GoogleDriveService] Media sync complete: $uploaded uploaded, $downloaded downloaded');
       onProgress?.call('Media sync complete');
     } catch (e) {
       debugPrint('[GoogleDriveService] Media sync failed: $e');
@@ -1151,7 +1290,7 @@ class GoogleDriveService extends ChangeNotifier {
     // First, perform the regular sync
     onProgress?.call('Syncing notes...');
     final result = await sync(localData: localData, applyData: applyData);
-    
+
     if (!result.success) {
       return result;
     }
@@ -1159,7 +1298,8 @@ class GoogleDriveService extends ChangeNotifier {
     // Then sync media files
     onProgress?.call('Syncing media files...');
     final mergedData = result.mergedData ?? localData;
-    final mediaResult = await syncMediaFiles(mergedData, onProgress: onProgress);
+    final mediaResult =
+        await syncMediaFiles(mergedData, onProgress: onProgress);
 
     // Return updated result with media counts
     return SyncResult(
@@ -1195,7 +1335,7 @@ class _MergeResult {
 class EncryptionRequiredException implements Exception {
   final String message;
   EncryptionRequiredException(this.message);
-  
+
   @override
   String toString() => message;
 }
