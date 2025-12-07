@@ -1,7 +1,7 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 
-![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -268,7 +268,12 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.3.0 (Current)
+### v2.3.1 (Current)
+- Fixed bug regarding malformed HTML formatting
+- Removed favorite functionality from notes management, streamlining the user experience
+- Code cleanup and improvements
+
+### v2.3.0
 - Major code refactoring and improvements for better maintainability
 - Enhanced Find & Replace functionality with dedicated module and improved UI
 - Added dedicated History Manager for improved undo/redo functionality
@@ -315,17 +320,6 @@ We welcome contributions! Here's how you can help:
 - Complete UI translation including menus, dialogs, and tooltips
 - Language selector in header overflow menu
 - Automatic language detection based on system preferences
-
-### v2.0.0
-- Folder & Tag Navigation with folder-based organization
-- Enhanced search with clear button
-- Media insertion buttons in toolbar
-- Revamped header toolbar
-- Enhanced splash screen with animated background
-
-### v1.5.0
-- Multi-tab support for working with multiple notes simultaneously
-- Enhanced header and search functionality
 
 For earlier versions, see the full [changelog](https://github.com/nawka12/CogNotez/releases).
 
