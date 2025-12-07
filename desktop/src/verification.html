@@ -1,0 +1,187 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sidebar Verification</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/themes.css">
+    <style>
+        /* Force some layout for the verification page */
+        body {
+            margin: 0;
+            padding: 0;
+            background: #f0f0f0;
+            display: flex;
+            height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        }
+
+        #app {
+            display: flex;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Mock variable if needed, though they should be in CSS files */
+    </style>
+</head>
+
+<body>
+    <div id="app">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <h2>Notes</h2>
+                <button id="sidebar-toggle" class="sidebar-toggle"><i class="fas fa-chevron-left"></i></button>
+            </div>
+
+            <!-- Folder Navigation -->
+            <div class="sidebar-folders" id="sidebar-folders">
+                <div class="folder-item active" data-folder="all">
+                    <i class="fas fa-layer-group folder-icon"></i>
+                    <span class="folder-name">All Notes</span>
+                    <span class="folder-count">12</span>
+                </div>
+                <div class="folder-item" data-folder="untagged">
+                    <i class="fas fa-file-alt folder-icon"></i>
+                    <span class="folder-name">Untagged</span>
+                    <span class="folder-count">4</span>
+                </div>
+                <div class="folders-divider">
+                    <span>Tags</span>
+                </div>
+                <div class="tag-folders-list">
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #ef4444;"></div>
+                        <span class="tag-folder-name">Work</span>
+                        <span class="tag-folder-count">5</span>
+                    </div>
+                    <div class="tag-folder-item active">
+                        <div class="tag-folder-color" style="background: #3b82f6;"></div>
+                        <span class="tag-folder-name">Personal</span>
+                        <span class="tag-folder-count">3</span>
+                    </div>
+                    <!-- Dummy tags to test scrolling -->
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #10b981;"></div><span
+                            class="tag-folder-name">Finance</span><span class="tag-folder-count">1</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #f59e0b;"></div><span
+                            class="tag-folder-name">Travel</span><span class="tag-folder-count">0</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #6366f1;"></div><span
+                            class="tag-folder-name">Ideas</span><span class="tag-folder-count">7</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #ec4899;"></div><span
+                            class="tag-folder-name">Health</span><span class="tag-folder-count">2</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #8b5cf6;"></div><span
+                            class="tag-folder-name">Journal</span><span class="tag-folder-count">12</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #14b8a6;"></div><span
+                            class="tag-folder-name">Reading List</span><span class="tag-folder-count">4</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #f97316;"></div><span
+                            class="tag-folder-name">Recipes</span><span class="tag-folder-count">8</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #64748b;"></div><span
+                            class="tag-folder-name">Archive</span><span class="tag-folder-count">99</span>
+                    </div>
+                    <div class="tag-folder-item">
+                        <div class="tag-folder-color" style="background: #71717a;"></div><span
+                            class="tag-folder-name">Trash</span><span class="tag-folder-count">0</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="notes-list" id="notes-list">
+                <!-- Mock Note Item 1: Active, Pinned -->
+                <div class="note-item active pinned">
+                    <div class="note-item-content">
+                        <div class="note-item-title">
+                            Project Phoenix Planning
+                        </div>
+                        <div class="note-item-preview">Discussing the roadmap for Q4 and assigning tasks to the team
+                            members. We need to focus on...</div>
+                        <div class="note-item-meta">
+                            <div class="note-item-date">Just now</div>
+                            <div class="note-item-tags">
+                                <span class="note-tag">Work</span>
+                                <span class="note-tag">Important</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="note-actions-overlay" style="opacity: 1; transform: none;">
+                        <!-- Force visible for screenshot -->
+                        <button class="note-action-btn note-pin-btn pinned"><i class="fas fa-thumbtack"></i></button>
+                        <button class="note-action-btn note-delete-btn"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+
+                <!-- Mock Note Item 2: Standard -->
+                <div class="note-item">
+                    <div class="note-item-content">
+                        <div class="note-item-title">
+                            <i class="fas fa-lock note-lock-icon"></i> Grocery List
+                        </div>
+                        <div class="note-item-preview">Milk, Eggs, Bread, Butter, Coffee beans, Spinach, Chicken breast.
+                        </div>
+                        <div class="note-item-meta">
+                            <div class="note-item-date">Yesterday</div>
+                            <div class="note-item-tags">
+                                <span class="note-tag">Personal</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="note-actions-overlay">
+                        <button class="note-action-btn note-pin-btn"><i class="fas fa-thumbtack"></i></button>
+                        <button class="note-action-btn note-delete-btn"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+
+                <!-- Mock Note Item 3: Long Title/Preview -->
+                <div class="note-item">
+                    <div class="note-item-content">
+                        <div class="note-item-title">
+                            Meeting Notes: Design System V2 Sync with the entire Engineering Team regarding the new
+                            tokens
+                        </div>
+                        <div class="note-item-preview">We decided to move forward with the HSL color space. The token
+                            naming convention will follow the Figma variables. Need to update the Tailwind config.</div>
+                        <div class="note-item-meta">
+                            <div class="note-item-date">Oct 24</div>
+                            <div class="note-item-tags">
+                                <span class="note-tag">Design</span>
+                                <span class="note-tag more-tags">+2</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="note-actions-overlay">
+                        <button class="note-action-btn note-pin-btn"><i class="fas fa-thumbtack"></i></button>
+                        <button class="note-action-btn note-delete-btn"><i class="fas fa-trash"></i></button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sidebar-resize-handle"></div>
+        </aside>
+
+        <!-- Mock Main Content Area placement -->
+        <main
+            style="flex: 1; background: #fff; display: flex; align-items: center; justify-content: center; color: #ccc;">
+            Content Area Placeholder
+        </main>
+    </div>
+</body>
+
+</html>

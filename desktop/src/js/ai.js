@@ -514,7 +514,6 @@ class AIManager {
     }
 
     showOfflineMessage() {
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         let message = '';
         if (this.backend === 'ollama') {
             const fallback = `🤖 AI features are currently offline.
@@ -526,7 +525,7 @@ class AIManager {
 4. Verify it's running at ${this.ollamaEndpoint}
 
 **Alternative:** Switch to OpenRouter in AI Settings for cloud-based AI (requires internet).`;
-            message = window.i18n ? window.i18n.t('ai.offlineOllama', { endpoint: this.ollamaEndpoint }) : fallback;
+            message = t('ai.offlineOllama', { endpoint: this.ollamaEndpoint }) || fallback;
         } else if (this.backend === 'openrouter') {
             const fallback = `🤖 AI features are currently offline.
 
@@ -537,7 +536,7 @@ class AIManager {
 4. Test the connection
 
 **Alternative:** Switch to Ollama in AI Settings for local AI (works offline).`;
-            message = window.i18n ? window.i18n.t('ai.offlineOpenRouter', {}) : fallback;
+            message = t('ai.offlineOpenRouter') || fallback;
         }
         this.app.showAIMessage(message, 'assistant');
     }
@@ -600,10 +599,10 @@ class AIManager {
     async updateOpenRouterApiKey(newApiKey) {
         const oldApiKey = this.openRouterApiKey;
         const keyChanged = oldApiKey !== newApiKey;
-        
+
         this.openRouterApiKey = newApiKey;
         await this.saveSettings();
-        
+
         // If API key changed, return true to indicate restart is needed
         // Restart is needed even if clearing the key, as it affects app initialization
         if (keyChanged) {
@@ -613,7 +612,7 @@ class AIManager {
             await this.checkConnection();
             await this.loadAvailableModels();
         }
-        
+
         return keyChanged; // Return true if restart is needed
     }
 
@@ -1011,7 +1010,7 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
             requestBody.tools = tools;
             // Force tool usage if requested, otherwise let model decide
             requestBody.tool_choice = options.forceTools ? {
-                    type: 'function',
+                type: 'function',
                 function: { name: 'web_search' }
             } : 'auto';
 
@@ -1740,18 +1739,18 @@ Please provide a clear, accurate answer based on the context. If the context doe
             // Check if the model wants to use tools
             if (assistantMessage.tool_calls && assistantMessage.tool_calls.length > 0) {
                 console.log(`🎯 [OLLAMA TOOL CALL] Model requested ${assistantMessage.tool_calls.length} tool(s)`);
-            console.log(`🎯 [OLLAMA TOOL CALL] Tools:`, assistantMessage.tool_calls.map(tc => {
-                let args = tc.function?.arguments;
-                if (typeof args === 'string') {
-                    try {
-                        args = JSON.parse(args);
-                    } catch (e) {
-                        args = {};
+                console.log(`🎯 [OLLAMA TOOL CALL] Tools:`, assistantMessage.tool_calls.map(tc => {
+                    let args = tc.function?.arguments;
+                    if (typeof args === 'string') {
+                        try {
+                            args = JSON.parse(args);
+                        } catch (e) {
+                            args = {};
+                        }
                     }
-                }
-                const paramNames = Object.keys(args || {});
-                return `${tc.function?.name}(${paramNames.join(', ')})`;
-            }).join(', '));
+                    const paramNames = Object.keys(args || {});
+                    return `${tc.function?.name}(${paramNames.join(', ')})`;
+                }).join(', '));
                 // Handle tool calls
                 const toolResults = await this.executeToolCalls(assistantMessage.tool_calls);
                 console.log(`📤 [OLLAMA TOOL RESULTS] Generated ${toolResults.length} tool result(s), sending follow-up request`);
@@ -1932,7 +1931,7 @@ Key Points:`;
     async generateTags(text, options = {}) {
         // Include note title in the prompt if provided for better context
         const titleContext = options.noteTitle ? `Note Title: "${options.noteTitle}"\n\n` : '';
-        
+
         const prompt = `Analyze the following content and suggest the 3 most relevant and important tags that would help categorize and find this note. Focus on the most essential tags only.
 
 ${titleContext}Content:

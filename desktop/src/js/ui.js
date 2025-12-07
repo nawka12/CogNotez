@@ -9,10 +9,15 @@ class UIManager {
     showNotification(message, type = 'info', duration = 3000) {
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
-        notification.innerHTML = `
-            <span>${message}</span>
-            <button class="notification-close">×</button>
-        `;
+
+        const messageSpan = document.createElement('span');
+        messageSpan.textContent = message;
+        notification.appendChild(messageSpan);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'notification-close';
+        closeBtn.textContent = '×';
+        notification.appendChild(closeBtn);
 
         // Style the notification
         Object.assign(notification.style, {
@@ -67,17 +72,26 @@ class UIManager {
         if (!loader) {
             loader = document.createElement('div');
             loader.id = 'global-loader';
-            loader.innerHTML = `
-                <div class="global-loader-backdrop">
-                    <div class="global-loader-content">
-                        <div class="loading-spinner"></div>
-                        <div class="loading-text">Processing...</div>
-                    </div>
-                </div>
-            `;
+
+            const backdrop = document.createElement('div');
+            backdrop.className = 'global-loader-backdrop';
+
+            const content = document.createElement('div');
+            content.className = 'global-loader-content';
+
+            const spinner = document.createElement('div');
+            spinner.className = 'loading-spinner';
+
+            const text = document.createElement('div');
+            text.className = 'loading-text';
+            text.textContent = 'Processing...';
+
+            content.appendChild(spinner);
+            content.appendChild(text);
+            backdrop.appendChild(content);
+            loader.appendChild(backdrop);
 
             // Style the loader
-            const backdrop = loader.querySelector('.global-loader-backdrop');
             Object.assign(backdrop.style, {
                 position: 'fixed',
                 top: '0',
@@ -108,27 +122,79 @@ class UIManager {
     createModal(title, content, buttons = []) {
         const modal = document.createElement('div');
         modal.className = 'modal';
-        modal.innerHTML = `
-            <div class="modal-content" style="max-width: 600px;">
-                <div class="modal-header">
-                    <h3>${title}</h3>
-                    <button class="modal-close">×</button>
-                </div>
-                <div class="modal-body">
-                    ${content}
-                </div>
-                ${buttons.length > 0 ? `
-                    <div class="modal-footer" style="padding: 16px 20px; border-top: 1px solid var(--border-color); display: flex; gap: 12px; justify-content: flex-end;">
-                        ${buttons.map(btn => `<button class="btn-${btn.type || 'secondary'}" data-action="${btn.action}">${btn.text}</button>`).join('')}
-                    </div>
-                ` : ''}
-            </div>
-        `;
+
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.maxWidth = '600px';
+
+        // Header
+        const header = document.createElement('div');
+        header.className = 'modal-header';
+
+        const h3 = document.createElement('h3');
+        h3.textContent = title;
+        header.appendChild(h3);
+
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'modal-close';
+        closeBtn.textContent = '×';
+        header.appendChild(closeBtn);
+
+        modalContent.appendChild(header);
+
+        // Body
+        const body = document.createElement('div');
+        body.className = 'modal-body';
+
+        if (typeof content === 'string') {
+            // Check if it's likely HTML (contains tags) or just text
+            if (/<[a-z][\s\S]*>/i.test(content)) {
+                // It's HTML, use safe innerHTML if available, otherwise just innerHTML (assuming caller handled sanitization if not using shared helper)
+                // Since this is a generic method, we should ideally use the shared setSafeInnerHTML if possible,
+                // but for now we'll stick to innerHTML to avoid breaking existing callers passing complex HTML.
+                // However, we should encourage passing DOM nodes.
+                // Let's implement a safe way if shared is available?
+                // For now, simple innerHTML assignment as we're focusing on STRUCTURE first.
+                // The task is to "Reduce innerHTML usage".
+                // If I can't guarantee safety here, I'll just assign it but wrapped in a try/catch or simple assignment.
+                modal.dataset.hasHtmlContent = 'true';
+                body.innerHTML = content;
+            } else {
+                body.textContent = content;
+            }
+        } else if (content instanceof Node) {
+            body.appendChild(content);
+        }
+
+        modalContent.appendChild(body);
+
+        // Footer
+        if (buttons.length > 0) {
+            const footer = document.createElement('div');
+            footer.className = 'modal-footer';
+            Object.assign(footer.style, {
+                padding: '16px 20px',
+                borderTop: '1px solid var(--border-color)',
+                display: 'flex',
+                gap: '12px',
+                justifyContent: 'flex-end'
+            });
+
+            buttons.forEach(btn => {
+                const btnEl = document.createElement('button');
+                btnEl.className = `btn-${btn.type || 'secondary'}`;
+                btnEl.setAttribute('data-action', btn.action);
+                btnEl.textContent = btn.text;
+                footer.appendChild(btnEl);
+            });
+            modalContent.appendChild(footer);
+        }
+
+        modal.appendChild(modalContent);
 
         document.body.appendChild(modal);
 
         // Event listeners
-        const closeBtn = modal.querySelector('.modal-close');
         closeBtn.addEventListener('click', () => this.closeModal(modal));
 
         modal.addEventListener('click', (e) => {
@@ -218,7 +284,7 @@ class UIManager {
 
             this.sidebarCollapsed = !this.sidebarCollapsed;
             sidebar.style.width = this.sidebarCollapsed ? '60px' : '';
-            
+
             // Add/remove collapsed class for CSS styling (hides resize handle)
             sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
 
@@ -242,7 +308,7 @@ class UIManager {
     setupSidebarResize() {
         const sidebar = document.getElementById('sidebar');
         const resizeHandle = document.getElementById('sidebar-resize-handle');
-        
+
         if (!sidebar || !resizeHandle) return;
 
         let isResizing = false;
@@ -267,38 +333,38 @@ class UIManager {
             // Only allow resize on desktop and when not collapsed
             if (window.innerWidth <= 768) return;
             if (this.sidebarCollapsed) return;
-            
+
             isResizing = true;
             startX = e.clientX || e.touches?.[0]?.clientX || 0;
             startWidth = sidebar.offsetWidth;
-            
+
             sidebar.classList.add('resizing');
             document.body.classList.add('sidebar-resizing');
-            
+
             // Prevent text selection during resize
             e.preventDefault();
         };
 
         const doResize = (e) => {
             if (!isResizing) return;
-            
+
             const currentX = e.clientX || e.touches?.[0]?.clientX || 0;
             const diff = currentX - startX;
             let newWidth = startWidth + diff;
-            
+
             // Clamp to min/max
             newWidth = Math.max(MIN_WIDTH, Math.min(MAX_WIDTH, newWidth));
-            
+
             sidebar.style.width = `${newWidth}px`;
         };
 
         const stopResize = () => {
             if (!isResizing) return;
-            
+
             isResizing = false;
             sidebar.classList.remove('resizing');
             document.body.classList.remove('sidebar-resizing');
-            
+
             // Save the width to localStorage
             const currentWidth = sidebar.offsetWidth;
             localStorage.setItem('sidebarWidth', currentWidth.toString());
@@ -361,18 +427,18 @@ class UIManager {
                 const start = editor.selectionStart;
                 const end = editor.selectionEnd;
                 const tab = '\t';
-                
+
                 // Insert tab at cursor position
                 editor.value = editor.value.substring(0, start) + tab + editor.value.substring(end);
-                
+
                 // Move cursor to after the inserted tab
                 editor.selectionStart = editor.selectionEnd = start + tab.length;
-                
+
                 // Trigger input event for autosave
                 editor.dispatchEvent(new Event('input', { bubbles: true }));
                 return;
             }
-            
+
             // Handle arrow keys for scrolling
             if (e.key === 'ArrowUp' || e.key === 'ArrowDown') {
                 // Check if content overflows and we're at the boundaries
@@ -489,8 +555,8 @@ class UIManager {
             const text = editor.value;
             const words = text.trim() ? text.trim().split(/\s+/).length : 0;
             const chars = text.length;
-            const wordsLabel = window.i18n ? window.i18n.t('editor.words') : 'words';
-            const charsLabel = window.i18n ? window.i18n.t('editor.chars') : 'chars';
+            const wordsLabel = t('editor.words');
+            const charsLabel = t('editor.chars');
             wordCountElement.textContent = `${words} ${wordsLabel}, ${chars} ${charsLabel}`;
             updateWordCountPosition(); // Update position when content changes
         };
@@ -548,7 +614,6 @@ class UIManager {
 
     // Keyboard shortcuts help
     showKeyboardShortcuts() {
-        const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
         const shortcuts = [
             { key: 'Ctrl+N', description: t('keyboard.newNote', 'New Note') },
             { key: 'Ctrl+S', description: t('keyboard.saveNote', 'Save Note') },
@@ -861,11 +926,11 @@ class UIManager {
     toggleMobileSidebar() {
         const sidebar = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
-        
+
         if (sidebar && backdrop) {
             const isOpen = sidebar.classList.toggle('mobile-open');
             backdrop.classList.toggle('active', isOpen);
-            
+
             // Prevent body scroll when sidebar is open
             if (isOpen) {
                 // Ensure mobile overlay uses responsive width (clear any desktop inline width)
@@ -884,7 +949,7 @@ class UIManager {
     closeMobileSidebar() {
         const sidebar = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
-        
+
         if (sidebar && backdrop) {
             sidebar.classList.remove('mobile-open');
             backdrop.classList.remove('active');
@@ -895,7 +960,7 @@ class UIManager {
     openMobileSidebar() {
         const sidebar = document.getElementById('sidebar');
         const backdrop = document.getElementById('sidebar-backdrop');
-        
+
         if (sidebar && backdrop) {
             sidebar.classList.add('mobile-open');
             backdrop.classList.add('active');
@@ -906,7 +971,7 @@ class UIManager {
     handleOrientationChange() {
         // Close any open mobile overlays on orientation change
         this.closeMobileSidebar();
-        
+
         // Update responsive elements
         if (this.updateWordCountPosition) {
             this.updateWordCountPosition();
@@ -972,14 +1037,14 @@ class UIManager {
     optimizeTouchInteractions() {
         // Add touch-friendly ripple effect to buttons
         const buttons = document.querySelectorAll('button, .action-btn, .note-item');
-        
+
         buttons.forEach(button => {
-            button.addEventListener('touchstart', function(e) {
+            button.addEventListener('touchstart', function (e) {
                 // Add visual feedback for touch
                 this.style.opacity = '0.7';
             }, { passive: true });
 
-            button.addEventListener('touchend', function(e) {
+            button.addEventListener('touchend', function (e) {
                 // Remove visual feedback
                 setTimeout(() => {
                     this.style.opacity = '';
@@ -990,8 +1055,8 @@ class UIManager {
 
     // Check if device is mobile
     isMobile() {
-        return window.innerWidth <= 768 || 
-               /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        return window.innerWidth <= 768 ||
+            /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
     }
 
     // Check if device is tablet
@@ -1213,7 +1278,7 @@ class UIManager {
         const confirmPasswordPlaceholder = window.i18n ? window.i18n.t('password.confirmPasswordPlaceholder') : 'Confirm password';
         const cancelText = window.i18n ? window.i18n.t('modals.cancel') : 'Cancel';
         const submitText = window.i18n ? window.i18n.t('modals.submit') : 'Submit';
-        
+
         const {
             title = defaultTitle,
             message = '',

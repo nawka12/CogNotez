@@ -119,7 +119,7 @@ class DatabaseManager {
             // This prevents plaintext content from being persisted to disk
             const dataToSave = { ...this.data };
             dataToSave.notes = {};
-            
+
             for (const [noteId, note] of Object.entries(this.data.notes)) {
                 if (note.password_protected) {
                     // For password-protected notes, ensure content and preview are NEVER saved as plaintext
@@ -232,8 +232,8 @@ class DatabaseManager {
         const wordCount = this.calculateWordCount(noteData.content || '');
         const charCount = (noteData.content || '').length;
 
-		const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
-		const note = {
+        const untitledTitle = t('editor.untitledNoteTitle', 'Untitled Note');
+        const note = {
             id: id,
             title: noteData.title || untitledTitle,
             content: noteData.content || '',
@@ -245,7 +245,7 @@ class DatabaseManager {
             pinned: noteData.pinned || false,
             password_protected: noteData.password_protected || false,
             password_hash: noteData.password_hash || null,
-			encrypted_content: noteData.encrypted_content || null,
+            encrypted_content: noteData.encrypted_content || null,
             word_count: wordCount,
             char_count: charCount,
             created_at: now,
@@ -274,7 +274,7 @@ class DatabaseManager {
         if (note && !note.is_archived) {
             // Create a deep copy to prevent accidental mutation of database objects
             const noteCopy = JSON.parse(JSON.stringify(note));
-            
+
             // Ensure proper date objects
             if (typeof noteCopy.created === 'string') {
                 noteCopy.created = new Date(noteCopy.created_at || noteCopy.created);
@@ -301,8 +301,8 @@ class DatabaseManager {
                 const safeContent = note.password_protected ? '' : (note.content || '');
                 const safePreview = note.password_protected ? '' : (note.preview || '');
                 const textMatch = note.title.toLowerCase().includes(searchTerm) ||
-                                safeContent.toLowerCase().includes(searchTerm) ||
-                                safePreview.toLowerCase().includes(searchTerm);
+                    safeContent.toLowerCase().includes(searchTerm) ||
+                    safePreview.toLowerCase().includes(searchTerm);
 
                 // Search in tags
                 let tagMatch = false;
@@ -418,9 +418,9 @@ class DatabaseManager {
             note.password_hash = noteData.password_hash;
         }
 
-		if (noteData.encrypted_content !== undefined) {
-			note.encrypted_content = noteData.encrypted_content;
-		}
+        if (noteData.encrypted_content !== undefined) {
+            note.encrypted_content = noteData.encrypted_content;
+        }
 
         // Collaboration metadata
         if (noteData.collaboration !== undefined) {
@@ -703,14 +703,14 @@ class DatabaseManager {
     clearUnusedTags() {
         // Find all tag IDs that are actually used in notes
         const usedTagIds = new Set();
-        
+
         // Check note_tags associations
         Object.values(this.data.note_tags).forEach(noteTag => {
             if (noteTag.tag_id) {
                 usedTagIds.add(noteTag.tag_id);
             }
         });
-        
+
         // Also check tags array in notes (for backward compatibility)
         Object.values(this.data.notes).forEach(note => {
             if (note.tags && Array.isArray(note.tags)) {
@@ -1197,7 +1197,7 @@ class DatabaseManager {
                     const localCollaboration = localNote.collaboration || {};
                     const remoteCollaboration = remoteNote.collaboration || {};
                     const collaborationChanged = JSON.stringify(localCollaboration.google_drive_file_id) !== JSON.stringify(remoteCollaboration.google_drive_file_id) ||
-                                                JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
+                        JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
 
                     if (remoteTime > localTime) {
                         // Remote is newer - use remote note completely, including its collaboration state
@@ -1245,12 +1245,12 @@ class DatabaseManager {
 
         // Merge other data types - respect local deletions
         // Local state is the source of truth for deletions
-        
+
         if (remoteData.ai_conversations && options.mergeConversations) {
             // Only add remote conversations that don't exist locally
             // This respects local deletions (if user cleared conversations)
             const existingNoteIds = new Set(Object.keys(this.data.notes));
-            
+
             for (const [convId, remoteConv] of Object.entries(remoteData.ai_conversations)) {
                 // Only add if:
                 // 1. Conversation doesn't exist locally (new from remote)
@@ -1266,7 +1266,7 @@ class DatabaseManager {
             // Only add remote tags that are actually used in notes or already exist locally
             // This prevents re-adding tags that were intentionally deleted
             const usedTagIds = new Set();
-            
+
             // Check which tags are currently used
             Object.values(this.data.notes).forEach(note => {
                 if (note.tags && Array.isArray(note.tags)) {
@@ -1276,7 +1276,7 @@ class DatabaseManager {
             Object.values(this.data.note_tags).forEach(noteTag => {
                 if (noteTag.tag_id) usedTagIds.add(noteTag.tag_id);
             });
-            
+
             // Only merge tags that exist locally or are used in notes
             for (const [tagId, remoteTag] of Object.entries(remoteData.tags)) {
                 if (this.data.tags[tagId] || usedTagIds.has(tagId)) {
@@ -1289,7 +1289,7 @@ class DatabaseManager {
             // Only add remote note_tags if the note still exists
             // This prevents orphaned tag associations
             const existingNoteIds = new Set(Object.keys(this.data.notes));
-            
+
             for (const [noteTagKey, remoteNoteTag] of Object.entries(remoteData.note_tags)) {
                 if (existingNoteIds.has(remoteNoteTag.note_id)) {
                     // Only add if not already present locally

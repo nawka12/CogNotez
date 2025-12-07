@@ -1,911 +1,12 @@
+
 // Main application entry point for CogNotez
 const { ipcRenderer } = require('electron');
 
 // Shared helpers
 const { t, setSafeInnerHTML, renderMarkdown } = require('./js/shared');
-
-// Find and Replace Dialog
-class FindReplaceDialog {
-    constructor(app) {
-        this.app = app;
-        this.isVisible = false;
-        this.findText = '';
-        this.replaceText = '';
-        this.currentMatchIndex = -1;
-        this.matches = [];
-        this.caseSensitive = false;
-        this.wholeWord = false;
-        this.regex = false;
-        this.element = null;
-    }
-
-    createDialog() {
-        const dialog = document.createElement('div');
-        dialog.id = 'find-replace-dialog';
-        dialog.className = 'find-replace-dialog';
-        const findReplaceTitle = t('findReplace.findReplace');
-        const findLabel = t('findReplace.find');
-        const replaceLabel = t('findReplace.replace');
-        const searchTextPlaceholder = t('findReplace.searchText');
-        const replaceWithPlaceholder = t('findReplace.replaceWith');
-        const noMatches = t('findReplace.noMatches');
-        const caseSensitive = t('findReplace.caseSensitive');
-        const wholeWord = t('findReplace.wholeWord');
-        const regularExpression = t('findReplace.regularExpression');
-        const previous = t('findReplace.previous');
-        const next = t('findReplace.next');
-        const replaceButton = t('findReplace.replaceButton');
-        const replaceAll = t('findReplace.replaceAll');
-        const disclaimerPreviewOnly = t('findReplace.disclaimerPreviewOnly');
-        
-        dialog.innerHTML = `
-            <div class="find-replace-header">
-                <h3>${findReplaceTitle}</h3>
-                <button id="find-replace-close" class="find-replace-close"><i class="fas fa-times"></i></button>
-            </div>
-            <div class="find-replace-body">
-                <div class="find-disclaimer">
-                    <i class="fas fa-info-circle"></i>
-                    <span>${disclaimerPreviewOnly}</span>
-                </div>
-                <div class="find-section">
-                    <label for="find-input">${findLabel}</label>
-                    <input type="text" id="find-input" class="find-input" placeholder="${searchTextPlaceholder}">
-                </div>
-                <div class="replace-section">
-                    <label for="replace-input">${replaceLabel}</label>
-                    <input type="text" id="replace-input" class="replace-input" placeholder="${replaceWithPlaceholder}">
-                </div>
-                <div class="options-section">
-                    <label><input type="checkbox" id="case-sensitive"> ${caseSensitive}</label>
-                    <label><input type="checkbox" id="whole-word"> ${wholeWord}</label>
-                    <label><input type="checkbox" id="use-regex"> ${regularExpression}</label>
-                </div>
-                <div class="results-section">
-                    <span id="match-count">${noMatches}</span>
-                </div>
-                <div class="buttons-section">
-                    <button id="find-prev" class="btn-secondary">${previous}</button>
-                    <button id="find-next" class="btn-secondary">${next}</button>
-                    <button id="replace-next" class="btn-primary">${replaceButton}</button>
-                    <button id="replace-all" class="btn-primary">${replaceAll}</button>
-                </div>
-            </div>
-        `;
-
-        // Style the dialog (positioning handled by CSS)
-        Object.assign(dialog.style, {
-            background: 'var(--bg-primary)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '8px',
-            boxShadow: '0 4px 20px rgba(0, 0, 0, 0.15)',
-            zIndex: '1000',
-            fontSize: '14px',
-            display: 'none'
-        });
-
-        document.body.appendChild(dialog);
-        this.element = dialog;
-        this.setupEventListeners();
-    }
-
-    setupEventListeners() {
-        if (!this.element) return;
-
-        // Close button
-        this.element.querySelector('#find-replace-close').addEventListener('click', () => {
-            this.hide();
-        });
-
-        // Make dialog draggable
-        this.setupDragAndDrop();
-
-        // Find input
-        const findInput = this.element.querySelector('#find-input');
-        findInput.addEventListener('input', (e) => {
-            this.findText = e.target.value;
-            this.findMatches();
-        });
-
-        findInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                this.findNext();
-                // Focus will be handled by findNext() -> selectCurrentMatch(true)
-            } else if (e.key === 'Escape') {
-                this.hide();
-            }
-        });
-
-        // Replace input
-        const replaceInput = this.element.querySelector('#replace-input');
-        replaceInput.addEventListener('input', (e) => {
-            this.replaceText = e.target.value;
-        });
-
-        replaceInput.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape') {
-                this.hide();
-            }
-        });
-
-        // Options
-        this.element.querySelector('#case-sensitive').addEventListener('change', (e) => {
-            this.caseSensitive = e.target.checked;
-            this.findMatches();
-        });
-
-        this.element.querySelector('#whole-word').addEventListener('change', (e) => {
-            this.wholeWord = e.target.checked;
-            this.findMatches();
-        });
-
-        this.element.querySelector('#use-regex').addEventListener('change', (e) => {
-            this.regex = e.target.checked;
-            this.findMatches();
-        });
-
-        // Buttons
-        this.element.querySelector('#find-prev').addEventListener('click', () => this.findPrevious());
-        this.element.querySelector('#find-next').addEventListener('click', () => this.findNext());
-        this.element.querySelector('#replace-next').addEventListener('click', () => this.replaceNext());
-        this.element.querySelector('#replace-all').addEventListener('click', () => this.replaceAll());
-    }
-
-    setupDragAndDrop() {
-        const header = this.element.querySelector('.find-replace-header');
-        let isDragging = false;
-        let startX, startY, startLeft, startTop;
-
-        header.style.cursor = 'move';
-        header.style.userSelect = 'none';
-
-        header.addEventListener('mousedown', (e) => {
-            isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            const rect = this.element.getBoundingClientRect();
-            startLeft = rect.left;
-            startTop = rect.top;
-
-            document.body.style.userSelect = 'none';
-            e.preventDefault();
-        });
-
-        document.addEventListener('mousemove', (e) => {
-            if (!isDragging) return;
-
-            const deltaX = e.clientX - startX;
-            const deltaY = e.clientY - startY;
-
-            let newLeft = startLeft + deltaX;
-            let newTop = startTop + deltaY;
-
-            // Keep dialog within viewport bounds
-            const rect = this.element.getBoundingClientRect();
-            const maxLeft = window.innerWidth - rect.width;
-            const maxTop = window.innerHeight - rect.height;
-
-            newLeft = Math.max(0, Math.min(newLeft, maxLeft));
-            newTop = Math.max(0, Math.min(newTop, maxTop));
-
-            this.element.style.left = `${newLeft}px`;
-            this.element.style.top = `${newTop}px`;
-            this.element.style.right = 'auto'; // Remove auto positioning
-            this.element.style.transform = 'none'; // Remove transform
-        });
-
-        document.addEventListener('mouseup', () => {
-            if (isDragging) {
-                isDragging = false;
-                document.body.style.userSelect = '';
-            }
-        });
-    }
-
-    show(findOnly = false) {
-        if (!this.element) {
-            this.createDialog();
-        }
-
-        this.isVisible = true;
-        this.element.style.display = 'block';
-
-        // Set initial position for dragging (center the dialog)
-        if (this.element.style.left === '' || this.element.style.top === '') {
-            const rect = this.element.getBoundingClientRect();
-            const centerX = (window.innerWidth - rect.width) / 2;
-            const centerY = (window.innerHeight - rect.height) / 2;
-            this.element.style.left = `${Math.max(0, centerX)}px`;
-            this.element.style.top = `${Math.max(0, centerY)}px`;
-            this.element.style.right = 'auto';
-            this.element.style.transform = 'none';
-        }
-
-        this.element.querySelector('#find-input').focus();
-
-        const t = (key) => window.i18n ? window.i18n.t(key) : key;
-        const currentMode = this.app.previewMode || 'edit';
-        const isPreviewOnly = currentMode === 'preview';
-        
-        // Update disclaimer based on mode
-        this.updateDisclaimer();
-        
-        // In preview-only mode, force find-only (no replace)
-        const effectiveFindOnly = findOnly || isPreviewOnly;
-        
-        if (effectiveFindOnly) {
-            this.element.querySelector('.replace-section').style.display = 'none';
-            this.element.querySelector('#replace-next').style.display = 'none';
-            this.element.querySelector('#replace-all').style.display = 'none';
-            this.element.querySelector('h3').textContent = t('findReplace.find');
-        } else {
-            this.element.querySelector('.replace-section').style.display = 'block';
-            this.element.querySelector('#replace-next').style.display = 'inline-block';
-            this.element.querySelector('#replace-all').style.display = 'inline-block';
-            this.element.querySelector('h3').textContent = t('findReplace.findReplace');
-        }
-
-        // Pre-fill with selected text (only if editor is accessible)
-        const editor = document.getElementById('note-editor');
-        if (!isPreviewOnly && editor && editor.selectionStart !== editor.selectionEnd) {
-            const selectedText = editor.value.substring(editor.selectionStart, editor.selectionEnd);
-            this.element.querySelector('#find-input').value = selectedText;
-            this.findText = selectedText;
-            this.findMatches();
-            // Don't focus editor when dialog opens with pre-filled text
-        }
-    }
-    
-    updateDisclaimer() {
-        const disclaimer = this.element.querySelector('.find-disclaimer span');
-        if (!disclaimer) return;
-        
-        const t = (key) => window.i18n ? window.i18n.t(key) : key;
-        const currentMode = this.app.previewMode || 'edit';
-        
-        switch (currentMode) {
-            case 'edit':
-                disclaimer.textContent = t('findReplace.disclaimerEdit');
-                break;
-            case 'preview':
-                disclaimer.textContent = t('findReplace.disclaimerPreview');
-                break;
-            case 'split':
-                disclaimer.textContent = t('findReplace.disclaimerSplit');
-                break;
-        }
-    }
-    
-    // Update UI when view mode changes while dialog is open
-    updateUIForMode() {
-        if (!this.element) return;
-        
-        const t = (key) => window.i18n ? window.i18n.t(key) : key;
-        const currentMode = this.app.previewMode || 'edit';
-        const isPreviewOnly = currentMode === 'preview';
-        
-        // Update disclaimer
-        this.updateDisclaimer();
-        
-        // Show/hide replace elements based on mode
-        if (isPreviewOnly) {
-            this.element.querySelector('.replace-section').style.display = 'none';
-            this.element.querySelector('#replace-next').style.display = 'none';
-            this.element.querySelector('#replace-all').style.display = 'none';
-            this.element.querySelector('h3').textContent = t('findReplace.find');
-        } else {
-            this.element.querySelector('.replace-section').style.display = 'block';
-            this.element.querySelector('#replace-next').style.display = 'inline-block';
-            this.element.querySelector('#replace-all').style.display = 'inline-block';
-            this.element.querySelector('h3').textContent = t('findReplace.findReplace');
-        }
-    }
-
-    hide() {
-        if (this.element) {
-            this.isVisible = false;
-            this.element.style.display = 'none';
-            this.clearHighlights();
-        }
-    }
-
-    findMatches() {
-        const editor = document.getElementById('note-editor');
-        const preview = document.getElementById('markdown-preview');
-        const currentMode = this.app.previewMode || 'edit';
-        
-        if (!this.findText) {
-            this.matches = [];
-            this.currentMatchIndex = -1;
-            this.updateMatchCount();
-            this.clearHighlights();
-            return;
-        }
-
-        // In preview-only mode, search in preview text content
-        // In edit and split modes, search in editor value
-        let content;
-        if (currentMode === 'preview') {
-            // Get text content from preview (rendered markdown)
-            if (!preview) {
-                this.matches = [];
-                this.currentMatchIndex = -1;
-                this.updateMatchCount();
-                return;
-            }
-            content = editor.value; // Still search in source for accurate positioning
-        } else {
-            if (!editor) {
-                this.matches = [];
-                this.currentMatchIndex = -1;
-                this.updateMatchCount();
-                return;
-            }
-            content = editor.value;
-        }
-        this.matches = [];
-        let searchText = this.findText;
-
-        if (!this.regex) {
-            // Escape special regex characters for literal search
-            searchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-        }
-
-        if (this.wholeWord) {
-            searchText = `\\b${searchText}\\b`;
-        }
-
-        const flags = this.caseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(searchText, flags);
-
-        let match;
-        while ((match = regex.exec(content)) !== null) {
-            this.matches.push({
-                start: match.index,
-                end: match.index + match[0].length,
-                text: match[0]
-            });
-        }
-
-        this.currentMatchIndex = this.matches.length > 0 ? 0 : -1;
-        this.updateMatchCount();
-        this.highlightMatches();
-        this.selectCurrentMatch(false); // Don't focus editor during typing
-    }
-
-    highlightMatches() {
-        const editor = document.getElementById('note-editor');
-        const preview = document.getElementById('markdown-preview');
-        const currentMode = this.app.previewMode || 'edit';
-
-        // If no matches, clear highlights and return
-        if (this.matches.length === 0) {
-            this.clearHighlights();
-            return;
-        }
-
-        switch (currentMode) {
-            case 'edit':
-                // Edit mode: highlight in editor only
-                if (editor) {
-                    this.selectCurrentMatch();
-                    this.highlightInEditor();
-                }
-                break;
-            case 'preview':
-                // Preview mode: highlight in preview only (read-only)
-                this.highlightInPreview();
-                break;
-            case 'split':
-                // Split mode: highlight in both editor and preview
-                if (editor) {
-                    this.selectCurrentMatch();
-                    this.highlightInEditor();
-                }
-                this.highlightInPreview();
-                break;
-        }
-    }
-
-    async clearHighlights() {
-        // Reset preview to normal content
-        const preview = document.getElementById('markdown-preview');
-        const editor = document.getElementById('note-editor');
-        
-        if (editor) {
-            // Remove find mode class
-            editor.classList.remove('find-mode-active');
-        }
-        
-        if (preview && editor) {
-            // Process media URLs before rendering
-            let content = editor.value;
-            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
-                try {
-                    content = await this.app.richMediaManager.processContentForPreview(content);
-                } catch (error) {
-                    console.warn('[Preview] Failed to process media URLs in clearHighlights:', error);
-                }
-            }
-            setSafeInnerHTML(preview, renderMarkdown(content));
-        }
-    }
-
-    async highlightInPreview() {
-        if (this.matches.length === 0) return;
-
-        const preview = document.getElementById('markdown-preview');
-        const editor = document.getElementById('note-editor');
-        if (!preview || !editor) return;
-
-        try {
-            // First, render the markdown normally
-            let content = editor.value;
-            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
-                try {
-                    content = await this.app.richMediaManager.processContentForPreview(content);
-                } catch (error) {
-                    console.warn('[Preview] Failed to process media URLs in highlightInPreview:', error);
-                }
-            }
-
-            // Parse markdown to HTML
-            const html = renderMarkdown(content);
-            
-            // Create a temporary container
-            const tempDiv = document.createElement('div');
-            setSafeInnerHTML(tempDiv, html);
-            
-            // Build the search pattern from find settings
-            let searchText = this.findText;
-            if (!this.regex) {
-                searchText = searchText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            }
-            if (this.wholeWord) {
-                searchText = `\\b${searchText}\\b`;
-            }
-            const flags = this.caseSensitive ? 'g' : 'gi';
-            const searchRegex = new RegExp(searchText, flags);
-            
-            // Track which match we're on (to identify current match)
-            let matchCounter = 0;
-            
-            // Function to highlight text in a text node
-            const highlightTextNode = (textNode) => {
-                const text = textNode.textContent;
-                const parent = textNode.parentNode;
-                
-                if (!parent || !text) return;
-                
-                // Skip if inside a code block or pre tag
-                let ancestor = parent;
-                while (ancestor) {
-                    if (ancestor.tagName === 'CODE' || ancestor.tagName === 'PRE') {
-                        // Still search in code blocks but continue
-                        break;
-                    }
-                    ancestor = ancestor.parentNode;
-                }
-                
-                // Find all matches in this text node
-                const matches = [];
-                let match;
-                searchRegex.lastIndex = 0; // Reset regex state
-                while ((match = searchRegex.exec(text)) !== null) {
-                    matches.push({
-                        start: match.index,
-                        end: match.index + match[0].length,
-                        text: match[0],
-                        globalIndex: matchCounter++
-                    });
-                }
-                
-                if (matches.length === 0) return;
-                
-                // Build new content with highlights
-                const fragment = document.createDocumentFragment();
-                let lastEnd = 0;
-                
-                for (const m of matches) {
-                    // Add text before this match
-                    if (m.start > lastEnd) {
-                        fragment.appendChild(document.createTextNode(text.substring(lastEnd, m.start)));
-                    }
-                    
-                    // Add highlighted match
-                    const highlightSpan = document.createElement('mark');
-                    const isCurrent = m.globalIndex === this.currentMatchIndex;
-                    highlightSpan.className = isCurrent ? 'find-highlight find-highlight-current' : 'find-highlight';
-                    highlightSpan.textContent = m.text;
-                    fragment.appendChild(highlightSpan);
-                    
-                    lastEnd = m.end;
-                }
-                
-                // Add remaining text after last match
-                if (lastEnd < text.length) {
-                    fragment.appendChild(document.createTextNode(text.substring(lastEnd)));
-                }
-                
-                // Replace the text node with the fragment
-                parent.replaceChild(fragment, textNode);
-            };
-            
-            // Get all text nodes using TreeWalker
-            const getTextNodes = (root) => {
-                const textNodes = [];
-                const walker = document.createTreeWalker(
-                    root,
-                    NodeFilter.SHOW_TEXT,
-                    null
-                );
-                
-                let node;
-                while (node = walker.nextNode()) {
-                    // Only process nodes with actual text content
-                    if (node.textContent.trim() || node.textContent.includes(this.findText)) {
-                        textNodes.push(node);
-                    }
-                }
-                return textNodes;
-            };
-            
-            // Collect text nodes first (to avoid modification during iteration)
-            const textNodes = getTextNodes(tempDiv);
-            
-            // Process each text node
-            for (const textNode of textNodes) {
-                highlightTextNode(textNode);
-            }
-            
-            // Update preview with highlighted content
-            preview.innerHTML = tempDiv.innerHTML;
-
-            // Scroll the current highlight into view
-            const currentHighlight = preview.querySelector('.find-highlight-current');
-            if (currentHighlight) {
-                const rect = currentHighlight.getBoundingClientRect();
-                const previewRect = preview.getBoundingClientRect();
-                const headerHeight = 64;
-                
-                const isVisible = rect.top >= previewRect.top + headerHeight && 
-                                 rect.bottom <= previewRect.bottom;
-                
-                if (!isVisible) {
-                    const scrollTop = preview.scrollTop + rect.top - previewRect.top - (window.innerHeight / 3);
-                    preview.scrollTo({ top: Math.max(0, scrollTop), behavior: 'smooth' });
-                }
-            } else {
-                const firstHighlight = preview.querySelector('.find-highlight');
-                if (firstHighlight) {
-                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' });
-                }
-            }
-        } catch (error) {
-            console.warn('Error highlighting in preview:', error);
-            // Fallback to normal rendering
-            let content = editor.value;
-            if (this.app.richMediaManager && this.app.richMediaManager.processContentForPreview) {
-                try {
-                    content = await this.app.richMediaManager.processContentForPreview(content);
-                } catch (e) {
-                    // Ignore
-                }
-            }
-            setSafeInnerHTML(preview, renderMarkdown(content));
-        }
-    }
-
-    highlightInEditor() {
-        // For textarea, we can't directly add HTML highlights, but we can:
-        // 1. Ensure the selection is visible (handled by selectCurrentMatch)
-        // 2. Add a wrapper element with visual indicator
-        // Since textarea doesn't support HTML, we rely on the selection being visible
-        // The CSS will make the selection more prominent
-        const editor = document.getElementById('note-editor');
-        if (!editor) return;
-
-        // Add a class to indicate find mode is active
-        editor.classList.add('find-mode-active');
-        
-        // Scroll to the current match with better calculation for smaller screens
-        if (this.currentMatchIndex >= 0 && this.currentMatchIndex < this.matches.length) {
-            const match = this.matches[this.currentMatchIndex];
-            
-            // Use a more accurate scroll calculation
-            const textBeforeMatch = editor.value.substring(0, match.start);
-            const lines = textBeforeMatch.split('\n').length;
-            
-            // Get actual line height
-            const style = getComputedStyle(editor);
-            const lineHeight = parseInt(style.lineHeight) || parseInt(style.fontSize) * 1.5 || 20;
-            const paddingTop = parseInt(style.paddingTop) || 0;
-            
-            // Calculate the target scroll position
-            // Account for viewport height and header on smaller screens
-            const editorRect = editor.getBoundingClientRect();
-            const viewportHeight = window.innerHeight;
-            const headerHeight = 64; // Approximate header + editor header height
-            const availableHeight = viewportHeight - headerHeight;
-            
-            // Calculate line position of match
-            const targetLinePosition = (lines - 1) * lineHeight;
-            
-            // Ideal scroll position: center the match in the visible area
-            // But on smaller screens, we want it closer to the top
-            const idealScrollTop = targetLinePosition - (availableHeight / 2) + paddingTop;
-            
-            // Ensure we don't scroll past the top
-            const minScrollTop = 0;
-            // Calculate max scroll (content height - visible height)
-            const contentHeight = editor.scrollHeight;
-            const visibleHeight = editorRect.height;
-            const maxScrollTop = Math.max(0, contentHeight - visibleHeight);
-            
-            // For smaller screens, prefer showing match near top
-            const isSmallScreen = viewportHeight < 800;
-            const scrollOffset = isSmallScreen ? availableHeight * 0.2 : availableHeight * 0.4;
-            const finalScrollTop = Math.max(minScrollTop, Math.min(maxScrollTop, targetLinePosition - scrollOffset + paddingTop));
-            
-            editor.scrollTop = finalScrollTop;
-            
-            // Ensure cursor/selection is visible after scroll
-            // Small delay to let scroll complete
-            setTimeout(() => {
-                const selectionStart = editor.selectionStart;
-                const selectionEnd = editor.selectionEnd;
-                
-                // Check if selection is visible
-                const textBeforeStart = editor.value.substring(0, selectionStart);
-                const startLine = textBeforeStart.split('\n').length;
-                const startLineTop = (startLine - 1) * lineHeight;
-                const startLineBottom = startLineTop + lineHeight;
-                
-                if (startLineTop < editor.scrollTop || startLineBottom > editor.scrollTop + visibleHeight) {
-                    // Selection not visible, adjust scroll
-                    editor.scrollTop = Math.max(0, startLineTop - scrollOffset);
-                }
-            }, 50);
-        }
-    }
-
-    selectCurrentMatch(focusEditor = false) {
-        if (this.currentMatchIndex >= 0 && this.currentMatchIndex < this.matches.length) {
-            const currentMode = this.app.previewMode || 'edit';
-            const match = this.matches[this.currentMatchIndex];
-            
-            // In preview-only mode, we don't select in editor, just scroll preview
-            if (currentMode === 'preview') {
-                // Scroll to highlight in preview will be handled by highlightInPreview
-                return;
-            }
-            
-            // In edit and split modes, select in editor
-            const editor = document.getElementById('note-editor');
-            if (!editor) return;
-            
-            editor.setSelectionRange(match.start, match.end);
-
-            if (focusEditor) {
-                editor.focus();
-            }
-
-            // Scroll into view
-            const lineHeight = parseInt(getComputedStyle(editor).lineHeight);
-            const lines = editor.value.substring(0, match.start).split('\n').length;
-            editor.scrollTop = (lines - 1) * lineHeight;
-        }
-    }
-
-    findNext() {
-        if (this.matches.length === 0) return;
-
-        this.currentMatchIndex = (this.currentMatchIndex + 1) % this.matches.length;
-        this.updateMatchCount();
-        this.highlightMatches();
-        
-        // Only focus editor if not in preview-only mode
-        const currentMode = this.app.previewMode || 'edit';
-        if (currentMode !== 'preview') {
-            this.selectCurrentMatch(true); // Focus editor when navigating
-        }
-    }
-
-    findPrevious() {
-        if (this.matches.length === 0) return;
-
-        this.currentMatchIndex = this.currentMatchIndex <= 0 ?
-            this.matches.length - 1 : this.currentMatchIndex - 1;
-        this.updateMatchCount();
-        this.highlightMatches();
-        
-        // Only focus editor if not in preview-only mode
-        const currentMode = this.app.previewMode || 'edit';
-        if (currentMode !== 'preview') {
-            this.selectCurrentMatch(true); // Focus editor when navigating
-        }
-    }
-
-    replaceNext() {
-        // Prevent replace in preview-only mode
-        const currentMode = this.app.previewMode || 'edit';
-        if (currentMode === 'preview') return;
-        
-        if (this.currentMatchIndex < 0 || this.currentMatchIndex >= this.matches.length) return;
-
-        const editor = document.getElementById('note-editor');
-        const match = this.matches[this.currentMatchIndex];
-        const before = editor.value.substring(0, match.start);
-        const after = editor.value.substring(match.end);
-        const newContent = before + this.replaceText + after;
-
-        editor.value = newContent;
-
-        // Track history
-        if (!this.app.ignoreHistoryUpdate) {
-            const cursorPos = match.start + this.replaceText.length;
-            this.app.historyManager.pushState(newContent, cursorPos, cursorPos, cursorPos);
-        }
-
-        // Update current note
-        if (this.app.currentNote) {
-            this.app.currentNote.content = newContent;
-            this.app.saveCurrentNote();
-        }
-
-        // Update preview
-        this.app.updateNotePreview();
-
-        // Re-find matches with updated content
-        this.findMatches();
-
-        // Adjust current index if necessary
-        if (this.currentMatchIndex >= this.matches.length) {
-            this.currentMatchIndex = Math.max(0, this.matches.length - 1);
-        }
-
-        this.selectCurrentMatch(true); // Focus editor after replacement
-    }
-
-    replaceAll() {
-        // Prevent replace in preview-only mode
-        const currentMode = this.app.previewMode || 'edit';
-        if (currentMode === 'preview') return;
-        
-        if (this.matches.length === 0) return;
-
-        const editor = document.getElementById('note-editor');
-        let content = editor.value;
-        let offset = 0;
-
-        // Replace all matches
-        this.matches.forEach(match => {
-            const before = content.substring(0, match.start + offset);
-            const after = content.substring(match.end + offset);
-            content = before + this.replaceText + after;
-            offset += this.replaceText.length - match.text.length;
-        });
-
-        editor.value = content;
-
-        // Track history
-        if (!this.app.ignoreHistoryUpdate) {
-            this.app.historyManager.pushState(content, 0, 0, 0);
-        }
-
-        // Update current note
-        if (this.app.currentNote) {
-            this.app.currentNote.content = content;
-            this.app.saveCurrentNote();
-        }
-
-        // Update preview
-        this.app.updateNotePreview();
-
-        // Clear matches
-        this.matches = [];
-        this.currentMatchIndex = -1;
-        this.updateMatchCount();
-        this.clearHighlights();
-    }
-
-    updateMatchCount() {
-        const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
-        const countElement = this.element.querySelector('#match-count');
-        if (this.matches.length === 0) {
-            countElement.textContent = t('findReplace.noMatches');
-        } else {
-            countElement.textContent = t('findReplace.matchCount', { 
-                current: this.currentMatchIndex + 1, 
-                total: this.matches.length 
-            });
-        }
-    }
-}
-
+const FindReplaceDialog = require('./js/find-replace');
 // History Manager for undo/redo functionality
-class HistoryManager {
-    constructor(maxHistorySize = 100) {
-        this.history = [];
-        this.currentIndex = -1;
-        this.maxHistorySize = maxHistorySize;
-    }
-
-    // Add a new state to history
-    pushState(content, cursorPosition = 0, selectionStart = 0, selectionEnd = 0) {
-        const state = {
-            content: content,
-            cursorPosition: cursorPosition,
-            selectionStart: selectionStart,
-            selectionEnd: selectionEnd,
-            timestamp: Date.now()
-        };
-
-        // Remove any history after current index (for when we're not at the end)
-        this.history = this.history.slice(0, this.currentIndex + 1);
-
-        // Add new state
-        this.history.push(state);
-        this.currentIndex++;
-
-        // Limit history size
-        if (this.history.length > this.maxHistorySize) {
-            this.history.shift();
-            this.currentIndex--;
-        }
-    }
-
-    // Get current state
-    getCurrentState() {
-        if (this.currentIndex >= 0 && this.currentIndex < this.history.length) {
-            return this.history[this.currentIndex];
-        }
-        return null;
-    }
-
-    // Check if undo is available
-    canUndo() {
-        return this.currentIndex > 0;
-    }
-
-    // Check if redo is available
-    canRedo() {
-        return this.currentIndex < this.history.length - 1;
-    }
-
-    // Perform undo operation
-    undo() {
-        if (!this.canUndo()) return null;
-
-        this.currentIndex--;
-        return this.history[this.currentIndex];
-    }
-
-    // Perform redo operation
-    redo() {
-        if (!this.canRedo()) return null;
-
-        this.currentIndex++;
-        return this.history[this.currentIndex];
-    }
-
-    // Clear all history
-    clear() {
-        this.history = [];
-        this.currentIndex = -1;
-    }
-
-    // Get history statistics
-    getStats() {
-        return {
-            totalStates: this.history.length,
-            currentIndex: this.currentIndex,
-            canUndo: this.canUndo(),
-            canRedo: this.canRedo()
-        };
-    }
-}
+const HistoryManager = require('./js/history');
 
 class CogNotezApp {
     constructor() {
@@ -932,11 +33,11 @@ class CogNotezApp {
             inProgress: false
         };
 
-		// Cache of passwords for unlocked notes (noteId -> password)
-		this.notePasswordCache = {};
+        // Cache of passwords for unlocked notes (noteId -> password)
+        this.notePasswordCache = {};
 
-		// Interval for updating note date in real-time
-		this.noteDateUpdateInterval = null;
+        // Interval for updating note date in real-time
+        this.noteDateUpdateInterval = null;
 
         // Phase 5 managers
         this.advancedSearchManager = null;
@@ -1004,12 +105,12 @@ class CogNotezApp {
             this.backendAPI.setAppReference(this);
 
             // Run backend and notes manager init in parallel
-            const [, ] = await Promise.all([
+            const [,] = await Promise.all([
                 this.backendAPI.initialize(),
                 (async () => {
-            console.log('[DEBUG] Initializing notes manager...');
-            this.notesManager = new NotesManager(this);
-            await this.notesManager.initialize();
+                    console.log('[DEBUG] Initializing notes manager...');
+                    this.notesManager = new NotesManager(this);
+                    await this.notesManager.initialize();
                 })()
             ]);
             this.updateSplashProgress('splash.loadingNotes', 40);
@@ -1020,16 +121,16 @@ class CogNotezApp {
             // Phase 2: UI and features (can run in parallel)
             console.log('[DEBUG] Initializing managers...');
             this.updateSplashProgress('splash.preparingInterface', 55);
-            
+
             // Initialize AI manager, UI manager, and Phase 5 features in parallel
             await Promise.all([
                 (async () => {
-            this.aiManager = new AIManager(this);
-            await this.aiManager.initialize();
+                    this.aiManager = new AIManager(this);
+                    await this.aiManager.initialize();
                 })(),
                 (async () => {
-            this.uiManager = new UIManager(this);
-            this.uiManager.initialize();
+                    this.uiManager = new UIManager(this);
+                    this.uiManager.initialize();
                 })(),
                 this.initializePhase5Features()
             ]);
@@ -1062,12 +163,12 @@ class CogNotezApp {
             // Mark as ready and hide splash quickly
             this.updateSplashProgress('splash.ready', 100);
             const elapsed = Math.round(performance.now() - startTime);
-            console.log(`[DEBUG] CogNotez initialized in ${elapsed}ms`);
+            console.log(`[DEBUG] CogNotez initialized in ${elapsed} ms`);
 
             // Short delay to show completion, then hide
             setTimeout(() => {
                 this.hideSplashScreen();
-                
+
                 // Run startup sync in BACKGROUND after app is visible
                 this.runBackgroundStartupSync();
             }, 300);
@@ -1101,7 +202,7 @@ class CogNotezApp {
             if (syncMeta && syncMeta.syncOnStartup && this.syncStatus && this.syncStatus.isAuthenticated) {
                 // Small delay to ensure app is fully interactive first
                 await new Promise(resolve => setTimeout(resolve, 500));
-                
+
                 // Check if we're online before attempting startup sync
                 const isOnline = await window.networkUtils.checkGoogleDriveConnectivity(2000);
                 if (isOnline) {
@@ -1138,13 +239,13 @@ class CogNotezApp {
         // Header buttons
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
-        
+
         // Header overflow menu toggle
         document.getElementById('header-overflow-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleHeaderOverflowMenu();
         });
-        
+
         // Close overflow menu when clicking any menu item (except language selector)
         document.querySelectorAll('.header-overflow-item').forEach(item => {
             if (!item.classList.contains('language-selector-item')) {
@@ -1154,14 +255,14 @@ class CogNotezApp {
                 });
             }
         });
-        
+
         // Language selector
         const languageSelector = document.getElementById('language-selector');
         if (languageSelector) {
             // Set current language
             const currentLang = window.i18n ? window.i18n.getLanguage() : 'en';
             languageSelector.value = currentLang;
-            
+
             // Handle language change
             languageSelector.addEventListener('change', async (e) => {
                 const newLang = e.target.value;
@@ -1169,7 +270,7 @@ class CogNotezApp {
                     await window.i18n.setLanguage(newLang);
                 }
             });
-            
+
             // Listen for language changes to update selector and notify main process
             window.addEventListener('languageChanged', (e) => {
                 languageSelector.value = e.detail.language;
@@ -1179,7 +280,7 @@ class CogNotezApp {
                 }
             });
         }
-        
+
         // Menu items that were moved to overflow
         document.getElementById('theme-toggle').addEventListener('click', () => this.toggleTheme());
         document.getElementById('mobile-search-btn').addEventListener('click', () => this.toggleMobileSearch());
@@ -1189,7 +290,7 @@ class CogNotezApp {
             }
         });
         document.getElementById('templates-btn').addEventListener('click', () => this.showTemplateChooser());
-        
+
         // Mobile-specific overflow menu items
         const mobileThemeToggle = document.getElementById('mobile-theme-toggle');
         if (mobileThemeToggle) {
@@ -1203,19 +304,19 @@ class CogNotezApp {
         if (syncSettingsBtn) {
             syncSettingsBtn.addEventListener('click', () => this.showSyncSettings());
         }
-        
+
         // Simplified sync button
         const syncBtn = document.getElementById('sync-btn');
         if (syncBtn) {
             syncBtn.addEventListener('click', () => this.manualSync());
         }
-        
+
         // Initialize tabs system
         this.initializeTabsEventListeners();
-        
+
         // Initialize folder navigation
         this.setupFolderNavigation();
-        
+
         // Update search shortcut for platform
         const searchShortcut = document.getElementById('search-shortcut');
         if (searchShortcut) {
@@ -1306,13 +407,13 @@ class CogNotezApp {
         document.getElementById('replace-btn').addEventListener('click', () => this.showReplaceDialog());
         document.getElementById('preview-toggle-btn').addEventListener('click', () => this.togglePreview());
         document.getElementById('save-btn').addEventListener('click', () => this.saveCurrentNote());
-        
+
         // Editor overflow menu toggle
         document.getElementById('editor-overflow-btn').addEventListener('click', (e) => {
             e.stopPropagation();
             this.toggleEditorOverflowMenu();
         });
-        
+
         // Close overflow menu when clicking any menu item
         document.querySelectorAll('.overflow-menu-item').forEach(item => {
             item.addEventListener('click', () => {
@@ -1342,7 +443,7 @@ class CogNotezApp {
             }
             this._ignoreNextInputForUnsaved = false;
         });
-        
+
         // Also track title changes for unsaved indicator and update tab title
         document.getElementById('note-title').addEventListener('input', (e) => {
             if (this.currentNote && !this._ignoreNextInputForUnsaved) {
@@ -1388,13 +489,13 @@ class CogNotezApp {
             const start = editor.selectionStart;
             const end = editor.selectionEnd;
             const selectedText = editor.value.substring(start, end);
-            
+
             // Store selection range for operations
             this.selectionStart = start;
             this.selectionEnd = end;
             this.selectedText = selectedText;
             this.contextElement = editor;
-            
+
             this.showContextMenu(e, selectedText);
         });
 
@@ -1571,7 +672,7 @@ class CogNotezApp {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
         const wrapper = document.querySelector('.editor-wrapper');
-        
+
         if (!editor || !preview || !wrapper) return;
 
         switch (this.previewMode) {
@@ -1597,7 +698,7 @@ class CogNotezApp {
                 this.setupSyncScroll();
                 break;
         }
-        
+
         this.updatePreviewToggleIcon();
     }
 
@@ -1654,12 +755,12 @@ class CogNotezApp {
     // Setup live preview with debouncing for performance
     setupLivePreview() {
         const editor = document.getElementById('note-editor');
-        
+
         // Remove old listener if exists
         if (this.livePreviewListener) {
             editor.removeEventListener('input', this.livePreviewListener);
         }
-        
+
         // Create new listener with debouncing
         this.livePreviewListener = () => {
             clearTimeout(this.livePreviewDebounce);
@@ -1667,7 +768,7 @@ class CogNotezApp {
                 this.renderMarkdownPreview();
             }, 300); // 300ms debounce for smooth typing experience
         };
-        
+
         editor.addEventListener('input', this.livePreviewListener);
         console.log('[DEBUG] Live preview enabled');
     }
@@ -1687,7 +788,7 @@ class CogNotezApp {
     setupSyncScroll() {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
-        
+
         if (!editor || !preview) return;
 
         // Track which element is being scrolled to prevent feedback loops
@@ -1697,26 +798,26 @@ class CogNotezApp {
         // Editor scroll handler
         this.editorScrollHandler = () => {
             if (!this.syncScrollEnabled) return;
-            
+
             // If preview initiated the scroll, ignore
             if (this.syncScrollSource === 'preview') return;
-            
+
             // Mark editor as the scroll source
             this.syncScrollSource = 'editor';
-            
+
             // Clear any existing timeout
             if (this.syncScrollTimeout) {
                 clearTimeout(this.syncScrollTimeout);
             }
-            
+
             // Calculate scroll percentage
             const scrollPercentage = editor.scrollTop / (editor.scrollHeight - editor.clientHeight);
-            
+
             // Apply to preview (with bounds check)
             if (isFinite(scrollPercentage) && scrollPercentage >= 0) {
                 preview.scrollTop = scrollPercentage * (preview.scrollHeight - preview.clientHeight);
             }
-            
+
             // Reset source after smooth scroll animation completes (300ms for smooth behavior)
             this.syncScrollTimeout = setTimeout(() => {
                 this.syncScrollSource = null;
@@ -1726,26 +827,26 @@ class CogNotezApp {
         // Preview scroll handler
         this.previewScrollHandler = () => {
             if (!this.syncScrollEnabled) return;
-            
+
             // If editor initiated the scroll, ignore
             if (this.syncScrollSource === 'editor') return;
-            
+
             // Mark preview as the scroll source
             this.syncScrollSource = 'preview';
-            
+
             // Clear any existing timeout
             if (this.syncScrollTimeout) {
                 clearTimeout(this.syncScrollTimeout);
             }
-            
+
             // Calculate scroll percentage
             const scrollPercentage = preview.scrollTop / (preview.scrollHeight - preview.clientHeight);
-            
+
             // Apply to editor (with bounds check)
             if (isFinite(scrollPercentage) && scrollPercentage >= 0) {
                 editor.scrollTop = scrollPercentage * (editor.scrollHeight - editor.clientHeight);
             }
-            
+
             // Reset source after smooth scroll animation completes (300ms for smooth behavior)
             this.syncScrollTimeout = setTimeout(() => {
                 this.syncScrollSource = null;
@@ -1755,7 +856,7 @@ class CogNotezApp {
         // Attach listeners
         editor.addEventListener('scroll', this.editorScrollHandler, { passive: true });
         preview.addEventListener('scroll', this.previewScrollHandler, { passive: true });
-        
+
         console.log('[DEBUG] Synchronized scrolling enabled');
     }
 
@@ -1763,24 +864,24 @@ class CogNotezApp {
     removeSyncScroll() {
         const editor = document.getElementById('note-editor');
         const preview = document.getElementById('markdown-preview');
-        
+
         if (editor && this.editorScrollHandler) {
             editor.removeEventListener('scroll', this.editorScrollHandler);
             this.editorScrollHandler = null;
         }
-        
+
         if (preview && this.previewScrollHandler) {
             preview.removeEventListener('scroll', this.previewScrollHandler);
             this.previewScrollHandler = null;
         }
-        
+
         // Clear sync scroll timeout and source
         if (this.syncScrollTimeout) {
             clearTimeout(this.syncScrollTimeout);
             this.syncScrollTimeout = null;
         }
         this.syncScrollSource = null;
-        
+
         console.log('[DEBUG] Synchronized scrolling disabled');
     }
 
@@ -1792,7 +893,7 @@ class CogNotezApp {
         if (isHidden) {
             // Show menu
             menu.classList.remove('hidden');
-            
+
             // Add click listener to close menu when clicking outside
             setTimeout(() => {
                 document.addEventListener('click', this.closeEditorOverflowMenu.bind(this), { once: true });
@@ -1807,7 +908,7 @@ class CogNotezApp {
     closeEditorOverflowMenu(e) {
         const menu = document.getElementById('editor-overflow-menu');
         const overflowBtn = document.getElementById('editor-overflow-btn');
-        
+
         // Don't close if clicking inside the menu or on the overflow button
         if (menu && !menu.contains(e?.target) && e?.target !== overflowBtn) {
             menu.classList.add('hidden');
@@ -1822,7 +923,7 @@ class CogNotezApp {
         if (isHidden) {
             // Show menu
             menu.classList.remove('hidden');
-            
+
             // Add click listener to close menu when clicking outside
             setTimeout(() => {
                 document.addEventListener('click', this.closeHeaderOverflowMenu.bind(this), { once: true });
@@ -1871,7 +972,7 @@ class CogNotezApp {
         if (!editor.value.trim()) {
             const startWritingText = t('editor.startWriting', 'Start writing your note...');
             const safeStart = this.escapeHtml(startWritingText);
-            setSafeInnerHTML(preview, `<p style="color: var(--text-tertiary); font-style: italic;">${safeStart}</p>`);
+            setSafeInnerHTML(preview, `< p style = "color: var(--text-tertiary); font-style: italic;" > ${safeStart}</p > `);
             return;
         }
 
@@ -1889,10 +990,10 @@ class CogNotezApp {
         // Render markdown and sanitize for security
         const renderedHTML = renderMarkdown(content);
         setSafeInnerHTML(preview, renderedHTML);
-        
+
         // Setup horizontal scroll functionality
         this.setupHorizontalScroll(preview);
-        
+
         // Ensure external links open in default browser (renderer-side handling)
         this.setupExternalLinkHandling(preview);
     }
@@ -1900,7 +1001,7 @@ class CogNotezApp {
     // Setup horizontal scroll functionality for markdown preview
     setupHorizontalScroll(container) {
         if (!container) return;
-        
+
         // Wrap tables in scrollable containers
         const tables = container.querySelectorAll('table');
         tables.forEach(table => {
@@ -1911,32 +1012,32 @@ class CogNotezApp {
                 wrapper.appendChild(table);
             }
         });
-        
+
         // Check for horizontal scroll and add visual indicators
         const checkHorizontalScroll = () => {
             const hasHorizontalScroll = container.scrollWidth > container.clientWidth;
             container.classList.toggle('scrollable-x', hasHorizontalScroll);
         };
-        
+
         // Initial check
         checkHorizontalScroll();
-        
+
         // Check on resize
         const resizeObserver = new ResizeObserver(checkHorizontalScroll);
         resizeObserver.observe(container);
-        
+
         // Check on content changes
         const mutationObserver = new MutationObserver(checkHorizontalScroll);
-        mutationObserver.observe(container, { 
-            childList: true, 
-            subtree: true, 
-            attributes: true 
+        mutationObserver.observe(container, {
+            childList: true,
+            subtree: true,
+            attributes: true
         });
-        
+
         // Add keyboard navigation for horizontal scrolling
         container.addEventListener('keydown', (e) => {
             if (e.ctrlKey || e.metaKey) {
-                switch(e.key) {
+                switch (e.key) {
                     case 'ArrowLeft':
                         e.preventDefault();
                         container.scrollBy({ left: -100, behavior: 'smooth' });
@@ -1948,7 +1049,7 @@ class CogNotezApp {
                 }
             }
         });
-        
+
         // Store observers for cleanup
         container._horizontalScrollObservers = { resizeObserver, mutationObserver };
     }
@@ -1956,28 +1057,28 @@ class CogNotezApp {
     // Setup link handling to open external links in default browser
     setupExternalLinkHandling(container) {
         if (!container) return;
-        
+
         // Remove any existing listeners to avoid duplicates
         const oldHandler = container._linkClickHandler;
         if (oldHandler) {
             container.removeEventListener('click', oldHandler);
         }
-        
+
         // Create new handler
         const linkClickHandler = (event) => {
             const target = event.target;
-            
+
             // Check if the clicked element is a link or is inside a link
             const link = target.closest('a');
             if (!link) return;
-            
+
             const href = link.getAttribute('href');
             if (!href) return;
-            
+
             // Only handle external links (http/https)
             if (href.startsWith('http://') || href.startsWith('https://')) {
                 event.preventDefault();
-                
+
                 // Use Electron's shell to open in default browser
                 if (typeof require !== 'undefined') {
                     try {
@@ -1992,10 +1093,10 @@ class CogNotezApp {
             }
             // Allow internal links (anchors, etc.) to work normally
         };
-        
+
         // Store handler reference for cleanup
         container._linkClickHandler = linkClickHandler;
-        
+
         // Add event listener
         container.addEventListener('click', linkClickHandler);
     }
@@ -2007,7 +1108,7 @@ class CogNotezApp {
             const searchInput = document.getElementById('search-input');
             const searchQuery = searchInput ? (searchInput.value || '') : '';
             await this.notesManager.renderNotesList(searchQuery, this.currentFolder);
-            
+
             // Render tag folders in sidebar
             await this.renderTagFolders();
 
@@ -2063,7 +1164,7 @@ class CogNotezApp {
                         ${t('modals.unsavedChangesMessage')}
                     </p>
                 </div>
-            `;
+    `;
             const modal = this.createModal(t('modals.unsavedChanges'), content, [
                 { text: t('modals.saveAndSwitch'), type: 'primary', action: 'save-switch' },
                 { text: t('modals.discardChanges'), type: 'secondary', action: 'discard-switch' },
@@ -2127,30 +1228,30 @@ class CogNotezApp {
         return new Promise((resolve) => {
             const title = window.i18n ? window.i18n.t('password.enterPassword') : 'Enter Password';
             const message = window.i18n ? window.i18n.t('password.unlockNote', { title: note.title }) : `Enter the password to unlock "${note.title}"`;
-            
+
             this.uiManager.showPasswordDialog({
                 title: title,
                 message: message,
                 onSubmit: async (password) => {
                     try {
-						const isValid = await this.verifyNotePassword(note, password);
+                        const isValid = await this.verifyNotePassword(note, password);
                         if (isValid) {
-							// Decrypt content for this session and cache password
-							if (note.encrypted_content && window.encryptionManager) {
-								try {
-									const envelope = JSON.parse(note.encrypted_content);
-									const decrypted = window.encryptionManager.decryptData(envelope, password);
-									note.content = decrypted.content || '';
-									this.cacheNotePassword(note.id, password);
-								} catch (e) {
-									console.error('Failed to decrypt note content:', e);
-									const t = (key) => window.i18n ? window.i18n.t(key) : key;
-									this.showNotification(t('notifications.errorDecryptingNote'), 'error');
-									resolve(false);
-									return;
-								}
-							}
-							this.displayNote(note);
+                            // Decrypt content for this session and cache password
+                            if (note.encrypted_content && window.encryptionManager) {
+                                try {
+                                    const envelope = JSON.parse(note.encrypted_content);
+                                    const decrypted = window.encryptionManager.decryptData(envelope, password);
+                                    note.content = decrypted.content || '';
+                                    this.cacheNotePassword(note.id, password);
+                                } catch (e) {
+                                    console.error('Failed to decrypt note content:', e);
+                                    const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                                    this.showNotification(t('notifications.errorDecryptingNote'), 'error');
+                                    resolve(false);
+                                    return;
+                                }
+                            }
+                            this.displayNote(note);
                             const t = (key) => window.i18n ? window.i18n.t(key) : key;
                             this.showNotification(t('notifications.noteUnlocked'), 'success');
                             resolve(true);
@@ -2174,20 +1275,20 @@ class CogNotezApp {
         });
     }
 
-	// Password cache helpers
-	cacheNotePassword(noteId, password) {
-		this.notePasswordCache[noteId] = password;
-	}
+    // Password cache helpers
+    cacheNotePassword(noteId, password) {
+        this.notePasswordCache[noteId] = password;
+    }
 
-	getCachedNotePassword(noteId) {
-		return this.notePasswordCache[noteId] || null;
-	}
+    getCachedNotePassword(noteId) {
+        return this.notePasswordCache[noteId] || null;
+    }
 
-	clearCachedNotePassword(noteId) {
-		if (this.notePasswordCache[noteId]) {
-			delete this.notePasswordCache[noteId];
-		}
-	}
+    clearCachedNotePassword(noteId) {
+        if (this.notePasswordCache[noteId]) {
+            delete this.notePasswordCache[noteId];
+        }
+    }
 
     async verifyNotePassword(note, password) {
         if (!note.password_protected || !note.password_hash) {
@@ -2212,7 +1313,7 @@ class CogNotezApp {
         }
     }
 
-	async showPasswordProtectionDialog() {
+    async showPasswordProtectionDialog() {
         if (!this.currentNote) {
             const t = (key) => window.i18n ? window.i18n.t(key) : key;
             this.showNotification(t('notifications.noNoteSelected'), 'error');
@@ -2222,7 +1323,7 @@ class CogNotezApp {
         const isCurrentlyProtected = this.currentNote.password_protected;
         const titleKey = isCurrentlyProtected ? 'password.removePasswordProtection' : 'password.addPasswordProtection';
         const messageKey = isCurrentlyProtected ? 'password.removePasswordMessage' : 'password.protectNote';
-        
+
         const title = window.i18n ? window.i18n.t(titleKey) : (isCurrentlyProtected ? 'Remove Password Protection' : 'Add Password Protection');
         const message = window.i18n ? window.i18n.t(messageKey) : (isCurrentlyProtected ? 'Enter the current password to remove protection from this note.' : 'Enter a password to protect this note.');
 
@@ -2237,7 +1338,7 @@ class CogNotezApp {
                         // Remove protection - verify current password
                         const isValid = await this.verifyNotePassword(this.currentNote, password);
                         if (isValid) {
-							await this.removePasswordProtection(this.currentNote, password);
+                            await this.removePasswordProtection(this.currentNote, password);
                             const t = (key) => window.i18n ? window.i18n.t(key) : key;
                             this.showNotification(t('notifications.passwordProtectionRemoved'), 'success');
                         } else {
@@ -2269,94 +1370,94 @@ class CogNotezApp {
         });
     }
 
-	async setPasswordProtection(note, password) {
+    async setPasswordProtection(note, password) {
         if (!window.encryptionManager) {
             throw new Error('Encryption manager not available');
         }
         const hashResult = window.encryptionManager.hashPassword(password);
 
-		// Encrypt current content and clear plaintext
-		let envelopeString = null;
-		try {
-			const envelope = window.encryptionManager.encryptData({ content: note.content || '' }, password);
-			envelopeString = JSON.stringify(envelope);
-		} catch (e) {
-			console.error('Failed to encrypt note during protection enable:', e);
-			const t = (key) => window.i18n ? window.i18n.t(key) : key;
-			this.showNotification(t('notifications.failedToEnableProtection'), 'error');
-			throw e;
-		}
+        // Encrypt current content and clear plaintext
+        let envelopeString = null;
+        try {
+            const envelope = window.encryptionManager.encryptData({ content: note.content || '' }, password);
+            envelopeString = JSON.stringify(envelope);
+        } catch (e) {
+            console.error('Failed to encrypt note during protection enable:', e);
+            const t = (key) => window.i18n ? window.i18n.t(key) : key;
+            this.showNotification(t('notifications.failedToEnableProtection'), 'error');
+            throw e;
+        }
 
-		const updateData = {
+        const updateData = {
             password_protected: true,
-			password_hash: JSON.stringify(hashResult),
-			encrypted_content: envelopeString,
-			content: '',
-			preview: ''
+            password_hash: JSON.stringify(hashResult),
+            encrypted_content: envelopeString,
+            content: '',
+            preview: ''
         };
 
         if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
             await this.notesManager.db.updateNote(note.id, updateData);
             // Update the current note object
-			Object.assign(note, updateData);
-			// Keep decrypted content in memory for current session
-			note.content = note.content || '';
+            Object.assign(note, updateData);
+            // Keep decrypted content in memory for current session
+            note.content = note.content || '';
         } else {
             // Fallback to localStorage
             Object.assign(note, updateData);
             this.saveNotes();
         }
 
-		// Cache the password for future saves in this session
-		this.cacheNotePassword(note.id, password);
+        // Cache the password for future saves in this session
+        this.cacheNotePassword(note.id, password);
     }
 
-	async removePasswordProtection(note, password = null) {
-		// If a password isn't provided, try cached
-		let passToUse = password || this.getCachedNotePassword(note.id);
-		if (!passToUse) {
-			// Ask user for password
-			const unlocked = await this.promptForNotePassword(note);
-			if (!unlocked) return;
-			passToUse = this.getCachedNotePassword(note.id);
-		}
+    async removePasswordProtection(note, password = null) {
+        // If a password isn't provided, try cached
+        let passToUse = password || this.getCachedNotePassword(note.id);
+        if (!passToUse) {
+            // Ask user for password
+            const unlocked = await this.promptForNotePassword(note);
+            if (!unlocked) return;
+            passToUse = this.getCachedNotePassword(note.id);
+        }
 
-		// Decrypt existing content
-		let plaintext = note.content || '';
-		if (!plaintext && note.encrypted_content && window.encryptionManager) {
-			try {
-				const envelope = JSON.parse(note.encrypted_content);
-				const decrypted = window.encryptionManager.decryptData(envelope, passToUse);
-				plaintext = decrypted.content || '';
-			} catch (e) {
-				console.error('Failed to decrypt while removing protection:', e);
-				const t = (key) => window.i18n ? window.i18n.t(key) : key;
-				this.showNotification(t('notifications.failedToRemoveProtection'), 'error');
-				return;
-			}
-		}
+        // Decrypt existing content
+        let plaintext = note.content || '';
+        if (!plaintext && note.encrypted_content && window.encryptionManager) {
+            try {
+                const envelope = JSON.parse(note.encrypted_content);
+                const decrypted = window.encryptionManager.decryptData(envelope, passToUse);
+                plaintext = decrypted.content || '';
+            } catch (e) {
+                console.error('Failed to decrypt while removing protection:', e);
+                const t = (key) => window.i18n ? window.i18n.t(key) : key;
+                this.showNotification(t('notifications.failedToRemoveProtection'), 'error');
+                return;
+            }
+        }
 
-		const updateData = {
-			password_protected: false,
-			password_hash: null,
-			encrypted_content: null,
-			content: plaintext,
-			preview: this.generatePreview(plaintext)
-		};
+        const updateData = {
+            password_protected: false,
+            password_hash: null,
+            encrypted_content: null,
+            content: plaintext,
+            preview: this.generatePreview(plaintext)
+        };
 
-		if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
-			await this.notesManager.db.updateNote(note.id, updateData);
-			// Update the current note object
-			Object.assign(note, updateData);
-		} else {
-			// Fallback to localStorage
-			Object.assign(note, updateData);
-			this.saveNotes();
-		}
+        if (this.notesManager && this.notesManager.db && this.notesManager.db.initialized) {
+            await this.notesManager.db.updateNote(note.id, updateData);
+            // Update the current note object
+            Object.assign(note, updateData);
+        } else {
+            // Fallback to localStorage
+            Object.assign(note, updateData);
+            this.saveNotes();
+        }
 
-		// Clear cached password
-		this.clearCachedNotePassword(note.id);
-	}
+        // Clear cached password
+        this.clearCachedNotePassword(note.id);
+    }
 
     updatePasswordLockIcon() {
         const lockBtn = document.getElementById('password-lock-btn');
@@ -2401,7 +1502,7 @@ class CogNotezApp {
                 this.renderNotesList();
                 this.displayNote(note);
             }
-            
+
             // Update folder counts
             await this.renderTagFolders();
         } catch (error) {
@@ -2456,7 +1557,7 @@ class CogNotezApp {
         if (this.previewMode === 'preview' || this.previewMode === 'split') {
             this.renderMarkdownPreview();
         }
-        
+
         // Ensure tab is marked as saved after loading (not unsaved)
         this.markTabUnsaved(note.id, false);
     }
@@ -2516,7 +1617,7 @@ class CogNotezApp {
     addNoteToTabs(noteId) {
         // Normalize ID to string for consistent comparison
         const normalizedId = String(noteId);
-        
+
         // Check if tab already exists
         const existingTab = this.openTabs.find(tab => String(tab.noteId) === normalizedId);
         if (existingTab) {
@@ -2532,7 +1633,7 @@ class CogNotezApp {
         if (this.openTabs.length >= this.maxTabs) {
             // Close the oldest non-active tab that isn't unsaved
             const currentId = this.currentNote ? String(this.currentNote.id) : null;
-            const tabToClose = this.openTabs.find(tab => 
+            const tabToClose = this.openTabs.find(tab =>
                 String(tab.noteId) !== currentId && !tab.unsaved
             );
             if (tabToClose) {
@@ -2569,7 +1670,7 @@ class CogNotezApp {
         if (tabIndex === -1) return;
 
         const tab = this.openTabs[tabIndex];
-        
+
         // If tab has unsaved changes and not silent, show confirmation
         if (tab.unsaved && !silent) {
             const noteName = tab.title || 'Untitled';
@@ -2629,7 +1730,7 @@ class CogNotezApp {
     renderTabs() {
         const tabsBar = document.getElementById('note-tabs-bar');
         const tabsContainer = document.getElementById('note-tabs-container');
-        
+
         if (!tabsBar || !tabsContainer) return;
 
         // Show/hide tabs bar based on whether we have tabs
@@ -2646,7 +1747,7 @@ class CogNotezApp {
         this.openTabs.forEach(tab => {
             const tabIdStr = String(tab.noteId);
             const isActive = this.currentNote && String(this.currentNote.id) === tabIdStr;
-            
+
             // For active tab, use currentNote title and update stored title
             // For inactive tabs, use stored title
             let title;
@@ -2658,7 +1759,7 @@ class CogNotezApp {
                 // Use stored title from tab
                 title = tab.title || 'Untitled';
             }
-            
+
             const unsavedClass = tab.unsaved ? 'unsaved' : '';
             const activeClass = isActive ? 'active' : '';
 
@@ -2677,10 +1778,10 @@ class CogNotezApp {
         // Add event listeners to tabs
         tabsContainer.querySelectorAll('.note-tab').forEach((tabEl, index) => {
             const noteId = tabEl.dataset.noteId;
-            
+
             // Make tab draggable
             tabEl.setAttribute('draggable', 'true');
-            
+
             // Click on tab to switch
             tabEl.addEventListener('click', (e) => {
                 if (!e.target.closest('.note-tab-close')) {
@@ -2695,7 +1796,7 @@ class CogNotezApp {
                     this.closeTab(noteId);
                 }
             });
-            
+
             // Drag start
             tabEl.addEventListener('dragstart', (e) => {
                 e.dataTransfer.effectAllowed = 'move';
@@ -2703,7 +1804,7 @@ class CogNotezApp {
                 tabEl.classList.add('dragging');
                 this._draggedTabIndex = index;
             });
-            
+
             // Drag end
             tabEl.addEventListener('dragend', () => {
                 tabEl.classList.remove('dragging');
@@ -2713,50 +1814,50 @@ class CogNotezApp {
                 });
                 this._draggedTabIndex = null;
             });
-            
+
             // Drag over
             tabEl.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                
+
                 if (this._draggedTabIndex === null || this._draggedTabIndex === index) return;
-                
+
                 // Determine if dropping before or after this tab
                 const rect = tabEl.getBoundingClientRect();
                 const midpoint = rect.left + rect.width / 2;
-                
+
                 // Clear previous states
                 tabEl.classList.remove('drag-over', 'drag-over-right');
-                
+
                 if (e.clientX < midpoint) {
                     tabEl.classList.add('drag-over');
                 } else {
                     tabEl.classList.add('drag-over-right');
                 }
             });
-            
+
             // Drag leave
             tabEl.addEventListener('dragleave', () => {
                 tabEl.classList.remove('drag-over', 'drag-over-right');
             });
-            
+
             // Drop
             tabEl.addEventListener('drop', (e) => {
                 e.preventDefault();
                 tabEl.classList.remove('drag-over', 'drag-over-right');
-                
+
                 if (this._draggedTabIndex === null || this._draggedTabIndex === index) return;
-                
+
                 // Determine drop position
                 const rect = tabEl.getBoundingClientRect();
                 const midpoint = rect.left + rect.width / 2;
                 let targetIndex = e.clientX < midpoint ? index : index + 1;
-                
+
                 // Adjust if dragging from before the target
                 if (this._draggedTabIndex < targetIndex) {
                     targetIndex--;
                 }
-                
+
                 this.reorderTab(this._draggedTabIndex, targetIndex);
             });
         });
@@ -2770,17 +1871,17 @@ class CogNotezApp {
             });
         });
     }
-    
+
     // Reorder a tab from one position to another
     reorderTab(fromIndex, toIndex) {
         if (fromIndex === toIndex) return;
         if (fromIndex < 0 || fromIndex >= this.openTabs.length) return;
         if (toIndex < 0 || toIndex >= this.openTabs.length) return;
-        
+
         // Remove tab from old position and insert at new position
         const [movedTab] = this.openTabs.splice(fromIndex, 1);
         this.openTabs.splice(toIndex, 0, movedTab);
-        
+
         this.renderTabs();
     }
 
@@ -2796,7 +1897,7 @@ class CogNotezApp {
 
         // Try to find note in array first
         let note = this.notes.find(n => String(n.id) === noteIdStr);
-        
+
         // If not found in array, try to fetch from database
         if (!note && this.notesManager && this.notesManager.db) {
             try {
@@ -2805,7 +1906,7 @@ class CogNotezApp {
                 console.warn('[switchToTab] Failed to get note from database:', e);
             }
         }
-        
+
         if (note) {
             // Handle password-protected notes
             if (note.password_protected) {
@@ -2841,7 +1942,7 @@ class CogNotezApp {
     closeOtherTabs() {
         const currentId = this.currentNote ? String(this.currentNote.id) : null;
         const tabsToClose = this.openTabs.filter(tab => String(tab.noteId) !== currentId);
-        
+
         // Check for unsaved changes
         const unsavedTabs = tabsToClose.filter(tab => tab.unsaved);
         if (unsavedTabs.length > 0) {
@@ -2943,43 +2044,43 @@ class CogNotezApp {
      */
     formatLocalizedDateTime(date, includeTime = true) {
         if (!date) return '';
-        
+
         const lang = window.i18n ? window.i18n.getLanguage() : 'en';
         const d = new Date(date);
-        
+
         // Get date components
         const day = String(d.getDate()).padStart(2, '0');
         const month = String(d.getMonth() + 1).padStart(2, '0');
         const year = d.getFullYear();
         const hours = d.getHours();
         const minutes = String(d.getMinutes()).padStart(2, '0');
-        
+
         let dateStr, timeStr;
-        
+
         switch (lang) {
             case 'id': // Indonesian: DD/MM/YYYY, 24-hour
-                dateStr = `${day}/${month}/${year}`;
+                dateStr = `${day} /${month}/${year} `;
                 if (includeTime) {
-                    timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+                    timeStr = `${String(hours).padStart(2, '0')}:${minutes} `;
                 }
                 break;
             case 'ja': // Japanese: YYYY/MM/DD, 24-hour
-                dateStr = `${year}/${month}/${day}`;
+                dateStr = `${year} /${month}/${day} `;
                 if (includeTime) {
-                    timeStr = `${String(hours).padStart(2, '0')}:${minutes}`;
+                    timeStr = `${String(hours).padStart(2, '0')}:${minutes} `;
                 }
                 break;
             default: // English: MM/DD/YYYY, 12-hour with AM/PM
-                dateStr = `${month}/${day}/${year}`;
+                dateStr = `${month} /${day}/${year} `;
                 if (includeTime) {
                     const hours12 = hours % 12 || 12;
                     const ampm = hours >= 12 ? 'PM' : 'AM';
-                    timeStr = `${hours12}:${minutes} ${ampm}`;
+                    timeStr = `${hours12}:${minutes} ${ampm} `;
                 }
                 break;
         }
-        
-        return includeTime ? `${dateStr} ${timeStr}` : dateStr;
+
+        return includeTime ? `${dateStr} ${timeStr} ` : dateStr;
     }
 
     // Update note date display
@@ -3003,11 +2104,11 @@ class CogNotezApp {
         } else {
             modifiedDate = this.currentNote.modified ? new Date(this.currentNote.modified) : new Date();
         }
-        
+
         // Format the date according to current language
         const formattedDateTime = this.formatLocalizedDateTime(modifiedDate, true);
         const modifiedLabel = window.i18n ? window.i18n.t('editor.modified') : 'Modified';
-        noteDateElement.textContent = `${modifiedLabel}: ${formattedDateTime}`;
+        noteDateElement.textContent = `${modifiedLabel}: ${formattedDateTime} `;
     }
 
     // Start real-time date updates
@@ -3047,49 +2148,49 @@ class CogNotezApp {
 
         // Create modal HTML
         const modalHtml = `
-            <div id="tag-manager-modal" class="modal">
-                <div class="modal-content tag-manager-content">
-                    <div class="modal-header">
-                        <h3>${t('editor.manageTags', 'Manage Tags')}</h3>
-                        <button id="tag-manager-close" class="modal-close"><i class="fas fa-times"></i></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="tag-manager-section">
-                            <h4>${t('tags.currentTags', 'Current Tags')}</h4>
-                            <div id="current-tags" class="current-tags">
-                                ${existingTags.length > 0 ?
-                                    existingTags.map(tagId => {
-                                        const tagName = this.notesManager.getTagName(tagId);
-                                        return `<span class="tag-item" data-tag-id="${tagId}">
+    <div id="tag-manager-modal" class="modal">
+        <div class="modal-content tag-manager-content">
+            <div class="modal-header">
+                <h3>${t('editor.manageTags', 'Manage Tags')}</h3>
+                <button id="tag-manager-close" class="modal-close"><i class="fas fa-times"></i></button>
+            </div>
+            <div class="modal-body">
+                <div class="tag-manager-section">
+                    <h4>${t('tags.currentTags', 'Current Tags')}</h4>
+                    <div id="current-tags" class="current-tags">
+                        ${existingTags.length > 0 ?
+                existingTags.map(tagId => {
+                    const tagName = this.notesManager.getTagName(tagId);
+                    return `<span class="tag-item" data-tag-id="${tagId}">
                                             ${this.escapeHtml(tagName)}
                                             <button class="tag-remove" data-tag-id="${tagId}">×</button>
                                         </span>`;
-                                    }).join('') :
-                                    `<span class="no-tags">${t('tags.noTagsAssigned', 'No tags assigned')}</span>`
-                                }
-                            </div>
-                        </div>
-                        <div class="tag-manager-section">
-                            <h4>${t('tags.addTags', 'Add Tags')}</h4>
-                            <div class="tag-input-section">
-                                <input type="text" id="new-tag-input" placeholder="${t('tags.enterTagName', 'Enter tag name...')}" class="tag-input">
-                                <button id="add-tag-btn" class="btn-primary">${t('tags.addTag', 'Add Tag')}</button>
-                            </div>
-                            <div class="available-tags">
-                                <h5>${t('tags.availableTags', 'Available Tags')}</h5>
-                                <div id="available-tags-list" class="available-tags-list">
-                                    ${allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
-                                        `<span class="available-tag" data-tag-id="${tag.id}">
+                }).join('') :
+                `<span class="no-tags">${t('tags.noTagsAssigned', 'No tags assigned')}</span>`
+            }
+                    </div>
+                </div>
+                <div class="tag-manager-section">
+                    <h4>${t('tags.addTags', 'Add Tags')}</h4>
+                    <div class="tag-input-section">
+                        <input type="text" id="new-tag-input" placeholder="${t('tags.enterTagName', 'Enter tag name...')}" class="tag-input">
+                            <button id="add-tag-btn" class="btn-primary">${t('tags.addTag', 'Add Tag')}</button>
+                    </div>
+                    <div class="available-tags">
+                        <h5>${t('tags.availableTags', 'Available Tags')}</h5>
+                        <div id="available-tags-list" class="available-tags-list">
+                            ${allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
+                `<span class="available-tag" data-tag-id="${tag.id}">
                                             ${this.escapeHtml(tag.name)}
                                         </span>`
-                                    ).join('')}
-                                </div>
-                            </div>
+            ).join('')}
                         </div>
                     </div>
                 </div>
             </div>
-        `;
+        </div>
+            </div>
+    `;
 
         document.body.insertAdjacentHTML('beforeend', modalHtml);
 
@@ -3182,7 +2283,7 @@ class CogNotezApp {
 
             await this.addTagToNote(tagId);
             input.value = '';
-            
+
             // Refresh folder navigation to show new tag
             await this.renderTagFolders();
 
@@ -3218,7 +2319,7 @@ class CogNotezApp {
                     this.notesManager.db.data = this.notesManager.db.data || {};
                     this.notesManager.db.data.note_tags = this.notesManager.db.data.note_tags || {};
 
-                    const noteTagKey = `${this.currentNote.id}_${tagId}`;
+                    const noteTagKey = `${this.currentNote.id}_${tagId} `;
                     this.notesManager.db.data.note_tags[noteTagKey] = {
                         note_id: this.currentNote.id,
                         tag_id: tagId
@@ -3258,7 +2359,7 @@ class CogNotezApp {
 
                 // Also remove note_tags relationship in fallback mode
                 if (this.notesManager.db && this.notesManager.db.data && this.notesManager.db.data.note_tags) {
-                    const noteTagKey = `${this.currentNote.id}_${tagId}`;
+                    const noteTagKey = `${this.currentNote.id}_${tagId} `;
                     delete this.notesManager.db.data.note_tags[noteTagKey];
                 }
 
@@ -3297,9 +2398,9 @@ class CogNotezApp {
             existingTags.map(tagId => {
                 const tagName = this.notesManager.getTagName(tagId);
                 return `<span class="tag-item" data-tag-id="${tagId}">
-                    ${this.escapeHtml(tagName)}
-                    <button class="tag-remove" data-tag-id="${tagId}">×</button>
-                </span>`;
+                                            ${this.escapeHtml(tagName)}
+                                            <button class="tag-remove" data-tag-id="${tagId}">×</button>
+                                        </span>`;
             }).join('') :
             '<span class="no-tags">No tags assigned</span>';
 
@@ -3307,12 +2408,12 @@ class CogNotezApp {
         const availableTagsEl = document.getElementById('available-tags-list');
         availableTagsEl.innerHTML = allTags.filter(tag => !existingTags.includes(tag.id)).map(tag =>
             `<span class="available-tag" data-tag-id="${tag.id}">
-                ${this.escapeHtml(tag.name)}
-            </span>`
+                                            ${this.escapeHtml(tag.name)}
+                                        </span>`
         ).join('');
     }
 
-	async saveCurrentNote(isAutoSave = false) {
+    async saveCurrentNote(isAutoSave = false) {
         if (!this.currentNote || !this.notesManager) return;
 
         // Flush any pending debounced history before saving
@@ -3330,49 +2431,49 @@ class CogNotezApp {
         const content = document.getElementById('note-editor').value;
 
         try {
-			const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
-			let updateData = {
-				title: title || untitledTitle,
-				content: content,
-				preview: this.generatePreview(content)
-			};
+            const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+            let updateData = {
+                title: title || untitledTitle,
+                content: content,
+                preview: this.generatePreview(content)
+            };
 
-			// If note is protected, encrypt content and avoid persisting plaintext
-			if (this.currentNote.password_protected) {
-				if (!window.encryptionManager) {
-					throw new Error('Encryption manager not available');
-				}
-				const cached = this.getCachedNotePassword(this.currentNote.id);
-				if (!cached) {
-					// For auto-save without password, skip encrypting to avoid prompts
-					if (isAutoSave) {
-						return; // silently skip auto-save to prevent plaintext leak
-					}
-					const ok = await this.promptForNotePassword(this.currentNote);
-					if (!ok) return;
-				}
-				const pass = this.getCachedNotePassword(this.currentNote.id);
-				const envelope = window.encryptionManager.encryptData({ content }, pass);
-				const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
-				updateData = {
-					title: title || untitledTitle,
-					content: '',
-					preview: '',
-					encrypted_content: JSON.stringify(envelope)
-				};
-			}
+            // If note is protected, encrypt content and avoid persisting plaintext
+            if (this.currentNote.password_protected) {
+                if (!window.encryptionManager) {
+                    throw new Error('Encryption manager not available');
+                }
+                const cached = this.getCachedNotePassword(this.currentNote.id);
+                if (!cached) {
+                    // For auto-save without password, skip encrypting to avoid prompts
+                    if (isAutoSave) {
+                        return; // silently skip auto-save to prevent plaintext leak
+                    }
+                    const ok = await this.promptForNotePassword(this.currentNote);
+                    if (!ok) return;
+                }
+                const pass = this.getCachedNotePassword(this.currentNote.id);
+                const envelope = window.encryptionManager.encryptData({ content }, pass);
+                const untitledTitle = window.i18n ? window.i18n.t('editor.untitledNoteTitle') : 'Untitled Note';
+                updateData = {
+                    title: title || untitledTitle,
+                    content: '',
+                    preview: '',
+                    encrypted_content: JSON.stringify(envelope)
+                };
+            }
 
             if (this.notesManager.db && this.notesManager.db.initialized) {
                 await this.notesManager.db.updateNote(this.currentNote.id, updateData);
-				// Refresh the current note data
-				const updatedFromDb = await this.notesManager.db.getNote(this.currentNote.id);
-				// Preserve decrypted content in memory for protected notes
-				if (updatedFromDb && this.currentNote.password_protected) {
-					const plaintext = content;
-					this.currentNote = { ...updatedFromDb, content: plaintext };
-				} else {
-					this.currentNote = updatedFromDb;
-				}
+                // Refresh the current note data
+                const updatedFromDb = await this.notesManager.db.getNote(this.currentNote.id);
+                // Preserve decrypted content in memory for protected notes
+                if (updatedFromDb && this.currentNote.password_protected) {
+                    const plaintext = content;
+                    this.currentNote = { ...updatedFromDb, content: plaintext };
+                } else {
+                    this.currentNote = updatedFromDb;
+                }
             } else {
                 // Fallback to localStorage
                 this.currentNote.title = updateData.title;
@@ -3419,7 +2520,7 @@ class CogNotezApp {
             }
 
             // Auto-update shared notes on Google Drive
-            if (this.currentNote.collaboration?.is_shared && 
+            if (this.currentNote.collaboration?.is_shared &&
                 this.currentNote.collaboration?.google_drive_file_id) {
                 this.updateSharedNoteOnDrive(this.currentNote).catch(error => {
                     console.error('[Google Drive] Failed to auto-update shared note:', error);
@@ -3437,7 +2538,7 @@ class CogNotezApp {
         // Silent update of shared note on Google Drive
         try {
             if (!this.backendAPI) return;
-            
+
             // Check if Google Drive is authenticated
             const syncStatus = await this.backendAPI.getGoogleDriveSyncStatus();
             if (!syncStatus || !syncStatus.isAuthenticated) {
@@ -3450,7 +2551,7 @@ class CogNotezApp {
                 { view: true, comment: false, edit: false }, // Maintain existing permissions
                 null // No email, just update existing share
             );
-            
+
             console.log('[Google Drive] Shared note auto-updated:', note.title);
         } catch (error) {
             console.error('[Google Drive] Failed to auto-update shared note:', error);
@@ -3472,58 +2573,58 @@ class CogNotezApp {
 
         // Split content into lines
         const lines = content.split('\n');
-        
+
         for (let line of lines) {
             line = line.trim();
-            
+
             // Skip empty lines
             if (!line) continue;
-            
+
             // Skip image markdown: ![alt](url) or ![alt][ref]
             if (/^!\[.*?\](\(.*?\)|\[.*?\])/.test(line)) continue;
-            
+
             // Skip HTML image tags: <img src="..." />
             if (/^<img\s+.*?>/.test(line)) continue;
-            
+
             // Skip standalone HTML tags without content
             if (/^<[^>]+>$/.test(line)) continue;
-            
+
             // Skip video/audio markdown embeds
             if (/^<(video|audio|iframe)\s+.*?>/.test(line)) continue;
-            
+
             // Clean the line for preview
             let preview = line;
-            
+
             // Remove markdown headers (# ## ### etc)
             preview = preview.replace(/^#+\s*/, '');
-            
+
             // Remove HTML tags but keep content
             preview = preview.replace(/<[^>]+>/g, '');
-            
+
             // Convert markdown links [text](url) to just text
             preview = preview.replace(/\[([^\]]+)\]\([^\)]+\)/g, '$1');
-            
+
             // Convert markdown bold/italic to plain text
             preview = preview.replace(/\*\*([^\*]+)\*\*/g, '$1'); // bold
             preview = preview.replace(/\*([^\*]+)\*/g, '$1'); // italic
             preview = preview.replace(/__([^_]+)__/g, '$1'); // bold
             preview = preview.replace(/_([^_]+)_/g, '$1'); // italic
-            
+
             // Remove inline code backticks
             preview = preview.replace(/`([^`]+)`/g, '$1');
-            
+
             // Remove remaining markdown image syntax if any
             preview = preview.replace(/!\[.*?\]\(.*?\)/g, '');
-            
+
             // Clean up extra whitespace
             preview = preview.trim();
-            
+
             // If we have actual content after cleaning, use it
             if (preview) {
                 return preview.length > 100 ? preview.substring(0, 100) + '...' : preview;
             }
         }
-        
+
         // If no meaningful content found, return fallback
         return t('notes.emptyNote');
     }
@@ -3599,7 +2700,7 @@ class CogNotezApp {
         const toggleBtn = document.getElementById('tags-toggle-btn');
         const tagFoldersList = document.getElementById('tag-folders-list');
         const tagsDivider = document.getElementById('tags-divider');
-        
+
         if (!toggleBtn || !tagFoldersList) return;
 
         // Restore collapsed state from localStorage
@@ -3626,12 +2727,12 @@ class CogNotezApp {
     toggleTagsList() {
         const toggleBtn = document.getElementById('tags-toggle-btn');
         const tagFoldersList = document.getElementById('tag-folders-list');
-        
+
         if (!toggleBtn || !tagFoldersList) return;
 
         const isCollapsed = toggleBtn.classList.toggle('collapsed');
         tagFoldersList.classList.toggle('collapsed', isCollapsed);
-        
+
         // Save state to localStorage
         localStorage.setItem('tagsListCollapsed', isCollapsed.toString());
     }
@@ -3643,7 +2744,7 @@ class CogNotezApp {
         });
 
         const activeItem = document.querySelector(`.folder-item[data-folder="${this.currentFolder}"]`) ||
-                          document.querySelector(`.tag-folder-item[data-tag-id="${this.currentFolder}"]`);
+            document.querySelector(`.tag-folder-item[data-tag-id="${this.currentFolder}"]`);
         if (activeItem) {
             activeItem.classList.add('active');
         } else {
@@ -3657,7 +2758,7 @@ class CogNotezApp {
 
     async switchFolder(folder) {
         this.currentFolder = folder;
-        
+
         // Save to localStorage for persistence
         localStorage.setItem('currentFolder', folder);
 
@@ -3667,7 +2768,7 @@ class CogNotezApp {
         });
 
         const activeItem = document.querySelector(`.folder-item[data-folder="${folder}"]`) ||
-                          document.querySelector(`.tag-folder-item[data-tag-id="${folder}"]`);
+            document.querySelector(`.tag-folder-item[data-tag-id="${folder}"]`);
         if (activeItem) {
             activeItem.classList.add('active');
         }
@@ -3731,7 +2832,7 @@ class CogNotezApp {
             if (this.notesManager) {
                 this.notesManager.updateFolderCounts();
             }
-            
+
             // Ensure active state is properly set (handles case where saved folder was a tag)
             this.updateFolderActiveState();
         } catch (error) {
@@ -4144,7 +3245,7 @@ class CogNotezApp {
             const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             const cancelText = t('modals.cancel', 'Cancel');
             const confirmText = t('modals.confirm', 'Confirm');
-            
+
             const content = `
                 <div style="padding: 10px 0;">
                     <p style="margin: 0; color: var(--text-primary); white-space: pre-line;">
@@ -4182,7 +3283,7 @@ class CogNotezApp {
             const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
             const cancelText = t('modals.cancel', 'Cancel');
             const okText = t('modals.ok', 'OK');
-            
+
             const inputId = 'prompt-input-' + Date.now();
             const content = `
                 <div style="padding: 10px 0;">
@@ -4198,10 +3299,12 @@ class CogNotezApp {
 
             const modal = this.createModal(title, content, [
                 { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(null) },
-                { text: okText, type: 'primary', action: 'confirm', callback: () => {
-                    const input = modal.querySelector(`#${inputId}`);
-                    resolve(input ? input.value.trim() : null);
-                }}
+                {
+                    text: okText, type: 'primary', action: 'confirm', callback: () => {
+                        const input = modal.querySelector(`#${inputId}`);
+                        resolve(input ? input.value.trim() : null);
+                    }
+                }
             ]);
 
             // Focus input on mount
@@ -4472,9 +3575,9 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             // Remove typing indicator and show actual response
-                this.hideTypingIndicator();
-                this.removeLastAIMessage();
-                this.showAIMessage(response, 'assistant');
+            this.hideTypingIndicator();
+            this.removeLastAIMessage();
+            this.showAIMessage(response, 'assistant');
 
             // Save conversation to database
             if (this.aiManager && this.currentNote) {
@@ -4505,7 +3608,7 @@ Please provide a helpful response based on the note content and conversation his
 
     showAIMessage(message, type, options = {}) {
         const messagesContainer = document.getElementById('ai-messages');
-        
+
         // Remove empty state if it exists
         const emptyState = messagesContainer.querySelector('.ai-messages-empty');
         if (emptyState) {
@@ -4546,9 +3649,9 @@ Please provide a helpful response based on the note content and conversation his
         const timestamp = document.createElement('div');
         timestamp.className = 'ai-message-timestamp';
         const now = new Date();
-        timestamp.textContent = now.toLocaleTimeString('en-US', { 
-            hour: '2-digit', 
-            minute: '2-digit' 
+        timestamp.textContent = now.toLocaleTimeString('en-US', {
+            hour: '2-digit',
+            minute: '2-digit'
         });
 
         const actions = document.createElement('div');
@@ -4586,17 +3689,17 @@ Please provide a helpful response based on the note content and conversation his
             const t = (key) => window.i18n ? window.i18n.t(key) : key;
             regenerateBtn.title = t('tooltips.regenerateResponse');
             regenerateBtn.innerHTML = '<i class="fas fa-redo"></i>';
-            
+
             // Capture app instance for use in event listener
             const appInstance = this;
-            
+
             regenerateBtn.addEventListener('click', async (e) => {
                 e.stopPropagation();
                 // Find the user message that prompted this response
                 const messages = Array.from(messagesContainer.querySelectorAll('.ai-message'));
                 const currentIndex = messages.indexOf(messageElement);
                 let userMessage = null;
-                
+
                 // Look backwards for the user message
                 for (let i = currentIndex - 1; i >= 0; i--) {
                     if (messages[i].classList.contains('user')) {
@@ -4634,7 +3737,7 @@ Please provide a helpful response based on the note content and conversation his
         messageElement.appendChild(contentWrapper);
 
         messagesContainer.appendChild(messageElement);
-        
+
         // Smooth scroll to bottom
         setTimeout(() => {
             messagesContainer.scrollTo({
@@ -4649,26 +3752,26 @@ Please provide a helpful response based on the note content and conversation his
         const typingElement = document.createElement('div');
         typingElement.className = 'ai-message assistant';
         typingElement.id = 'ai-typing-indicator';
-        
+
         const avatar = document.createElement('div');
         avatar.className = 'ai-message-avatar';
         avatar.innerHTML = '<i class="fas fa-robot"></i>';
-        
+
         const contentWrapper = document.createElement('div');
         contentWrapper.className = 'ai-message-content';
-        
+
         const bubble = document.createElement('div');
         bubble.className = 'ai-message-bubble';
-        
+
         const typingIndicator = document.createElement('div');
         typingIndicator.className = 'ai-typing-indicator';
         typingIndicator.innerHTML = '<div class="ai-typing-dot"></div><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div>';
-        
+
         bubble.appendChild(typingIndicator);
         contentWrapper.appendChild(bubble);
         typingElement.appendChild(avatar);
         typingElement.appendChild(contentWrapper);
-        
+
         messagesContainer.appendChild(typingElement);
         messagesContainer.scrollTo({
             top: messagesContainer.scrollHeight,
@@ -4686,7 +3789,7 @@ Please provide a helpful response based on the note content and conversation his
     showWelcomeMessage() {
         const messagesContainer = document.getElementById('ai-messages');
         messagesContainer.innerHTML = '';
-        
+
         const emptyState = document.createElement('div');
         emptyState.className = 'ai-messages-empty';
         emptyState.innerHTML = `
@@ -4698,7 +3801,7 @@ Please provide a helpful response based on the note content and conversation his
                 ${window.i18n ? window.i18n.t('ai.welcomeMessage') : "I'm here to help! Select text and right-click for AI features, or ask me anything about your note."}
             </div>
         `;
-        
+
         messagesContainer.appendChild(emptyState);
     }
 
@@ -4752,7 +3855,7 @@ Please provide a helpful response based on the note content and conversation his
                 conversations.reverse().forEach(conv => {
                     // Add user message
                     this.showAIMessage(conv.user_message, 'user');
-                    
+
                     // Add AI response
                     this.showAIMessage(conv.ai_response, 'assistant');
                 });
@@ -4775,10 +3878,10 @@ Please provide a helpful response based on the note content and conversation his
     // Unified Context Menu
     showContextMenu(e, selectedText = '') {
         this.hideContextMenu();
-        
+
         const menu = document.getElementById('context-menu');
         const hasSelection = selectedText.length > 0;
-        
+
         // Show/hide menu items based on context
         const aiItems = menu.querySelectorAll('.context-menu-ai');
         const generateItem = menu.querySelector('[data-action="generate-ai"]');
@@ -4794,7 +3897,7 @@ Please provide a helpful response based on the note content and conversation his
         // Check if context menu was triggered from editor (textarea)
         // Content-modifying operations (edit, generate) only work when right-clicking on the editor
         const isEditorContext = this.contextElement && this.contextElement.tagName === 'TEXTAREA';
-        
+
         // AI items that modify content (edit, generate) only work when clicking on editor
         // AI items that don't modify content (summarize, ask) work everywhere
 
@@ -4834,7 +3937,7 @@ Please provide a helpful response based on the note content and conversation his
         }
 
         separator.style.display = hasSelection ? 'block' : 'none';
-        
+
         // Cut/Copy enabled only when text is selected
         if (cutItem) {
             if (hasSelection && this.contextElement && this.contextElement.tagName === 'TEXTAREA') {
@@ -4843,11 +3946,11 @@ Please provide a helpful response based on the note content and conversation his
                 cutItem.classList.add('disabled');
             }
         }
-        
+
         if (copyItem) {
             copyItem.classList.toggle('disabled', !hasSelection);
         }
-        
+
         // Paste only works in editor mode (textarea)
         if (pasteItem) {
             if (this.contextElement && this.contextElement.tagName === 'TEXTAREA') {
@@ -4867,31 +3970,31 @@ Please provide a helpful response based on the note content and conversation his
                 downloadItem.classList.remove('disabled');
             }
         }
-        
+
         // Position the menu
         const x = e.clientX;
         const y = e.clientY;
         const menuWidth = 250;
         const menuHeight = hasSelection ? 300 : 150;
-        
+
         let finalX = x;
         let finalY = y;
-        
+
         if (x + menuWidth > window.innerWidth) {
             finalX = x - menuWidth;
         }
-        
+
         if (y + menuHeight > window.innerHeight) {
             finalY = y - menuHeight;
         }
-        
+
         finalX = Math.max(10, finalX);
         finalY = Math.max(10, finalY);
-        
+
         menu.style.left = finalX + 'px';
         menu.style.top = finalY + 'px';
         menu.classList.remove('hidden');
-        
+
         // Handle menu item clicks
         const handleClick = (e) => {
             const target = e.target.closest('.context-menu-item');
@@ -4903,7 +4006,7 @@ Please provide a helpful response based on the note content and conversation his
                 }
             }
         };
-        
+
         menu.addEventListener('click', handleClick, { once: true });
     }
 
@@ -4914,7 +4017,7 @@ Please provide a helpful response based on the note content and conversation his
 
     async handleContextAction(action) {
         const editor = document.getElementById('note-editor');
-        
+
         switch (action) {
             case 'cut':
                 if (this.selectedText && this.contextElement === editor) {
@@ -4929,7 +4032,7 @@ Please provide a helpful response based on the note content and conversation his
                     this.showNotification(t('notifications.textCut'), 'success');
                 }
                 break;
-                
+
             case 'copy':
                 if (this.selectedText) {
                     await navigator.clipboard.writeText(this.selectedText);
@@ -4937,7 +4040,7 @@ Please provide a helpful response based on the note content and conversation his
                     this.showNotification(t('notifications.textCopied'), 'success');
                 }
                 break;
-                
+
             case 'paste':
                 if (this.contextElement === editor) {
                     try {
@@ -4956,7 +4059,7 @@ Please provide a helpful response based on the note content and conversation his
                     }
                 }
                 break;
-                
+
             case 'summarize':
                 if (this.selectedText) {
                     this.preserveSelection = true;
@@ -4965,7 +4068,7 @@ Please provide a helpful response based on the note content and conversation his
                     await this.summarizeNote();
                 }
                 break;
-                
+
             case 'ask-ai':
                 this.preserveSelection = true;
                 if (this.selectedText) {
@@ -4980,7 +4083,7 @@ Please provide a helpful response based on the note content and conversation his
                         'ask-ai');
                 }
                 break;
-                
+
             case 'edit-ai':
                 if (this.selectedText) {
                     this.preserveSelection = true;
@@ -5206,7 +4309,7 @@ Please provide a helpful response based on the note content and conversation his
     async processAIDialog() {
         console.log('[DEBUG] processAIDialog called');
         console.log('[DEBUG] processAIDialog: currentAIAction =', this.currentAIAction);
-        
+
         // Save the action before hiding the dialog (which clears currentAIAction)
         const actionToProcess = this.currentAIAction;
         let input = document.getElementById('ai-dialog-input').value.trim();
@@ -5221,7 +4324,7 @@ Please provide a helpful response based on the note content and conversation his
                 input = customData.style; // Use style as input for rewrite
             }
         }
-        
+
         this.hideAIDialog();
         // Create abort controller for this AI operation
         this.currentAIAbortController = new AbortController();
@@ -5254,7 +4357,7 @@ Please provide a helpful response based on the note content and conversation his
         console.log('[DEBUG] handleAIAction called with action:', action, 'input:', input);
         console.log('[DEBUG] handleAIAction: selectedText =', this.selectedText ? this.selectedText.substring(0, 50) + '...' : 'none');
         console.log('[DEBUG] handleAIAction: selectionStart =', this.selectionStart, 'selectionEnd =', this.selectionEnd);
-        
+
         if (!this.aiManager) {
             console.error('[DEBUG] handleAIAction: AI manager not available');
             const t = (key) => window.i18n ? window.i18n.t(key) : key;
@@ -5323,13 +4426,13 @@ Please provide a helpful response based on the note content and conversation his
                         const style = input || customData.style || 'professional';
                         console.log('[DEBUG] handleAIAction rewrite: using style:', style);
                         const response = await this.aiManager.rewriteText(this.selectedText, style);
-                        
+
                         // Check if operation was cancelled before applying result
                         if (this.isAIOperationCancelled) {
                             console.log('[DEBUG] handleAIAction rewrite: Operation was cancelled, not applying result');
                             return;
                         }
-                        
+
                         console.log('[DEBUG] handleAIAction rewrite: got response:', response.substring(0, 50) + '...');
                         await this.aiManager.saveConversation(noteId, `Rewrite "${this.selectedText.substring(0, 50)}..." in ${style} style`, response, this.selectedText, 'rewrite');
                         this.replaceSelection(response);
@@ -5357,13 +4460,13 @@ Please provide a helpful response based on the note content and conversation his
                     this.showLoading(null, true); // Show cancel button for AI operations
                     try {
                         const keyPointsResponse = await this.aiManager.extractKeyPoints(this.selectedText);
-                        
+
                         // Check if operation was cancelled before applying result
                         if (this.isAIOperationCancelled) {
                             console.log('[DEBUG] handleAIAction key-points: Operation was cancelled, not applying result');
                             return;
                         }
-                        
+
                         await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, keyPointsResponse, this.selectedText, 'key-points');
                         this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${keyPointsResponse}`, 'assistant');
                     } finally {
@@ -5386,13 +4489,13 @@ Please provide a helpful response based on the note content and conversation his
                         // Include note title for better tag generation context
                         const noteTitle = this.currentNote ? this.currentNote.title : document.getElementById('note-title').value;
                         const tagsResponse = await this.aiManager.generateTags(this.selectedText, { noteTitle });
-                        
+
                         // Check if operation was cancelled before applying result
                         if (this.isAIOperationCancelled) {
                             console.log('[DEBUG] handleAIAction generate-tags: Operation was cancelled, not applying result');
                             return;
                         }
-                        
+
                         await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, tagsResponse, this.selectedText, 'tags');
                         this.showAIMessage(`<i class="fas fa-tags"></i> **Suggested Tags:**\n${tagsResponse}`, 'assistant');
                     } finally {
@@ -5467,13 +4570,13 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             this.updateNotePreview();
-            
+
             // Update markdown preview if visible (preview or split mode)
             const preview = document.getElementById('markdown-preview');
             if (preview && !preview.classList.contains('hidden')) {
                 this.renderMarkdownPreview();
             }
-            
+
             this.ignoreHistoryUpdate = false;
 
             console.log('[DEBUG] Undo operation completed');
@@ -5505,13 +4608,13 @@ Please provide a helpful response based on the note content and conversation his
             }
 
             this.updateNotePreview();
-            
+
             // Update markdown preview if visible (preview or split mode)
             const preview = document.getElementById('markdown-preview');
             if (preview && !preview.classList.contains('hidden')) {
                 this.renderMarkdownPreview();
             }
-            
+
             this.ignoreHistoryUpdate = false;
 
             console.log('[DEBUG] Redo operation completed');
@@ -5743,7 +4846,7 @@ Please provide a helpful response based on the note content and conversation his
                 return;
             }
 
-                this.updateLoadingText(t('loading.processingFiles', { count: result.notes.length }));
+            this.updateLoadingText(t('loading.processingFiles', { count: result.notes.length }));
 
             // Add imported notes
             this.notes.unshift(...result.notes);
@@ -5913,26 +5016,26 @@ Please provide a helpful response based on the note content and conversation his
     hideSplashScreen() {
         const splash = document.getElementById('splash-screen');
         const app = document.getElementById('app');
-        
+
         if (splash) {
             // Add ready state first
             splash.classList.add('ready');
-            
+
             // Update status to show completion
             const statusText = splash.querySelector('.status-text');
             if (statusText) statusText.textContent = window.i18n ? window.i18n.t('splash.ready') : 'Ready';
-            
+
             // Short delay to show ready state, then animate out
             setTimeout(() => {
                 splash.classList.add('hiding');
-                
+
                 // Remove from DOM after animation
-            setTimeout(() => {
-                splash.style.display = 'none';
+                setTimeout(() => {
+                    splash.style.display = 'none';
                 }, 400);
             }, 100);
         }
-        
+
         if (app) {
             app.classList.remove('app-hidden');
             app.classList.add('app-visible');
@@ -5968,19 +5071,19 @@ Please provide a helpful response based on the note content and conversation his
 
         if (percentage !== null) {
             const percent = Math.min(100, Math.max(0, percentage));
-            
+
             if (progressFill) {
                 progressFill.style.width = `${percent}%`;
             }
-            
+
             if (progressGlow) {
                 progressGlow.style.width = `${percent}%`;
             }
-            
+
             if (progressPercent) {
                 progressPercent.textContent = `${Math.round(percent)}%`;
             }
-            
+
             // Update status text based on progress
             if (statusText) {
                 const t = (key) => window.i18n ? window.i18n.t(key) : key;
@@ -6001,13 +5104,13 @@ Please provide a helpful response based on the note content and conversation his
     showLoading(text = null, showCancel = false) {
         const loadingOverlay = document.getElementById('loading-overlay');
         const cancelBtn = document.getElementById('loading-cancel-btn');
-        
+
         loadingOverlay.classList.remove('hidden');
-        
+
         if (text) {
             this.updateLoadingText(text);
         }
-        
+
         // Show/hide cancel button for AI operations
         if (showCancel) {
             cancelBtn.classList.remove('hidden');
@@ -6024,10 +5127,10 @@ Please provide a helpful response based on the note content and conversation his
     hideLoading() {
         const loadingOverlay = document.getElementById('loading-overlay');
         const cancelBtn = document.getElementById('loading-cancel-btn');
-        
+
         loadingOverlay.classList.add('hidden');
         cancelBtn.classList.add('hidden');
-        
+
         // Clear abort controller when hiding loading (but keep cancellation flag until operation completes)
         // The flag will be cleared when the operation finishes or is cancelled
     }
@@ -6056,19 +5159,19 @@ Please provide a helpful response based on the note content and conversation his
 
     cancelAIOperation() {
         console.log('[AI] Cancelling current AI operation...');
-        
+
         // Set cancellation flag
         this.isAIOperationCancelled = true;
-        
+
         if (this.currentAIAbortController) {
             this.currentAIAbortController.abort();
             this.currentAIAbortController = null;
         }
-        
+
         this.hideLoading();
         const t = (key) => window.i18n ? window.i18n.t(key) : key;
         this.showNotification(t('notifications.aiOperationCancelled'), 'info');
-        
+
         // Clear any pending AI operations
         if (this.aiManager) {
             // Reset any AI manager state if needed
@@ -6084,7 +5187,7 @@ Please provide a helpful response based on the note content and conversation his
 
     showNotification(message, type = 'info') {
         console.log(`Notification (${type}):`, message);
-        
+
         // Create a visual notification element
         const notification = document.createElement('div');
         notification.className = `notification notification-${type}`;
@@ -6694,13 +5797,13 @@ Please provide a helpful response based on the note content and conversation his
                     this.updateLoadingText(t('ai.extractingKeyPointsLoading'));
                     this.showLoading(null, true); // Show cancel button for AI operations
                     response = await this.aiManager.extractKeyPoints(this.selectedText);
-                    
+
                     // Check if operation was cancelled before applying result
                     if (this.isAIOperationCancelled) {
                         console.log('[DEBUG] processAIActionWithoutDialog key-points: Operation was cancelled, not applying result');
                         return;
                     }
-                    
+
                     await this.aiManager.saveConversation(noteId, `Extract key points from: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'key-points');
                     this.showAIMessage(`<i class="fas fa-clipboard-list"></i> **Key Points:**\n${response}`, 'assistant');
                     this.hideLoading();
@@ -6719,13 +5822,13 @@ Please provide a helpful response based on the note content and conversation his
                     this.showLoading(null, true); // Show cancel button for AI operations
                     // Include note title for better tag generation context
                     response = await this.aiManager.generateTags(this.selectedText, { noteTitle: this.noteTitle });
-                    
+
                     // Check if operation was cancelled before applying result
                     if (this.isAIOperationCancelled) {
                         console.log('[DEBUG] processAIActionWithoutDialog generate-tags: Operation was cancelled, not applying result');
                         return;
                     }
-                    
+
                     await this.aiManager.saveConversation(noteId, `Generate tags for: "${this.selectedText.substring(0, 100)}..."`, response, this.selectedText, 'tags');
 
                     // Parse and save tags to the current note
@@ -6852,7 +5955,7 @@ Please provide a helpful response based on the note content and conversation his
         let selectedText = this.selectedText;
         let start = this.selectionStart;
         let end = this.selectionEnd;
-        
+
         if (!selectedText || start === -1 || end === -1) {
             console.log('[DEBUG] editSelectionWithAI: No stored selection, getting current selection');
             const editor = document.getElementById('note-editor');
@@ -6869,7 +5972,7 @@ Please provide a helpful response based on the note content and conversation his
         }
 
         console.log('[DEBUG] editSelectionWithAI: Using selectedText:', selectedText.substring(0, 50) + '...');
-        
+
         // Store selection for replacement (ensure we have the latest)
         this.selectedText = selectedText;
         this.selectionStart = start;
@@ -6887,8 +5990,8 @@ Please provide a helpful response based on the note content and conversation his
         // Check if in preview-only mode (preview visible AND editor hidden)
         const preview = document.getElementById('markdown-preview');
         const editor = document.getElementById('note-editor');
-        const isPreviewOnlyMode = preview && !preview.classList.contains('hidden') && 
-                                  editor && editor.classList.contains('hidden');
+        const isPreviewOnlyMode = preview && !preview.classList.contains('hidden') &&
+            editor && editor.classList.contains('hidden');
 
         if (isPreviewOnlyMode) {
             const t = (key) => window.i18n ? window.i18n.t(key) : key;
@@ -6905,12 +6008,12 @@ Please provide a helpful response based on the note content and conversation his
 
     rewriteSelection() {
         console.log('[DEBUG] rewriteSelection called');
-        
+
         // Use stored selection if available, otherwise get current selection
         let selectedText = this.selectedText;
         let start = this.selectionStart;
         let end = this.selectionEnd;
-        
+
         if (!selectedText || start === -1 || end === -1) {
             console.log('[DEBUG] rewriteSelection: No stored selection, getting current selection');
             const editor = document.getElementById('note-editor');
@@ -7146,8 +6249,8 @@ Please provide a helpful response based on the note content and conversation his
                         <label for="ollama-model" style="display: block; margin-bottom: 6px; font-weight: 500;">${t('settings.ai.ollamaModel', 'Ollama Model')}:</label>
                         <select id="ollama-model" style="width: 100%; padding: 8px; border: 1px solid var(--border-color); border-radius: 4px; background: var(--input-bg); color: var(--text-primary);">
                             ${this.aiManager.availableModels && this.aiManager.backend === 'ollama' ? this.aiManager.availableModels.map(model =>
-                                `<option value="${model.name}" ${model.name === this.aiManager.ollamaModel ? 'selected' : ''}>${model.name}</option>`
-                            ).join('') : `<option value="${this.aiManager.ollamaModel}" selected>${this.aiManager.ollamaModel}</option>`}
+            `<option value="${model.name}" ${model.name === this.aiManager.ollamaModel ? 'selected' : ''}>${model.name}</option>`
+        ).join('') : `<option value="${this.aiManager.ollamaModel}" selected>${this.aiManager.ollamaModel}</option>`}
                         </select>
                     </div>
                 </div>
@@ -7275,9 +6378,9 @@ Please provide a helpful response based on the note content and conversation his
             const modelDropdown = modal.querySelector('#openrouter-model-dropdown');
             const modelHiddenInput = modal.querySelector('#openrouter-model');
             const modelContainer = modal.querySelector('#openrouter-model-container');
-            
+
             let filteredModels = [...this.aiManager.availableModels];
-            
+
             // Function to render dropdown items
             const renderDropdown = (models) => {
                 if (models.length === 0) {
@@ -7286,7 +6389,7 @@ Please provide a helpful response based on the note content and conversation his
                     modelDropdown.innerHTML = `<div style="padding: 12px; color: var(--text-secondary); text-align: center;">${noModelsText}</div>`;
                     return;
                 }
-                
+
                 modelDropdown.innerHTML = models.map(model => {
                     const displayName = model.name || model.id;
                     const isSelected = model.id === this.aiManager.openRouterModel;
@@ -7300,7 +6403,7 @@ Please provide a helpful response based on the note content and conversation his
                         </div>
                     `;
                 }).join('');
-                
+
                 // Add click handlers
                 modelDropdown.querySelectorAll('.model-dropdown-item').forEach(item => {
                     item.addEventListener('click', () => {
@@ -7309,35 +6412,35 @@ Please provide a helpful response based on the note content and conversation his
                         modelHiddenInput.value = modelId;
                         modelSearchInput.value = modelName;
                         modelDropdown.style.display = 'none';
-                        
+
                         // Update selected state
                         modelDropdown.querySelectorAll('.model-dropdown-item').forEach(i => {
                             i.style.background = i.dataset.modelId === modelId ? 'var(--accent-color)' : 'var(--bg-primary)';
                             i.style.color = i.dataset.modelId === modelId ? 'white' : 'var(--text-primary)';
                         });
                     });
-                    
-                    item.addEventListener('mouseenter', function() {
+
+                    item.addEventListener('mouseenter', function () {
                         if (this.dataset.modelId !== modelHiddenInput.value) {
                             this.style.background = 'var(--bg-hover)';
                         }
                     });
-                    
-                    item.addEventListener('mouseleave', function() {
+
+                    item.addEventListener('mouseleave', function () {
                         if (this.dataset.modelId !== modelHiddenInput.value) {
                             this.style.background = 'var(--bg-primary)';
                         }
                     });
                 });
             };
-            
+
             // Initial render
             renderDropdown(filteredModels);
-            
+
             // Search functionality
             modelSearchInput.addEventListener('input', (e) => {
                 const searchTerm = e.target.value.toLowerCase().trim();
-                
+
                 if (searchTerm === '') {
                     filteredModels = [...this.aiManager.availableModels];
                 } else {
@@ -7347,30 +6450,30 @@ Please provide a helpful response based on the note content and conversation his
                         return name.includes(searchTerm) || id.includes(searchTerm);
                     });
                 }
-                
+
                 renderDropdown(filteredModels);
                 modelDropdown.style.display = filteredModels.length > 0 ? 'block' : 'none';
             });
-            
+
             // Show dropdown on focus
             modelSearchInput.addEventListener('focus', () => {
                 if (filteredModels.length > 0) {
                     modelDropdown.style.display = 'block';
                 }
             });
-            
+
             // Hide dropdown when clicking outside
             document.addEventListener('click', (e) => {
                 if (!modelContainer.contains(e.target)) {
                     modelDropdown.style.display = 'none';
                 }
             });
-            
+
             // Handle keyboard navigation
             let selectedIndex = -1;
             modelSearchInput.addEventListener('keydown', (e) => {
                 const items = modelDropdown.querySelectorAll('.model-dropdown-item');
-                
+
                 if (e.key === 'ArrowDown') {
                     e.preventDefault();
                     // Reset previous selection
@@ -7680,15 +6783,15 @@ Please provide a helpful response based on the note content and conversation his
                     const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
                     const plural = result.deletedCount > 1 ? 's' : '';
                     const pluralRemaining = result.remainingCount !== 1 ? 's' : '';
-                    const message = `✅ ${t('settings.advanced.clearUnusedTagsSuccess', { 
-                        deletedCount: result.deletedCount, 
+                    const message = `✅ ${t('settings.advanced.clearUnusedTagsSuccess', {
+                        deletedCount: result.deletedCount,
                         plural,
                         remainingCount: result.remainingCount,
                         pluralRemaining
                     })}`;
                     this.showNotification(message, 'success');
                     console.log('[Advanced Settings] Cleared unused tags:', result);
-                    
+
                     // Close modal and refresh if needed
                     this.closeModal(modal);
                 } else {
@@ -7728,7 +6831,7 @@ Please provide a helpful response based on the note content and conversation his
                     const message = result.message || `✅ ${t('settings.advanced.allAIConversationsCleared')}`;
                     this.showNotification(message, 'success');
                     console.log('[Advanced Settings] Cleared AI conversations:', result);
-                    
+
                     // Close modal
                     this.closeModal(modal);
                 } else {
@@ -7769,7 +6872,7 @@ Please provide a helpful response based on the note content and conversation his
         // Default message if none provided
         const defaultMessage = t('modals.restartMessage', 'This change requires an app restart to take full effect.');
         const displayMessage = message || defaultMessage;
-        
+
         const content = `
             <div style="padding: 10px 0;">
                 <p style="margin: 0 0 20px 0; color: var(--text-primary);">
@@ -7790,13 +6893,13 @@ Please provide a helpful response based on the note content and conversation his
 
     restartApp() {
         console.log('[DEBUG] Restarting application...');
-        
+
         // Try to use Electron's app.relaunch if available
         try {
             if (typeof ipcRenderer !== 'undefined') {
                 // Request main process to relaunch the app
                 ipcRenderer.send('restart-app');
-                
+
                 // Fallback to reload if restart message doesn't work after 1 second
                 setTimeout(() => {
                     window.location.reload();
@@ -7961,7 +7064,7 @@ Please provide a helpful response based on the note content and conversation his
                         );
                         this.hideLoading();
                         this.showNotification(t('notifications.shareRevokedSuccessfully', 'Share revoked successfully'), 'success');
-                        
+
                         // Update the note's collaboration data in renderer's database
                         if (result.success && result.updatedCollaboration && this.notesManager && this.notesManager.db) {
                             const noteData = this.notesManager.db.data.notes[this.currentNote.id];
@@ -7975,7 +7078,7 @@ Please provide a helpful response based on the note content and conversation his
                         }
                         // Close ALL modals (in case there are multiple stacked)
                         this.closeAllModals();
-                        
+
                         // Reload the share options to reflect updated state
                         setTimeout(() => this.showShareOptions(), 300);
                     } catch (error) {
@@ -8172,14 +7275,14 @@ Please provide a helpful response based on the note content and conversation his
                         }
                     }
 
-                    const message = result.isUpdate ? 
-                        t('notifications.sharedNoteUpdatedSuccessfully', 'Shared note updated successfully on Google Drive!') : 
+                    const message = result.isUpdate ?
+                        t('notifications.sharedNoteUpdatedSuccessfully', 'Shared note updated successfully on Google Drive!') :
                         t('notifications.noteSharedSuccessfully', 'Note shared on Google Drive successfully!');
                     this.showNotification(message, 'success');
 
                     // Close ALL modals (including parent Share Note dialog) and reopen
                     this.closeAllModals();
-                    
+
                     // Reload the share options to reflect updated state
                     setTimeout(() => this.showShareOptions(), 300);
                 }
@@ -8836,7 +7939,7 @@ Please provide a helpful response based on the note content and conversation his
                         this.showNotification(result.message || t('settings.sync.connectedSuccessfully', 'Successfully connected to Google Drive'), 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
-                        
+
                         // Close the sync settings modal and show restart dialog
                         this.closeModal(modal);
                         setTimeout(() => {
@@ -8872,7 +7975,7 @@ Please provide a helpful response based on the note content and conversation his
                         this.showNotification(t('settings.sync.disconnectedSuccessfully', 'Successfully disconnected from Google Drive'), 'success');
                         await this.updateModalSyncStatus(modal);
                         await this.updateSyncStatus(); // Update main UI
-                        
+
                         // Close the sync settings modal and show restart dialog
                         this.closeModal(modal);
                         setTimeout(() => {
@@ -8979,7 +8082,7 @@ Please provide a helpful response based on the note content and conversation his
 
                     if (!this.notesManager || !this.notesManager.db) {
                         const t = (key) => window.i18n ? window.i18n.t(key) : key;
-                this.showNotification(t('notifications.databaseNotAvailable'), 'error');
+                        this.showNotification(t('notifications.databaseNotAvailable'), 'error');
                         return;
                     }
 
@@ -9009,7 +8112,7 @@ Please provide a helpful response based on the note content and conversation his
 
                     if (!this.notesManager || !this.notesManager.db) {
                         const t = (key) => window.i18n ? window.i18n.t(key) : key;
-                this.showNotification(t('notifications.databaseNotAvailable'), 'error');
+                        this.showNotification(t('notifications.databaseNotAvailable'), 'error');
                         return;
                     }
 
@@ -9570,13 +8673,13 @@ Please provide a helpful response based on the note content and conversation his
                         if (mediaResult.success) {
                             const { uploaded, skipped, deletedFromDrive, deletedFromLocal } = mediaResult;
                             console.log(`[Sync] Media sync: ${uploaded} uploaded, ${skipped} skipped, ${deletedFromDrive} deleted from Drive, ${deletedFromLocal} deleted from local`);
-                            
+
                             // Show notification if files were deleted
                             const totalDeleted = (deletedFromDrive || 0) + (deletedFromLocal || 0);
                             if (totalDeleted > 0) {
                                 const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
-                                this.showNotification(t('notifications.cleanedUpUnusedMedia', { 
-                                    total: totalDeleted, 
+                                this.showNotification(t('notifications.cleanedUpUnusedMedia', {
+                                    total: totalDeleted,
                                     plural: totalDeleted > 1 ? 's' : '',
                                     drive: deletedFromDrive,
                                     local: deletedFromLocal
@@ -9645,7 +8748,16 @@ function resolveModalConflict(conflictId, resolution, modalId) {
 }
 
 // Initialize the application when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
+    // Initialize i18n first to ensure translations are available
+    if (window.i18n) {
+        await window.i18n.initialize();
+        // Notify main process of initial language
+        if (ipcRenderer) {
+            ipcRenderer.send('menu-language-changed', window.i18n.getLanguage());
+        }
+    }
+
     window.cognotezApp = new CogNotezApp();
 });
 

@@ -80,7 +80,6 @@ class AdvancedSearchManager {
             if (tags.length === 0) {
                 const option = document.createElement('option');
                 option.disabled = true;
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 option.textContent = t('tags.noTagsAvailable');
                 tagsSelect.appendChild(option);
                 return;
@@ -234,11 +233,11 @@ class AdvancedSearchManager {
         if (this.currentFilters.dateFrom || this.currentFilters.dateTo) {
             filtered = filtered.filter(note => {
                 const noteDate = new Date(note.updated_at || note.created_at);
-                
+
                 if (this.currentFilters.dateFrom && noteDate < this.currentFilters.dateFrom) {
                     return false;
                 }
-                
+
                 if (this.currentFilters.dateTo) {
                     // Include the entire day of dateTo
                     const dateToEnd = new Date(this.currentFilters.dateTo);
@@ -247,7 +246,7 @@ class AdvancedSearchManager {
                         return false;
                     }
                 }
-                
+
                 return true;
             });
         }
@@ -268,7 +267,6 @@ class AdvancedSearchManager {
     updateResultsCount(count) {
         const countElement = document.getElementById('search-results-count');
         if (countElement) {
-            const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
             const plural = count !== 1 ? 's' : '';
             const text = t('advancedSearch.searchResultsCount', `${count} note${plural} found`, { count, plural });
             countElement.textContent = text;
@@ -282,7 +280,7 @@ class AdvancedSearchManager {
             const notesList = document.getElementById('notes-list');
             if (notesList) {
                 notesList.innerHTML = '';
-                
+
                 if (notes.length === 0) {
                     this.app.notesManager.renderEmptyState();
                 } else {
@@ -359,9 +357,9 @@ class AdvancedSearchManager {
         }
 
         if (this.currentFilters.dateFrom || this.currentFilters.dateTo) {
-            const from = this.currentFilters.dateFrom ? 
+            const from = this.currentFilters.dateFrom ?
                 this.currentFilters.dateFrom.toLocaleDateString() : 'any';
-            const to = this.currentFilters.dateTo ? 
+            const to = this.currentFilters.dateTo ?
                 this.currentFilters.dateTo.toLocaleDateString() : 'any';
             parts.push(`Date: ${from} to ${to}`);
         }
@@ -375,12 +373,12 @@ class AdvancedSearchManager {
 
     hasActiveFilters() {
         return this.currentFilters.text !== '' ||
-               this.currentFilters.tags.length > 0 ||
-               this.currentFilters.dateFrom !== null ||
-               this.currentFilters.dateTo !== null ||
-               this.currentFilters.favoritesOnly ||
-               this.currentFilters.pinnedOnly ||
-               this.currentFilters.protectedOnly;
+            this.currentFilters.tags.length > 0 ||
+            this.currentFilters.dateFrom !== null ||
+            this.currentFilters.dateTo !== null ||
+            this.currentFilters.favoritesOnly ||
+            this.currentFilters.pinnedOnly ||
+            this.currentFilters.protectedOnly;
     }
 }
 

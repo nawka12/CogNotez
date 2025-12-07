@@ -504,22 +504,6 @@
     <script src="./js/ai-edit-approval.js"></script>
     <script src="./js/ai.js"></script>
     <script src="./js/ui.js"></script>
-    <script>
-        // Initialize i18n after DOM is ready
-        document.addEventListener('DOMContentLoaded', async () => {
-            await window.i18n.initialize();
-            // Notify main process of initial language
-            if (typeof require !== 'undefined') {
-                try {
-                    const { ipcRenderer } = require('electron');
-                    if (ipcRenderer) {
-                        ipcRenderer.send('menu-language-changed', window.i18n.getLanguage());
-                    }
-                } catch (error) {
-                    console.warn('[i18n] Could not notify main process of language:', error);
-                }
-            }
-        });
-    </script>
+
 </body>
 </html>

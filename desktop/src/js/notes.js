@@ -53,7 +53,7 @@ class NotesManager {
                 const noteElement = this.createNoteElement(note);
                 this.notesListElement.appendChild(noteElement);
             });
-            
+
             // Update folder counts after rendering
             this.updateFolderCounts();
         } catch (error) {
@@ -136,55 +136,102 @@ class NotesManager {
             element.classList.add('pinned');
         }
 
-        // Generate tags HTML if tags exist
-        let tagsHtml = '';
+        const content = document.createElement('div');
+        content.className = 'note-item-content';
+
+        // Title
+        const titleDiv = document.createElement('div');
+        titleDiv.className = 'note-item-title';
+
+        if (note.password_protected) {
+            const lockIcon = document.createElement('i');
+            lockIcon.className = 'fas fa-lock note-lock-icon';
+            lockIcon.title = t('notes.passwordProtected');
+            titleDiv.appendChild(lockIcon);
+            titleDiv.appendChild(document.createTextNode(' '));
+        }
+        titleDiv.appendChild(document.createTextNode(note.title));
+        content.appendChild(titleDiv);
+
+        // Preview
+        const previewDiv = document.createElement('div');
+        previewDiv.className = 'note-item-preview';
+        previewDiv.textContent = note.password_protected ? '' : (note.preview || '');
+        content.appendChild(previewDiv);
+
+        // Meta (Date + Tags) Container
+        const metaDiv = document.createElement('div');
+        metaDiv.className = 'note-item-meta';
+
+        // Date
+        const dateDiv = document.createElement('div');
+        dateDiv.className = 'note-item-date';
+        dateDiv.textContent = this.app.formatLocalizedDateTime(note.modified, false);
+        metaDiv.appendChild(dateDiv);
+
+        // Tags
         if (note.tags && note.tags.length > 0) {
-            tagsHtml = '<div class="note-item-tags">';
-            // Limit to first 3 tags for display
-            const displayTags = note.tags.slice(0, 3);
+            const tagsDiv = document.createElement('div');
+            tagsDiv.className = 'note-item-tags';
+
+            // Limit to first 2 tags for display in the condensed list
+            const displayTags = note.tags.slice(0, 2);
             displayTags.forEach(tagId => {
-                // Get tag name from database if available, otherwise show tag ID
                 const tagName = this.getTagName(tagId);
-                tagsHtml += `<span class="note-tag">${this.escapeHtml(tagName)}</span>`;
+                const tagSpan = document.createElement('span');
+                tagSpan.className = 'note-tag';
+                tagSpan.textContent = tagName;
+                tagsDiv.appendChild(tagSpan);
             });
-            if (note.tags.length > 3) {
-                tagsHtml += `<span class="note-tag more-tags">+${note.tags.length - 3} more</span>`;
+
+            if (note.tags.length > 2) {
+                const moreTagsSpan = document.createElement('span');
+                moreTagsSpan.className = 'note-tag more-tags';
+                moreTagsSpan.textContent = `+${note.tags.length - 2}`;
+                tagsDiv.appendChild(moreTagsSpan);
             }
-            tagsHtml += '</div>';
+            metaDiv.appendChild(tagsDiv);
         }
 
-        const passwordProtectedTitle = window.i18n ? window.i18n.t('notes.passwordProtected') : 'Password protected';
-        const pinTitle = note.pinned ? (window.i18n ? window.i18n.t('notes.unpinNote') : 'Unpin note') : (window.i18n ? window.i18n.t('notes.pinNote') : 'Pin note');
-        const deleteTitle = window.i18n ? window.i18n.t('notes.deleteNote') : 'Delete note';
-        
-        element.innerHTML = `
-            <div class="note-item-content">
-                <div class="note-item-title">
-                    ${note.password_protected ? `<i class="fas fa-lock note-lock-icon" title="${passwordProtectedTitle}"></i>` : ''}
-                    ${this.escapeHtml(note.title)}
-                </div>
-                <div class="note-item-preview">${this.escapeHtml(note.password_protected ? '' : (note.preview || ''))}</div>
-                ${tagsHtml}
-                <div class="note-item-date">${this.app.formatLocalizedDateTime(note.modified, false)}</div>
-            </div>
-            <button class="note-pin-btn ${note.pinned ? 'pinned' : ''}" data-note-id="${note.id}" title="${pinTitle}"><i class="fas fa-thumbtack"></i></button>
-            <button class="note-delete-btn" data-note-id="${note.id}" title="${deleteTitle}"><i class="fas fa-trash"></i></button>
-        `;
+        content.appendChild(metaDiv);
+        element.appendChild(content);
 
-        // Note selection is now handled by the app.js delegate event listener
-        // This prevents duplicate event handlers and double warnings
+        // Action Buttons Overlay
+        const actionsOverlay = document.createElement('div');
+        actionsOverlay.className = 'note-actions-overlay';
 
-        // Delete button functionality
-        const deleteBtn = element.querySelector('.note-delete-btn');
+        // Pin Button
+        const pinBtn = document.createElement('button');
+        pinBtn.className = `note-action-btn note-pin-btn ${note.pinned ? 'pinned' : ''}`;
+        pinBtn.dataset.noteId = note.id;
+        pinBtn.title = note.pinned ? t('notes.unpinNote') : t('notes.pinNote');
+
+        const pinIcon = document.createElement('i');
+        pinIcon.className = 'fas fa-thumbtack';
+        pinBtn.appendChild(pinIcon);
+
+        // Delete Button
+        const deleteBtn = document.createElement('button');
+        deleteBtn.className = 'note-action-btn note-delete-btn';
+        deleteBtn.dataset.noteId = note.id;
+        deleteBtn.title = t('notes.deleteNote');
+
+        const deleteIcon = document.createElement('i');
+        deleteIcon.className = 'fas fa-trash';
+        deleteBtn.appendChild(deleteIcon);
+
+        actionsOverlay.appendChild(pinBtn);
+        actionsOverlay.appendChild(deleteBtn);
+        element.appendChild(actionsOverlay);
+
+        // Event listeners
         deleteBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent triggering the note selection
+            e.stopPropagation();
             this.deleteNote(note.id);
         });
 
-        // Pin button functionality
-        const pinBtn = element.querySelector('.note-pin-btn');
         pinBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // Prevent triggering the note selection
+            e.stopPropagation();
             this.togglePinNote(note.id);
         });
 
@@ -194,7 +241,7 @@ class NotesManager {
     renderEmptyState(folderFilter = null) {
         const emptyState = document.createElement('div');
         emptyState.className = 'empty-state';
-        
+
         let icon = 'fa-sticky-note';
         let title = 'No notes yet';
         let subtitle = 'Click the + button to create your first note';
@@ -210,13 +257,38 @@ class NotesManager {
             subtitle = 'Add this tag to notes to see them here';
         }
 
-        emptyState.innerHTML = `
-            <div style="text-align: center; padding: 40px 20px; color: var(--text-tertiary);">
-                <div style="font-size: 48px; margin-bottom: 16px;"><i class="fas ${icon}"></i></div>
-                <div style="font-size: 16px; margin-bottom: 8px;">${title}</div>
-                <div style="font-size: 14px;">${subtitle}</div>
-            </div>
-        `;
+        const container = document.createElement('div');
+        Object.assign(container.style, {
+            textAlign: 'center',
+            padding: '40px 20px',
+            color: 'var(--text-tertiary)'
+        });
+
+        const iconDiv = document.createElement('div');
+        Object.assign(iconDiv.style, {
+            fontSize: '48px',
+            marginBottom: '16px'
+        });
+
+        const i = document.createElement('i');
+        i.className = `fas ${icon}`;
+        iconDiv.appendChild(i);
+        container.appendChild(iconDiv);
+
+        const titleDiv = document.createElement('div');
+        Object.assign(titleDiv.style, {
+            fontSize: '16px',
+            marginBottom: '8px'
+        });
+        titleDiv.textContent = title;
+        container.appendChild(titleDiv);
+
+        const subtitleDiv = document.createElement('div');
+        subtitleDiv.style.fontSize = '14px';
+        subtitleDiv.textContent = subtitle;
+        container.appendChild(subtitleDiv);
+
+        emptyState.appendChild(container);
         this.notesListElement.appendChild(emptyState);
     }
 
@@ -308,8 +380,8 @@ class NotesManager {
         return notes.filter(note => {
             // Search in title, content, and preview
             const textMatch = note.title.toLowerCase().includes(searchTerm) ||
-                            note.content.toLowerCase().includes(searchTerm) ||
-                            note.preview.toLowerCase().includes(searchTerm);
+                note.content.toLowerCase().includes(searchTerm) ||
+                note.preview.toLowerCase().includes(searchTerm);
 
             // Search in tags
             let tagMatch = false;
@@ -336,7 +408,7 @@ class NotesManager {
 
                 // Use custom modal instead of native confirm() to avoid focus/rendering issues
                 const shouldDelete = await this.showDeleteConfirmation(note.title);
-                
+
                 if (shouldDelete) {
                     await this.db.deleteNote(noteId);
 
@@ -352,10 +424,10 @@ class NotesManager {
                     }
 
                     await this.renderNotesList('', this.app.currentFolder);
-                    
+
                     // Update folder counts
                     await this.app.renderTagFolders();
-                    
+
                     // Force a reflow/repaint to ensure UI is responsive
                     this.forceReflow();
                 }
@@ -365,10 +437,10 @@ class NotesManager {
                 if (index === -1) return;
 
                 const note = this.app.notes[index];
-                
+
                 // Use custom modal instead of native confirm() to avoid focus/rendering issues
                 const shouldDelete = await this.showDeleteConfirmation(note.title);
-                
+
                 if (shouldDelete) {
                     this.app.notes.splice(index, 1);
 
@@ -385,10 +457,10 @@ class NotesManager {
 
                     this.app.saveNotes();
                     this.renderNotesList('', this.app.currentFolder);
-                    
+
                     // Update folder counts
                     this.app.renderTagFolders();
-                    
+
                     // Force a reflow/repaint to ensure UI is responsive
                     this.forceReflow();
                 }
@@ -401,7 +473,6 @@ class NotesManager {
     // Show delete confirmation using custom modal (avoids native confirm() focus issues)
     showDeleteConfirmation(noteTitle) {
         return new Promise((resolve) => {
-            const t = (key, params = {}) => window.i18n ? window.i18n.t(key, params) : key;
             const deleteTitle = t('notes.deleteNoteTitle');
             const deleteWarning = t('notes.deleteNoteWarning');
             const deleteButtonText = t('notes.deleteButton');
@@ -453,7 +524,7 @@ class NotesManager {
         // Trigger a forced reflow by reading offsetHeight
         const body = document.body;
         void body.offsetHeight;
-        
+
         // Also ensure focus is properly managed
         setTimeout(() => {
             // Clear any stuck focus
@@ -464,7 +535,7 @@ class NotesManager {
                     activeEl.blur();
                 }
             }
-            
+
             // Re-enable event propagation by forcing a focus cycle
             document.body.focus();
             document.body.blur();
@@ -534,7 +605,6 @@ class NotesManager {
 
             if (!currentlyPinned && pinnedCount >= 3) {
                 // Cannot pin more than 3 notes
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 const pinLimitTitle = t('notes.pinLimitReached');
                 const pinLimitMessage = t('notes.pinLimitMessage');
                 await this.app.showAlert(pinLimitTitle, pinLimitMessage);
@@ -707,7 +777,7 @@ class NotesManager {
         const currentContent = document.getElementById('note-editor').value;
 
         return currentTitle !== this.app.currentNote.title ||
-               currentContent !== this.app.currentNote.content;
+            currentContent !== this.app.currentNote.content;
     }
 
     // Context menu for notes
@@ -736,14 +806,21 @@ class NotesManager {
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
 
-        menu.innerHTML = `
-            <div class="context-menu-item" data-action="open">Open</div>
-            <div class="context-menu-item" data-action="password">${passwordText}</div>
-            <div class="context-menu-item" data-action="pin">${pinText}</div>
-            <div class="context-menu-item" data-action="duplicate">Duplicate</div>
-            <div class="context-menu-item" data-action="export">Export</div>
-            <div class="context-menu-item" data-action="delete" style="color: #dc3545;">Delete</div>
-        `;
+        const createMenuItem = (text, action, style = {}) => {
+            const item = document.createElement('div');
+            item.className = 'context-menu-item';
+            item.dataset.action = action;
+            item.textContent = text;
+            Object.assign(item.style, style);
+            return item;
+        };
+
+        menu.appendChild(createMenuItem('Open', 'open'));
+        menu.appendChild(createMenuItem(passwordText, 'password'));
+        menu.appendChild(createMenuItem(pinText, 'pin'));
+        menu.appendChild(createMenuItem('Duplicate', 'duplicate'));
+        menu.appendChild(createMenuItem('Export', 'export'));
+        menu.appendChild(createMenuItem('Delete', 'delete', { color: '#dc3545' }));
 
         document.body.appendChild(menu);
 

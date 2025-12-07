@@ -109,16 +109,16 @@
   --font-size-xl: 20px;
   --font-size-2xl: 24px;
   --font-size-3xl: 30px;
-  
+
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
-  
+
   --line-height-tight: 1.25;
   --line-height-normal: 1.5;
   --line-height-relaxed: 1.75;
-  
+
   --letter-spacing-tight: -0.025em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.025em;
@@ -219,24 +219,33 @@ body {
 /* Modern Theme Transitions */
 * {
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
-              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* Modern Button System */
-.theme-toggle, .action-btn, .search-button, .new-note-btn {
+.theme-toggle,
+.action-btn,
+.search-button,
+.new-note-btn {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
 }
 
-.theme-toggle:hover, .action-btn:hover, .search-button:hover, .new-note-btn:hover {
+.theme-toggle:hover,
+.action-btn:hover,
+.search-button:hover,
+.new-note-btn:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-md);
 }
 
-.theme-toggle:active, .action-btn:active, .search-button:active, .new-note-btn:active {
+.theme-toggle:active,
+.action-btn:active,
+.search-button:active,
+.new-note-btn:active {
   transform: translateY(0);
   transition-duration: 0.1s;
 }
@@ -292,25 +301,46 @@ body {
 
 /* Modern Loading Animation */
 @keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
+  0% {
+    transform: rotate(0deg);
+  }
+
+  100% {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.5;
+  }
 }
 
 @keyframes bounce {
-  0%, 20%, 53%, 80%, 100% {
-    transform: translate3d(0,0,0);
+
+  0%,
+  20%,
+  53%,
+  80%,
+  100% {
+    transform: translate3d(0, 0, 0);
   }
-  40%, 43% {
+
+  40%,
+  43% {
     transform: translate3d(0, -8px, 0);
   }
+
   70% {
     transform: translate3d(0, -4px, 0);
   }
+
   90% {
     transform: translate3d(0, -2px, 0);
   }
@@ -339,7 +369,8 @@ body {
   -webkit-backdrop-filter: blur(8px) saturate(150%);
 }
 
-/* Modern Hover Effects */
+/* Modern Hover Effects - MOVED TO STYLES.CSS */
+/* 
 .note-item {
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
@@ -357,6 +388,7 @@ body {
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
+*/
 
 /* Modern Context Menu Animations */
 .context-menu {
@@ -370,6 +402,7 @@ body {
     opacity: 0;
     transform: translateY(-8px) scale(0.95);
   }
+
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
@@ -387,13 +420,15 @@ body {
     opacity: 0;
     transform: translateX(100%);
   }
+
   to {
     opacity: 1;
     transform: translateX(0);
   }
 }
 
-/* Modern Note Item Styling */
+/* Modern Note Item Styling - REMOVED (Conflicted with styles.css) */
+/*
 .note-item {
   position: relative;
   overflow: hidden;
@@ -434,6 +469,7 @@ body {
 .note-item.active::before {
   width: 4px;
 }
+*/
 
 /* Modern Editor Enhancement */
 .note-editor:focus {
@@ -443,7 +479,8 @@ body {
   border-radius: var(--radius-md);
 }
 
-/* Modern Tag Styling */
+/* Modern Tag Styling - REMOVED (Conflicted with styles.css) */
+/*
 .note-tag, .editor-note-tag, .tag-item {
   border-radius: var(--radius-full);
   padding: var(--spacing-xs) var(--spacing-sm);
@@ -460,8 +497,10 @@ body {
   transform: translateY(-1px);
   box-shadow: var(--shadow-sm);
 }
+*/
 
-/* Modern Button Styling */
+/* Modern Button Styling - REMOVED (Conflicted with styles.css) */
+/*
 .action-btn, .search-button, .new-note-btn, .theme-toggle {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
@@ -486,8 +525,10 @@ body {
   color: white;
   box-shadow: var(--shadow-accent);
 }
+*/
 
-/* Modern Input Styling */
+/* Modern Input Styling - REMOVED (Conflicted with styles.css) */
+/*
 .search-input, .ai-input, .ai-dialog-input, .find-input, .replace-input, .tag-input {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
@@ -507,32 +548,40 @@ body {
   box-shadow: 0 0 0 3px var(--accent-color-light);
   background: var(--input-bg);
 }
+*/
 
 /* Responsive design for different screen sizes */
 
 /* Large Desktop (1440px and above) */
 @media (min-width: 1440px) {
   .ai-panel {
-    width: 400px; /* Slightly wider for larger screens */
+    width: 400px;
+    /* Slightly wider for larger screens */
   }
 
   .sidebar {
-    width: 320px; /* Slightly wider sidebar */
+    width: 320px;
+    /* Slightly wider sidebar */
   }
 
   .search-container {
-    max-width: 360px; /* Wider search bar */
+    max-width: 360px;
+    /* Wider search bar */
   }
 
   /* More generous sync status width for large screens */
   .sync-status-container {
-    max-width: 200px; /* Even more generous for large screens */
-    padding: 6px 10px; /* Slightly more padding on large screens */
+    max-width: 200px;
+    /* Even more generous for large screens */
+    padding: 6px 10px;
+    /* Slightly more padding on large screens */
   }
 
   .sync-status-text {
-    max-width: 140px; /* Allow full text on large screens */
-    font-size: 13px; /* Slightly larger font for better readability */
+    max-width: 140px;
+    /* Allow full text on large screens */
+    font-size: 13px;
+    /* Slightly larger font for better readability */
   }
 }
 
@@ -545,20 +594,24 @@ body {
   .sidebar {
     width: 280px;
   }
-  
+
   .search-container {
     max-width: 280px;
   }
 
   /* Generous sync status width for desktop */
   .sync-status-container {
-    max-width: 180px; /* Generous width for desktop */
-    padding: 5px 9px; /* Comfortable padding for desktop */
+    max-width: 180px;
+    /* Generous width for desktop */
+    padding: 5px 9px;
+    /* Comfortable padding for desktop */
   }
 
   .sync-status-text {
-    max-width: 120px; /* Allow longer text on desktop */
-    font-size: 12px; /* Standard readable size */
+    max-width: 120px;
+    /* Allow longer text on desktop */
+    font-size: 12px;
+    /* Standard readable size */
   }
 }
 
@@ -567,16 +620,16 @@ body {
   .search-container {
     max-width: 220px;
   }
-  
+
   .header-btn-group {
     padding: 2px;
   }
-  
+
   .header-action-btn {
     padding: 6px 8px;
     min-width: 32px;
   }
-  
+
   .new-note-btn-primary {
     padding: 9px 14px;
   }
@@ -584,29 +637,35 @@ body {
 
 /* Optimize for 1366x768 screens and split-screen scenarios */
 @media (min-width: 650px) and (max-width: 768px) {
+
   /* Specific optimizations for split 1366x768 screens */
   .sidebar {
-    width: 220px; /* Narrower sidebar for split screens */
+    width: 220px;
+    /* Narrower sidebar for split screens */
   }
 
   .ai-panel {
-    width: 260px; /* Optimized AI panel width for split screens */
+    width: 260px;
+    /* Optimized AI panel width for split screens */
   }
 
   .main-content-area {
     flex: 1;
-    min-width: 250px; /* Ensure minimum usable content area */
+    min-width: 250px;
+    /* Ensure minimum usable content area */
   }
 
   .search-container {
-    max-width: 160px; /* Smaller search for space constraints */
+    max-width: 160px;
+    /* Smaller search for space constraints */
     min-width: 120px;
   }
 
   /* Optimize header for split screens */
   .app-header {
     padding: 0 12px;
-    height: 48px; /* Slightly reduced height */
+    height: 48px;
+    /* Slightly reduced height */
   }
 
   .editor-header {
@@ -630,7 +689,8 @@ body {
 
   .sync-status-text {
     font-size: 11px;
-    max-width: 90px; /* Slightly smaller for split screens */
+    max-width: 90px;
+    /* Slightly smaller for split screens */
   }
 
   /* Better button sizing for split screens */
@@ -648,66 +708,79 @@ body {
 
   .ai-panel {
     border-left: 1px solid var(--border-color);
-    max-height: none; /* Allow full height usage */
+    max-height: none;
+    /* Allow full height usage */
   }
 }
 
 /* Specific optimizations for low-height screens (768px height) */
 @media (max-height: 800px) and (min-width: 1024px) {
   .app-header {
-    height: 45px; /* Reduce header height for better vertical space */
+    height: 45px;
+    /* Reduce header height for better vertical space */
     padding: 0 18px;
   }
 
   .editor-header {
-    min-height: 45px; /* Reduce editor header height */
+    min-height: 45px;
+    /* Reduce editor header height */
     padding: 6px 18px;
   }
 
   .editor-wrapper {
-    padding: 16px; /* Slightly reduce padding to save space */
+    padding: 16px;
+    /* Slightly reduce padding to save space */
   }
 
   .ai-panel-content {
-    padding: 14px; /* Optimize AI panel padding */
+    padding: 14px;
+    /* Optimize AI panel padding */
   }
 
   .ai-messages {
-    max-height: calc(100vh - 180px); /* Better height utilization for low-height screens */
+    max-height: calc(100vh - 180px);
+    /* Better height utilization for low-height screens */
     min-height: 150px;
   }
 
   .markdown-preview {
-    max-height: calc(100vh - 160px); /* Optimize preview height */
+    max-height: calc(100vh - 160px);
+    /* Optimize preview height */
   }
 
   .note-editor {
-    height: calc(100vh - 130px); /* Better height calculation for low screens */
+    height: calc(100vh - 130px);
+    /* Better height calculation for low screens */
   }
 }
 
 /* Specific optimizations for ~1366px width screens */
 @media (min-width: 1350px) and (max-width: 1380px) {
   .sidebar {
-    width: 260px; /* Slightly narrower sidebar for better balance */
+    width: 260px;
+    /* Slightly narrower sidebar for better balance */
   }
 
   .ai-panel {
-    width: 320px; /* Slightly narrower AI panel */
+    width: 320px;
+    /* Slightly narrower AI panel */
   }
 
   .search-container {
-    max-width: 260px; /* Optimize search width */
+    max-width: 260px;
+    /* Optimize search width */
   }
 
   /* Better text sizing for this specific resolution */
   .sync-status-text {
     font-size: 12px;
-    max-width: 110px; /* Slightly smaller to fit better */
+    max-width: 110px;
+    /* Slightly smaller to fit better */
   }
 
   .note-title-input {
-    font-size: 15px; /* Slightly smaller for better fit */
+    font-size: 15px;
+    /* Slightly smaller for better fit */
   }
 
   /* Optimize spacing for 1366px width */
@@ -719,5 +792,3 @@ body {
     padding: 6px 16px;
   }
 }
-
-
