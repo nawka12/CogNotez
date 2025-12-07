@@ -1,7 +1,7 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 
-![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)
+![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -268,7 +268,17 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.2.0 (Current)
+### v2.3.0 (Current)
+- Major code refactoring and improvements for better maintainability
+- Enhanced Find & Replace functionality with dedicated module and improved UI
+- Added dedicated History Manager for improved undo/redo functionality
+- Refactored CSS styles for improved readability and consistency
+- Removed inline JavaScript from HTML for better separation of concerns
+- Enhanced sidebar design with modern styling and improved user experience
+- Cleaned up unused variables and improved code structure across modules
+- Completed technical debt items: markdown rendering hardening and decryption modal improvements
+
+### v2.2.0
 - Added Quick Model Switcher for rapid AI model changes (Ollama/OpenRouter) with search and keyboard support
 - Updated UI text and localization to cover new model-switching actions
 - Bumped desktop app version metadata to 2.2.0
