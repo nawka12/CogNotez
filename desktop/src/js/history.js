@@ -1,12 +1,28 @@
 class HistoryManager {
     /**
      * History Manager for undo/redo functionality
-     * @param {number} maxHistorySize - Maximum number of states to keep
+     * Uses a memory-efficient approach by limiting history size.
+     * 
+     * @param {number} maxHistorySize - Maximum number of states to keep (default: 50)
      */
-    constructor(maxHistorySize = 100) {
+    constructor(maxHistorySize = 50) {
         this.history = [];
         this.currentIndex = -1;
         this.maxHistorySize = maxHistorySize;
+    }
+
+    /**
+     * Get estimated memory usage in bytes
+     * @returns {number} Estimated memory in bytes
+     */
+    getMemoryEstimate() {
+        let totalBytes = 0;
+        for (const state of this.history) {
+            if (state.content) {
+                totalBytes += state.content.length * 2; // UTF-16 characters = 2 bytes each
+            }
+        }
+        return totalBytes;
     }
 
     // Add a new state to history

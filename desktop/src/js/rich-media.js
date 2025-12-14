@@ -9,6 +9,81 @@ class RichMediaManager {
         this.supportedAudioTypes = ['audio/mp3', 'audio/mpeg', 'audio/ogg', 'audio/wav'];
         this.mediaDirectory = null; // Will be set during initialization
         this.useFileSystem = true; // Use file system instead of base64
+
+        // Memory management
+        this.activeBlobUrls = new Set(); // Track active blob URLs for cleanup
+        this.maxCachedNotes = 5; // LRU cache limit for attachments
+        this.recentNoteIds = []; // Track recently accessed notes for LRU eviction
+    }
+
+    /**
+     * Get estimated memory usage statistics
+     * @returns {Object} Memory statistics
+     */
+    getMemoryStats() {
+        return {
+            cachedNotes: this.attachments.size,
+            activeBlobUrls: this.activeBlobUrls.size,
+            recentNotes: this.recentNoteIds.length
+        };
+    }
+
+    /**
+     * Revoke all active blob URLs to free memory
+     */
+    revokeAllBlobUrls() {
+        for (const url of this.activeBlobUrls) {
+            try {
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                console.warn('[RichMedia] Failed to revoke blob URL:', e);
+            }
+        }
+        this.activeBlobUrls.clear();
+        console.log('[RichMedia] Revoked all blob URLs');
+    }
+
+    /**
+     * Revoke a specific blob URL
+     * @param {string} url - Blob URL to revoke
+     */
+    revokeBlobUrl(url) {
+        if (this.activeBlobUrls.has(url)) {
+            URL.revokeObjectURL(url);
+            this.activeBlobUrls.delete(url);
+        }
+    }
+
+    /**
+     * Track a blob URL for later cleanup
+     * @param {string} url - Blob URL to track
+     * @returns {string} The same URL for chaining
+     */
+    trackBlobUrl(url) {
+        this.activeBlobUrls.add(url);
+        return url;
+    }
+
+    /**
+     * Evict old note attachments from cache using LRU strategy
+     * @param {string} currentNoteId - Currently accessed note ID
+     */
+    evictOldAttachments(currentNoteId) {
+        // Update recently accessed notes
+        const idx = this.recentNoteIds.indexOf(currentNoteId);
+        if (idx > -1) {
+            this.recentNoteIds.splice(idx, 1);
+        }
+        this.recentNoteIds.unshift(currentNoteId);
+
+        // Evict if over limit
+        while (this.recentNoteIds.length > this.maxCachedNotes) {
+            const oldNoteId = this.recentNoteIds.pop();
+            if (oldNoteId && this.attachments.has(oldNoteId)) {
+                this.attachments.delete(oldNoteId);
+                console.log('[RichMedia] Evicted attachments for note:', oldNoteId);
+            }
+        }
     }
 
     async initialize() {
@@ -24,7 +99,7 @@ class RichMediaManager {
         try {
             // Get media directory path from main process
             let ipcRenderer = null;
-            
+
             // Try window.electron first (if preload script sets it)
             if (window.electron && window.electron.ipcRenderer) {
                 ipcRenderer = window.electron.ipcRenderer;
@@ -37,7 +112,7 @@ class RichMediaManager {
                     console.log('[RichMedia] Electron not available, will use IndexedDB');
                 }
             }
-            
+
             if (ipcRenderer) {
                 this.mediaDirectory = await ipcRenderer.invoke('get-media-directory');
                 console.log('[RichMedia] Media directory:', this.mediaDirectory);
@@ -58,14 +133,14 @@ class RichMediaManager {
     async initializeIndexedDB() {
         return new Promise((resolve, reject) => {
             const request = indexedDB.open('CogNotezMedia', 1);
-            
+
             request.onerror = () => reject(request.error);
             request.onsuccess = () => {
                 this.mediaDB = request.result;
                 console.log('[RichMedia] IndexedDB initialized');
                 resolve();
             };
-            
+
             request.onupgradeneeded = (event) => {
                 const db = event.target.result;
                 if (!db.objectStoreNames.contains('media')) {
@@ -124,7 +199,7 @@ class RichMediaManager {
             editor.addEventListener('drop', async (e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                
+
                 const files = Array.from(e.dataTransfer.files);
                 await this.handleFilesDrop(files);
             });
@@ -134,7 +209,7 @@ class RichMediaManager {
         editor?.addEventListener('paste', async (e) => {
             const items = Array.from(e.clipboardData.items);
             const imageItems = items.filter(item => item.type.startsWith('image/'));
-            
+
             if (imageItems.length > 0) {
                 e.preventDefault();
                 for (const item of imageItems) {
@@ -247,7 +322,7 @@ class RichMediaManager {
                 // Fall through to IndexedDB storage
             }
         }
-        
+
         // Use IndexedDB storage
         const buffer = await file.arrayBuffer();
         const fileData = {
@@ -269,7 +344,7 @@ class RichMediaManager {
             const transaction = this.mediaDB.transaction(['media'], 'readwrite');
             const store = transaction.objectStore('media');
             const request = store.put(fileData);
-            
+
             request.onsuccess = () => resolve();
             request.onerror = () => reject(request.error);
         });
@@ -278,7 +353,7 @@ class RichMediaManager {
     async getMediaFile(fileId) {
         // Check if it's a file system reference
         const mediaRef = await this.getMediaReference(fileId);
-        
+
         if (!mediaRef) {
             console.warn('[RichMedia] Media reference not found:', fileId);
             return null;
@@ -307,7 +382,7 @@ class RichMediaManager {
             const transaction = this.mediaDB.transaction(['media'], 'readonly');
             const store = transaction.objectStore('media');
             const request = store.get(fileId);
-            
+
             request.onsuccess = () => resolve(request.result);
             request.onerror = () => reject(request.error);
         });
@@ -317,7 +392,7 @@ class RichMediaManager {
         if (!this.attachments.has(noteId)) {
             this.attachments.set(noteId, []);
         }
-        
+
         this.attachments.get(noteId).push(fileRef);
         await this.saveAttachments(noteId);
     }
@@ -339,7 +414,7 @@ class RichMediaManager {
         try {
             // Extract file ID from URL
             const fileId = cognotezUrl.replace('cognotez-media://', '');
-            
+
             if (this.useFileSystem) {
                 // In Electron, the protocol handler will handle it
                 // Just return the URL as-is, the protocol will intercept it
@@ -349,13 +424,15 @@ class RichMediaManager {
                 const fileData = await this.getFromIndexedDB(fileId);
                 if (fileData && fileData.data) {
                     const blob = new Blob([fileData.data], { type: fileData.type });
-                    return URL.createObjectURL(blob);
+                    const blobUrl = URL.createObjectURL(blob);
+                    this.trackBlobUrl(blobUrl); // Track for cleanup
+                    return blobUrl;
                 }
             }
         } catch (error) {
             console.error('[RichMedia] Failed to resolve media URL:', error);
         }
-        
+
         return cognotezUrl; // Return original if resolution fails
     }
 
@@ -369,13 +446,13 @@ class RichMediaManager {
         // Find all cognotez-media:// URLs
         const mediaUrlPattern = /cognotez-media:\/\/[a-z0-9]+/gi;
         const matches = content.match(mediaUrlPattern);
-        
+
         if (!matches || matches.length === 0) {
             return content;
         }
 
         let processedContent = content;
-        
+
         // If using file system (Electron), URLs work as-is with protocol handler
         if (this.useFileSystem) {
             return processedContent;
@@ -403,18 +480,18 @@ class RichMediaManager {
 
         try {
             const fileRef = await this.saveMediaFile(file, 'video');
-            
+
             const editor = document.getElementById('note-editor');
             if (editor) {
                 const cursorPos = editor.selectionStart;
                 const videoHtml = `\n<video controls width="100%">\n  <source src="cognotez-media://${fileRef.id}" type="${file.type}">\n  Your browser does not support the video tag.\n</video>\n`;
-                
+
                 const before = editor.value.substring(0, cursorPos);
                 const after = editor.value.substring(cursorPos);
                 editor.value = before + videoHtml + after;
-                
+
                 editor.selectionStart = editor.selectionEnd = cursorPos + videoHtml.length;
-                
+
                 await this.trackMediaInNote(this.app.currentNote.id, fileRef);
                 this.app.saveCurrentNote?.();
                 this.app.updatePreview?.();
@@ -436,18 +513,18 @@ class RichMediaManager {
 
         try {
             const fileRef = await this.saveMediaFile(file, 'audio');
-            
+
             const editor = document.getElementById('note-editor');
             if (editor) {
                 const cursorPos = editor.selectionStart;
                 const audioHtml = `\n<audio controls>\n  <source src="cognotez-media://${fileRef.id}" type="${file.type}">\n  Your browser does not support the audio tag.\n</audio>\n`;
-                
+
                 const before = editor.value.substring(0, cursorPos);
                 const after = editor.value.substring(cursorPos);
                 editor.value = before + audioHtml + after;
-                
+
                 editor.selectionStart = editor.selectionEnd = cursorPos + audioHtml.length;
-                
+
                 await this.trackMediaInNote(this.app.currentNote.id, fileRef);
                 this.app.saveCurrentNote?.();
                 this.app.updatePreview?.();
@@ -474,7 +551,7 @@ class RichMediaManager {
 
         try {
             const fileRef = await this.saveMediaFile(file, 'attachment');
-            
+
             // Track as attachment
             await this.trackMediaInNote(this.app.currentNote.id, fileRef);
 
@@ -492,14 +569,14 @@ class RichMediaManager {
 
         const attachments = this.attachments.get(noteId);
         const index = attachments.findIndex(a => a.id === attachmentId);
-        
+
         if (index === -1) return;
 
         const attachment = attachments[index];
         attachments.splice(index, 1);
 
         await this.saveAttachments(noteId);
-        
+
         this.app.showNotification?.(`Attachment "${attachment.name}" removed`, 'success');
     }
 
@@ -513,7 +590,7 @@ class RichMediaManager {
             if (!db || !db.initialized) return;
 
             const attachmentsData = db.getSetting('note_attachments', {});
-            
+
             // Convert plain object to Map
             for (const [noteId, attachments] of Object.entries(attachmentsData)) {
                 this.attachments.set(noteId, attachments);
@@ -531,7 +608,7 @@ class RichMediaManager {
      */
     displayAttachments(noteId) {
         const attachments = this.getAttachmentsForNote(noteId);
-        
+
         // Find or create attachments container
         let container = document.getElementById('note-attachments-list');
         if (!container) {
@@ -575,7 +652,7 @@ class RichMediaManager {
     createAttachmentHTML(attachment) {
         const sizeStr = this.formatFileSize(attachment.size);
         const icon = this.getFileIcon(attachment.type);
-        
+
         return `
             <div class="note-attachment">
                 <div class="attachment-icon">${icon}</div>
@@ -703,7 +780,7 @@ class RichMediaManager {
             // Get all attachments as plain object
             const attachmentsData = db.getSetting('note_attachments', {});
             attachmentsData[noteId] = this.attachments.get(noteId) || [];
-            
+
             db.setSetting('note_attachments', attachmentsData);
 
         } catch (error) {

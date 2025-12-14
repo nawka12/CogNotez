@@ -111,6 +111,11 @@ class CogNotezApp {
                     console.log('[DEBUG] Initializing notes manager...');
                     this.notesManager = new NotesManager(this);
                     await this.notesManager.initialize();
+
+                    // Memory optimization: prune old AI conversations (>30 days old)
+                    if (this.notesManager.db && this.notesManager.db.initialized) {
+                        this.notesManager.db.pruneOldConversations(30);
+                    }
                 })()
             ]);
             this.updateSplashProgress('splash.loadingNotes', 40);
@@ -235,7 +240,69 @@ class CogNotezApp {
         }
     }
 
+    /**
+     * Cleanup method for memory management - called before app unloads
+     */
+    cleanup() {
+        console.log('[App] Running cleanup...');
+
+        // Clear all intervals
+        if (this.noteDateUpdateInterval) {
+            clearInterval(this.noteDateUpdateInterval);
+            this.noteDateUpdateInterval = null;
+        }
+        if (this.autoSyncInterval) {
+            clearInterval(this.autoSyncInterval);
+            this.autoSyncInterval = null;
+        }
+        if (this.notesManager?.autoSaveInterval) {
+            clearInterval(this.notesManager.autoSaveInterval);
+            this.notesManager.autoSaveInterval = null;
+        }
+
+        // Clear debounce timers
+        if (this.historyDebounceTimer) {
+            clearTimeout(this.historyDebounceTimer);
+            this.historyDebounceTimer = null;
+        }
+        if (this.livePreviewDebounce) {
+            clearTimeout(this.livePreviewDebounce);
+            this.livePreviewDebounce = null;
+        }
+        if (this.syncScrollTimeout) {
+            clearTimeout(this.syncScrollTimeout);
+            this.syncScrollTimeout = null;
+        }
+
+        // Revoke all blob URLs to free memory
+        if (this.richMediaManager) {
+            this.richMediaManager.revokeAllBlobUrls();
+        }
+
+        console.log('[App] Cleanup completed');
+    }
+
+    /**
+     * Get memory statistics for debugging
+     * @returns {Object} Memory usage statistics
+     */
+    getMemoryStats() {
+        const stats = {
+            historyStates: this.historyManager?.history?.length || 0,
+            historyMemory: this.historyManager?.getMemoryEstimate?.() || 0,
+            openTabs: this.openTabs?.length || 0,
+            notesLoaded: this.notes?.length || 0,
+            richMedia: this.richMediaManager?.getMemoryStats?.() || null
+        };
+
+        console.log('[App] Memory stats:', stats);
+        return stats;
+    }
+
     setupEventListeners() {
+        // Register cleanup on window unload
+        window.addEventListener('beforeunload', () => this.cleanup());
+
         // Header buttons
         document.getElementById('new-note-btn').addEventListener('click', () => this.createNewNote());
         document.getElementById('ai-toggle-btn').addEventListener('click', () => this.toggleAIPanel());
@@ -1514,6 +1581,12 @@ class CogNotezApp {
         if (!note) {
             this.showNoNotePlaceholder();
             return;
+        }
+
+        // Memory optimization: clean up blob URLs from previous note and evict old attachment caches
+        if (this.richMediaManager) {
+            this.richMediaManager.revokeAllBlobUrls();
+            this.richMediaManager.evictOldAttachments(note.id);
         }
 
         this.currentNote = note;

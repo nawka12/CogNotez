@@ -558,6 +558,55 @@ class DatabaseManager {
         return deletedCount;
     }
 
+    /**
+     * Prune old AI conversations to free memory
+     * @param {number} maxAgeDays - Maximum age in days (default: 30)
+     * @returns {number} Number of pruned conversations
+     */
+    pruneOldConversations(maxAgeDays = 30) {
+        const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
+        const cutoffTime = Date.now() - maxAgeMs;
+        let prunedCount = 0;
+
+        for (const id of Object.keys(this.data.ai_conversations)) {
+            const conv = this.data.ai_conversations[id];
+            const createdAt = new Date(conv.created_at).getTime();
+
+            if (createdAt < cutoffTime) {
+                delete this.data.ai_conversations[id];
+                prunedCount++;
+            }
+        }
+
+        if (prunedCount > 0) {
+            this.saveToLocalStorage();
+            console.log(`[Database] Pruned ${prunedCount} old AI conversations (older than ${maxAgeDays} days)`);
+        }
+
+        return prunedCount;
+    }
+
+    /**
+     * Get memory usage statistics
+     * @returns {Object} Memory statistics
+     */
+    getMemoryStats() {
+        const notesCount = Object.keys(this.data.notes).length;
+        const conversationsCount = Object.keys(this.data.ai_conversations).length;
+        const tagsCount = Object.keys(this.data.tags).length;
+
+        // Rough estimate of data size
+        const dataSize = JSON.stringify(this.data).length;
+
+        return {
+            notesCount,
+            conversationsCount,
+            tagsCount,
+            estimatedSizeBytes: dataSize,
+            estimatedSizeKB: Math.round(dataSize / 1024)
+        };
+    }
+
     // Settings operations
     setSetting(key, value) {
         this.data.settings[key] = {
