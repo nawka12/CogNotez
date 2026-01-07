@@ -116,6 +116,42 @@ class GoogleDriveSyncManager {
         return hash.toString(16);
     }
 
+    /**
+     * Generate a unique device identifier for tracking which device performed a sync.
+     * Uses a combination of machine ID and random suffix for uniqueness.
+     */
+    _getDeviceIdentifier() {
+        // Use a cached device ID if available
+        if (this._deviceId) {
+            return this._deviceId;
+        }
+
+        // Try to get a persistent device identifier
+        let deviceId = 'unknown';
+        try {
+            if (isMainProcess) {
+                // Main process - use machine-id or hostname
+                const os = require('os');
+                const hostname = os.hostname();
+                deviceId = `${hostname}-${crypto.randomBytes(4).toString('hex')}`;
+            } else if (typeof window !== 'undefined' && window.localStorage) {
+                // Renderer process - use or create a persistent ID in localStorage
+                let storedId = window.localStorage.getItem('cognotez_device_id');
+                if (!storedId) {
+                    storedId = `browser-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 8)}`;
+                    window.localStorage.setItem('cognotez_device_id', storedId);
+                }
+                deviceId = storedId;
+            }
+        } catch (error) {
+            console.warn('[GoogleDriveSync] Could not get device identifier:', error.message);
+            deviceId = `fallback-${Date.now().toString(36)}`;
+        }
+
+        this._deviceId = deviceId;
+        return deviceId;
+    }
+
     async ensureInitialized() {
         if (!this.initialized) {
             console.log('[GoogleDriveSync] Waiting for initialization...');
@@ -177,7 +213,7 @@ class GoogleDriveSyncManager {
         const maxRetries = 3;
         const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
 
-        let progressCallback = () => {};
+        let progressCallback = () => { };
         try {
             // Ensure the sync manager is fully initialized before proceeding
             await this.ensureInitialized();
@@ -192,8 +228,51 @@ class GoogleDriveSyncManager {
             console.log('[GoogleDriveSync] Upload data contains', Object.keys(data.notes || {}).length, 'notes');
             console.log('[GoogleDriveSync] Encryption enabled:', this.encryptionEnabled);
 
+            // =====================================================
+            // OPTIMISTIC LOCKING: Check remote version before upload
+            // =====================================================
+            if (this.syncMetadata.remoteFileId && options.expectedRemoteModifiedTime) {
+                try {
+                    const fileInfo = await this.drive.files.get({
+                        fileId: this.syncMetadata.remoteFileId,
+                        fields: 'modifiedTime'
+                    });
+
+                    const currentRemoteModifiedTime = fileInfo.data.modifiedTime;
+
+                    if (currentRemoteModifiedTime !== options.expectedRemoteModifiedTime) {
+                        console.warn('[GoogleDriveSync] Version conflict detected!');
+                        console.warn('[GoogleDriveSync] Expected remote modifiedTime:', options.expectedRemoteModifiedTime);
+                        console.warn('[GoogleDriveSync] Actual remote modifiedTime:', currentRemoteModifiedTime);
+
+                        const conflictError = new Error('Version conflict: another device synced since last download');
+                        conflictError.versionConflict = true;
+                        conflictError.currentRemoteModifiedTime = currentRemoteModifiedTime;
+                        throw conflictError;
+                    }
+
+                    console.log('[GoogleDriveSync] Version check passed - remote unchanged since download');
+                } catch (error) {
+                    if (error.versionConflict) {
+                        throw error; // Re-throw version conflict errors
+                    }
+                    // If we can't check (e.g., network error), log warning but proceed
+                    console.warn('[GoogleDriveSync] Could not verify remote version, proceeding with upload:', error.message);
+                }
+            }
+
+            // Include syncVersion in the data being uploaded
+            const dataWithVersion = {
+                ...data,
+                _syncMeta: {
+                    syncVersion: options.syncVersion || (data._syncMeta?.syncVersion || 0) + 1,
+                    uploadedAt: new Date().toISOString(),
+                    uploadedBy: this._getDeviceIdentifier()
+                }
+            };
+
             // Encrypt data if encryption is enabled
-            let dataToUpload = data;
+            let dataToUpload = dataWithVersion;
             if (this.encryptionEnabled) {
                 if (!this.encryptionPassphrase) {
                     throw new Error('Encryption is enabled but no passphrase is set');
@@ -300,11 +379,11 @@ class GoogleDriveSyncManager {
 
             // Categorize error types for better handling
             const isRetryableError = error.code === 429 || // Rate limit
-                                   error.code === 500 || // Server error
-                                   error.code === 502 || // Bad gateway
-                                   error.code === 503 || // Service unavailable
-                                   error.code === 504 || // Gateway timeout
-                                   (error.code >= 520 && error.code <= 527); // Cloudflare errors
+                error.code === 500 || // Server error
+                error.code === 502 || // Bad gateway
+                error.code === 503 || // Service unavailable
+                error.code === 504 || // Gateway timeout
+                (error.code >= 520 && error.code <= 527); // Cloudflare errors
 
             // Retry for transient errors
             if (isRetryableError && retryCount < maxRetries) {
@@ -339,7 +418,7 @@ class GoogleDriveSyncManager {
             });
 
             const jsonData = response.data;
-            
+
             // Parse JSON with error handling
             let parsed;
             let isEncrypted = false;
@@ -416,11 +495,11 @@ class GoogleDriveSyncManager {
 
             // Categorize error types for better handling
             const isRetryableError = error.code === 429 || // Rate limit
-                                   error.code === 500 || // Server error
-                                   error.code === 502 || // Bad gateway
-                                   error.code === 503 || // Service unavailable
-                                   error.code === 504 || // Gateway timeout
-                                   (error.code >= 520 && error.code <= 527); // Cloudflare errors
+                error.code === 500 || // Server error
+                error.code === 502 || // Bad gateway
+                error.code === 503 || // Service unavailable
+                error.code === 504 || // Gateway timeout
+                (error.code >= 520 && error.code <= 527); // Cloudflare errors
 
             // Retry for transient errors
             if (isRetryableError && retryCount < maxRetries) {
@@ -470,7 +549,7 @@ class GoogleDriveSyncManager {
     }
 
     async sync(options = {}) {
-        let progressCallback = () => {};
+        let progressCallback = () => { };
         try {
             // Check if sync is already in progress BEFORE async initialization to prevent race conditions
             if (this.syncInProgress) {
@@ -486,7 +565,7 @@ class GoogleDriveSyncManager {
             console.log('[GoogleDriveSync] Starting sync process');
 
             // Progress callback support
-            progressCallback = typeof options.onProgress === 'function' ? options.onProgress : (() => {});
+            progressCallback = typeof options.onProgress === 'function' ? options.onProgress : (() => { });
 
             progressCallback({ status: 'initializing', message: 'Preparing sync...' });
 
@@ -524,11 +603,24 @@ class GoogleDriveSyncManager {
 
             let remoteData = null;
             let remoteChecksum = null;
+            let remoteModifiedTime = null; // Track for optimistic locking
 
             // Download remote data if it exists
             if (this.syncMetadata.remoteFileId) {
                 progressCallback({ status: 'downloading', message: 'Downloading remote data...' });
                 try {
+                    // Get remote file's modifiedTime for optimistic locking
+                    try {
+                        const fileInfo = await this.drive.files.get({
+                            fileId: this.syncMetadata.remoteFileId,
+                            fields: 'modifiedTime'
+                        });
+                        remoteModifiedTime = fileInfo.data.modifiedTime;
+                        console.log('[GoogleDriveSync] Remote file modifiedTime:', remoteModifiedTime);
+                    } catch (modifiedTimeError) {
+                        console.warn('[GoogleDriveSync] Could not get remote modifiedTime:', modifiedTimeError.message);
+                    }
+
                     const downloadResult = await this.downloadData();
                     remoteData = downloadResult.data;
                     remoteChecksum = downloadResult.checksum;
@@ -537,7 +629,8 @@ class GoogleDriveSyncManager {
                     console.log('[GoogleDriveSync] Remote data summary:', {
                         notesCount: Object.keys(remoteData.notes || {}).length,
                         conversationsCount: Object.keys(remoteData.ai_conversations || {}).length,
-                        checksum: remoteChecksum ? remoteChecksum.substring(0, 16) + '...' : 'none'
+                        checksum: remoteChecksum ? remoteChecksum.substring(0, 16) + '...' : 'none',
+                        syncVersion: remoteData._syncMeta?.syncVersion || 'none'
                     });
                 } catch (error) {
                     console.warn('[GoogleDriveSync] Could not download remote data:', error.message);
@@ -596,19 +689,80 @@ class GoogleDriveSyncManager {
                 //          treated as "deleted" because 8 AM < 8:30 AM (cloud's lastSync)
                 const internalLastSync = this.syncMetadata.lastSync ? new Date(this.syncMetadata.lastSync).getTime() : null;
                 const effectiveLastSync = internalLastSync ? new Date(internalLastSync).toISOString() : null;
-                
+
                 console.log('[GoogleDriveSync] Using device-specific lastSync:', effectiveLastSync);
                 console.log('[GoogleDriveSync] This prevents treating offline-created notes as deletions');
                 const conflictResult = await this.resolveConflicts(localData, remoteData, options.strategy || 'merge', effectiveLastSync);
 
                 if (conflictResult.resolved) {
-                    // Upload merged data
+                    // Upload merged data with version conflict detection and retry
                     progressCallback({ status: 'uploading', message: 'Uploading merged data...' });
                     console.log('[GoogleDriveSync] Uploading merged data after conflict resolution');
-                    await this.uploadData(conflictResult.mergedData);
+
+                    // =====================================================
+                    // OPTIMISTIC LOCKING: Upload with version check and retry on conflict
+                    // =====================================================
+                    const maxVersionRetries = 3;
+                    let versionRetryCount = 0;
+                    let uploadSuccess = false;
+                    let currentMergedData = conflictResult.mergedData;
+                    let currentRemoteModifiedTime = remoteModifiedTime;
+
+                    while (!uploadSuccess && versionRetryCount < maxVersionRetries) {
+                        try {
+                            await this.uploadData(currentMergedData, {
+                                expectedRemoteModifiedTime: currentRemoteModifiedTime,
+                                syncVersion: (remoteData?._syncMeta?.syncVersion || 0) + 1
+                            });
+                            uploadSuccess = true;
+                            console.log('[GoogleDriveSync] Upload successful on attempt', versionRetryCount + 1);
+
+                        } catch (uploadError) {
+                            if (uploadError.versionConflict) {
+                                versionRetryCount++;
+                                console.warn(`[GoogleDriveSync] Version conflict on attempt ${versionRetryCount}, retrying...`);
+
+                                if (versionRetryCount >= maxVersionRetries) {
+                                    console.error('[GoogleDriveSync] Max version conflict retries exceeded');
+                                    throw new Error('Sync conflict: another device is syncing. Please try again in a few seconds.');
+                                }
+
+                                // Exponential backoff before retry
+                                const backoffDelay = 1000 * Math.pow(2, versionRetryCount - 1);
+                                console.log(`[GoogleDriveSync] Waiting ${backoffDelay}ms before retry...`);
+                                await new Promise(resolve => setTimeout(resolve, backoffDelay));
+
+                                // Re-download remote data and re-merge
+                                progressCallback({ status: 'resolving_version_conflict', message: 'Another device synced, re-merging...' });
+
+                                // Get new remote modifiedTime
+                                const newFileInfo = await this.drive.files.get({
+                                    fileId: this.syncMetadata.remoteFileId,
+                                    fields: 'modifiedTime'
+                                });
+                                currentRemoteModifiedTime = newFileInfo.data.modifiedTime;
+
+                                // Re-download and re-merge
+                                const newDownloadResult = await this.downloadData();
+                                const newRemoteData = newDownloadResult.data;
+
+                                console.log('[GoogleDriveSync] Re-merging with new remote data (syncVersion:', newRemoteData._syncMeta?.syncVersion || 'none', ')');
+
+                                // Re-resolve conflicts with new remote data
+                                const newConflictResult = await this.resolveConflicts(localData, newRemoteData, options.strategy || 'merge', effectiveLastSync);
+                                currentMergedData = newConflictResult.mergedData;
+
+                            } else {
+                                // Non-version-conflict error, propagate
+                                throw uploadError;
+                            }
+                        }
+                    }
+
                     result.action = 'merge';
-                    result.mergedData = conflictResult.mergedData; // Include merged data in result
+                    result.mergedData = currentMergedData; // Include merged data in result
                     result.stats.uploaded = 1;
+                    result.stats.versionRetries = versionRetryCount;
                     result.success = true;
                 } else {
                     progressCallback({ status: 'conflict_detected', message: 'Manual conflict resolution needed' });
@@ -648,15 +802,15 @@ class GoogleDriveSyncManager {
     _formatSyncErrorMessage(error) {
         try {
             const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
-            
+
             if (!error) return t('settings.sync.syncFailedUnknown', 'Sync failed due to an unknown error');
             if (error.encryptionRequired) {
                 return t('settings.sync.syncFailedEncryptionRequired', 'Cloud data is encrypted. Enter your E2EE passphrase to continue.');
             }
-            
+
             // Network-related errors
             if (error.message && (
-                error.message.includes('Failed to fetch') || 
+                error.message.includes('Failed to fetch') ||
                 error.message.includes('NetworkError') ||
                 error.message.includes('ENOTFOUND') ||
                 error.message.includes('ETIMEDOUT') ||
@@ -664,7 +818,7 @@ class GoogleDriveSyncManager {
             )) {
                 return t('settings.sync.syncFailedNoInternet', 'No internet connection. Sync requires an active internet connection. Will retry when online.');
             }
-            
+
             const code = error.code || error.status || '';
             if (code === 404) return t('settings.sync.syncFailedNotFound', 'Remote backup not found on Google Drive.');
             if (code === 401 || code === 403) return t('settings.sync.syncFailedAccessDenied', 'Google Drive access denied. Please reconnect your account in Sync Settings.');
@@ -672,7 +826,7 @@ class GoogleDriveSyncManager {
             if (code === 500 || code === 502 || code === 503 || code === 504) {
                 return t('settings.sync.syncFailedServiceUnavailable', 'Google Drive service temporarily unavailable. Will retry automatically.');
             }
-            
+
             return t('settings.sync.syncFailedGeneric', `Sync failed: ${error.message || 'Unexpected error'}`, { error: error.message || 'Unexpected error' });
         } catch (_) {
             const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
@@ -734,13 +888,13 @@ class GoogleDriveSyncManager {
 
                     // Check if content actually differs (prevents false overwrites)
                     const contentChanged = JSON.stringify(localNote.content) !== JSON.stringify(remoteNote.content) ||
-                                         JSON.stringify(localNote.title) !== JSON.stringify(remoteNote.title);
+                        JSON.stringify(localNote.title) !== JSON.stringify(remoteNote.title);
 
                     // Check if collaboration data differs (important for share revocation)
                     const localCollaboration = localNote.collaboration || {};
                     const remoteCollaboration = remoteNote.collaboration || {};
                     const collaborationChanged = JSON.stringify(localCollaboration.google_drive_file_id) !== JSON.stringify(remoteCollaboration.google_drive_file_id) ||
-                                                JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
+                        JSON.stringify(localCollaboration.is_shared) !== JSON.stringify(remoteCollaboration.is_shared);
 
                     if (localModified > remoteModified) {
                         // Local is newer - keep local content but merge collaboration data if remote revoked
@@ -762,7 +916,7 @@ class GoogleDriveSyncManager {
                             // Both versions have changes since last sync - potential offline edit conflict
                             const localChangedSinceSync = localModified.getTime() > lastSyncTime;
                             const remoteChangedSinceSync = remoteModified.getTime() > lastSyncTime;
-                            
+
                             if (localChangedSinceSync && remoteChangedSinceSync) {
                                 // Both edited since last sync - this is a real conflict
                                 console.log('[GoogleDriveSync] Real conflict detected - both devices edited since last sync:', localNote.title);
@@ -774,7 +928,7 @@ class GoogleDriveSyncManager {
                                     remoteModified: remoteModified,
                                     reason: 'both_edited_offline'
                                 });
-                                
+
                                 // For safety, keep local content but merge collaboration data if remote revoked
                                 if (collaborationChanged && remoteCollaboration.google_drive_file_id === null && remoteCollaboration.is_shared === false) {
                                     console.log('[GoogleDriveSync] Merging collaboration revocation from remote (content conflict):', localNote.title);
@@ -785,7 +939,7 @@ class GoogleDriveSyncManager {
                                     mergedData.notes[noteId].collaboration.google_drive_file_id = null;
                                     mergedData.notes[noteId].collaboration.google_drive_share_link = null;
                                 }
-                                
+
                                 // Remote version is not lost - it's still in cloud
                                 console.log('[GoogleDriveSync] Keeping local version to prevent data loss');
                                 continue;
@@ -863,7 +1017,7 @@ class GoogleDriveSyncManager {
                 if (!mergedData.tags) {
                     mergedData.tags = {};
                 }
-                
+
                 // Get all tag IDs that are currently used in notes (local state)
                 const usedTagIds = new Set();
                 Object.values(mergedData.notes || {}).forEach(note => {
@@ -876,7 +1030,7 @@ class GoogleDriveSyncManager {
                         if (noteTag.tag_id) usedTagIds.add(noteTag.tag_id);
                     });
                 }
-                
+
                 // Only add remote tags that are actually used in notes or already exist locally
                 // This prevents re-adding tags that were intentionally deleted
                 for (const [tagId, remoteTag] of Object.entries(remoteData.tags)) {
@@ -893,9 +1047,9 @@ class GoogleDriveSyncManager {
                 if (!mergedData.note_tags) {
                     mergedData.note_tags = {};
                 }
-                
+
                 const existingNoteIds = new Set(Object.keys(mergedData.notes || {}));
-                
+
                 // Only add remote note_tags if the note still exists
                 for (const [noteTagKey, remoteNoteTag] of Object.entries(remoteData.note_tags)) {
                     if (existingNoteIds.has(remoteNoteTag.note_id)) {
@@ -915,9 +1069,9 @@ class GoogleDriveSyncManager {
                 if (!mergedData.ai_conversations) {
                     mergedData.ai_conversations = {};
                 }
-                
+
                 const existingNoteIds = new Set(Object.keys(mergedData.notes || {}));
-                
+
                 // Only add remote conversations if:
                 // 1. The conversation doesn't exist locally (new from remote)
                 // 2. The associated note still exists
@@ -1163,7 +1317,7 @@ class GoogleDriveSyncManager {
     async uploadMediaFile(fileName, fileData, mtime = null) {
         try {
             const mediaFolderId = await this.getMediaFolderId();
-            
+
             // Convert Buffer to Stream (Google Drive API expects a stream)
             const { Readable } = require('stream');
             const bufferStream = Readable.from(fileData);
@@ -1179,16 +1333,16 @@ class GoogleDriveSyncManager {
                 // File exists - update it
                 const fileId = existing.data.files[0].id;
                 const updateStream = Readable.from(fileData);
-                
+
                 const updateMetadata = {
                     name: fileName
                 };
-                
+
                 // Set modification time if provided
                 if (mtime) {
                     updateMetadata.modifiedTime = new Date(mtime).toISOString();
                 }
-                
+
                 await this.drive.files.update({
                     fileId: fileId,
                     resource: updateMetadata,
@@ -1204,7 +1358,7 @@ class GoogleDriveSyncManager {
                     name: fileName,
                     parents: [mediaFolderId]
                 };
-                
+
                 // Set modification time if provided
                 if (mtime) {
                     fileMetadata.modifiedTime = new Date(mtime).toISOString();
@@ -1579,7 +1733,7 @@ class GoogleDriveSyncManager {
             // Check if note is already shared and update existing file
             let fileId = null;
             let isUpdate = false;
-            
+
             if (note.collaboration && note.collaboration.google_drive_file_id) {
                 fileId = note.collaboration.google_drive_file_id;
                 isUpdate = true;
@@ -1593,10 +1747,10 @@ class GoogleDriveSyncManager {
 
             if (mediaMatches && mediaMatches.length > 0) {
                 console.log(`[GoogleDriveSync] Found ${mediaMatches.length} media files to upload`);
-                
+
                 for (const mediaUrl of mediaMatches) {
                     const mediaFileId = mediaUrl.replace('cognotez-media://', '');
-                    
+
                     try {
                         // Read media file from filesystem
                         let fileData = null;
@@ -1609,7 +1763,7 @@ class GoogleDriveSyncManager {
                             if (mediaRef) {
                                 fileName = mediaRef.name || mediaFileId;
                                 mimeType = mediaRef.type || 'application/octet-stream';
-                                
+
                                 if (mediaRef.storageType === 'filesystem' && mediaRef.path) {
                                     const electron = require('electron');
                                     const fileDataObj = await electron.ipcRenderer.invoke('get-media-file', mediaRef.path);
@@ -1622,17 +1776,17 @@ class GoogleDriveSyncManager {
                         } else {
                             // Main process - use direct file access
                             const mediaDir = await this.getMediaDirectory();
-                            
+
                             // Try to find the file (could have extension)
                             try {
                                 const files = await fs.readdir(mediaDir);
                                 const matchingFile = files.find(file => file.startsWith(mediaFileId));
-                                
+
                                 if (matchingFile) {
                                     const filePath = path.join(mediaDir, matchingFile);
                                     fileData = await fs.readFile(filePath);
                                     fileName = matchingFile;
-                                    
+
                                     // Try to determine MIME type from extension
                                     const ext = path.extname(matchingFile).toLowerCase();
                                     const mimeTypes = {
@@ -1670,7 +1824,7 @@ class GoogleDriveSyncManager {
                                 mediaDriveFileId = existingMedia.data.files[0].id;
                                 const { Readable } = require('stream');
                                 const bufferStream = Readable.from(fileData);
-                                
+
                                 await this.drive.files.update({
                                     fileId: mediaDriveFileId,
                                     media: {
@@ -1679,26 +1833,26 @@ class GoogleDriveSyncManager {
                                     },
                                     fields: 'id,webContentLink'
                                 });
-                                
+
                                 // Get updated file info
                                 const updatedFile = await this.drive.files.get({
                                     fileId: mediaDriveFileId,
                                     fields: 'webContentLink'
                                 });
                                 mediaDriveUrl = updatedFile.data.webContentLink;
-                                
+
                                 console.log(`[GoogleDriveSync] Updated media file: ${fileName}`);
                             } else {
                                 // Create new file
                                 const { Readable } = require('stream');
                                 const bufferStream = Readable.from(fileData);
-                                
+
                                 const mediaFileMetadata = {
                                     name: fileName,
                                     parents: [shareFolderId],
                                     description: `Media file from shared note: ${note.title}`
                                 };
-                                
+
                                 const createResponse = await this.drive.files.create({
                                     resource: mediaFileMetadata,
                                     media: {
@@ -1707,10 +1861,10 @@ class GoogleDriveSyncManager {
                                     },
                                     fields: 'id,webContentLink'
                                 });
-                                
+
                                 mediaDriveFileId = createResponse.data.id;
                                 mediaDriveUrl = createResponse.data.webContentLink;
-                                
+
                                 // Make media file accessible to anyone with the link (same permissions as note)
                                 await this.drive.permissions.create({
                                     fileId: mediaDriveFileId,
@@ -1719,7 +1873,7 @@ class GoogleDriveSyncManager {
                                         type: 'anyone'
                                     }
                                 });
-                                
+
                                 console.log(`[GoogleDriveSync] Uploaded media file: ${fileName}`);
                             }
 
@@ -1742,7 +1896,7 @@ class GoogleDriveSyncManager {
                 const tagNames = [];
                 for (const tagId of note.tags) {
                     let tagName = tagId; // Fallback to ID if name not found
-                    
+
                     // Try to get tag name from database (main process)
                     if (typeof global !== 'undefined' && global.databaseManager && global.databaseManager.data && global.databaseManager.data.tags) {
                         const tag = global.databaseManager.data.tags[tagId];
@@ -1750,7 +1904,7 @@ class GoogleDriveSyncManager {
                             tagName = tag.name;
                         }
                     }
-                    
+
                     tagNames.push(tagName);
                 }
                 noteContent += `**Tags:** ${tagNames.join(', ')}\n\n`;
@@ -1758,13 +1912,13 @@ class GoogleDriveSyncManager {
             noteContent += `**Created:** ${new Date(note.created_at).toLocaleString()}\n`;
             noteContent += `**Last Updated:** ${new Date(note.updated_at).toLocaleString()}\n\n`;
             noteContent += `---\n\n`;
-            
+
             // Replace cognotez-media:// URLs with Google Drive URLs
             let processedContent = note.content || '';
             for (const [cognotezUrl, driveUrl] of mediaFileMap.entries()) {
                 processedContent = processedContent.replace(new RegExp(cognotezUrl.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'g'), driveUrl);
             }
-            
+
             noteContent += processedContent;
 
             const fileName = `${note.title.replace(/[^a-zA-Z0-9\s]/g, '_').substring(0, 50)}.md`;
@@ -1775,27 +1929,27 @@ class GoogleDriveSyncManager {
             };
 
             let response;
-            
+
             // Get share folder ID for placing the note file
             const shareFolderId = await this.getShareFolderId();
-            
+
             if (isUpdate) {
                 // Update existing file
                 const updateMetadata = {
                     name: fileName,
                     description: `Shared note: ${note.title}`
                 };
-                
+
                 // Check if file is already in the share folder, if not, move it
                 try {
                     const fileInfo = await this.drive.files.get({
                         fileId: fileId,
                         fields: 'parents'
                     });
-                    
+
                     const currentParents = fileInfo.data.parents || [];
                     const isInShareFolder = currentParents.includes(shareFolderId);
-                    
+
                     if (!isInShareFolder) {
                         // Move file to share folder
                         // Remove old parent and add share folder as parent
@@ -1812,7 +1966,7 @@ class GoogleDriveSyncManager {
                     console.warn('[GoogleDriveSync] Could not check/move file to share folder:', error.message);
                     // Continue with update even if move fails
                 }
-                
+
                 response = await this.drive.files.update({
                     fileId: fileId,
                     resource: updateMetadata,
@@ -1826,13 +1980,13 @@ class GoogleDriveSyncManager {
                     parents: [shareFolderId],
                     description: `Shared note: ${note.title}`
                 };
-                
+
                 response = await this.drive.files.create({
                     resource: fileMetadata,
                     media: media,
                     fields: 'id,webViewLink,webContentLink'
                 });
-                
+
                 fileId = response.data.id;
             }
 
@@ -1908,7 +2062,7 @@ class GoogleDriveSyncManager {
 
             // Update or create permission
             const role = permissions.edit ? 'writer' : (permissions.comment ? 'commenter' : 'reader');
-            
+
             if (email) {
                 // Find existing permission for this email
                 const existingPerm = existingPermissions.data.permissions.find(
@@ -1978,35 +2132,35 @@ class GoogleDriveSyncManager {
             if (note && note.content) {
                 const mediaUrlPattern = /cognotez-media:\/\/([a-z0-9]+)/gi;
                 const mediaMatches = note.content.match(mediaUrlPattern);
-                
+
                 if (mediaMatches && mediaMatches.length > 0) {
                     console.log(`[GoogleDriveSync] Found ${mediaMatches.length} media files to delete`);
-                    
+
                     const shareFolderId = await this.getShareFolderId();
                     const mediaFileIds = new Set();
-                    
+
                     // Extract unique media file IDs
                     for (const mediaUrl of mediaMatches) {
                         const mediaFileId = mediaUrl.replace('cognotez-media://', '');
                         mediaFileIds.add(mediaFileId);
                     }
-                    
+
                     // Get list of files in share folder
                     const shareFiles = await this.drive.files.list({
                         q: `'${shareFolderId}' in parents and trashed=false`,
                         fields: 'files(id, name)',
                         spaces: 'drive'
                     });
-                    
+
                     // Find and delete matching media files
                     let deletedCount = 0;
                     for (const file of shareFiles.data.files || []) {
                         // Check if file name starts with any of the media file IDs
                         // Files are stored as "fileId" or "fileId.extension"
-                        const matchesMediaId = Array.from(mediaFileIds).some(id => 
+                        const matchesMediaId = Array.from(mediaFileIds).some(id =>
                             file.name === id || file.name.startsWith(id + '.')
                         );
-                        
+
                         if (matchesMediaId) {
                             try {
                                 await this.drive.files.delete({
@@ -2022,7 +2176,7 @@ class GoogleDriveSyncManager {
                             }
                         }
                     }
-                    
+
                     console.log(`[GoogleDriveSync] Deleted ${deletedCount} media files from share folder`);
                 }
             }
@@ -2042,7 +2196,7 @@ class GoogleDriveSyncManager {
                 console.log('[GoogleDriveSync] File already deleted (likely revoked on another device):', fileId);
                 return true; // Return success since the goal (file not shared) is already achieved
             }
-            
+
             console.error('[GoogleDriveSync] Failed to delete shared note:', error);
             throw error;
         }

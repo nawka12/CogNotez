@@ -44,7 +44,9 @@ class DatabaseManager {
                 remoteChecksum: null,
                 syncConflicts: [],
                 autoSync: false,
-                syncInterval: 300000 // 5 minutes in milliseconds
+                syncInterval: 300000, // 5 minutes in milliseconds
+                syncVersion: 0, // Incremented on each upload for optimistic locking
+                remoteSyncVersion: 0 // Last seen remote version
             },
             metadata: {
                 version: '1.0',
@@ -939,7 +941,40 @@ class DatabaseManager {
         if (syncData.localChecksum) this.data.sync.localChecksum = syncData.localChecksum;
         if (syncData.remoteChecksum) this.data.sync.remoteChecksum = syncData.remoteChecksum;
         if (typeof syncData.syncOnStartup === 'boolean') this.data.sync.syncOnStartup = syncData.syncOnStartup;
+        if (typeof syncData.syncVersion === 'number') this.data.sync.syncVersion = syncData.syncVersion;
+        if (typeof syncData.remoteSyncVersion === 'number') this.data.sync.remoteSyncVersion = syncData.remoteSyncVersion;
         this.saveToLocalStorage();
+    }
+
+    /**
+     * Increment local syncVersion and return the new value.
+     * Used before uploading to ensure each upload has a unique version.
+     */
+    incrementSyncVersion() {
+        // Ensure sync structure exists
+        this.ensureDataStructure();
+        if (typeof this.data.sync.syncVersion !== 'number') {
+            this.data.sync.syncVersion = 0;
+        }
+        this.data.sync.syncVersion += 1;
+        this.saveToLocalStorage();
+        return this.data.sync.syncVersion;
+    }
+
+    /**
+     * Get the current sync version.
+     */
+    getSyncVersion() {
+        this.ensureDataStructure();
+        return this.data.sync.syncVersion || 0;
+    }
+
+    /**
+     * Get the last known remote sync version.
+     */
+    getRemoteSyncVersion() {
+        this.ensureDataStructure();
+        return this.data.sync.remoteSyncVersion || 0;
     }
 
     getSyncMetadata() {
