@@ -262,14 +262,17 @@ class GoogleDriveSyncManager {
             }
 
             // Include syncVersion in the data being uploaded
+            const newSyncVersion = options.syncVersion || (data._syncMeta?.syncVersion || 0) + 1;
             const dataWithVersion = {
                 ...data,
                 _syncMeta: {
-                    syncVersion: options.syncVersion || (data._syncMeta?.syncVersion || 0) + 1,
+                    syncVersion: newSyncVersion,
                     uploadedAt: new Date().toISOString(),
                     uploadedBy: this._getDeviceIdentifier()
                 }
             };
+            
+            console.log('[GoogleDriveSync] Uploading with syncVersion:', newSyncVersion);
 
             // Encrypt data if encryption is enabled
             let dataToUpload = dataWithVersion;
@@ -279,7 +282,8 @@ class GoogleDriveSyncManager {
                 }
 
                 try {
-                    dataToUpload = encryptionManager.encryptData(data, this.encryptionPassphrase, {
+                    // IMPORTANT: Encrypt dataWithVersion (not data) to include _syncMeta
+                    dataToUpload = encryptionManager.encryptData(dataWithVersion, this.encryptionPassphrase, {
                         saltBase64: this.encryptionSalt,
                         iterations: this.encryptionIterations
                     });
@@ -341,13 +345,15 @@ class GoogleDriveSyncManager {
             console.log('[GoogleDriveSync] File ID:', response.data.id);
             console.log('[GoogleDriveSync] File size:', response.data.size, 'bytes');
             console.log('[GoogleDriveSync] Checksum:', checksum.substring(0, 16) + '...');
+            console.log('[GoogleDriveSync] Uploaded syncVersion:', newSyncVersion);
 
             return {
                 success: true,
                 fileId: response.data.id,
                 checksum: checksum,
                 size: response.data.size,
-                modifiedTime: response.data.modifiedTime
+                modifiedTime: response.data.modifiedTime,
+                syncVersion: newSyncVersion
             };
 
         } catch (error) {
@@ -652,12 +658,16 @@ class GoogleDriveSyncManager {
             progressCallback({ status: 'analyzing_changes', message: 'Analyzing data changes...' });
             console.log('[GoogleDriveSync] Comparing data - remoteData exists:', !!remoteData);
 
+            // Track the syncVersion that was uploaded (for persistence)
+            let uploadedSyncVersion = null;
+            
             if (!remoteData) {
                 // First time sync - upload local data
                 progressCallback({ status: 'uploading', message: 'Uploading data to Google Drive...' });
                 console.log('[GoogleDriveSync] First time sync - uploading local data');
                 console.log('[GoogleDriveSync] Uploading data with', Object.keys(localData.notes || {}).length, 'notes');
-                await this.uploadData(localData);
+                const uploadResult = await this.uploadData(localData);
+                uploadedSyncVersion = uploadResult.syncVersion;
                 result.action = 'upload';
                 result.stats.uploaded = 1;
                 result.success = true;
@@ -687,12 +697,26 @@ class GoogleDriveSyncManager {
                 //          Device B syncs at 8:30 AM
                 //          Device A syncs at 9 AM - note created at 8 AM would be wrongly
                 //          treated as "deleted" because 8 AM < 8:30 AM (cloud's lastSync)
-                const internalLastSync = this.syncMetadata.lastSync ? new Date(this.syncMetadata.lastSync).getTime() : null;
+                // 
+                // FIX: Also use options.lastSync (from database) if internal lastSync is null
+                // This handles app restart scenarios where this.syncMetadata is reset
+                const internalLastSync = this.syncMetadata.lastSync 
+                    ? new Date(this.syncMetadata.lastSync).getTime() 
+                    : (options.lastSync ? new Date(options.lastSync).getTime() : null);
                 const effectiveLastSync = internalLastSync ? new Date(internalLastSync).toISOString() : null;
+                
+                // Track remote syncVersion for optimistic locking
+                const remoteSyncVersion = remoteData?._syncMeta?.syncVersion || 0;
+                // Get last seen remote syncVersion from options (passed from database)
+                const lastSeenRemoteSyncVersion = options.lastSeenRemoteSyncVersion || 0;
 
                 console.log('[GoogleDriveSync] Using device-specific lastSync:', effectiveLastSync);
+                console.log('[GoogleDriveSync] Remote syncVersion:', remoteSyncVersion, 'Last seen:', lastSeenRemoteSyncVersion);
                 console.log('[GoogleDriveSync] This prevents treating offline-created notes as deletions');
-                const conflictResult = await this.resolveConflicts(localData, remoteData, options.strategy || 'merge', effectiveLastSync);
+                const conflictResult = await this.resolveConflicts(localData, remoteData, options.strategy || 'merge', effectiveLastSync, {
+                    remoteSyncVersion: remoteSyncVersion,
+                    lastSeenRemoteSyncVersion: lastSeenRemoteSyncVersion
+                });
 
                 if (conflictResult.resolved) {
                     // Upload merged data with version conflict detection and retry
@@ -707,15 +731,18 @@ class GoogleDriveSyncManager {
                     let uploadSuccess = false;
                     let currentMergedData = conflictResult.mergedData;
                     let currentRemoteModifiedTime = remoteModifiedTime;
+                    let currentRemoteSyncVersion = remoteSyncVersion;
 
                     while (!uploadSuccess && versionRetryCount < maxVersionRetries) {
                         try {
-                            await this.uploadData(currentMergedData, {
+                            const nextSyncVersion = currentRemoteSyncVersion + 1;
+                            const uploadResult = await this.uploadData(currentMergedData, {
                                 expectedRemoteModifiedTime: currentRemoteModifiedTime,
-                                syncVersion: (remoteData?._syncMeta?.syncVersion || 0) + 1
+                                syncVersion: nextSyncVersion
                             });
+                            uploadedSyncVersion = uploadResult.syncVersion;
                             uploadSuccess = true;
-                            console.log('[GoogleDriveSync] Upload successful on attempt', versionRetryCount + 1);
+                            console.log('[GoogleDriveSync] Upload successful on attempt', versionRetryCount + 1, 'syncVersion:', uploadedSyncVersion);
 
                         } catch (uploadError) {
                             if (uploadError.versionConflict) {
@@ -746,10 +773,16 @@ class GoogleDriveSyncManager {
                                 const newDownloadResult = await this.downloadData();
                                 const newRemoteData = newDownloadResult.data;
 
-                                console.log('[GoogleDriveSync] Re-merging with new remote data (syncVersion:', newRemoteData._syncMeta?.syncVersion || 'none', ')');
+                                const newRemoteSyncVersion = newRemoteData._syncMeta?.syncVersion || 0;
+                                currentRemoteSyncVersion = newRemoteSyncVersion; // Update for next retry
+                                console.log('[GoogleDriveSync] Re-merging with new remote data (syncVersion:', newRemoteSyncVersion, ')');
 
                                 // Re-resolve conflicts with new remote data
-                                const newConflictResult = await this.resolveConflicts(localData, newRemoteData, options.strategy || 'merge', effectiveLastSync);
+                                // Use the NEW remote syncVersion for the retry
+                                const newConflictResult = await this.resolveConflicts(localData, newRemoteData, options.strategy || 'merge', effectiveLastSync, {
+                                    remoteSyncVersion: newRemoteSyncVersion,
+                                    lastSeenRemoteSyncVersion: lastSeenRemoteSyncVersion
+                                });
                                 currentMergedData = newConflictResult.mergedData;
 
                             } else {
@@ -776,6 +809,23 @@ class GoogleDriveSyncManager {
             // Update sync metadata
             this.syncMetadata.lastSync = new Date().toISOString();
             this.syncMetadata.localChecksum = localChecksum;
+            
+            // Track remote syncVersion for future conflict detection
+            // Use uploadedSyncVersion if we uploaded, otherwise use downloaded remoteData's syncVersion
+            const finalRemoteSyncVersion = uploadedSyncVersion || remoteData?._syncMeta?.syncVersion || 0;
+            
+            // Include sync metadata in result for database persistence
+            // This ensures lastSync and remoteSyncVersion are saved across app restarts
+            result.syncMetadata = {
+                lastSync: this.syncMetadata.lastSync,
+                localChecksum: localChecksum,
+                remoteChecksum: this.syncMetadata.remoteChecksum,
+                remoteFileId: this.syncMetadata.remoteFileId,
+                remoteSyncVersion: finalRemoteSyncVersion
+            };
+            
+            console.log('[GoogleDriveSync] Final remoteSyncVersion to persist:', finalRemoteSyncVersion, 
+                '(uploaded:', uploadedSyncVersion, ', downloaded:', remoteData?._syncMeta?.syncVersion, ')');
 
             progressCallback({
                 status: 'completed',
@@ -784,6 +834,7 @@ class GoogleDriveSyncManager {
             });
 
             console.log('[GoogleDriveSync] Sync completed:', result);
+            console.log('[GoogleDriveSync] Sync metadata to persist:', result.syncMetadata);
             return result;
 
         } catch (error) {
@@ -834,12 +885,19 @@ class GoogleDriveSyncManager {
         }
     }
 
-    async resolveConflicts(localData, remoteData, strategy = 'merge', lastSyncIso = null) {
+    async resolveConflicts(localData, remoteData, strategy = 'merge', lastSyncIso = null, options = {}) {
         const conflicts = [];
         const mergedData = JSON.parse(JSON.stringify(localData)); // Deep clone
+        
+        // Extract syncVersion info for smarter deletion inference
+        const remoteSyncVersion = options.remoteSyncVersion || remoteData?._syncMeta?.syncVersion || 0;
+        const lastSeenRemoteSyncVersion = options.lastSeenRemoteSyncVersion || 0;
+        const isNewRemoteVersion = remoteSyncVersion > lastSeenRemoteSyncVersion;
 
         console.log('[GoogleDriveSync] Starting conflict resolution with strategy:', strategy);
         console.log('[GoogleDriveSync] lastSyncIso:', lastSyncIso);
+        console.log('[GoogleDriveSync] remoteSyncVersion:', remoteSyncVersion, 'lastSeenRemoteSyncVersion:', lastSeenRemoteSyncVersion);
+        console.log('[GoogleDriveSync] isNewRemoteVersion:', isNewRemoteVersion);
         console.log('[GoogleDriveSync] Local notes count:', Object.keys(localData.notes || {}).length);
         console.log('[GoogleDriveSync] Remote notes count:', Object.keys(remoteData.notes || {}).length);
 
@@ -856,12 +914,33 @@ class GoogleDriveSyncManager {
                 const remoteNote = remoteNotes[noteId];
 
                 if (!localNote && remoteNote) {
-                    // Note missing locally. If we have a lastSync and the remote wasn't
-                    // modified after lastSync, treat this as a local deletion and do NOT re-add.
+                    // Note missing locally but exists in remote.
+                    // 
+                    // IMPROVED DELETION INFERENCE:
+                    // Old logic: If remoteModifiedTime <= lastSyncTime, treat as local deletion.
+                    // Problem: This fails when Device A creates a note offline at T2, Device B syncs at T3,
+                    //          then Device A syncs. Device B would see remoteModifiedTime=T2 <= lastSync=T3
+                    //          and wrongly delete the note.
+                    //
+                    // New logic: Use syncVersion as primary indicator.
+                    // - If remote syncVersion > lastSeenRemoteSyncVersion, the remote has new data we haven't seen
+                    // - In this case, notes in remote that we don't have locally are NEW, not deleted
+                    // - Only if we've seen this exact syncVersion before AND remoteModifiedTime <= lastSyncTime,
+                    //   can we safely assume it was deleted locally
+                    //
                     const remoteModifiedTime = new Date(remoteNote.updated_at || remoteNote.modified || remoteNote.created_at).getTime();
                     console.log(`[GoogleDriveSync] Note ${noteId} missing locally, remote modified: ${new Date(remoteModifiedTime).toISOString()}, lastSync: ${lastSyncTime ? new Date(lastSyncTime).toISOString() : 'none'}`);
+                    
+                    // If remote has a new syncVersion we haven't seen, treat missing local notes as NEW from remote
+                    if (isNewRemoteVersion) {
+                        console.log(`[GoogleDriveSync] Remote syncVersion is newer (${remoteSyncVersion} > ${lastSeenRemoteSyncVersion}) - treating as new remote note`);
+                        mergedData.notes[noteId] = remoteNote;
+                        continue;
+                    }
+                    
+                    // Only if we've seen this syncVersion before, use timestamp-based deletion inference
                     if (lastSyncTime && remoteModifiedTime <= lastSyncTime) {
-                        console.log(`[GoogleDriveSync] Treating as local deletion - omitting from merged data`);
+                        console.log(`[GoogleDriveSync] Same syncVersion and remoteModified <= lastSync - treating as local deletion`);
                         // Respect local deletion: do nothing (omit from merged)
                         continue;
                     }

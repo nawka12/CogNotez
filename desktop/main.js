@@ -307,8 +307,10 @@ async function performSyncBeforeClose() {
     const localData = global.databaseManager.exportDataForSync();
     const dbSyncMeta = global.databaseManager.getSyncMetadata();
     const lastSyncToUse = dbSyncMeta && dbSyncMeta.lastSync ? dbSyncMeta.lastSync : null;
+    const lastSeenRemoteSyncVersion = dbSyncMeta.remoteSyncVersion || 0;
 
     console.log('[Main] Performing sync before close...');
+    console.log('[Main] Using lastSync:', lastSyncToUse, 'lastSeenRemoteSyncVersion:', lastSeenRemoteSyncVersion);
 
     // Show sync progress to user (if mainWindow still exists)
     if (mainWindow && mainWindow.webContents) {
@@ -322,7 +324,8 @@ async function performSyncBeforeClose() {
     const syncResult = await global.googleDriveSyncManager.sync({
       localData: localData.data,
       strategy: 'merge',
-      lastSync: lastSyncToUse
+      lastSync: lastSyncToUse,
+      lastSeenRemoteSyncVersion: lastSeenRemoteSyncVersion
     });
 
     // Update sync status
@@ -334,12 +337,20 @@ async function performSyncBeforeClose() {
     }
 
     if (syncResult.success) {
-      // Update sync metadata in database
-      global.databaseManager.updateSyncMetadata({
-        lastSync: new Date().toISOString(),
-        lastSyncVersion: localData.data.metadata.version,
-        localChecksum: localData.checksum
-      });
+      // Update sync metadata in database - include remoteSyncVersion for future conflict detection
+      const syncMetaToSave = {
+        lastSync: syncResult.syncMetadata?.lastSync || new Date().toISOString(),
+        lastSyncVersion: localData.data.metadata?.version || '1.0',
+        localChecksum: syncResult.syncMetadata?.localChecksum || localData.checksum
+      };
+      
+      // Persist remoteSyncVersion so we can detect new remote versions on next sync
+      if (typeof syncResult.syncMetadata?.remoteSyncVersion === 'number') {
+        syncMetaToSave.remoteSyncVersion = syncResult.syncMetadata.remoteSyncVersion;
+        console.log('[Main] Persisting remoteSyncVersion (before close):', syncMetaToSave.remoteSyncVersion);
+      }
+      
+      global.databaseManager.updateSyncMetadata(syncMetaToSave);
 
       // Note: The sync manager already handles downloading and applying data
       // for 'download' and 'merge' actions, so no additional import is needed here
@@ -1134,13 +1145,16 @@ if (ipcMain) {
       // Perform sync - use lastSync from renderer if provided, otherwise from main process DB
       const dbSyncMeta = global.databaseManager ? global.databaseManager.getSyncMetadata() : {};
       const lastSyncToUse = options.lastSync || (dbSyncMeta && dbSyncMeta.lastSync ? dbSyncMeta.lastSync : null);
-      console.log('[Sync] Using lastSync:', lastSyncToUse);
+      // Get last seen remote syncVersion for improved deletion inference
+      const lastSeenRemoteSyncVersion = dbSyncMeta.remoteSyncVersion || 0;
+      console.log('[Sync] Using lastSync:', lastSyncToUse, 'lastSeenRemoteSyncVersion:', lastSeenRemoteSyncVersion);
       let syncResult;
       try {
         syncResult = await global.googleDriveSyncManager.sync({
           localData: localData.data,
           strategy: options.strategy || 'merge',
-          lastSync: lastSyncToUse
+          lastSync: lastSyncToUse,
+          lastSeenRemoteSyncVersion: lastSeenRemoteSyncVersion
         });
       } catch (error) {
         if (error && error.encryptionRequired) {
@@ -1164,12 +1178,22 @@ if (ipcMain) {
       }
 
       if (syncResult.success) {
-        // Update sync metadata in database
-        global.databaseManager.updateSyncMetadata({
-          lastSync: new Date().toISOString(),
-          lastSyncVersion: localData.data.metadata.version,
-          localChecksum: localData.checksum
-        });
+        // Update sync metadata in database - include remoteSyncVersion for future conflict detection
+        const syncMetaToSave = {
+          lastSync: syncResult.syncMetadata?.lastSync || new Date().toISOString(),
+          lastSyncVersion: localData.data.metadata?.version || '1.0',
+          localChecksum: syncResult.syncMetadata?.localChecksum || localData.checksum,
+          remoteChecksum: syncResult.syncMetadata?.remoteChecksum,
+          remoteFileId: syncResult.syncMetadata?.remoteFileId
+        };
+        
+        // Persist remoteSyncVersion so we can detect new remote versions on next sync
+        if (typeof syncResult.syncMetadata?.remoteSyncVersion === 'number') {
+          syncMetaToSave.remoteSyncVersion = syncResult.syncMetadata.remoteSyncVersion;
+          console.log('[Sync] Persisting remoteSyncVersion:', syncMetaToSave.remoteSyncVersion);
+        }
+        
+        global.databaseManager.updateSyncMetadata(syncMetaToSave);
 
         // If we downloaded data, apply it
         if (syncResult.action === 'download' && syncResult.remoteData) {
@@ -1252,12 +1276,26 @@ if (ipcMain) {
       const uploadResult = await global.googleDriveSyncManager.uploadData(localData.data);
 
       if (uploadResult.success) {
+        const now = new Date().toISOString();
+        const uploadedSyncVersion = uploadResult.syncVersion || 0;
+        
         global.databaseManager.updateSyncMetadata({
-          lastSync: new Date().toISOString(),
-          lastSyncVersion: localData.data.metadata.version,
+          lastSync: now,
+          lastSyncVersion: localData.data.metadata?.version || '1.0',
           remoteFileId: uploadResult.fileId,
-          localChecksum: localData.checksum
+          localChecksum: localData.checksum,
+          remoteSyncVersion: uploadedSyncVersion
         });
+        
+        console.log('[Sync] Upload completed, persisting remoteSyncVersion:', uploadedSyncVersion);
+        
+        // Add syncMetadata to result for renderer persistence
+        uploadResult.syncMetadata = {
+          lastSync: now,
+          localChecksum: localData.checksum,
+          remoteFileId: uploadResult.fileId,
+          remoteSyncVersion: uploadedSyncVersion
+        };
       }
 
       // Notify renderer process that upload completed successfully

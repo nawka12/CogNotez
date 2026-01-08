@@ -1,7 +1,7 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 
-![Version](https://img.shields.io/badge/version-2.3.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.4.1-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -268,7 +268,14 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.3.1 (Current)
+### v2.4.1 (Current)
+- Fixed Google Drive sync edge cases causing notes to disappear on multi-device setups
+- Implemented proper syncVersion tracking for optimistic locking during sync
+- Fixed deletion inference logic to not falsely delete notes created offline on other devices
+- Fixed encryption not preserving sync metadata (_syncMeta) during upload
+- Improved sync metadata persistence across app restarts
+
+### v2.3.1
 - Fixed bug regarding malformed HTML formatting
 - Removed favorite functionality from notes management, streamlining the user experience
 - Code cleanup and improvements

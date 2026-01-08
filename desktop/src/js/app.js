@@ -6500,6 +6500,13 @@ Please provide a helpful response based on the note content and conversation his
         try {
             console.log('[Sync] Sync completed, refreshing UI...');
 
+            // Persist sync metadata to renderer's database for future syncs
+            // This ensures lastSync and remoteSyncVersion survive across sessions
+            if (syncResult && syncResult.success && syncResult.syncMetadata && this.notesManager && this.notesManager.db) {
+                console.log('[Sync] Persisting sync metadata to renderer database:', syncResult.syncMetadata);
+                this.notesManager.db.updateSyncMetadata(syncResult.syncMetadata);
+            }
+
             // Refresh notes list
             await this.loadNotes();
 
@@ -6917,8 +6924,10 @@ Please provide a helpful response based on the note content and conversation his
                 });
             }
 
-            const lastSync = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata().lastSync : null;
-            const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync });
+            const syncMetadata = (this.notesManager && this.notesManager.db) ? this.notesManager.db.getSyncMetadata() : {};
+            const lastSync = syncMetadata.lastSync || null;
+            const lastSeenRemoteSyncVersion = syncMetadata.remoteSyncVersion || 0;
+            const result = await this.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync, lastSeenRemoteSyncVersion });
 
             if (result.success) {
                 // Success notification handled by sync-completed event

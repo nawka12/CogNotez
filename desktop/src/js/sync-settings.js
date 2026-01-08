@@ -494,8 +494,10 @@ async function initializeModalSyncHandlers(app, modal) {
                     localChecksum = exportResult.checksum;
                 }
 
-                const lastSync = (app.notesManager && app.notesManager.db) ? app.notesManager.db.getSyncMetadata().lastSync : null;
-                const result = await app.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync });
+                const syncMetadata = (app.notesManager && app.notesManager.db) ? app.notesManager.db.getSyncMetadata() : {};
+                const lastSync = syncMetadata.lastSync || null;
+                const lastSeenRemoteSyncVersion = syncMetadata.remoteSyncVersion || 0;
+                const result = await app.backendAPI.syncWithGoogleDrive({ localData, localChecksum, lastSync, lastSeenRemoteSyncVersion });
 
                 if (result.success) {
                     // Success notification handled by sync-completed event
