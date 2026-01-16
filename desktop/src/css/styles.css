@@ -7,7 +7,7 @@
 
 /* Modern Font Stack */
 body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'SF Pro Display', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
     font-size: var(--font-size-base);
     line-height: var(--line-height-normal);
     overflow: hidden;

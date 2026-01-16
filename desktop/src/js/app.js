@@ -6624,7 +6624,7 @@ Please provide a helpful response based on the note content and conversation his
         } else if (this.syncStatus.isAuthenticated) {
             if (contentInSync) {
                 syncBtn.classList.add('connected');
-                icon.className = 'fas fa-cloud-check';
+                icon.className = 'fas fa-cloud';
                 text.textContent = t('settings.sync.statusConnected', 'Synced');
                 syncBtn.disabled = false;
                 syncBtn.title = t('settings.sync.statusConnectedTooltip', 'In sync - Click to sync manually');

@@ -1,6 +1,6 @@
 {
   "name": "cognotez",
-  "version": "2.4.1",
+  "version": "2.4.2",
   "description": "CogNotez - An AI-powered note app with local LLM integration",
   "main": "main.js",
   "scripts": {
