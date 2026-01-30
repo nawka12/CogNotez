@@ -126,6 +126,9 @@ class GoogleDriveService extends ChangeNotifier {
   static const String _e2eeSaltKey = 'e2ee_salt';
   static const String _e2eePassphraseKey = 'e2ee_passphrase';
   static const String _lastSyncKey = 'last_sync_timestamp';
+  static const String _syncVersionKey = 'sync_version';
+  static const String _remoteSyncVersionKey = 'remote_sync_version';
+  static const String _deviceIdKey = 'device_id';
 
   final FlutterSecureStorage _secureStorage = const FlutterSecureStorage(
     aOptions: AndroidOptions(
@@ -155,6 +158,11 @@ class GoogleDriveService extends ChangeNotifier {
   DateTime? _lastSync;
   String? _localChecksum;
   String? _remoteChecksum;
+
+  // Optimistic locking for multi-device sync
+  int _syncVersion = 0;
+  int _remoteSyncVersion = 0;
+  String? _deviceId;
 
   // Encryption settings
   bool _encryptionEnabled = false;
@@ -263,6 +271,9 @@ class GoogleDriveService extends ChangeNotifier {
       // Load lastSync timestamp for deletion inference
       await _loadLastSync();
 
+      // Load syncVersion for optimistic locking
+      await _loadSyncVersion();
+
       // Try to sign in silently (restore previous session)
       final account = await _googleSignIn.signInSilently();
       if (account != null) {
@@ -301,6 +312,62 @@ class GoogleDriveService extends ChangeNotifier {
     } catch (e) {
       debugPrint('[GoogleDriveService] Failed to save lastSync: $e');
     }
+  }
+
+  /// Load syncVersion from persistent storage
+  Future<void> _loadSyncVersion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _syncVersion = prefs.getInt(_syncVersionKey) ?? 0;
+      _remoteSyncVersion = prefs.getInt(_remoteSyncVersionKey) ?? 0;
+      debugPrint(
+          '[GoogleDriveService] Loaded syncVersion: $_syncVersion, remoteSyncVersion: $_remoteSyncVersion');
+    } catch (e) {
+      debugPrint('[GoogleDriveService] Failed to load syncVersion: $e');
+    }
+  }
+
+  /// Save syncVersion to persistent storage
+  Future<void> _saveSyncVersion() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_syncVersionKey, _syncVersion);
+      await prefs.setInt(_remoteSyncVersionKey, _remoteSyncVersion);
+      debugPrint(
+          '[GoogleDriveService] Saved syncVersion: $_syncVersion, remoteSyncVersion: $_remoteSyncVersion');
+    } catch (e) {
+      debugPrint('[GoogleDriveService] Failed to save syncVersion: $e');
+    }
+  }
+
+  /// Get or create a unique device identifier for sync tracking
+  Future<String> _getDeviceIdentifier() async {
+    if (_deviceId != null) {
+      return _deviceId!;
+    }
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _deviceId = prefs.getString(_deviceIdKey);
+
+      if (_deviceId == null) {
+        // Generate a new device ID
+        final timestamp = DateTime.now().millisecondsSinceEpoch.toRadixString(36);
+        final random = List.generate(6, (_) =>
+            'abcdefghijklmnopqrstuvwxyz0123456789'[DateTime.now().microsecond % 36])
+            .join();
+        _deviceId = 'android-$timestamp-$random';
+        await prefs.setString(_deviceIdKey, _deviceId!);
+        debugPrint('[GoogleDriveService] Created new device ID: $_deviceId');
+      } else {
+        debugPrint('[GoogleDriveService] Loaded device ID: $_deviceId');
+      }
+    } catch (e) {
+      debugPrint('[GoogleDriveService] Failed to get device ID: $e');
+      _deviceId = 'android-unknown-${DateTime.now().millisecondsSinceEpoch}';
+    }
+
+    return _deviceId!;
   }
 
   /// Sign in to Google
@@ -519,7 +586,8 @@ class GoogleDriveService extends ChangeNotifier {
 
   /// Upload data to Google Drive
   /// If encryption is enabled, data will be encrypted before upload
-  Future<bool> uploadData(Map<String, dynamic> data) async {
+  /// Supports optimistic locking via [options.expectedRemoteModifiedTime]
+  Future<UploadResult> uploadData(Map<String, dynamic> data, {UploadOptions? options}) async {
     if (_driveApi == null || _appFolderId == null) {
       throw Exception('Not connected to Google Drive');
     }
@@ -527,8 +595,55 @@ class GoogleDriveService extends ChangeNotifier {
     try {
       final checksum = _calculateChecksum(data);
 
+      // =====================================================
+      // OPTIMISTIC LOCKING: Check remote version before upload
+      // =====================================================
+      if (_remoteFileId != null && options?.expectedRemoteModifiedTime != null) {
+        try {
+          final fileInfo = await _driveApi!.files.get(
+            _remoteFileId!,
+            $fields: 'modifiedTime',
+          ) as drive.File;
+
+          final currentRemoteModifiedTime = fileInfo.modifiedTime?.toIso8601String();
+
+          if (currentRemoteModifiedTime != null &&
+              currentRemoteModifiedTime != options!.expectedRemoteModifiedTime) {
+            debugPrint('[GoogleDriveService] Version conflict detected!');
+            debugPrint('[GoogleDriveService] Expected remote modifiedTime: ${options.expectedRemoteModifiedTime}');
+            debugPrint('[GoogleDriveService] Actual remote modifiedTime: $currentRemoteModifiedTime');
+
+            throw VersionConflictException(
+              'Version conflict: another device synced since last download',
+              currentRemoteModifiedTime: currentRemoteModifiedTime,
+            );
+          }
+
+          debugPrint('[GoogleDriveService] Version check passed - remote unchanged since download');
+        } catch (e) {
+          if (e is VersionConflictException) {
+            rethrow;
+          }
+          // If we can't check (e.g., network error), log warning but proceed
+          debugPrint('[GoogleDriveService] Could not verify remote version, proceeding with upload: $e');
+        }
+      }
+
+      // Include syncVersion in the data being uploaded (inside _syncMeta)
+      final newSyncVersion = options?.syncVersion ?? (_syncVersion + 1);
+      final deviceId = await _getDeviceIdentifier();
+
+      final dataWithMeta = Map<String, dynamic>.from(data);
+      dataWithMeta['_syncMeta'] = {
+        'syncVersion': newSyncVersion,
+        'uploadedAt': DateTime.now().toIso8601String(),
+        'uploadedBy': deviceId,
+      };
+
+      debugPrint('[GoogleDriveService] Uploading with syncVersion: $newSyncVersion');
+
       // Encrypt data if encryption is enabled
-      dynamic dataToUpload = data;
+      dynamic dataToUpload = dataWithMeta;
       if (_encryptionEnabled) {
         if (_encryptionPassphrase == null || _encryptionPassphrase!.isEmpty) {
           throw Exception('Encryption is enabled but no passphrase is set');
@@ -536,7 +651,7 @@ class GoogleDriveService extends ChangeNotifier {
 
         debugPrint('[GoogleDriveService] Encrypting data before upload...');
         dataToUpload = await EncryptionService.encryptSyncData(
-          data,
+          dataWithMeta,
           _encryptionPassphrase!,
           saltBase64: _encryptionSalt,
         );
@@ -574,9 +689,13 @@ class GoogleDriveService extends ChangeNotifier {
         _remoteFileId = created.id;
       }
 
+      // Update local syncVersion tracking
+      _syncVersion = newSyncVersion;
+
       _remoteChecksum = checksum;
       _lastSync = DateTime.now();
       await _saveLastSync(); // Persist for deletion inference
+      await _saveSyncVersion(); // Persist syncVersion
       _updateStatus(_status.copyWith(
         lastSync: _lastSync,
         hasRemoteBackup: true,
@@ -584,8 +703,12 @@ class GoogleDriveService extends ChangeNotifier {
       ));
 
       debugPrint(
-          '[GoogleDriveService] Upload successful, checksum: $checksum, encrypted: $_encryptionEnabled');
-      return true;
+          '[GoogleDriveService] Upload successful, checksum: $checksum, syncVersion: $newSyncVersion, encrypted: $_encryptionEnabled');
+      return UploadResult(
+        success: true,
+        syncVersion: newSyncVersion,
+        checksum: checksum,
+      );
     } catch (e) {
       debugPrint('[GoogleDriveService] Upload failed: $e');
       rethrow;
@@ -595,13 +718,27 @@ class GoogleDriveService extends ChangeNotifier {
   /// Download data from Google Drive
   /// If data is encrypted, it will be decrypted automatically (requires passphrase)
   /// Throws EncryptionRequiredException if data is encrypted but no passphrase is set
-  Future<Map<String, dynamic>?> downloadData() async {
+  /// Returns DownloadResult with data, modifiedTime, and syncVersion for optimistic locking
+  Future<DownloadResult?> downloadData() async {
     if (_driveApi == null || _remoteFileId == null) {
       return null;
     }
 
     try {
       debugPrint('[GoogleDriveService] Downloading backup');
+
+      // Get file metadata including modifiedTime for optimistic locking
+      String? remoteModifiedTime;
+      try {
+        final fileInfo = await _driveApi!.files.get(
+          _remoteFileId!,
+          $fields: 'modifiedTime',
+        ) as drive.File;
+        remoteModifiedTime = fileInfo.modifiedTime?.toIso8601String();
+        debugPrint('[GoogleDriveService] Remote file modifiedTime: $remoteModifiedTime');
+      } catch (e) {
+        debugPrint('[GoogleDriveService] Could not get remote modifiedTime: $e');
+      }
 
       final response = await _driveApi!.files.get(
         _remoteFileId!,
@@ -648,10 +785,19 @@ class GoogleDriveService extends ChangeNotifier {
             _status.copyWith(isEncrypted: false, needsPassphrase: false));
       }
 
-      _remoteChecksum = _calculateChecksum(data);
-      debugPrint('[GoogleDriveService] Download successful');
+      // Extract syncVersion from _syncMeta
+      final syncMeta = data['_syncMeta'] as Map<String, dynamic>?;
+      final remoteSyncVersion = (syncMeta?['syncVersion'] as int?) ?? 0;
 
-      return data;
+      _remoteChecksum = _calculateChecksum(data);
+      debugPrint('[GoogleDriveService] Download successful, syncVersion: $remoteSyncVersion');
+
+      return DownloadResult(
+        data: data,
+        checksum: _remoteChecksum,
+        remoteModifiedTime: remoteModifiedTime,
+        syncVersion: remoteSyncVersion,
+      );
     } catch (e) {
       if (e is EncryptionRequiredException) {
         rethrow;
@@ -661,7 +807,7 @@ class GoogleDriveService extends ChangeNotifier {
     }
   }
 
-  /// Perform full sync operation
+  /// Perform full sync operation with optimistic locking and version conflict retry
   Future<SyncResult> sync({
     required Map<String, dynamic> localData,
     required Future<void> Function(Map<String, dynamic>) applyData,
@@ -691,15 +837,21 @@ class GoogleDriveService extends ChangeNotifier {
       final localChecksum = _calculateChecksum(localData);
       _localChecksum = localChecksum;
 
+      DownloadResult? downloadResult;
       Map<String, dynamic>? remoteData;
       String? remoteChecksum;
+      String? remoteModifiedTime;
+      int remoteSyncVersion = 0;
 
       // Download remote data if exists
       if (_remoteFileId != null) {
         try {
-          remoteData = await downloadData();
-          if (remoteData != null) {
-            remoteChecksum = _calculateChecksum(remoteData);
+          downloadResult = await downloadData();
+          if (downloadResult != null) {
+            remoteData = downloadResult.data;
+            remoteChecksum = downloadResult.checksum;
+            remoteModifiedTime = downloadResult.remoteModifiedTime;
+            remoteSyncVersion = downloadResult.syncVersion;
             _remoteChecksum = remoteChecksum;
           }
         } on EncryptionRequiredException catch (e) {
@@ -719,13 +871,16 @@ class GoogleDriveService extends ChangeNotifier {
 
       debugPrint('[GoogleDriveService] Local checksum: $localChecksum');
       debugPrint('[GoogleDriveService] Remote checksum: $remoteChecksum');
+      debugPrint('[GoogleDriveService] Remote syncVersion: $remoteSyncVersion, Last seen: $_remoteSyncVersion');
 
       SyncResult result;
+      int? uploadedSyncVersion;
 
       if (remoteData == null) {
         // First time sync - upload local data
         debugPrint('[GoogleDriveService] First sync - uploading local data');
-        await uploadData(localData);
+        final uploadResult = await uploadData(localData);
+        uploadedSyncVersion = uploadResult.syncVersion;
         result = SyncResult(
           success: true,
           action: 'upload',
@@ -754,22 +909,75 @@ class GoogleDriveService extends ChangeNotifier {
           notesDownloaded: _countNotes(remoteData),
         );
       } else {
-        // Both have data - merge
+        // Both have data - merge with optimistic locking and retry
         debugPrint('[GoogleDriveService] Merging local and remote data');
-        final mergeResult =
-            _mergeData(localData, remoteData, lastSync: _lastSync);
 
-        // Apply merged data locally
-        await applyData(mergeResult.data);
+        // =====================================================
+        // OPTIMISTIC LOCKING: Upload with version check and retry on conflict
+        // =====================================================
+        const maxVersionRetries = 3;
+        var versionRetryCount = 0;
+        var uploadSuccess = false;
+        var currentRemoteModifiedTime = remoteModifiedTime;
+        var currentRemoteSyncVersion = remoteSyncVersion;
+        var currentRemoteData = remoteData;
+        _MergeResult? mergeResult;
 
-        // Upload merged data to cloud
-        await uploadData(mergeResult.data);
+        while (!uploadSuccess && versionRetryCount < maxVersionRetries) {
+          // Merge data with syncVersion info for smarter deletion inference
+          mergeResult = _mergeData(
+            localData,
+            currentRemoteData,
+            lastSync: _lastSync,
+            remoteSyncVersion: currentRemoteSyncVersion,
+            lastSeenRemoteSyncVersion: _remoteSyncVersion,
+          );
+
+          // Apply merged data locally
+          await applyData(mergeResult.data);
+
+          try {
+            final nextSyncVersion = currentRemoteSyncVersion + 1;
+            final uploadResult = await uploadData(
+              mergeResult.data,
+              options: UploadOptions(
+                expectedRemoteModifiedTime: currentRemoteModifiedTime,
+                syncVersion: nextSyncVersion,
+              ),
+            );
+            uploadedSyncVersion = uploadResult.syncVersion;
+            uploadSuccess = true;
+            debugPrint('[GoogleDriveService] Upload successful on attempt ${versionRetryCount + 1}, syncVersion: $uploadedSyncVersion');
+          } on VersionConflictException {
+            versionRetryCount++;
+            debugPrint('[GoogleDriveService] Version conflict on attempt $versionRetryCount, retrying...');
+
+            if (versionRetryCount >= maxVersionRetries) {
+              debugPrint('[GoogleDriveService] Max version conflict retries exceeded');
+              throw Exception('Sync conflict: another device is syncing. Please try again in a few seconds.');
+            }
+
+            // Exponential backoff before retry
+            final backoffDelay = Duration(milliseconds: 1000 * (1 << (versionRetryCount - 1)));
+            debugPrint('[GoogleDriveService] Waiting ${backoffDelay.inMilliseconds}ms before retry...');
+            await Future.delayed(backoffDelay);
+
+            // Re-download remote data and re-merge
+            final newDownloadResult = await downloadData();
+            if (newDownloadResult != null) {
+              currentRemoteData = newDownloadResult.data;
+              currentRemoteModifiedTime = newDownloadResult.remoteModifiedTime;
+              currentRemoteSyncVersion = newDownloadResult.syncVersion;
+              debugPrint('[GoogleDriveService] Re-merging with new remote data (syncVersion: $currentRemoteSyncVersion)');
+            }
+          }
+        }
 
         result = SyncResult(
           success: true,
           action: 'merge',
           message:
-              'Merged data: ${mergeResult.localAdded} local notes, ${mergeResult.remoteAdded} remote notes${_encryptionEnabled ? " (encrypted)" : ""}',
+              'Merged data: ${mergeResult!.localAdded} local notes, ${mergeResult.remoteAdded} remote notes${_encryptionEnabled ? " (encrypted)" : ""}',
           notesUploaded: mergeResult.localAdded,
           notesDownloaded: mergeResult.remoteAdded,
           conflicts: mergeResult.conflicts,
@@ -777,13 +985,20 @@ class GoogleDriveService extends ChangeNotifier {
         );
       }
 
+      // Track remote syncVersion for future conflict detection
+      final finalRemoteSyncVersion = uploadedSyncVersion ?? remoteSyncVersion;
+      _remoteSyncVersion = finalRemoteSyncVersion;
+
       _lastSync = DateTime.now();
       await _saveLastSync(); // Persist for deletion inference
+      await _saveSyncVersion(); // Persist syncVersion
       _updateStatus(_status.copyWith(
         isSyncing: false,
         lastSync: _lastSync,
         error: null,
       ));
+
+      debugPrint('[GoogleDriveService] Final remoteSyncVersion to persist: $finalRemoteSyncVersion');
 
       return result;
     } on EncryptionRequiredException catch (e) {
@@ -824,24 +1039,32 @@ class GoogleDriveService extends ChangeNotifier {
   }
 
   /// Merge local and remote data
-  /// [lastSync] is used for bi-directional deletion inference:
-  /// - If a note exists remotely but not locally, and remote wasn't modified after lastSync,
-  ///   it means the note was deleted locally -> omit from merged (let deletion propagate)
-  /// - If a note exists locally but not remotely, and local wasn't modified after lastSync,
-  ///   it means the note was deleted remotely -> remove from merged (existing logic)
+  /// [lastSync] is used for bi-directional deletion inference
+  /// [remoteSyncVersion] is the current remote syncVersion
+  /// [lastSeenRemoteSyncVersion] is the last syncVersion we saw from remote
+  ///
+  /// Deletion inference logic:
+  /// - If remoteSyncVersion > lastSeenRemoteSyncVersion, remote has new data we haven't seen,
+  ///   so treat missing local notes as NEW from remote (not locally deleted)
+  /// - Only if we've seen this syncVersion before, use timestamp-based deletion inference
   _MergeResult _mergeData(
       Map<String, dynamic> localData, Map<String, dynamic> remoteData,
-      {DateTime? lastSync}) {
+      {DateTime? lastSync, int remoteSyncVersion = 0, int lastSeenRemoteSyncVersion = 0}) {
     final mergedData = Map<String, dynamic>.from(localData);
     int localAdded = 0;
     int remoteAdded = 0;
     int conflicts = 0;
 
-    // Debug: Log lastSync and note counts for troubleshooting
+    // Check if remote has a newer syncVersion than what we've seen
+    final isNewRemoteVersion = remoteSyncVersion > lastSeenRemoteSyncVersion;
+
+    // Debug: Log sync info for troubleshooting
     final localNoteCount = (localData['notes'] as Map?)?.length ?? 0;
     final remoteNoteCount = (remoteData['notes'] as Map?)?.length ?? 0;
     debugPrint(
         '[GoogleDriveService] _mergeData: lastSync=$lastSync, localNotes=$localNoteCount, remoteNotes=$remoteNoteCount');
+    debugPrint(
+        '[GoogleDriveService] _mergeData: remoteSyncVersion=$remoteSyncVersion, lastSeenRemoteSyncVersion=$lastSeenRemoteSyncVersion, isNewRemoteVersion=$isNewRemoteVersion');
 
     // Timestamp when remote backup was created/exported. We use this to infer
     // deletions: if a note is missing remotely and the remote export is newer
@@ -870,7 +1093,21 @@ class GoogleDriveService extends ChangeNotifier {
 
       if (!localNotes.containsKey(noteId)) {
         // Note only exists in remote - check if it was deleted locally
-        if (lastSync != null) {
+        //
+        // Use syncVersion as primary indicator:
+        // - If remote syncVersion > lastSeenRemoteSyncVersion, the remote has new data we haven't seen
+        //   This means we CANNOT use absence of local note as evidence of local deletion
+        // - Only if we've seen this exact syncVersion before AND remoteModifiedTime <= lastSyncTime,
+        //   we can infer the note was deleted locally
+
+        if (isNewRemoteVersion) {
+          // Remote has a new syncVersion we haven't seen - treat missing local notes as NEW from remote
+          debugPrint(
+              '[GoogleDriveService] Remote syncVersion is newer ($remoteSyncVersion > $lastSeenRemoteSyncVersion) - treating $noteId as new remote note');
+          localNotes[noteId] = remoteNote;
+          remoteAdded++;
+        } else if (lastSync != null) {
+          // Same syncVersion - use timestamp-based deletion inference
           final remoteUpdated =
               DateTime.tryParse(remoteNote['updated_at']?.toString() ?? '') ??
                   DateTime(1970);
@@ -882,13 +1119,17 @@ class GoogleDriveService extends ChangeNotifier {
           // -> Don't add to merged data (let deletion propagate to remote)
           if (!remoteUpdated.isAfter(lastSync)) {
             debugPrint(
-                '[GoogleDriveService] Note $noteId appears deleted locally - not re-adding from remote');
+                '[GoogleDriveService] Same syncVersion and remoteModified <= lastSync - treating $noteId as local deletion');
             continue;
           }
+          // Note was modified after lastSync - it's new, add it
+          localNotes[noteId] = remoteNote;
+          remoteAdded++;
+        } else {
+          // No lastSync and no syncVersion difference - just add the note
+          localNotes[noteId] = remoteNote;
+          remoteAdded++;
         }
-        // New remote note (modified after lastSync or no lastSync) - add to local
-        localNotes[noteId] = remoteNote;
-        remoteAdded++;
       } else {
         // Note exists in both - use newer version
         final localNote = localNotes[noteId] as Map<String, dynamic>;
@@ -938,7 +1179,11 @@ class GoogleDriveService extends ChangeNotifier {
     // remote data, and the remote export is newer than the note's last update,
     // treat it as deleted and drop it from the merged dataset so it does not
     // get re-uploaded.
-    if (remoteNotes.isNotEmpty && remoteExportedAt != null) {
+    //
+    // IMPORTANT: Only do this if we've seen this syncVersion before.
+    // If remote has a new syncVersion, another device may have created notes
+    // that we haven't synced yet, so we shouldn't treat our local notes as deleted.
+    if (!isNewRemoteVersion && remoteNotes.isNotEmpty && remoteExportedAt != null) {
       final notesToRemove = <String>{};
       for (final entry in localNotes.entries) {
         final noteId = entry.key;
@@ -950,6 +1195,7 @@ class GoogleDriveService extends ChangeNotifier {
                 DateTime(1970);
 
         if (remoteExportedAt.isAfter(localUpdated)) {
+          debugPrint('[GoogleDriveService] Note $noteId appears deleted on remote - removing from local');
           notesToRemove.add(noteId);
         }
       }
@@ -1357,4 +1603,54 @@ class RemoteMediaFile {
     required this.modifiedTime,
     required this.mimeType,
   });
+}
+
+/// Options for upload operation (optimistic locking)
+class UploadOptions {
+  final String? expectedRemoteModifiedTime;
+  final int? syncVersion;
+
+  UploadOptions({
+    this.expectedRemoteModifiedTime,
+    this.syncVersion,
+  });
+}
+
+/// Result of an upload operation
+class UploadResult {
+  final bool success;
+  final int syncVersion;
+  final String? checksum;
+
+  UploadResult({
+    required this.success,
+    required this.syncVersion,
+    this.checksum,
+  });
+}
+
+/// Result of a download operation
+class DownloadResult {
+  final Map<String, dynamic> data;
+  final String? checksum;
+  final String? remoteModifiedTime;
+  final int syncVersion;
+
+  DownloadResult({
+    required this.data,
+    this.checksum,
+    this.remoteModifiedTime,
+    required this.syncVersion,
+  });
+}
+
+/// Exception thrown when a version conflict is detected during upload
+class VersionConflictException implements Exception {
+  final String message;
+  final String? currentRemoteModifiedTime;
+
+  VersionConflictException(this.message, {this.currentRemoteModifiedTime});
+
+  @override
+  String toString() => message;
 }
