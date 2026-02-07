@@ -318,7 +318,7 @@ class UIManager {
         // Min and max width constraints
         const MIN_WIDTH = 260;
         const MAX_WIDTH = 600;
-        const DEFAULT_WIDTH = 320;
+        const DEFAULT_WIDTH = 280;
 
         // Restore saved width from localStorage
         const savedWidth = localStorage.getItem('sidebarWidth');

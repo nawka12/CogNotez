@@ -20,7 +20,17 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link rel="stylesheet" href="./css/styles.css">
+    <link rel="stylesheet" href="./css/base.css">
+    <link rel="stylesheet" href="./css/header.css">
+    <link rel="stylesheet" href="./css/layout.css">
+    <link rel="stylesheet" href="./css/sidebar.css">
+    <link rel="stylesheet" href="./css/editor.css">
+    <link rel="stylesheet" href="./css/ai-panel.css">
+    <link rel="stylesheet" href="./css/modals.css">
+    <link rel="stylesheet" href="./css/search-features.css">
+    <link rel="stylesheet" href="./css/ai-generate.css">
+    <link rel="stylesheet" href="./css/responsive.css">
+    <link rel="stylesheet" href="./css/accessibility.css">
     <link rel="stylesheet" href="./css/themes.css">
 </head>
 <body>
@@ -223,10 +233,6 @@
                                 <button id="redo-btn" class="editor-tool-btn" title="Redo (Ctrl+Y)" data-i18n-title="editor.redo"><i class="fas fa-redo"></i></button>
                                 <div class="editor-toolbar-divider"></div>
                                 <button id="preview-toggle-btn" class="editor-tool-btn" title="Preview Mode" data-i18n-title="editor.previewMode"><i class="fas fa-eye"></i></button>
-                                <button id="save-btn" class="editor-tool-btn" title="Save" data-i18n-title="editor.save"><i class="fas fa-save"></i></button>
-                                <!-- Rich media buttons (image / video) -->
-                                <button id="insert-image-btn" class="editor-tool-btn" title="Insert Image" data-i18n-title="editor.insertImage"><i class="fas fa-image"></i></button>
-                                <button id="insert-video-btn" class="editor-tool-btn" title="Insert Video" data-i18n-title="editor.insertVideo"><i class="fas fa-video"></i></button>
                                 <div class="editor-toolbar-divider"></div>
                                 <button id="editor-overflow-btn" class="editor-tool-btn" title="More options" data-i18n-title="editor.moreOptions"><i class="fas fa-ellipsis-h"></i></button>
                             </div>
@@ -238,6 +244,11 @@
                         
                         <!-- Overflow menu -->
                         <div id="editor-overflow-menu" class="editor-overflow-menu hidden">
+                            <button id="save-btn" class="overflow-menu-item" title="Save" data-i18n-title="editor.save"><i class="fas fa-save"></i> <span data-i18n="editor.save">Save</span></button>
+                            <div class="overflow-menu-separator"></div>
+                            <button id="insert-image-btn" class="overflow-menu-item" title="Insert Image" data-i18n-title="editor.insertImage"><i class="fas fa-image"></i> <span data-i18n="editor.insertImage">Insert Image</span></button>
+                            <button id="insert-video-btn" class="overflow-menu-item" title="Insert Video" data-i18n-title="editor.insertVideo"><i class="fas fa-video"></i> <span data-i18n="editor.insertVideo">Insert Video</span></button>
+                            <div class="overflow-menu-separator"></div>
                             <button id="find-btn" class="overflow-menu-item" title="Find (Ctrl+F)" data-i18n-title="editor.findShortcut"><i class="fas fa-search"></i> <span data-i18n="editor.find">Find</span></button>
                             <button id="replace-btn" class="overflow-menu-item" title="Replace (Ctrl+H)" data-i18n-title="editor.replaceShortcut"><i class="fas fa-exchange-alt"></i> <span data-i18n="editor.replace">Replace</span></button>
                             <div class="overflow-menu-separator"></div>

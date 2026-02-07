@@ -1,0 +1,811 @@
+/* Modern Main Content Layout */
+.main-content {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+    background: var(--bg-primary);
+}
+
+/* Modern Sidebar Design - REVAMPED */
+.sidebar {
+    width: 280px;
+    background: var(--sidebar-bg);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-right: 1px solid var(--border-color);
+    display: flex;
+    flex-direction: column;
+    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03);
+    position: relative;
+    z-index: 50;
+    flex-shrink: 0;
+    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.sidebar-header {
+    padding: 16px 16px 12px 16px;
+    background: transparent;
+    /* Let the blur show through */
+    /* border-bottom: 1px solid var(--border-color); - Remove strict border for cleaner look */
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: relative;
+    min-height: 80px;
+}
+
+/* Center toggle button when sidebar is collapsed (60px width) */
+.sidebar[style*="width: 60px"] .sidebar-header,
+.sidebar[style*="width:60px"] .sidebar-header {
+    justify-content: center;
+    padding: var(--spacing-lg);
+}
+
+.sidebar[style*="width: 60px"] .sidebar-toggle,
+.sidebar[style*="width:60px"] .sidebar-toggle {
+    margin: 0 auto;
+}
+
+.sidebar-header h2 {
+    font-size: 20px;
+    font-weight: 700;
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
+    margin: 0;
+    background: var(--gradient-primary);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+.sidebar-toggle {
+    background: transparent;
+    border: none;
+    border-radius: var(--radius-lg);
+    font-size: 14px;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    padding: 8px;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+}
+
+.sidebar-toggle:hover {
+    background: var(--button-hover-bg);
+    color: var(--text-primary);
+    transform: scale(1.05);
+}
+
+/* Sidebar Resize Handle - Improved visibility */
+.sidebar-resize-handle {
+    position: absolute;
+    top: 0;
+    right: -3px;
+    width: 6px;
+    height: 100%;
+    cursor: col-resize;
+    background: transparent;
+    z-index: 100;
+    transition: background 0.2s ease;
+}
+
+.sidebar-resize-handle::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 2px;
+    width: 2px;
+    height: 100%;
+    background: transparent;
+    transition: background 0.2s ease;
+}
+
+.sidebar-resize-handle:hover::after,
+.sidebar.resizing .sidebar-resize-handle::after {
+    background: var(--accent-color);
+    opacity: 0.5;
+}
+
+.sidebar.resizing {
+    user-select: none;
+}
+
+/* Hide resize handle when sidebar is collapsed */
+.sidebar.collapsed .sidebar-resize-handle {
+    display: none;
+}
+
+body.sidebar-resizing {
+    cursor: col-resize !important;
+    user-select: none;
+}
+
+body.sidebar-resizing * {
+    cursor: col-resize !important;
+}
+
+/* Sidebar Folders/Categories Navigation - Modernized */
+.sidebar-folders {
+    padding: 0 16px 16px 16px;
+    border-bottom: 1px solid var(--border-color);
+    background: transparent;
+    flex-shrink: 0;
+    max-height: 40%;
+    overflow-y: auto;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.folder-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    color: var(--text-secondary);
+    font-size: 14px;
+    margin-bottom: 4px;
+    border: 1px solid transparent;
+}
+
+.folder-item:hover {
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+}
+
+.folder-item.active {
+    background: var(--surface-elevated);
+    color: var(--accent-color);
+    font-weight: 600;
+    box-shadow: var(--shadow-sm);
+    border-color: var(--border-color);
+}
+
+.folder-item.active .folder-icon {
+    color: var(--accent-color);
+    transform: scale(1.1);
+}
+
+.folder-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+    color: var(--text-tertiary);
+    transition: all 0.2s ease;
+}
+
+.folder-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.folder-count {
+    font-size: 11px;
+    background: var(--bg-secondary);
+    padding: 2px 8px;
+    border-radius: 12px;
+    color: var(--text-tertiary);
+    font-weight: 600;
+    min-width: 20px;
+    text-align: center;
+    transition: all 0.2s ease;
+}
+
+.folder-item.active .folder-count {
+    background: var(--accent-color);
+    color: white;
+}
+
+.folders-divider {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 16px 12px 8px 12px;
+    margin-top: 4px;
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    user-select: none;
+    opacity: 0.8;
+}
+
+.folders-divider:hover {
+    opacity: 1;
+    color: var(--text-secondary);
+}
+
+.folders-divider span {
+    flex: 1;
+}
+
+.tags-toggle-btn {
+    background: none;
+    border: none;
+    padding: 0;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    border-radius: 4px;
+    transition: all 0.2s ease;
+    font-size: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 20px;
+    height: 20px;
+}
+
+.tags-toggle-btn:hover {
+    background: var(--button-hover-bg);
+    color: var(--text-primary);
+}
+
+.tags-toggle-btn i {
+    transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.tags-toggle-btn.collapsed i {
+    transform: rotate(-90deg);
+}
+
+.tag-folders-list {
+    /* max-height removed to prevent nested scrolling */
+    /* overflow-y removed */
+    transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s ease;
+    padding-left: 0;
+}
+
+.tag-folders-list.collapsed {
+    max-height: 0;
+    opacity: 0;
+    overflow: hidden;
+    padding: 0;
+}
+
+.create-folder-btn {
+    background: transparent;
+    border: 1px dashed var(--border-color);
+    padding: 4px 8px;
+    cursor: pointer;
+    color: var(--text-tertiary);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    font-size: 10px;
+}
+
+.create-folder-btn:hover {
+    background: var(--button-hover-bg);
+    border-color: var(--accent-color-light);
+    color: var(--accent-color);
+}
+
+.tag-folder-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 12px;
+    margin-left: 0;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: var(--text-secondary);
+    font-size: 13px;
+    margin-bottom: 2px;
+}
+
+.tag-folder-item:hover {
+    background: var(--button-hover-bg);
+    color: var(--text-primary);
+    transform: translateX(4px);
+}
+
+.tag-folder-item.active {
+    background: var(--bg-tertiary);
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.tag-folder-color {
+    width: 8px;
+    height: 8px;
+    border-radius: 4px;
+    flex-shrink: 0;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+}
+
+.tag-folder-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.tag-folder-count {
+    font-size: 10px;
+    color: var(--text-tertiary);
+    opacity: 0.7;
+}
+
+.tag-folder-item.active .tag-folder-count {
+    color: var(--accent-color);
+    opacity: 1;
+}
+
+.tag-folders-empty {
+    padding: 12px;
+    font-size: 12px;
+    color: var(--text-tertiary);
+    font-style: italic;
+    text-align: center;
+}
+
+/* Create tag dialog color options */
+.color-option {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.color-option:hover {
+    transform: scale(1.1);
+}
+
+.color-option.active {
+    border-color: var(--text-primary) !important;
+    box-shadow: 0 0 0 2px var(--bg-primary), 0 0 0 4px var(--text-primary);
+}
+
+/* Tag folder context menu */
+.tag-folder-context-menu .context-menu-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border-radius: 4px;
+    transition: background 0.15s ease;
+}
+
+.tag-folder-context-menu .context-menu-item:hover {
+    background: var(--button-hover-bg);
+}
+
+.tag-folder-context-menu .context-menu-item i {
+    width: 16px;
+    text-align: center;
+}
+
+/* Active folder indicator in sidebar header */
+.sidebar-active-folder {
+    font-size: 11px;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-left: 8px;
+    padding: 2px 8px;
+    background: var(--bg-secondary);
+    border-radius: 12px;
+    opacity: 0.9;
+}
+
+/* Notes List - Premium Card Layout */
+.notes-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.note-item {
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    display: flex;
+    flex-direction: column;
+    /* Changed to column for better content flow */
+    gap: 8px;
+    min-height: auto;
+    position: relative;
+    border-radius: 16px;
+    background: var(--card-bg);
+    border: 1px solid transparent;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+}
+
+/* Hover effect */
+.note-item:hover {
+    background: var(--surface-elevated);
+    transform: translateY(-2px);
+    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
+    z-index: 10;
+}
+
+/* Active State - strongly clear */
+.note-item.active {
+    background: var(--bg-primary);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-color), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Remove the left border "sash" - it's outdated. Use border selection instead. */
+.note-item.active::before {
+    display: none;
+}
+
+/* Pinned Note - Distinct Visuals */
+.note-item.pinned {
+    background: var(--bg-tertiary);
+    border-color: var(--border-color);
+    border-top: 2px solid var(--accent-color);
+}
+
+.note-item.pinned:hover {
+    background: var(--surface-elevated);
+    border-color: var(--accent-color-light);
+}
+
+.note-item.pinned.active {
+    background: var(--bg-primary);
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-color), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.note-item.pinned::before {
+    display: none;
+}
+
+/* Remove emoji pin indicator; rely on the pin button state */
+.note-item.pinned::after {
+    display: none;
+}
+
+.note-item-content {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    /* Full width */
+    padding-right: 0;
+}
+
+/* Note Title */
+.note-item-title {
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+    font-size: 15px;
+    line-height: 1.3;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.note-lock-icon {
+    color: var(--accent-color);
+    font-size: 12px;
+    background: var(--accent-color-lighter);
+    padding: 4px;
+    border-radius: 4px;
+}
+
+/* Password-protected note styling */
+.note-item:has(.note-lock-icon) {
+    border-left: 3px solid var(--accent-color);
+    background: linear-gradient(90deg, var(--accent-color-lightest) 0%, var(--card-bg) 100%);
+}
+
+.note-item:has(.note-lock-icon):hover {
+    background: linear-gradient(90deg, var(--accent-color-lighter) 0%, var(--surface-elevated) 100%);
+}
+
+/* Note Preview */
+.note-item-preview {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    word-break: break-word;
+    margin-bottom: 8px;
+    opacity: 0.9;
+}
+
+/* Note Indicators Row */
+.note-item-indicators {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+}
+
+.note-indicator {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.note-indicator-pinned {
+    color: var(--accent-color);
+    font-size: 10px;
+}
+
+.note-indicator-media {
+    color: var(--text-secondary);
+    font-size: 10px;
+}
+
+.note-indicator-words {
+    color: var(--text-tertiary);
+    font-size: 10px;
+    font-variant-numeric: tabular-nums;
+}
+
+/* Meta Data Row (Date & Tags) */
+.note-item-meta {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-top: auto;
+    gap: 8px;
+}
+
+/* Date styling */
+.note-item-date {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    font-weight: 500;
+    background: transparent;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+}
+
+/* Tags in List */
+.note-item-tags {
+    margin-top: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    justify-content: flex-end;
+}
+
+.note-tag {
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    /* Pill shape */
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    border: none;
+    white-space: nowrap;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: 600;
+    box-shadow: none;
+    transition: all 0.2s ease;
+}
+
+.note-tag:hover {
+    background: var(--accent-color-lighter);
+    color: var(--accent-color-darker);
+    transform: none;
+}
+
+.note-tag.more-tags {
+    background: transparent;
+    border: 1px solid var(--border-color);
+    color: var(--text-tertiary);
+}
+
+/* Floating Action Buttons for Note Item */
+.note-actions-overlay {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    display: flex;
+    gap: 6px;
+    opacity: 0;
+    transform: translateX(10px);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.note-item:hover .note-actions-overlay {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Common button style for pin/delete */
+.note-action-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    border: 1px solid var(--border-color);
+    background: var(--surface-elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--text-secondary);
+    box-shadow: var(--shadow-sm);
+    transition: all 0.2s ease;
+}
+
+.note-action-btn:hover {
+    transform: scale(1.1);
+    box-shadow: var(--shadow-md);
+}
+
+.note-pin-btn {
+    color: var(--text-secondary);
+}
+
+.note-pin-btn:hover {
+    color: var(--accent-color);
+    border-color: var(--accent-color);
+}
+
+.note-pin-btn.pinned {
+    background: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.note-delete-btn:hover {
+    color: var(--error-color);
+    border-color: var(--error-color);
+    background: var(--error-light);
+}
+
+/* Hide legacy specific classes if they conflict */
+.note-pin-btn.legacy,
+.note-delete-btn.legacy {
+    display: none;
+}
+
+/* Password lock button styling */
+#password-lock-btn {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+#password-lock-btn:hover {
+    background: var(--context-menu-hover-bg);
+    color: var(--accent-color);
+}
+
+#password-lock-btn:hover i {
+    color: var(--accent-color);
+}
+
+#password-lock-btn.active {
+    background: var(--accent-color);
+    color: white;
+}
+
+#password-lock-btn.active:hover {
+    background: var(--accent-color-dark);
+    color: white;
+}
+
+/* Context menu password item styling */
+.context-menu-item[data-action="password"] {
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
+.context-menu-item[data-action="password"]:before {
+    content: "🔒";
+    margin-right: 8px;
+}
+
+/* Editor tags display */
+.note-tags-display {
+    margin-top: 0;
+    max-height: 60px;
+    max-width: 75%;
+    /* Don't take up more than 75% of available width */
+    overflow-y: auto;
+    overflow-x: hidden;
+    display: block;
+}
+
+/* When empty, hide the container */
+.note-tags-display:empty {
+    display: none;
+}
+
+/* Reduce tag display size on narrow screens */
+@media (max-width: 1200px) {
+    .note-tags-display {
+        max-width: 60%;
+        max-height: 40px;
+    }
+}
+
+@media (max-width: 900px) {
+    .note-tags-display {
+        max-width: 50%;
+        max-height: 30px;
+    }
+}
+
+.editor-note-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    max-height: 60px;
+    overflow-y: auto;
+    padding-right: 4px;
+    /* Space for scrollbar */
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-color) transparent;
+}
+
+.editor-note-tags::-webkit-scrollbar {
+    width: 4px;
+}
+
+.editor-note-tags::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.editor-note-tags::-webkit-scrollbar-thumb {
+    background: var(--border-color);
+    border-radius: 2px;
+}
+
+.editor-note-tags::-webkit-scrollbar-thumb:hover {
+    background: var(--text-tertiary);
+}
+
+.editor-note-tag {
+    font-size: var(--font-size-xs);
+    padding: 4px var(--spacing-sm);
+    border-radius: var(--radius-md);
+    background: var(--accent-color-lighter);
+    color: var(--accent-color-darker);
+    border: 1px solid var(--accent-color-light);
+    white-space: nowrap;
+    flex-shrink: 0;
+    /* Prevent tags from shrinking */
+    max-width: 140px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    font-weight: var(--font-weight-medium);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    cursor: default;
+}
+
+.editor-note-tag:hover {
+    background: var(--accent-color-light);
+    border-color: var(--accent-color);
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+

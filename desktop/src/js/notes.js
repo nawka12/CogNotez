@@ -123,6 +123,17 @@ class NotesManager {
         }
     }
 
+    hasMedia(note) {
+        if (!note.content || note.password_protected) return false;
+        return /!\[.*?\]\(.*?\)|<img |<video |<iframe /i.test(note.content);
+    }
+
+    getWordCount(note) {
+        if (!note.content || note.password_protected) return 0;
+        const text = note.content.replace(/[#*_~`>\-\[\]()!|]/g, '').trim();
+        return text ? text.split(/\s+/).length : 0;
+    }
+
     createNoteElement(note) {
         const element = document.createElement('div');
         element.className = 'note-item';
@@ -158,6 +169,36 @@ class NotesManager {
         previewDiv.className = 'note-item-preview';
         previewDiv.textContent = note.password_protected ? '' : (note.preview || '');
         content.appendChild(previewDiv);
+
+        // Indicators row (pin, media, word count)
+        const indicatorsDiv = document.createElement('div');
+        indicatorsDiv.className = 'note-item-indicators';
+
+        if (note.pinned) {
+            const pinIndicator = document.createElement('span');
+            pinIndicator.className = 'note-indicator note-indicator-pinned';
+            pinIndicator.innerHTML = '<i class="fas fa-thumbtack"></i>';
+            indicatorsDiv.appendChild(pinIndicator);
+        }
+
+        if (this.hasMedia(note)) {
+            const mediaIndicator = document.createElement('span');
+            mediaIndicator.className = 'note-indicator note-indicator-media';
+            mediaIndicator.innerHTML = '<i class="fas fa-image"></i>';
+            indicatorsDiv.appendChild(mediaIndicator);
+        }
+
+        const wordCount = this.getWordCount(note);
+        if (wordCount > 0) {
+            const wordIndicator = document.createElement('span');
+            wordIndicator.className = 'note-indicator note-indicator-words';
+            wordIndicator.textContent = `${wordCount}w`;
+            indicatorsDiv.appendChild(wordIndicator);
+        }
+
+        if (indicatorsDiv.children.length > 0) {
+            content.appendChild(indicatorsDiv);
+        }
 
         // Meta (Date + Tags) Container
         const metaDiv = document.createElement('div');

@@ -1,0 +1,780 @@
+/* ============================================================
+   MOBILE RESPONSIVE DESIGN - ANDROID/MOBILE OPTIMIZATION
+   ============================================================ */
+
+/* Mobile Hamburger Menu Button */
+.mobile-menu-toggle {
+    display: none;
+    background: var(--button-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-sm);
+    cursor: pointer;
+    color: var(--text-secondary);
+    min-width: 44px;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.mobile-menu-toggle:active {
+    background: var(--button-hover-bg);
+    transform: scale(0.95);
+}
+
+/* Medium Screens (1366x768 and similar laptops) - between tablet and desktop */
+@media (max-width: 1440px) and (min-width: 1025px) {
+    .app-header {
+        padding: 0 var(--spacing-md);
+        gap: var(--spacing-md);
+    }
+
+    .header-left {
+        gap: var(--spacing-md);
+    }
+
+    .header-right {
+        gap: var(--spacing-xs);
+    }
+
+    .search-container {
+        max-width: 240px;
+    }
+
+    /* Slightly reduce toolbar sizes for better fit */
+    .header-toolbar {
+        padding: 3px;
+        gap: 1px;
+    }
+
+    .header-toolbar-btn {
+        padding: 6px 10px;
+        min-height: 32px;
+    }
+
+    .toolbar-btn-label {
+        display: none;
+    }
+
+    .toolbar-divider {
+        height: 16px;
+        margin: 0 2px;
+    }
+}
+
+/* Tablet and Below (iPad, small tablets) */
+@media (max-width: 1024px) and (min-width: 769px) {
+
+    /* Reduce sidebar width - but keep desktop layout */
+    .sidebar {
+        width: 280px;
+        position: relative;
+        /* Keep relative positioning on tablet */
+    }
+
+    /* Reduce sidebar header padding on tablet */
+    .sidebar-header {
+        padding: var(--spacing-md);
+    }
+
+    /* Reduce AI panel width */
+    .ai-panel {
+        width: 320px;
+    }
+
+    /* Reduce header padding */
+    .app-header {
+        padding: 0 var(--spacing-md);
+        height: 56px;
+    }
+
+    /* Smaller search input */
+    .search-container {
+        max-width: 200px;
+        min-width: 140px;
+    }
+
+    .search-shortcut {
+        display: none;
+    }
+
+    /* Stack editor actions if needed */
+    .editor-actions {
+        flex-wrap: wrap;
+    }
+
+    /* Remove rotation from pinned button on tablet */
+    .note-pin-btn.pinned {
+        transform: none;
+    }
+}
+
+/* Mobile Devices (phones in landscape and portrait) */
+@media (max-width: 768px) {
+
+    /* Hide word count indicator on mobile */
+    .note-indicator-words {
+        display: none;
+    }
+
+    /* App layout changes to stack vertically */
+    .main-content {
+        flex-direction: column;
+    }
+
+    /* Mobile header optimizations */
+    .app-header {
+        height: 56px;
+        padding: 0 var(--spacing-sm);
+        flex-wrap: nowrap;
+        overflow: visible;
+    }
+
+    .header-left {
+        gap: var(--spacing-sm);
+        flex: 1;
+        min-width: 0;
+    }
+
+    .app-title-container {
+        gap: var(--spacing-xs);
+    }
+
+    .app-logo {
+        width: 28px;
+        height: 28px;
+    }
+
+    .app-title {
+        font-size: 18px;
+        display: none;
+        /* Hide title on small screens to save space */
+    }
+
+    /* Show hamburger menu */
+    .mobile-menu-toggle {
+        display: flex;
+        order: -1;
+        /* Put it first */
+    }
+
+    /* Hide regular search on mobile, show it in a drawer instead */
+    .search-container {
+        position: fixed;
+        top: 56px;
+        left: 0;
+        right: 0;
+        padding: var(--spacing-md);
+        background: var(--header-bg);
+        border-bottom: 1px solid var(--border-color);
+        z-index: 99;
+        transform: translateY(-100%);
+        transition: transform 0.3s ease;
+        display: none;
+    }
+
+    .search-container.mobile-active {
+        transform: translateY(0);
+        display: flex;
+    }
+
+    .search-input-wrapper {
+        width: 100%;
+    }
+
+    .search-shortcut {
+        display: none;
+    }
+
+    .search-input {
+        width: 100%;
+        flex: 1;
+    }
+
+    .header-right {
+        gap: 4px;
+        flex-shrink: 0;
+    }
+
+    /* Mobile toolbar - compact design */
+    .header-toolbar {
+        padding: 2px;
+        gap: 1px;
+        border-radius: var(--radius-lg);
+    }
+
+    .header-toolbar-btn {
+        padding: 8px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    .toolbar-btn-label {
+        display: none;
+    }
+
+    .toolbar-divider {
+        display: none;
+    }
+
+    /* Hide theme toggle on mobile - use overflow menu */
+    #theme-toggle {
+        display: none;
+    }
+
+    /* Tabs bar mobile styling */
+    .note-tabs-bar {
+        height: 38px;
+        padding: 0 var(--spacing-sm);
+    }
+
+    .note-tab {
+        padding: 6px 10px;
+        min-width: 80px;
+        max-width: 140px;
+        font-size: 12px;
+    }
+
+    /* Mobile sidebar - full screen overlay */
+    .sidebar {
+        position: fixed !important;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        max-width: 100%;
+        z-index: 150;
+        transform: translateX(-100%);
+        transition: transform 0.3s ease;
+        box-shadow: none;
+        border-right: none;
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: auto;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    /* Ensure sidebar flex container allows child to grow */
+    .notes-list {
+        min-height: 0;
+        height: auto;
+        max-height: none;
+    }
+
+    /* Hide sidebar toggle button on mobile */
+    .sidebar-toggle {
+        display: none;
+    }
+
+    /* Hide resize handle on mobile */
+    .sidebar-resize-handle {
+        display: none;
+    }
+
+    /* Mobile folder navigation */
+    .sidebar-folders {
+        max-height: 35%;
+        padding: var(--spacing-xs) var(--spacing-sm);
+    }
+
+    .folder-item {
+        padding: var(--spacing-xs) var(--spacing-sm);
+        min-height: 44px;
+    }
+
+    .tag-folder-item {
+        min-height: 40px;
+    }
+
+    .tag-folders-list {
+        max-height: 150px;
+    }
+
+    /* Sidebar backdrop */
+    .sidebar-backdrop {
+        display: none;
+        position: fixed;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 140;
+        opacity: 0;
+        transition: opacity 0.3s ease;
+    }
+
+    .sidebar-backdrop.active {
+        display: block;
+        opacity: 1;
+    }
+
+    /* Main content area takes full width */
+    .main-content-area {
+        flex: 1;
+        width: 100%;
+    }
+
+    /* Editor optimizations */
+    .editor-header {
+        padding: var(--spacing-sm);
+        gap: var(--spacing-xs);
+    }
+
+    .editor-header-top {
+        flex-wrap: wrap;
+        gap: var(--spacing-xs);
+    }
+
+    .note-title-input {
+        font-size: 16px;
+        /* Prevent zoom on iOS */
+        flex: 1 1 100%;
+        order: -1;
+    }
+
+    .editor-toolbar {
+        padding: 2px;
+        flex: 1;
+        justify-content: flex-end;
+    }
+
+    .editor-tool-btn {
+        width: 38px;
+        height: 38px;
+    }
+
+    .note-date {
+        font-size: 11px;
+        padding: 2px 6px;
+    }
+
+    .editor-wrapper {
+        padding: var(--spacing-md);
+        overflow: hidden;
+    }
+
+    .note-editor,
+    .markdown-preview {
+        font-size: 16px;
+        padding: var(--spacing-md);
+        min-height: 300px;
+    }
+
+    /* Enhanced mobile horizontal scrolling */
+    .markdown-preview {
+        -webkit-overflow-scrolling: touch;
+        scroll-behavior: smooth;
+    }
+
+    .markdown-preview pre,
+    .markdown-preview .table-container {
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* AI Panel - mobile overlay style */
+    .ai-panel {
+        position: fixed;
+        top: 56px;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        width: 100%;
+        z-index: 160;
+        transform: translateY(100%);
+        transition: transform 0.3s ease;
+        border-left: none;
+        border-top: 1px solid var(--border-color);
+    }
+
+    .ai-panel:not(.hidden) {
+        transform: translateY(0);
+    }
+
+    .ai-panel-content {
+        padding: var(--spacing-md);
+        min-height: 0;
+        overflow: hidden;
+    }
+
+    .ai-messages {
+        min-height: 0;
+        max-height: 100%;
+        flex: 1;
+    }
+
+    .ai-input-container {
+        padding: var(--spacing-sm);
+        flex-shrink: 0;
+    }
+
+    .ai-input {
+        font-size: 16px;
+        /* Prevent zoom on iOS */
+        padding: var(--spacing-sm);
+    }
+
+    .ai-send-btn {
+        min-width: 44px;
+        min-height: 44px;
+        padding: var(--spacing-sm);
+    }
+
+    /* Note items - larger touch targets */
+    .note-item {
+        padding: var(--spacing-md);
+        min-height: 70px;
+    }
+
+    .note-item-title {
+        font-size: 16px;
+    }
+
+    .note-item-preview {
+        font-size: 14px;
+    }
+
+    /* Buttons always visible on mobile (no hover needed) */
+    .note-pin-btn,
+    .note-delete-btn {
+        opacity: 1;
+        width: 40px;
+        height: 40px;
+        font-size: 16px;
+        min-width: 40px;
+        min-height: 40px;
+    }
+
+    /* Adjust delete button position to account for larger size */
+    .note-delete-btn {
+        right: calc(var(--spacing-sm) + 40px + var(--spacing-xs));
+    }
+
+    /* Modals optimized for mobile */
+    .modal {
+        padding: var(--spacing-sm);
+    }
+
+    .modal-content {
+        max-width: 100%;
+        max-height: 95vh;
+        margin: 0;
+    }
+
+    .modal-body {
+        max-height: calc(95vh - 120px);
+        padding: var(--spacing-md);
+    }
+
+    /* Advanced search panel */
+    .advanced-search-panel {
+        top: 56px;
+        width: 100%;
+        max-width: 100%;
+        max-height: calc(100vh - 60px);
+        left: 0;
+        transform: none;
+        border-radius: 0;
+    }
+
+    /* Template grid - single column on mobile */
+    .template-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-md);
+    }
+
+    /* Context menu adjustments */
+    .context-menu {
+        max-width: 90vw;
+    }
+
+    /* Overflow menus */
+    .editor-overflow-menu,
+    .header-overflow-menu {
+        right: auto;
+        left: auto;
+        max-width: 90vw;
+    }
+
+    /* No note placeholder */
+    .placeholder-content {
+        padding: var(--spacing-lg);
+    }
+
+    .placeholder-icon {
+        font-size: 60px;
+    }
+
+    .placeholder-title {
+        font-size: 24px;
+    }
+
+    .placeholder-description {
+        font-size: 16px;
+    }
+
+    /* Tag displays */
+    .note-tags-display {
+        max-width: 100%;
+        max-height: 50px;
+    }
+
+    .editor-note-tags {
+        max-height: 50px;
+    }
+
+    /* Find/Replace dialog */
+    .find-replace-dialog {
+        width: 100%;
+        max-width: 100%;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        max-height: 100%;
+        border-radius: 0;
+    }
+
+    /* Reduce animations on mobile for better performance */
+    .note-item:hover,
+    .action-btn:hover,
+    .new-note-btn:hover,
+    .note-item:hover .note-pin-btn,
+    .note-item:hover .note-delete-btn,
+    .note-pin-btn:hover,
+    .note-delete-btn:hover {
+        transform: none !important;
+    }
+
+    /* Remove rotation from pinned button on mobile */
+    .note-pin-btn.pinned {
+        transform: none !important;
+    }
+}
+
+/* Small Mobile Devices (small phones) */
+@media (max-width: 480px) {
+    .app-header {
+        height: 52px;
+        padding: 0 8px;
+    }
+
+    .header-right {
+        gap: 2px;
+    }
+
+    /* Compact toolbar for small screens */
+    .header-toolbar {
+        padding: 2px;
+    }
+
+    .header-toolbar-btn {
+        min-width: 36px;
+        min-height: 36px;
+        padding: 6px;
+    }
+
+    /* Adjust overlay elements to match smaller header */
+    .sidebar,
+    .sidebar-backdrop,
+    .search-container,
+    .ai-panel,
+    .advanced-search-panel,
+    .find-replace-dialog {
+        top: 52px;
+    }
+
+    /* Even more compact editor */
+    .editor-header {
+        padding: 6px 8px;
+    }
+
+    .editor-toolbar {
+        padding: 2px;
+    }
+
+    .editor-tool-btn {
+        width: 32px;
+        height: 32px;
+    }
+
+    .editor-toolbar-divider {
+        display: none;
+    }
+
+    .editor-wrapper {
+        padding: var(--spacing-sm);
+    }
+
+    /* Smaller fonts for very small screens */
+    .note-item-title {
+        font-size: 15px;
+    }
+
+    .note-item-preview {
+        font-size: 13px;
+    }
+
+    .sidebar-toggle {
+        display: none;
+    }
+
+    /* AI messages more compact */
+    .ai-message {
+        padding: var(--spacing-sm);
+        font-size: 13px;
+    }
+
+    .ai-messages {
+        padding: var(--spacing-sm);
+    }
+
+    /* Placeholder even smaller */
+    .placeholder-icon {
+        font-size: 48px;
+    }
+
+    .placeholder-title {
+        font-size: 20px;
+    }
+
+    .placeholder-description {
+        font-size: 14px;
+    }
+}
+
+/* Landscape mode on mobile */
+@media (max-width: 896px) and (orientation: landscape) {
+
+    /* Reduce header height in landscape */
+    .app-header {
+        height: 48px;
+    }
+
+    .sidebar {
+        position: fixed !important;
+        top: 48px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        width: 100%;
+        transform: translateX(-100%);
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        height: auto;
+    }
+
+    .sidebar.mobile-open {
+        transform: translateX(0);
+    }
+
+    /* Hide sidebar toggle on landscape mobile too */
+    .sidebar-toggle {
+        display: none;
+    }
+
+    .sidebar-backdrop {
+        top: 48px;
+    }
+
+    .ai-panel {
+        position: fixed !important;
+        top: 48px;
+        width: 50%;
+        left: auto;
+        right: 0;
+        bottom: 0;
+        transform: translateX(100%);
+        border-left: 1px solid var(--border-color);
+        border-top: none;
+    }
+
+    .ai-panel:not(.hidden) {
+        transform: translateX(0);
+    }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+
+    /* Ensure all interactive elements are touch-friendly */
+    button,
+    .action-btn,
+    .note-item,
+    .context-menu-item,
+    .overflow-menu-item {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Show action buttons always (no hover state on touch) */
+    .note-pin-btn,
+    .note-delete-btn,
+    .template-delete-btn {
+        opacity: 1;
+    }
+
+    /* Disable hover animations on touch devices */
+    .note-item:hover,
+    .action-btn:hover,
+    .btn-primary:hover,
+    .btn-secondary:hover {
+        transform: none !important;
+    }
+
+    /* Better tap highlights */
+    * {
+        -webkit-tap-highlight-color: rgba(62, 207, 142, 0.2);
+    }
+
+    /* Prevent text selection during touch interactions */
+    .note-item,
+    .action-btn,
+    button {
+        -webkit-user-select: none;
+        user-select: none;
+    }
+
+    /* But allow text selection in editor and preview */
+    .note-editor,
+    .markdown-preview,
+    .note-title-input {
+        -webkit-user-select: text;
+        user-select: text;
+    }
+}
+
+/* Print styles */
+@media print {
+
+    .app-header,
+    .sidebar,
+    .ai-panel,
+    .editor-header,
+    .editor-actions,
+    .mobile-menu-toggle,
+    .sidebar-backdrop {
+        display: none !important;
+    }
+
+    .main-content-area {
+        width: 100%;
+    }
+
+    .editor-wrapper {
+        padding: 0;
+    }
+
+    .markdown-preview,
+    .note-editor {
+        max-height: none;
+        overflow: visible;
+    }
+}

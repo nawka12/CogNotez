@@ -1,0 +1,31 @@
+/* Modern Reset and Base Styles */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+/* Modern Font Stack */
+body {
+    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-size: var(--font-size-base);
+    line-height: var(--line-height-normal);
+    overflow: hidden;
+    font-weight: var(--font-weight-normal);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    background: var(--bg-primary);
+    color: var(--text-primary);
+}
+
+#app {
+    height: 100dvh;
+    /* Reliable viewport height in Chromium/Electron */
+    min-height: 100vh;
+    /* Fallback */
+    display: flex;
+    flex-direction: column;
+    background: var(--gradient-subtle);
+    position: relative;
+}
+

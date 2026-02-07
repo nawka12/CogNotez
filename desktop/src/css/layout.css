@@ -1,0 +1,174 @@
+
+/* =====================================================
+   NOTE TABS BAR - Multi-note Tab System
+   ===================================================== */
+.note-tabs-bar {
+    display: none;
+    /* Hidden by default, shown when tabs exist */
+    height: 42px;
+    background: var(--bg-secondary);
+    border-bottom: 1px solid var(--border-color);
+    padding: 0 var(--spacing-md);
+    align-items: flex-end;
+    gap: var(--spacing-xs);
+    position: relative;
+    z-index: 99;
+    overflow: hidden;
+}
+
+.note-tabs-bar.has-tabs {
+    display: flex;
+}
+
+.note-tabs-container {
+    display: flex;
+    align-items: flex-end;
+    gap: 2px;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scrollbar-width: none;
+    -ms-overflow-style: none;
+    padding-bottom: 0;
+    margin-bottom: -1px;
+    /* Overlap border */
+}
+
+.note-tabs-container::-webkit-scrollbar {
+    display: none;
+}
+
+.note-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 12px;
+    background: var(--bg-tertiary);
+    border: 1px solid var(--border-color);
+    border-bottom: none;
+    border-radius: var(--radius-md) var(--radius-md) 0 0;
+    cursor: grab;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    max-width: 200px;
+    min-width: 120px;
+    position: relative;
+    flex-shrink: 0;
+    user-select: none;
+}
+
+.note-tab:hover {
+    background: var(--surface-elevated);
+    color: var(--text-primary);
+}
+
+/* Drag and drop states */
+.note-tab.dragging {
+    opacity: 0.5;
+    cursor: grabbing;
+}
+
+.note-tab.drag-over {
+    border-left: 3px solid var(--accent-color);
+    margin-left: -2px;
+}
+
+.note-tab.drag-over-right {
+    border-right: 3px solid var(--accent-color);
+    margin-right: -2px;
+}
+
+.note-tab.active {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    border-color: var(--border-color);
+    z-index: 1;
+}
+
+.note-tab.active::after {
+    content: '';
+    position: absolute;
+    bottom: -1px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--bg-primary);
+}
+
+.note-tab.unsaved::before {
+    content: '';
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 6px;
+    height: 6px;
+    background: var(--warning-color);
+    border-radius: 50%;
+}
+
+.note-tab.unsaved {
+    padding-left: 20px;
+}
+
+.note-tab-title {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-weight: var(--font-weight-medium);
+    line-height: 1.2;
+}
+
+.note-tab-close {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    transition: all 0.15s ease;
+    font-size: 10px;
+    opacity: 0;
+    flex-shrink: 0;
+}
+
+.note-tab:hover .note-tab-close,
+.note-tab.active .note-tab-close {
+    opacity: 1;
+}
+
+.note-tab-close:hover {
+    background: var(--error-light);
+    color: var(--error-color);
+}
+
+.tabs-overflow-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
+    background: var(--button-bg);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    color: var(--text-secondary);
+    transition: all 0.2s ease;
+    flex-shrink: 0;
+    margin-bottom: 6px;
+}
+
+.tabs-overflow-btn:hover {
+    background: var(--button-hover-bg);
+    color: var(--accent-color);
+}
+
+.tabs-overflow-btn.hidden {
+    display: none;
+}
+
