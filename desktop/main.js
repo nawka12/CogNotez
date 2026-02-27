@@ -960,18 +960,18 @@ if (ipcMain) {
   });
 
   // App restart handler
+  // Instead of a full process restart (which causes FUSE mount conflicts on
+  // AppImage and SIGTRAP on relaunch), reset main-process auth/sync state and
+  // reload the renderer. This is sufficient for all current restart triggers
+  // (Google Drive connect/disconnect, API key change).
   ipcMain.on('restart-app', () => {
-    console.log('[Main] Restarting application...');
-    // On Linux AppImage, process.execPath points to the extracted binary inside
-    // the FUSE mount, not the AppImage wrapper. Relaunching that path directly
-    // crashes because it lacks the AppImage environment. Use APPIMAGE env var
-    // (set by the AppImage runtime) to relaunch through the wrapper instead.
-    if (process.env.APPIMAGE) {
-      app.relaunch({ execPath: process.env.APPIMAGE, args: process.argv.slice(1) });
-    } else {
-      app.relaunch();
+    console.log('[Main] Soft-restarting: clearing auth state and reloading renderer...');
+    global.googleAuthManager = null;
+    global.googleDriveSyncManager = null;
+    globalSyncInProgress = false;
+    if (mainWindow) {
+      mainWindow.loadFile(path.join(__dirname, 'src/index.html'));
     }
-    app.quit();
   });
 
   // Google Drive sync IPC handlers
