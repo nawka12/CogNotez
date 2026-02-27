@@ -1,7 +1,7 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 
-![Version](https://img.shields.io/badge/version-2.4.1-blue.svg)
+![Version](https://img.shields.io/badge/version-2.4.8-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -268,7 +268,13 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.4.1 (Current)
+### v2.4.8 (Current)
+- Fixed crash (SIGTRAP) when restarting after Google Drive login/logout on Linux AppImage
+- Replaced full process restart with renderer reload to avoid AppImage FUSE mount conflicts
+- Fixed race condition where GoogleAuthManager initialization wasn't awaited before first use
+- Fixed sync not activating immediately after login following a soft restart
+
+### v2.4.1
 - Fixed Google Drive sync edge cases causing notes to disappear on multi-device setups
 - Implemented proper syncVersion tracking for optimistic locking during sync
 - Fixed deletion inference logic to not falsely delete notes created offline on other devices
