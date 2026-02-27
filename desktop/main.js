@@ -964,11 +964,17 @@ if (ipcMain) {
   // AppImage and SIGTRAP on relaunch), reset main-process auth/sync state and
   // reload the renderer. This is sufficient for all current restart triggers
   // (Google Drive connect/disconnect, API key change).
-  ipcMain.on('restart-app', () => {
+  ipcMain.on('restart-app', async () => {
     console.log('[Main] Soft-restarting: clearing auth state and reloading renderer...');
-    global.googleAuthManager = null;
     global.googleDriveSyncManager = null;
     globalSyncInProgress = false;
+    // Re-initialize auth manager from disk BEFORE reloading the renderer so that
+    // google-drive-get-sync-status finds an already-ready instance. Without this,
+    // the renderer's initializeSync() calls get-sync-status while googleAuthManager
+    // is still null, isAuthenticated comes back false, and startup sync is skipped.
+    const { GoogleAuthManager } = require('./src/js/google-auth.js');
+    global.googleAuthManager = new GoogleAuthManager();
+    await global.googleAuthManager._initPromise;
     if (mainWindow) {
       mainWindow.loadFile(path.join(__dirname, 'src/index.html'));
     }
