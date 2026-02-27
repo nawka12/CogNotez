@@ -4652,11 +4652,6 @@ Please provide a helpful response based on the note content and conversation his
             if (typeof ipcRenderer !== 'undefined') {
                 // Request main process to relaunch the app
                 ipcRenderer.send('restart-app');
-
-                // Fallback to reload if restart message doesn't work after 1 second
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
             } else {
                 // Not in Electron, just reload the page
                 window.location.reload();

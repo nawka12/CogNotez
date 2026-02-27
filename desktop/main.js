@@ -963,7 +963,7 @@ if (ipcMain) {
   ipcMain.on('restart-app', () => {
     console.log('[Main] Restarting application...');
     app.relaunch();
-    app.exit(0);
+    app.quit();
   });
 
   // Google Drive sync IPC handlers
