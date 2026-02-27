@@ -962,7 +962,15 @@ if (ipcMain) {
   // App restart handler
   ipcMain.on('restart-app', () => {
     console.log('[Main] Restarting application...');
-    app.relaunch();
+    // On Linux AppImage, process.execPath points to the extracted binary inside
+    // the FUSE mount, not the AppImage wrapper. Relaunching that path directly
+    // crashes because it lacks the AppImage environment. Use APPIMAGE env var
+    // (set by the AppImage runtime) to relaunch through the wrapper instead.
+    if (process.env.APPIMAGE) {
+      app.relaunch({ execPath: process.env.APPIMAGE, args: process.argv.slice(1) });
+    } else {
+      app.relaunch();
+    }
     app.quit();
   });
 
