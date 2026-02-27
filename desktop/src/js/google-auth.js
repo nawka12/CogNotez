@@ -19,7 +19,7 @@ class GoogleAuthManager {
             'https://www.googleapis.com/auth/drive.metadata.readonly' // Read metadata of files
         ];
 
-        this.initialize();
+        this._initPromise = this.initialize();
     }
 
     async initialize() {

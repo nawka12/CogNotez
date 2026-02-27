@@ -433,7 +433,7 @@ async function initApp() {
     console.log('[Main] Initializing Google Auth Manager...');
     const { GoogleAuthManager } = require('./src/js/google-auth.js');
     global.googleAuthManager = new GoogleAuthManager();
-    await global.googleAuthManager.initialize();
+    await global.googleAuthManager._initPromise;
     console.log('[Main] Google Auth Manager initialized successfully');
   } catch (error) {
     console.error('[Main] Failed to initialize Google Auth Manager:', error);
@@ -982,6 +982,7 @@ if (ipcMain) {
         const { GoogleAuthManager } = require('./src/js/google-auth.js');
         global.googleAuthManager = new GoogleAuthManager();
       }
+      await global.googleAuthManager._initPromise;
 
       const authResult = await global.googleAuthManager.authenticate();
 
@@ -1583,6 +1584,7 @@ if (ipcMain) {
       if (!global.googleAuthManager) {
         const { GoogleAuthManager } = require('./src/js/google-auth.js');
         global.googleAuthManager = new GoogleAuthManager();
+        await global.googleAuthManager._initPromise;
       }
 
       // Read credentials file
