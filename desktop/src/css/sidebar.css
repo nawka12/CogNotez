@@ -394,7 +394,7 @@ body.sidebar-resizing * {
     opacity: 0.9;
 }
 
-/* Notes List - Premium Card Layout */
+/* Notes List */
 .notes-list {
     flex: 1;
     overflow-y: auto;
@@ -409,7 +409,7 @@ body.sidebar-resizing * {
 .note-item {
     padding: 7px 8px;
     cursor: pointer;
-    transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+    transition: background-color 0.2s ease, border-color 0.2s ease;
     display: flex;
     flex-direction: column;
     /* Changed to column for better content flow */
@@ -444,8 +444,6 @@ body.sidebar-resizing * {
 
 /* Pinned Note - Distinct Visuals */
 .note-item.pinned {
-    background: var(--bg-tertiary);
-    border-color: var(--border-color);
 }
 
 .note-item.pinned:hover {
@@ -454,9 +452,7 @@ body.sidebar-resizing * {
 }
 
 .note-item.pinned.active {
-    background: var(--bg-primary);
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 1px var(--accent-color), 0 4px 12px rgba(0, 0, 0, 0.05);
+    border-left: 2px solid var(--accent-color);
 }
 
 .note-item.pinned::before {
@@ -505,12 +501,13 @@ body.sidebar-resizing * {
 
 /* Password-protected note styling */
 .note-item:has(.note-lock-icon) {
-    border-left: 3px solid var(--accent-color);
-    background: linear-gradient(90deg, var(--accent-color-lightest) 0%, var(--card-bg) 100%);
+    border-left: 2px solid rgba(189, 171, 227, 0.5);
+    background: rgba(189, 171, 227, 0.04);
 }
 
 .note-item:has(.note-lock-icon):hover {
-    background: linear-gradient(90deg, var(--accent-color-lighter) 0%, var(--surface-elevated) 100%);
+    background: rgba(189, 171, 227, 0.09);
+    border-left-color: rgba(189, 171, 227, 0.5);
 }
 
 /* Note Preview */
