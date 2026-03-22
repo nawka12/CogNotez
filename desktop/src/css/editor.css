@@ -465,7 +465,13 @@
 .editor-header-meta {
     display: flex;
     align-items: center;
-    gap: var(--spacing-sm);
+    gap: 10px;
+    padding-bottom: 18px;
+    margin-bottom: 18px;
+    border-bottom: 1px solid var(--border-color);
+    font-style: italic;
+    font-size: 11px;
+    color: var(--text-tertiary);
     flex-wrap: wrap;
     min-height: 0;
 }
@@ -608,6 +614,11 @@
     margin: 0;
     cursor: text;
     box-shadow: none !important;
+    font-family: var(--font-family-display);
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1.15;
 }
 
 /* Responsive title sizing */
@@ -863,7 +874,7 @@
 /* Editor Wrapper */
 .editor-wrapper {
     flex: 1;
-    padding: var(--spacing-xl);
+    padding: 36px 64px;
     overflow: hidden;
     min-height: 0;
     background: var(--editor-bg);
@@ -912,6 +923,9 @@
     scroll-behavior: smooth;
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
+    font-family: var(--font-family-base);
+    font-size: 15px;
+    line-height: 1.9;
 }
 
 .note-editor:hover,
