@@ -142,7 +142,7 @@
   /* Dark Border System */
   --border-color: #1a2332;
   --border-color-light: #1e2d40;
-  --border-color-subtle: #1e293b;
+  --border-color-subtle: #141c28;
 
   /* Enhanced Accent for Dark Mode */
   --accent-color: #bdabe3;
@@ -156,7 +156,7 @@
   /* Dark Gradient System */
   --gradient-primary: linear-gradient(135deg, #bdabe3 0%, #c8b8e8 100%);
   --gradient-subtle: linear-gradient(135deg, rgba(189, 171, 227, 0.18) 0%, rgba(200, 184, 232, 0.1) 100%);
-  --gradient-surface: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+  --gradient-surface: linear-gradient(135deg, #0d1117 0%, #141c28 100%);
   --gradient-accent: linear-gradient(135deg, rgba(189, 171, 227, 0.2) 0%, rgba(200, 184, 232, 0.12) 100%);
 
   /* Dark Surface Colors */
@@ -164,17 +164,17 @@
   --sidebar-bg: rgba(10, 14, 22, 0.95);
   --editor-bg: #0d1117;
   --input-bg: rgba(20, 28, 40, 0.9);
-  --button-bg: rgba(30, 41, 59, 0.95);
+  --button-bg: rgba(20, 28, 40, 0.95);
   --button-hover-bg: rgba(189, 171, 227, 0.18);
   --button-active-bg: rgba(189, 171, 227, 0.22);
   --note-hover-bg: rgba(189, 171, 227, 0.15);
   --note-active-bg: rgba(189, 171, 227, 0.2);
-  --context-menu-bg: rgba(15, 23, 42, 0.98);
-  --context-menu-hover-bg: rgba(189, 171, 227, 0.25);
-  --modal-bg: rgba(15, 23, 42, 0.98);
-  --message-bg: rgba(30, 41, 59, 0.95);
+  --context-menu-bg: #111827;
+  --context-menu-hover-bg: rgba(189, 171, 227, 0.15);
+  --modal-bg: rgba(10, 14, 22, 0.98);
+  --message-bg: rgba(20, 28, 40, 0.95);
   --context-highlight-bg: rgba(189, 171, 227, 0.25);
-  --card-bg: rgba(30, 41, 59, 0.95);
+  --card-bg: rgba(20, 28, 40, 0.95);
 
   /* Enhanced Dark Shadow System */
   --shadow-xs: 0 1px 2px 0 rgba(0, 0, 0, 0.4);
@@ -210,8 +210,8 @@
   --error-light: rgba(239, 68, 68, 0.2);
 
   /* Dark Surface Colors */
-  --surface-bg: rgba(15, 23, 42, 0.8);
-  --surface-elevated: rgba(30, 41, 59, 0.9);
+  --surface-bg: rgba(10, 14, 22, 0.8);
+  --surface-elevated: rgba(20, 28, 40, 0.9);
 
   /* Typography */
   --font-family-base: 'Source Serif 4', Georgia, serif;
