@@ -445,9 +445,9 @@
 
 /* Revamped Editor Header */
 .editor-header {
-    padding: var(--spacing-md) var(--spacing-lg);
-    background: var(--surface-elevated);
-    border-bottom: 1px solid var(--border-color);
+    padding: 48px 64px 0 64px;
+    background: transparent;
+    border-bottom: none;
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
@@ -466,8 +466,8 @@
     display: flex;
     align-items: center;
     gap: 10px;
-    padding-bottom: 18px;
-    margin-bottom: 18px;
+    padding-bottom: 20px;
+    margin-bottom: 0;
     border-bottom: 1px solid var(--border-color);
     font-style: italic;
     font-size: 11px;
@@ -530,7 +530,7 @@
 /* Responsive editor header */
 @media (max-width: 900px) {
     .editor-header {
-        padding: var(--spacing-sm) var(--spacing-md);
+        padding: 32px 32px 0 32px;
     }
 
     .editor-header-top {
@@ -870,7 +870,7 @@
 /* Editor Wrapper */
 .editor-wrapper {
     flex: 1;
-    padding: 36px 64px;
+    padding: 0 64px 48px 64px;
     overflow: hidden;
     min-height: 0;
     background: var(--editor-bg);
@@ -901,9 +901,8 @@
     color: var(--text-primary);
     resize: none;
     outline: none !important;
-    padding: var(--spacing-xl);
-    padding-bottom: 80px;
-    /* Extra padding to prevent word count obstruction and content cutoff */
+    padding: 28px 0 80px 0;
+    /* top: breathing room after separator; bottom: prevents word count obstruction */
     overflow-y: auto;
     overflow-x: hidden;
     border-radius: 0;
