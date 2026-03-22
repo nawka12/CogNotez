@@ -1,7 +1,7 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 
-![Version](https://img.shields.io/badge/version-2.4.8-blue.svg)
+![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -268,7 +268,19 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v2.4.8 (Current)
+### v3.0.0 (Current)
+- **Complete visual redesign** — Fraunces (display) + Source Serif 4 (body) typography, replacing Inter
+- Reduced gradient text overuse — lavender gradient kept only on app title as the single brand moment
+- Note sidebar redesigned from cards to compact dense list with left-border accent
+- Tab bar redesigned as pill-shaped chips with dot indicator
+- Editor open-page treatment — large display-font title, generous padding, no panel header separation
+- Deeper dark mode palette — near-black backgrounds for better contrast and atmosphere
+- Scoped theme transition from `*` to specific surfaces for improved render performance
+- Fixed 3-dot overflow menu rendering white/transparent in dark mode (Electron backdrop-filter compositing issue)
+- Fixed dark mode color inconsistency across surfaces (orphaned surface tokens still using old slate-blue values)
+- Fixed native menu labels (File, Edit, AI, View, Settings, Help) showing as raw translation keys on English restart
+
+### v2.4.8
 - Fixed crash (SIGTRAP) when restarting after Google Drive login/logout on Linux AppImage
 - Replaced full process restart with renderer reload to avoid AppImage FUSE mount conflicts
 - Fixed race condition where GoogleAuthManager initialization wasn't awaited before first use
