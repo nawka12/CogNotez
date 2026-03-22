@@ -7,7 +7,7 @@
 
 /* Modern Font Stack */
 body {
-    font-family: 'Inter', 'SF Pro Display', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+    font-family: var(--font-family-base);
     font-size: var(--font-size-base);
     line-height: var(--line-height-normal);
     overflow: hidden;

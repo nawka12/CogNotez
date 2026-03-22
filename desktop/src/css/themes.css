@@ -122,6 +122,10 @@
   --letter-spacing-tight: -0.025em;
   --letter-spacing-normal: 0;
   --letter-spacing-wide: 0.025em;
+
+  /* Typography */
+  --font-family-base: 'Source Serif 4', Georgia, serif;
+  --font-family-display: 'Fraunces', Georgia, serif;
 }
 
 /* Dark Theme - Modern Dark Design */
@@ -208,6 +212,10 @@
   /* Dark Surface Colors */
   --surface-bg: rgba(15, 23, 42, 0.8);
   --surface-elevated: rgba(30, 41, 59, 0.9);
+
+  /* Typography */
+  --font-family-base: 'Source Serif 4', Georgia, serif;
+  --font-family-display: 'Fraunces', Georgia, serif;
 }
 
 /* Base body styling that uses theme variables */
