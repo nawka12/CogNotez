@@ -62,8 +62,9 @@
 }
 
 .note-tab:hover {
-    background: var(--surface-elevated);
+    background: rgba(189, 171, 227, 0.1);
     color: var(--text-primary);
+    border-color: rgba(189, 171, 227, 0.4);
 }
 
 /* Drag and drop states */
@@ -107,7 +108,7 @@
     content: '';
     position: absolute;
     top: 8px;
-    left: 8px;
+    left: 10px;
     width: 6px;
     height: 6px;
     background: var(--warning-color);
