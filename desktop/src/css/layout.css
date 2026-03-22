@@ -168,7 +168,6 @@
     color: var(--text-secondary);
     transition: all 0.2s ease;
     flex-shrink: 0;
-    margin-bottom: 6px;
 }
 
 .tabs-overflow-btn:hover {
