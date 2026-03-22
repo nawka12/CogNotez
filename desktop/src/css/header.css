@@ -46,6 +46,7 @@
 .app-title {
     font-size: var(--font-size-xl);
     font-weight: var(--font-weight-bold);
+    font-family: var(--font-family-display);
     color: var(--text-primary);
     background: var(--gradient-primary);
     -webkit-background-clip: text;

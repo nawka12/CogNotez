@@ -25,14 +25,10 @@
 .ai-panel-header h3 {
     font-size: var(--font-size-lg);
     font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
+    color: var(--accent-color);
     letter-spacing: var(--letter-spacing-tight);
     line-height: var(--line-height-tight);
     margin: 0;
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
 }
 
 .ai-panel-actions {
