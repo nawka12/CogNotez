@@ -227,7 +227,9 @@ body {
 /* Targeted theme transition — applied only to visible surfaces */
 .app-header,
 .sidebar,
-.editor-area,
+.main-content-area,
+.editor-header,
+.header-toolbar,
 .ai-panel,
 .note-item,
 .folder-item,
