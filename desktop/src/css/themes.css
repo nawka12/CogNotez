@@ -131,17 +131,17 @@
 /* Dark Theme - Modern Dark Design */
 [data-theme="dark"] {
   /* Dark Color Palette */
-  --bg-primary: #0f172a;
-  --bg-secondary: #1e293b;
-  --bg-tertiary: #334155;
+  --bg-primary: #0d1117;
+  --bg-secondary: #0a0e16;
+  --bg-tertiary: #141c28;
   --text-primary: #f1f5f9;
   --text-secondary: #cbd5e1;
   --text-tertiary: #94a3b8;
   --text-muted: #64748b;
 
   /* Dark Border System */
-  --border-color: #334155;
-  --border-color-light: #475569;
+  --border-color: #1a2332;
+  --border-color-light: #1e2d40;
   --border-color-subtle: #1e293b;
 
   /* Enhanced Accent for Dark Mode */
@@ -160,10 +160,10 @@
   --gradient-accent: linear-gradient(135deg, rgba(189, 171, 227, 0.2) 0%, rgba(200, 184, 232, 0.12) 100%);
 
   /* Dark Surface Colors */
-  --header-bg: rgba(15, 23, 42, 0.92);
-  --sidebar-bg: rgba(30, 41, 59, 0.85);
-  --editor-bg: #0f172a;
-  --input-bg: rgba(30, 41, 59, 0.9);
+  --header-bg: rgba(9, 12, 18, 0.96);
+  --sidebar-bg: rgba(10, 14, 22, 0.95);
+  --editor-bg: #0d1117;
+  --input-bg: rgba(20, 28, 40, 0.9);
   --button-bg: rgba(30, 41, 59, 0.95);
   --button-hover-bg: rgba(189, 171, 227, 0.18);
   --button-active-bg: rgba(189, 171, 227, 0.22);
