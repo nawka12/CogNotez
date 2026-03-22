@@ -742,13 +742,11 @@ body {
 
   .editor-header {
     min-height: 45px;
-    /* Reduce editor header height */
-    padding: 6px 18px;
+    padding: 20px 48px 0 48px;
   }
 
   .editor-wrapper {
-    padding: 16px;
-    /* Slightly reduce padding to save space */
+    padding: 0 48px 20px 48px;
   }
 
   .ai-panel-content {
@@ -794,12 +792,10 @@ body {
   .sync-status-text {
     font-size: 12px;
     max-width: 110px;
-    /* Slightly smaller to fit better */
   }
 
   .note-title-input {
-    font-size: 15px;
-    /* Slightly smaller for better fit */
+    font-size: 26px;
   }
 
   /* Optimize spacing for 1366px width */
@@ -808,6 +804,6 @@ body {
   }
 
   .editor-header {
-    padding: 6px 16px;
+    padding: 20px 48px 0 48px;
   }
 }
