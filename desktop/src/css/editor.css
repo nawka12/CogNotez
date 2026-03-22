@@ -597,8 +597,6 @@
 .note-title-input {
     border: none !important;
     background: transparent !important;
-    font-size: var(--font-size-2xl);
-    font-weight: var(--font-weight-bold);
     color: var(--text-primary);
     outline: none !important;
     overflow: visible;
@@ -606,8 +604,6 @@
     white-space: nowrap;
     min-width: 0;
     flex: 1;
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: 1.3;
     transition: none;
     padding: 0;
     border-radius: 0;
@@ -902,9 +898,6 @@
     min-height: 300px;
     border: none !important;
     background: transparent !important;
-    font-family: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'Source Code Pro', monospace;
-    font-size: var(--font-size-base);
-    line-height: var(--line-height-relaxed);
     color: var(--text-primary);
     resize: none;
     outline: none !important;
@@ -982,6 +975,7 @@
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
     font-size: var(--font-size-base);
+    font-family: var(--font-family-base);
 }
 
 /* Custom scrollbar for markdown preview */
