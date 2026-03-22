@@ -403,38 +403,38 @@ body.sidebar-resizing * {
     scrollbar-color: var(--scrollbar-thumb) transparent;
     display: flex;
     flex-direction: column;
-    gap: 12px;
+    gap: 1px;
 }
 
 .note-item {
-    padding: 16px;
+    padding: 7px 8px;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
     display: flex;
     flex-direction: column;
     /* Changed to column for better content flow */
-    gap: 8px;
-    min-height: auto;
+    gap: 3px;
     position: relative;
-    border-radius: 16px;
-    background: var(--card-bg);
-    border: 1px solid transparent;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
+    border-radius: 6px;
+    background: transparent;
+    border-left: 2px solid transparent;
+    box-shadow: none;
 }
 
 /* Hover effect */
 .note-item:hover {
-    background: var(--surface-elevated);
-    transform: translateY(-2px);
-    box-shadow: 0 8px 16px rgba(0, 0, 0, 0.06);
-    z-index: 10;
+    background: rgba(189, 171, 227, 0.07);
+    border-left-color: rgba(189, 171, 227, 0.35);
+    transform: none;
+    box-shadow: none;
 }
 
 /* Active State - strongly clear */
 .note-item.active {
-    background: var(--bg-primary);
-    border-color: var(--accent-color);
-    box-shadow: 0 0 0 1px var(--accent-color), 0 4px 12px rgba(0, 0, 0, 0.05);
+    background: rgba(189, 171, 227, 0.12);
+    border: none;
+    border-left: 2px solid var(--accent-color);
+    box-shadow: none;
 }
 
 /* Remove the left border "sash" - it's outdated. Use border selection instead. */
@@ -446,7 +446,6 @@ body.sidebar-resizing * {
 .note-item.pinned {
     background: var(--bg-tertiary);
     border-color: var(--border-color);
-    border-top: 2px solid var(--accent-color);
 }
 
 .note-item.pinned:hover {
@@ -516,14 +515,14 @@ body.sidebar-resizing * {
 
 /* Note Preview */
 .note-item-preview {
-    font-size: 13px;
+    font-size: 10px;
     color: var(--text-secondary);
     line-height: 1.5;
     overflow: hidden;
     text-overflow: ellipsis;
     display: -webkit-box;
-    -webkit-line-clamp: 2;
-    line-clamp: 2;
+    -webkit-line-clamp: 1;
+    line-clamp: 1;
     -webkit-box-orient: vertical;
     word-break: break-word;
     margin-bottom: 8px;
@@ -576,6 +575,7 @@ body.sidebar-resizing * {
     font-size: 11px;
     color: var(--text-tertiary);
     font-weight: 500;
+    font-style: italic;
     background: transparent;
     padding: 0;
     border: none;
