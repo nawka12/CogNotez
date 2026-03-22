@@ -1971,7 +1971,7 @@ if (ipcMain) {
 
 // Load translations for menu
 let menuTranslations = {};
-let currentMenuLanguage = 'en';
+let currentMenuLanguage = null;
 
 const loadMenuTranslations = async (lang = 'en') => {
   try {
