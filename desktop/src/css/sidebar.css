@@ -127,12 +127,14 @@ body.sidebar-resizing * {
 .sidebar-folders {
     padding: 0 16px 16px 16px;
     border-bottom: 1px solid var(--border-color);
-    background: transparent;
+    background: var(--bg-secondary);
     flex-shrink: 0;
     max-height: 40%;
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--scrollbar-thumb) transparent;
+    position: relative;
+    z-index: 1;
 }
 
 .folder-item {
