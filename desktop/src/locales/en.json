@@ -90,7 +90,8 @@
     "modified": "Modified",
     "words": "words",
     "chars": "chars",
-    "draft": "DRAFT"
+    "draft": "DRAFT",
+    "dropCap": "DROP-CAP"
   },
   "ai": {
     "assistant": "Companion",

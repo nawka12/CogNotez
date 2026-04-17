@@ -1342,3 +1342,23 @@
     color: white;
 }
 
+/* Drop-cap toggle visibility — only shown when preview pane is visible */
+.editor-tool-btn.drop-cap-only {
+    display: none;
+}
+
+body.preview-active .editor-tool-btn.drop-cap-only {
+    display: inline-flex;
+}
+
+/* Drop-cap rendering via ::first-letter (no JS DOM mutation) */
+body.note-drop-cap .markdown-preview > p:first-child::first-letter {
+    font-family: var(--font-family-display);
+    font-size: 48px;
+    font-weight: 500;
+    line-height: 1;
+    float: left;
+    margin: 0 6px 0 0;
+    color: var(--text-primary);
+}
+

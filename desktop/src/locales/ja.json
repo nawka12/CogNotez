@@ -90,7 +90,8 @@
     "modified": "更新",
     "words": "語",
     "chars": "文字",
-    "draft": "下書き"
+    "draft": "下書き",
+    "dropCap": "ドロップキャップ"
   },
   "ai": {
     "assistant": "伴走者",

@@ -90,7 +90,8 @@
     "modified": "Diubah",
     "words": "kata",
     "chars": "karakter",
-    "draft": "DRAF"
+    "draft": "DRAF",
+    "dropCap": "KAPITAL HIAS"
   },
   "ai": {
     "assistant": "Pendamping",

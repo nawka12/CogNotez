@@ -442,6 +442,7 @@ class CogNotezApp {
                 wrapper.classList.remove('split-mode');
                 this.removeLivePreview();
                 this.removeSyncScroll();
+                document.body.classList.remove('preview-active');
                 break;
             case 'preview':
                 editor.classList.add('hidden');
@@ -449,6 +450,7 @@ class CogNotezApp {
                 wrapper.classList.remove('split-mode');
                 this.removeLivePreview();
                 this.removeSyncScroll();
+                document.body.classList.add('preview-active');
                 break;
             case 'split':
                 editor.classList.remove('hidden');
@@ -456,6 +458,7 @@ class CogNotezApp {
                 wrapper.classList.add('split-mode');
                 this.setupLivePreview();
                 this.setupSyncScroll();
+                document.body.classList.add('preview-active');
                 break;
         }
 
@@ -478,6 +481,7 @@ class CogNotezApp {
             wrapper.classList.remove('split-mode');
             this.removeLivePreview();
             this.renderMarkdownPreview();
+            document.body.classList.add('preview-active');
         } else if (this.previewMode === 'preview') {
             // State 2 → State 3: Switch to live split
             this.previewMode = 'split';
@@ -487,6 +491,7 @@ class CogNotezApp {
             this.renderMarkdownPreview();
             this.setupLivePreview();
             this.setupSyncScroll();
+            document.body.classList.add('preview-active');
         } else {
             // State 3 → State 1: Switch to edit only
             this.previewMode = 'edit';
@@ -496,6 +501,7 @@ class CogNotezApp {
             this.removeLivePreview();
             this.removeSyncScroll();
             toggleBtn.classList.remove('active');
+            document.body.classList.remove('preview-active');
         }
 
         // Update button icon to reflect current mode
@@ -1314,6 +1320,12 @@ class CogNotezApp {
         document.querySelectorAll('.note-item').forEach(item => {
             item.classList.toggle('active', item.dataset.id === note.id);
         });
+
+        // Restore per-note drop-cap state
+        const dropCapBtn = document.getElementById('drop-cap-toggle');
+        const dropCapEnabled = note.drop_cap === 1;
+        if (dropCapBtn) dropCapBtn.classList.toggle('active', dropCapEnabled);
+        document.body.classList.toggle('note-drop-cap', dropCapEnabled);
 
         // Trigger word count update since we set content programmatically
         // Use a flag to prevent this from marking the tab as unsaved

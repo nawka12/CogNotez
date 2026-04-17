@@ -183,6 +183,18 @@ function setupEventListeners(app) {
     document.getElementById('find-btn').addEventListener('click', () => app.showFindDialog());
     document.getElementById('replace-btn').addEventListener('click', () => app.showReplaceDialog());
     document.getElementById('preview-toggle-btn').addEventListener('click', () => app.togglePreview());
+    document.getElementById('drop-cap-toggle')?.addEventListener('click', async () => {
+        const note = app.currentNote;
+        if (!note) return;
+        const next = note.drop_cap ? 0 : 1;
+        note.drop_cap = next;
+        if (app.notesManager?.db?.initialized) {
+            await app.notesManager.db.updateNote(note.id, { drop_cap: next });
+        }
+        const btn = document.getElementById('drop-cap-toggle');
+        if (btn) btn.classList.toggle('active', next === 1);
+        document.body.classList.toggle('note-drop-cap', next === 1);
+    });
     document.getElementById('save-btn').addEventListener('click', () => app.saveCurrentNote());
 
     // Editor overflow menu toggle

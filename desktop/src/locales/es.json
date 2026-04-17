@@ -90,7 +90,8 @@
     "modified": "Modificado",
     "words": "palabras",
     "chars": "caracteres",
-    "draft": "BORRADOR"
+    "draft": "BORRADOR",
+    "dropCap": "MAYÚSCULA DECORATIVA"
   },
   "ai": {
     "assistant": "Compañero",
