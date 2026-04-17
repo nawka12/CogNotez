@@ -1,15 +1,16 @@
 /* Modern AI Panel Design */
 .ai-panel {
-    width: 380px;
-    background: var(--sidebar-bg);
-    backdrop-filter: blur(16px) saturate(180%);
-    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    width: 320px;
+    background: var(--bg-secondary);
     border-left: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    box-shadow: var(--shadow-lg);
     position: relative;
     z-index: 40;
+}
+
+.ai-panel.hidden {
+    display: none;
 }
 
 .ai-panel-header {
