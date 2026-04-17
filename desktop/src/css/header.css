@@ -153,48 +153,42 @@
     display: flex;
     align-items: center;
     gap: 2px;
-    background: var(--bg-tertiary);
-    border-radius: var(--radius-xl);
-    padding: 4px;
-    border: 1px solid var(--border-color);
+    background: transparent;
+    border-radius: 0;
+    padding: 0;
+    border: none;
 }
 
 .header-toolbar-btn {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    gap: 6px;
-    padding: 8px 12px;
+    width: 32px;
+    height: 32px;
     background: transparent;
     border: none;
-    border-radius: var(--radius-lg);
+    color: var(--text-tertiary);
     cursor: pointer;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    min-height: 36px;
-    white-space: nowrap;
+    padding: 0;
+    font-size: 14px;
+    transition: color 150ms ease, background-color 150ms ease;
 }
 
 .header-toolbar-btn:hover {
-    background: var(--button-hover-bg);
     color: var(--text-primary);
+    background: transparent;
 }
 
-.header-toolbar-btn:active {
-    transform: scale(0.96);
+.header-toolbar-btn.active {
+    color: var(--accent-color);
 }
 
-.header-toolbar-btn i {
-    font-size: 14px;
-    width: 16px;
-    text-align: center;
+.header-toolbar-btn.hidden {
+    display: none;
 }
 
 .toolbar-btn-label {
-    font-size: 13px;
-    line-height: 1;
+    display: none;
 }
 
 /* Toolbar Divider */
@@ -233,15 +227,25 @@
     color: #8B5CF6;
 }
 
-/* New Note Button - Accent style */
+/* New Note Button - Ink-filled primary CTA */
 .header-toolbar-btn.new-note-btn {
-    background: var(--accent-color);
-    color: white;
+    background: var(--text-primary);
+    color: var(--bg-primary);
+    border: none;
+    padding: 6px 14px;
+    border-radius: 4px;
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+    width: auto;
+    height: auto;
 }
 
 .header-toolbar-btn.new-note-btn:hover {
-    background: var(--accent-color-dark);
-    color: white;
+    background: var(--accent-color);
 }
 
 /* Sync Button States */
@@ -250,7 +254,7 @@
 }
 
 #sync-btn.connected:hover {
-    background: rgba(40, 167, 69, 0.15);
+    background: transparent;
 }
 
 #sync-btn.disconnected {
@@ -258,7 +262,7 @@
 }
 
 #sync-btn.disconnected:hover {
-    background: rgba(220, 53, 69, 0.15);
+    background: transparent;
 }
 
 #sync-btn.syncing {
@@ -266,7 +270,7 @@
 }
 
 #sync-btn.syncing:hover {
-    background: rgba(255, 193, 7, 0.15);
+    background: transparent;
 }
 
 #sync-btn.syncing #sync-btn-icon {
@@ -298,22 +302,18 @@
 /* Legacy header buttons - kept for backwards compatibility */
 .templates-btn,
 .sync-settings-btn {
-    padding: 10px;
-    background: var(--button-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    font-size: var(--font-size-md);
-    color: var(--text-secondary);
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 44px;
-    min-height: 44px;
-    position: relative;
-    overflow: hidden;
-    box-shadow: var(--shadow-xs);
+    width: 32px;
+    height: 32px;
+    background: transparent;
+    border: none;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    padding: 0;
+    font-size: 14px;
+    transition: color 150ms ease, background-color 150ms ease;
 }
 
 /* Explicit icon sizing for header buttons */
@@ -347,16 +347,12 @@
 
 .templates-btn:hover,
 .sync-settings-btn:hover {
-    background: var(--button-hover-bg);
-    border-color: var(--accent-color-light);
-    color: var(--accent-color);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+    color: var(--text-primary);
+    background: transparent;
 }
 
 .templates-btn:active,
 .sync-settings-btn:active {
-    transform: translateY(0);
     transition-duration: 0.1s;
 }
 
