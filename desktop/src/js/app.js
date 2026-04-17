@@ -2217,7 +2217,7 @@ Please provide a helpful response based on the note content and conversation his
             <div class="ai-messages-empty-icon">
                 <i class="fas fa-robot"></i>
             </div>
-            <div class="ai-messages-empty-title">${window.i18n ? window.i18n.t('ai.assistant') : 'AI Assistant'}</div>
+            <div class="ai-messages-empty-title">${window.i18n ? window.i18n.t('ai.assistant') : 'Companion'}</div>
             <div class="ai-messages-empty-description">
                 ${window.i18n ? window.i18n.t('ai.welcomeMessage') : "I'm here to help! Select text and right-click for AI features, or ask me anything about your note."}
             </div>
