@@ -19,6 +19,7 @@
     "regenerateResponse": "Regenerasi tanggapan"
   },
   "splash": {
+    "tagline": "Buku Cathetan kanggo Mikir",
     "startingUp": "Miwi...",
     "connectingServices": "Nyambungake layanan...",
     "loadingNotes": "Ngundhuh cathetan sampeyan...",

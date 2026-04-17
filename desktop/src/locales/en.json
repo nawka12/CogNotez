@@ -5,6 +5,7 @@
     "subtitle": "AI-Powered Note Taking"
   },
   "splash": {
+    "tagline": "A Notebook for Thinking",
     "startingUp": "Starting up...",
     "connectingServices": "Connecting services...",
     "loadingNotes": "Loading your notes...",

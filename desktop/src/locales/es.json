@@ -19,6 +19,7 @@
     "regenerateResponse": "Regenerar respuesta"
   },
   "splash": {
+    "tagline": "Un Cuaderno para Pensar",
     "startingUp": "Iniciando...",
     "connectingServices": "Conectando servicios...",
     "loadingNotes": "Cargando tus notas...",

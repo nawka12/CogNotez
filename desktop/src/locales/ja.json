@@ -19,6 +19,7 @@
     "regenerateResponse": "応答を再生成"
   },
   "splash": {
+    "tagline": "思考のためのノート",
     "startingUp": "起動中...",
     "connectingServices": "サービスに接続中...",
     "loadingNotes": "ノートを読み込み中...",

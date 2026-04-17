@@ -19,6 +19,7 @@
     "regenerateResponse": "Regenerasi respons"
   },
   "splash": {
+    "tagline": "Buku Catatan untuk Berpikir",
     "startingUp": "Memulai...",
     "connectingServices": "Menghubungkan layanan...",
     "loadingNotes": "Memuat catatan Anda...",
