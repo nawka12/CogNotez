@@ -1,15 +1,12 @@
 /* Modern Header Design */
 .app-header {
-    height: 64px;
+    height: 44px;
     display: flex;
     align-items: center;
     justify-content: space-between;
     padding: 0 var(--spacing-xl);
-    background: var(--header-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
-    box-shadow: var(--shadow-sm);
     position: relative;
     z-index: 100;
     gap: var(--spacing-lg);
@@ -39,21 +36,25 @@
     transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.app-logo:hover {
-    transform: scale(1.05);
-}
-
 .app-title {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-bold);
+    font-size: 18px;
+    font-weight: 400;
     font-family: var(--font-family-display);
     color: var(--text-primary);
-    background: var(--gradient-primary);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: var(--line-height-tight);
+    letter-spacing: -0.02em;
+    line-height: 1;
+    margin: 0;
+}
+
+.app-title em {
+    font-style: italic;
+    color: var(--accent-color);
+    font-weight: 400;
+}
+
+[data-theme="dark"] .app-title {
+    font-weight: 300;
+    color: #ffffff;
 }
 
 /* Modern Search Container */
@@ -394,8 +395,6 @@
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
     box-shadow: var(--shadow-xl);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
     z-index: 1000;
     min-width: 240px;
     padding: var(--spacing-sm) 0;
