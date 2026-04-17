@@ -3432,10 +3432,6 @@ Please provide a helpful response based on the note content and conversation his
             // Add ready state first
             splash.classList.add('ready');
 
-            // Update status to show completion
-            const statusText = splash.querySelector('.status-text');
-            if (statusText) statusText.textContent = window.i18n ? window.i18n.t('splash.ready') : 'Ready';
-
             // Short delay to show ready state, then animate out
             setTimeout(() => {
                 splash.classList.add('hiding');
@@ -3469,9 +3465,6 @@ Please provide a helpful response based on the note content and conversation his
     updateSplashProgress(text, percentage = null) {
         const progressText = document.getElementById('progress-text');
         const progressFill = document.getElementById('progress-fill');
-        const progressPercent = document.getElementById('progress-percent');
-        const progressGlow = document.querySelector('.progress-glow');
-        const statusText = document.querySelector('.status-text');
 
         if (progressText && text) {
             // Translate if it's a translation key (starts with "splash.") or use text directly
@@ -3485,28 +3478,6 @@ Please provide a helpful response based on the note content and conversation his
 
             if (progressFill) {
                 progressFill.style.width = `${percent}%`;
-            }
-
-            if (progressGlow) {
-                progressGlow.style.width = `${percent}%`;
-            }
-
-            if (progressPercent) {
-                progressPercent.textContent = `${Math.round(percent)}%`;
-            }
-
-            // Update status text based on progress
-            if (statusText) {
-                const t = (key) => window.i18n ? window.i18n.t(key) : key;
-                if (percent >= 100) {
-                    statusText.textContent = t('splash.ready');
-                } else if (percent >= 75) {
-                    statusText.textContent = t('splash.almostThere');
-                } else if (percent >= 50) {
-                    statusText.textContent = t('splash.loading');
-                } else {
-                    statusText.textContent = t('splash.starting');
-                }
             }
         }
     }

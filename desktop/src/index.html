@@ -36,56 +36,19 @@
 <body>
     <!-- Splash Screen -->
     <div id="splash-screen" class="splash-screen">
-        <!-- Animated background -->
-        <div class="splash-bg">
-            <div class="splash-gradient"></div>
-            <div class="splash-particles">
-                <div class="particle"></div>
-                <div class="particle"></div>
-                <div class="particle"></div>
-                <div class="particle"></div>
-                <div class="particle"></div>
-                <div class="particle"></div>
-            </div>
-            <div class="splash-rings">
-                <div class="ring ring-1"></div>
-                <div class="ring ring-2"></div>
-                <div class="ring ring-3"></div>
-            </div>
-        </div>
-        
         <div class="splash-content">
-            <div class="splash-logo">
-                <div class="splash-icon-wrapper">
-                    <div class="splash-icon-glow"></div>
-                    <div class="splash-icon">
-                        <img src="../assets/icon.svg" alt="CogNotez Logo" width="72" height="72">
-                    </div>
-                </div>
-                <h1 class="splash-title">
-                    <span class="title-letter">C</span><span class="title-letter">o</span><span class="title-letter">g</span><span class="title-letter">N</span><span class="title-letter">o</span><span class="title-letter">t</span><span class="title-letter">e</span><span class="title-letter">z</span>
-                </h1>
-                <p class="splash-subtitle" data-i18n="app.subtitle">AI-Powered Note Taking</p>
-            </div>
-            
+            <h1 class="splash-wordmark">Cog<em>N</em>otez</h1>
+            <div class="splash-rule" aria-hidden="true"></div>
+            <p class="splash-tagline" data-i18n="splash.tagline">A Notebook for Thinking</p>
+
             <div class="splash-progress">
                 <div class="progress-bar">
                     <div class="progress-fill" id="progress-fill"></div>
-                    <div class="progress-glow"></div>
-                </div>
-                <div class="progress-info">
-                    <span class="progress-text" id="progress-text" data-i18n="splash.startingUp">Starting up...</span>
-                    <span class="progress-percent" id="progress-percent">0%</span>
                 </div>
             </div>
-            
-            <div class="splash-footer">
-                <p class="splash-version" id="splash-version" data-i18n="splash.version">Version</p>
-                <div class="splash-status">
-                    <div class="status-dot"></div>
-                    <span class="status-text" data-i18n="splash.loading">Loading</span>
-                </div>
-            </div>
+            <p class="splash-status" id="progress-text" data-i18n="splash.startingUp">Starting up…</p>
+
+            <p class="splash-version" id="splash-version" data-i18n="splash.version">Version</p>
         </div>
     </div>
 
