@@ -454,7 +454,7 @@
     position: relative;
     z-index: 50;
     flex-shrink: 0;
-    max-width: 720px;
+    max-width: 640px;
     margin: 0 auto;
     width: 100%;
 }
@@ -888,7 +888,7 @@
     min-height: 0;
     background: var(--editor-bg);
     position: relative;
-    max-width: 720px;
+    max-width: 640px;
     margin: 0 auto;
     width: 100%;
 }
