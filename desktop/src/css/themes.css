@@ -1,21 +1,21 @@
 /* Modern Design System - CSS Custom Properties for Theming */
 :root {
   /* Modern Color Palette with #bdabe3 as primary accent */
-  --bg-primary: #ffffff;
-  --bg-secondary: #f8fafc;
-  --bg-tertiary: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #64748b;
-  --text-tertiary: #94a3b8;
-  --text-muted: #cbd5e1;
+  --bg-primary: #fbf9f4;
+  --bg-secondary: #f6f2e8;
+  --bg-tertiary: #ece5d2;
+  --text-primary: #1a1715;
+  --text-secondary: #4a4439;
+  --text-tertiary: #8a8375;
+  --text-muted: #a89a78;
 
   /* Modern Border System */
-  --border-color: #e2e8f0;
-  --border-color-light: #f1f5f9;
-  --border-color-subtle: #f8fafc;
+  --border-color: #ece5d2;
+  --border-color-light: #ece5d2;
+  --border-color-subtle: #f6f2e8;
 
   /* Enhanced Accent Color System - Keeping #bdabe3 as primary */
-  --accent-color: #bdabe3;
+  --accent-color: #7c5fd1;
   --accent-color-light: rgba(189, 171, 227, 0.4);
   --accent-color-lighter: rgba(189, 171, 227, 0.08);
   --accent-color-lightest: rgba(189, 171, 227, 0.04);
@@ -103,7 +103,7 @@
   /* Typography Scale */
   --font-size-xs: 11px;
   --font-size-sm: 13px;
-  --font-size-base: 14px;
+  --font-size-base: 15px;
   --font-size-md: 16px;
   --font-size-lg: 18px;
   --font-size-xl: 20px;
@@ -116,7 +116,7 @@
   --font-weight-bold: 700;
 
   --line-height-tight: 1.25;
-  --line-height-normal: 1.5;
+  --line-height-normal: 1.7;
   --line-height-relaxed: 1.75;
 
   --letter-spacing-tight: -0.025em;
@@ -131,21 +131,21 @@
 /* Dark Theme - Modern Dark Design */
 [data-theme="dark"] {
   /* Dark Color Palette */
-  --bg-primary: #0d1117;
-  --bg-secondary: #0a0e16;
-  --bg-tertiary: #141c28;
-  --text-primary: #f1f5f9;
-  --text-secondary: #cbd5e1;
-  --text-tertiary: #94a3b8;
-  --text-muted: #64748b;
+  --bg-primary: #0c0b10;
+  --bg-secondary: #15131c;
+  --bg-tertiary: #24202f;
+  --text-primary: #f0ebf5;
+  --text-secondary: #c8c0d4;
+  --text-tertiary: #a89ebb;
+  --text-muted: #8b7fa3;
 
   /* Dark Border System */
-  --border-color: #1a2332;
-  --border-color-light: #1e2d40;
-  --border-color-subtle: #141c28;
+  --border-color: #24202f;
+  --border-color-light: #24202f;
+  --border-color-subtle: #15131c;
 
   /* Enhanced Accent for Dark Mode */
-  --accent-color: #bdabe3;
+  --accent-color: #c9a9ff;
   --accent-color-light: rgba(189, 171, 227, 0.25);
   --accent-color-lighter: rgba(189, 171, 227, 0.12);
   --accent-color-lightest: rgba(189, 171, 227, 0.06);
