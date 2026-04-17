@@ -45,11 +45,12 @@
 }
 
 .sidebar-header h2 {
-    font-size: 20px;
-    font-weight: 700;
-    font-family: var(--font-family-display);
-    color: var(--accent-color);
-    letter-spacing: -0.02em;
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--text-tertiary);
     margin: 0;
 }
 
@@ -205,14 +206,14 @@ body.sidebar-resizing * {
     gap: 8px;
     padding: 16px 12px 8px 12px;
     margin-top: 4px;
+    font-family: var(--font-family-base);
     font-size: 11px;
-    font-weight: 700;
+    font-weight: 400;
     text-transform: uppercase;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.25em;
     color: var(--text-tertiary);
     cursor: pointer;
     user-select: none;
-    opacity: 0.8;
 }
 
 .folders-divider:hover {
