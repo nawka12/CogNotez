@@ -8,7 +8,6 @@
     justify-content: center;
     padding: 48px 16px;
     background: rgba(0, 0, 0, 0.45);
-    backdrop-filter: blur(6px);
     z-index: 3200;
 }
 
@@ -76,7 +75,6 @@
 
 .model-switcher-close:hover {
     color: var(--text-primary);
-    transform: scale(1.05);
 }
 
 .model-switcher-search {
