@@ -139,14 +139,16 @@ body.sidebar-resizing * {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
-    border-radius: 12px;
+    padding: 8px 12px 8px 14px;
+    border-radius: 0;
+    border-left: 2px solid transparent;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 150ms ease, color 150ms ease;
     color: var(--text-secondary);
+    font-family: var(--font-family-base);
     font-size: 14px;
-    margin-bottom: 4px;
-    border: 1px solid transparent;
+    margin: 0;
+    background: transparent;
 }
 
 .folder-item:hover {
@@ -155,25 +157,25 @@ body.sidebar-resizing * {
 }
 
 .folder-item.active {
-    background: var(--surface-elevated);
-    color: var(--accent-color);
-    font-weight: 600;
-    box-shadow: var(--shadow-sm);
-    border-color: var(--border-color);
+    background: var(--bg-tertiary);
+    color: var(--text-primary);
+    border-left-color: var(--accent-color);
+    font-weight: 400;
 }
 
-.folder-item.active .folder-icon {
-    color: var(--accent-color);
-    transform: scale(1.1);
+.folder-item.active .folder-icon,
+.folder-item:hover .folder-icon {
+    color: var(--text-primary);
+    transform: none;
 }
 
 .folder-icon {
-    font-size: 16px;
-    width: 20px;
+    font-size: 14px;
+    width: 18px;
     text-align: center;
     flex-shrink: 0;
     color: var(--text-tertiary);
-    transition: all 0.2s ease;
+    transition: color 150ms ease;
 }
 
 .folder-name {
@@ -184,20 +186,21 @@ body.sidebar-resizing * {
 }
 
 .folder-count {
+    font-family: var(--font-family-base);
     font-size: 11px;
-    background: var(--bg-secondary);
-    padding: 2px 8px;
-    border-radius: 12px;
-    color: var(--text-tertiary);
-    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: var(--text-muted);
+    font-weight: 400;
+    background: transparent;
+    padding: 0;
+    border-radius: 0;
     min-width: 20px;
-    text-align: center;
-    transition: all 0.2s ease;
+    text-align: right;
 }
 
 .folder-item.active .folder-count {
-    background: var(--accent-color);
-    color: white;
+    color: var(--text-tertiary);
+    background: transparent;
 }
 
 .folders-divider {
