@@ -407,62 +407,56 @@ body.sidebar-resizing * {
 }
 
 .note-item {
-    padding: 7px 8px;
-    cursor: pointer;
-    transition: background-color 0.2s ease, border-color 0.2s ease;
-    display: flex;
-    flex-direction: column;
-    /* Changed to column for better content flow */
-    gap: 3px;
-    position: relative;
-    border-radius: 6px;
-    background: transparent;
+    padding: 10px 14px 10px 16px;
+    border-radius: 0;
     border-left: 2px solid transparent;
-    box-shadow: none;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+    background: transparent;
+    margin: 0;
+    position: relative;
+    overflow: hidden;
 }
 
-/* Hover effect */
 .note-item:hover {
-    background: rgba(189, 171, 227, 0.07);
-    border-left-color: rgba(189, 171, 227, 0.35);
+    background: var(--bg-tertiary);
     transform: none;
-    box-shadow: none;
 }
 
-/* Active State - strongly clear */
 .note-item.active {
-    background: rgba(189, 171, 227, 0.12);
-    border: none;
-    border-left: 2px solid var(--accent-color);
-    box-shadow: none;
+    background: var(--bg-tertiary);
+    border-left-color: var(--accent-color);
 }
 
-/* Remove the left border "sash" - it's outdated. Use border selection instead. */
-.note-item.active::before {
-    display: none;
+.note-item .note-title {
+    font-family: var(--font-family-display);
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--text-primary);
+    margin: 0 0 2px 0;
+    line-height: 1.2;
+    letter-spacing: -0.01em;
 }
 
-/* Pinned Note - Distinct Visuals */
-.note-item.pinned {
+.note-item .note-title em {
+    font-style: italic;
+    color: var(--accent-color);
 }
 
-.note-item.pinned:hover {
-    background: var(--surface-elevated);
-    border-color: var(--accent-color-light);
+.note-item .note-meta {
+    font-family: var(--font-family-base);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
 }
 
-.note-item.pinned.active {
-    border-left: 2px solid var(--accent-color);
+.note-item .note-meta .tag {
+    color: var(--rubric);
+    font-style: italic;
 }
 
-.note-item.pinned::before {
-    display: none;
-}
-
-/* Remove emoji pin indicator; rely on the pin button state */
-.note-item.pinned::after {
-    display: none;
-}
 
 .note-item-content {
     width: 100%;
