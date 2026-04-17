@@ -89,7 +89,8 @@
     "passwordProtection": "パスワード保護",
     "modified": "更新",
     "words": "語",
-    "chars": "文字"
+    "chars": "文字",
+    "draft": "下書き"
   },
   "ai": {
     "assistant": "伴走者",

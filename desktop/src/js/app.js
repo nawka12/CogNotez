@@ -1292,6 +1292,15 @@ class CogNotezApp {
         document.getElementById('note-editor').value = note.content;
         this.updateNoteDate();
 
+        // Update editorial meta line date
+        const metaDate = document.getElementById('meta-date');
+        if (metaDate) {
+            const when = new Date(note.modified || note.created || Date.now());
+            metaDate.textContent = new Intl.DateTimeFormat(undefined, {
+                day: '2-digit', month: 'short', year: 'numeric'
+            }).format(when).toUpperCase();
+        }
+
         // Initialize history for undo/redo functionality
         this.initializeHistoryForNote(note.content);
 

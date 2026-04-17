@@ -610,39 +610,30 @@
 }
 
 .note-title-input {
-    border: none !important;
-    background: transparent !important;
+    font-family: var(--font-family-display);
+    font-size: 36px;
+    font-weight: 500;
+    line-height: 1.05;
+    letter-spacing: -0.028em;
     color: var(--text-primary);
-    outline: none !important;
+    border: none;
+    outline: none;
+    background: transparent;
+    flex: 1;
+    min-width: 0;
+    padding: 0;
+    margin: 4px 0 0 0;
+    cursor: text;
+    box-shadow: none !important;
+    border-radius: 0;
     overflow: visible;
     text-overflow: ellipsis;
     white-space: nowrap;
-    min-width: 0;
-    flex: 1;
     transition: none;
-    padding: 0;
-    border-radius: 0;
-    margin: 0;
-    cursor: text;
-    box-shadow: none !important;
-    font-family: var(--font-family-display);
-    font-size: 32px;
-    font-weight: 700;
-    letter-spacing: -0.03em;
-    line-height: 1.15;
 }
 
-/* Responsive title sizing */
-@media (max-width: 1200px) {
-    .note-title-input {
-        font-size: 18px;
-    }
-}
-
-@media (max-width: 900px) {
-    .note-title-input {
-        font-size: 16px;
-    }
+[data-theme="dark"] .note-title-input {
+    font-weight: 300;
 }
 
 .note-title-input:focus,
@@ -656,7 +647,42 @@
 
 .note-title-input::placeholder {
     color: var(--text-tertiary);
-    font-weight: 500;
+    font-style: italic;
+}
+
+.editor-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-family: var(--font-family-base);
+    font-size: 10px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 6px;
+}
+
+.editor-meta .meta-sep {
+    color: var(--text-muted);
+    letter-spacing: 0;
+}
+
+.editor-rule {
+    width: 80px;
+    height: 3px;
+    background: var(--text-primary);
+    position: relative;
+    margin: 14px 0 18px 0;
+}
+
+.editor-rule::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: 5px;
+    height: 1px;
+    background: var(--text-primary);
 }
 
 .note-date {

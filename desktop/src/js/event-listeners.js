@@ -219,6 +219,15 @@ function setupEventListeners(app) {
             app.markTabUnsaved(app.currentNote.id, true);
         }
         app._ignoreNextInputForUnsaved = false;
+
+        // Update editorial meta word count
+        const wc = document.getElementById('meta-wordcount');
+        if (wc) {
+            const noteEditor = document.getElementById('note-editor');
+            const text = (noteEditor ? noteEditor.value : '').trim();
+            const words = text ? text.split(/\s+/).filter(Boolean).length : 0;
+            wc.textContent = `${words} WORDS`;
+        }
     });
 
     // Also track title changes for unsaved indicator and update tab title

@@ -89,7 +89,8 @@
     "passwordProtection": "Perlindungan Sandi",
     "modified": "Diubah",
     "words": "kata",
-    "chars": "karakter"
+    "chars": "karakter",
+    "draft": "DRAF"
   },
   "ai": {
     "assistant": "Pendamping",

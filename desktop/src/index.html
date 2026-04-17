@@ -189,6 +189,13 @@
                 <!-- Editor Area -->
                 <div class="editor-container" id="editor-container">
                     <div class="editor-header">
+                        <div class="editor-meta" id="editor-meta">
+                          <span class="meta-status" data-i18n="editor.draft">DRAFT</span>
+                          <span class="meta-sep">·</span>
+                          <span class="meta-date" id="meta-date"></span>
+                          <span class="meta-sep">·</span>
+                          <span class="meta-wordcount" id="meta-wordcount">0 WORDS</span>
+                        </div>
                         <div class="editor-header-top">
                             <input type="text" id="note-title" placeholder="Untitled note..." class="note-title-input" data-i18n-placeholder="editor.untitledNote">
                             <div class="editor-toolbar editor-actions">
@@ -200,6 +207,7 @@
                                 <button id="editor-overflow-btn" class="editor-tool-btn" title="More options" data-i18n-title="editor.moreOptions"><i class="fas fa-ellipsis-h"></i></button>
                             </div>
                         </div>
+                        <div class="editor-rule" aria-hidden="true"></div>
                         <div class="editor-header-meta">
                             <div id="note-tags-display" class="note-tags-display"></div>
                             <span id="note-date" class="note-date"></span>

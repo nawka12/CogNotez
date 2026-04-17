@@ -89,7 +89,8 @@
     "passwordProtection": "Protección con Contraseña",
     "modified": "Modificado",
     "words": "palabras",
-    "chars": "caracteres"
+    "chars": "caracteres",
+    "draft": "BORRADOR"
   },
   "ai": {
     "assistant": "Compañero",
