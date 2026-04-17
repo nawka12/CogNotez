@@ -145,7 +145,8 @@
     "failedToEditText": "❌ テキストの編集に失敗しました: {{error}}。AI接続とSearXNG設定を確認してください。",
     "failedToGenerateContent": "❌ コンテンツの生成に失敗しました: {{error}}。AI接続とSearXNG設定を確認してください。",
     "offlineOllama": "🤖 AI機能は現在オフラインです。\n\n**Ollamaを使用するには:**\n1. https://ollama.com からOllamaをインストール\n2. ターミナルで「ollama serve」を実行してOllamaを起動\n3. モデルをダウンロード: \"ollama pull llama2\"\n4. {{endpoint}} で実行されていることを確認\n\n**代替案:** クラウドベースのAI（インターネットが必要）には、AI設定でOpenRouterに切り替えてください。",
-    "offlineOpenRouter": "🤖 AI機能は現在オフラインです。\n\n**OpenRouterを使用するには:**\n1. アクティブなインターネット接続があることを確認\n2. https://openrouter.ai からAPIキーを取得\n3. AI設定にAPIキーを追加\n4. 接続をテスト\n\n**代替案:** ローカルAI（オフラインで動作）には、AI設定でOllamaに切り替えてください。"
+    "offlineOpenRouter": "🤖 AI機能は現在オフラインです。\n\n**OpenRouterを使用するには:**\n1. アクティブなインターネット接続があることを確認\n2. https://openrouter.ai からAPIキーを取得\n3. AI設定にAPIキーを追加\n4. 接続をテスト\n\n**代替案:** ローカルAI（オフラインで動作）には、AI設定でOllamaに切り替えてください。",
+    "thinking": "考え中…"
   },
   "placeholder": {
     "readyToCapture": "思考を記録する準備はできていますか？",

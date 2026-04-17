@@ -145,7 +145,8 @@
     "failedToEditText": "❌ Gagal mengedit teks: {{error}}. Silakan periksa koneksi AI Anda dan pengaturan SearXNG.",
     "failedToGenerateContent": "❌ Gagal menghasilkan konten: {{error}}. Silakan periksa koneksi AI Anda dan pengaturan SearXNG.",
     "offlineOllama": "🤖 Fitur AI saat ini sedang offline.\n\n**Untuk menggunakan Ollama:**\n1. Instal Ollama dari https://ollama.com\n2. Jalankan Ollama dengan menjalankan \"ollama serve\" di terminal\n3. Unduh model: \"ollama pull llama2\"\n4. Verifikasi berjalan di {{endpoint}}\n\n**Alternatif:** Beralih ke OpenRouter di Pengaturan AI untuk AI berbasis cloud (memerlukan internet).",
-    "offlineOpenRouter": "🤖 Fitur AI saat ini sedang offline.\n\n**Untuk menggunakan OpenRouter:**\n1. Pastikan Anda memiliki koneksi internet aktif\n2. Dapatkan kunci API dari https://openrouter.ai\n3. Tambahkan kunci API Anda di Pengaturan AI\n4. Uji koneksi\n\n**Alternatif:** Beralih ke Ollama di Pengaturan AI untuk AI lokal (bekerja offline)."
+    "offlineOpenRouter": "🤖 Fitur AI saat ini sedang offline.\n\n**Untuk menggunakan OpenRouter:**\n1. Pastikan Anda memiliki koneksi internet aktif\n2. Dapatkan kunci API dari https://openrouter.ai\n3. Tambahkan kunci API Anda di Pengaturan AI\n4. Uji koneksi\n\n**Alternatif:** Beralih ke Ollama di Pengaturan AI untuk AI lokal (bekerja offline).",
+    "thinking": "Sedang memikirkan…"
   },
   "placeholder": {
     "readyToCapture": "Siap menangkap pikiran Anda?",

@@ -2161,30 +2161,12 @@ Please provide a helpful response based on the note content and conversation his
 
     showTypingIndicator() {
         const messagesContainer = document.getElementById('ai-messages');
-        const typingElement = document.createElement('div');
-        typingElement.className = 'ai-message assistant';
-        typingElement.id = 'ai-typing-indicator';
+        const thinkingElement = document.createElement('div');
+        thinkingElement.className = 'ai-thinking';
+        thinkingElement.id = 'ai-typing-indicator';
+        thinkingElement.textContent = window.i18n ? window.i18n.t('ai.thinking') : 'Thinking…';
 
-        const avatar = document.createElement('div');
-        avatar.className = 'ai-message-avatar';
-        avatar.innerHTML = '<i class="fas fa-robot"></i>';
-
-        const contentWrapper = document.createElement('div');
-        contentWrapper.className = 'ai-message-content';
-
-        const bubble = document.createElement('div');
-        bubble.className = 'ai-message-bubble';
-
-        const typingIndicator = document.createElement('div');
-        typingIndicator.className = 'ai-typing-indicator';
-        typingIndicator.innerHTML = '<div class="ai-typing-dot"></div><div class="ai-typing-dot"></div><div class="ai-typing-dot"></div>';
-
-        bubble.appendChild(typingIndicator);
-        contentWrapper.appendChild(bubble);
-        typingElement.appendChild(avatar);
-        typingElement.appendChild(contentWrapper);
-
-        messagesContainer.appendChild(typingElement);
+        messagesContainer.appendChild(thinkingElement);
         messagesContainer.scrollTo({
             top: messagesContainer.scrollHeight,
             behavior: 'smooth'

@@ -145,7 +145,8 @@
     "failedToEditText": "❌ Error al editar texto: {{error}}. Por favor verifica tu conexión de IA y la configuración de SearXNG.",
     "failedToGenerateContent": "❌ Error al generar contenido: {{error}}. Por favor verifica tu conexión de IA y la configuración de SearXNG.",
     "offlineOllama": "🤖 Las funciones de IA están actualmente fuera de línea.\n\n**Para usar Ollama:**\n1. Instala Ollama desde https://ollama.com\n2. Inicia Ollama ejecutando \"ollama serve\" en la terminal\n3. Descarga un modelo: \"ollama pull llama2\"\n4. Verifica que esté ejecutándose en {{endpoint}}\n\n**Alternativa:** Cambia a OpenRouter en Configuración de IA para IA basada en la nube (requiere internet).",
-    "offlineOpenRouter": "🤖 Las funciones de IA están actualmente fuera de línea.\n\n**Para usar OpenRouter:**\n1. Asegúrate de tener una conexión a internet activa\n2. Obtén una clave API desde https://openrouter.ai\n3. Agrega tu clave API en Configuración de IA\n4. Prueba la conexión\n\n**Alternativa:** Cambia a Ollama en Configuración de IA para IA local (funciona sin internet)."
+    "offlineOpenRouter": "🤖 Las funciones de IA están actualmente fuera de línea.\n\n**Para usar OpenRouter:**\n1. Asegúrate de tener una conexión a internet activa\n2. Obtén una clave API desde https://openrouter.ai\n3. Agrega tu clave API en Configuración de IA\n4. Prueba la conexión\n\n**Alternativa:** Cambia a Ollama en Configuración de IA para IA local (funciona sin internet).",
+    "thinking": "Pensando…"
   },
   "placeholder": {
     "readyToCapture": "¿Listo para capturar tus pensamientos?",

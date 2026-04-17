@@ -145,7 +145,8 @@
     "failedToEditText": "❌ Gagal ngowahi teks: {{error}}. Mangga priksa sambungan AI sampeyan lan setelan SearXNG.",
     "failedToGenerateContent": "❌ Gagal gawe konten: {{error}}. Mangga priksa sambungan AI sampeyan lan setelan SearXNG.",
     "offlineOllama": "🤖 Fitur AI saiki lagi offline.\n\n**Kanggo nggunakake Ollama:**\n1. Instal Ollama saka https://ollama.com\n2. Jaluk Ollama kanthi nglakokake \"ollama serve\" ing terminal\n3. Unduh model: \"ollama pull llama2\"\n4. Verifikasi lagi mlaku ing {{endpoint}}\n\n**Alternatif:** Ganti menyang OpenRouter ing Setelan AI kanggo AI basis cloud (mbutuhake internet).",
-    "offlineOpenRouter": "🤖 Fitur AI saiki lagi offline.\n\n**Kanggo nggunakake OpenRouter:**\n1. Pastikake sampeyan duwe sambungan internet aktif\n2. Entuk kunci API saka https://openrouter.ai\n3. Tambahake kunci API sampeyan ing Setelan AI\n4. Test sambungan\n\n**Alternatif:** Ganti menyang Ollama ing Setelan AI kanggo AI lokal (bisa mlaku offline)."
+    "offlineOpenRouter": "🤖 Fitur AI saiki lagi offline.\n\n**Kanggo nggunakake OpenRouter:**\n1. Pastikake sampeyan duwe sambungan internet aktif\n2. Entuk kunci API saka https://openrouter.ai\n3. Tambahake kunci API sampeyan ing Setelan AI\n4. Test sambungan\n\n**Alternatif:** Ganti menyang Ollama ing Setelan AI kanggo AI lokal (bisa mlaku offline).",
+    "thinking": "Lagi mikir…"
   },
   "placeholder": {
     "readyToCapture": "Siap njupuk pikiran sampeyan?",
