@@ -48,7 +48,7 @@
     "advancedSearch": "Búsqueda Avanzada",
     "templates": "Plantillas",
     "toggleThemeMenu": "Alternar Tema",
-    "aiAssistant": "Asistente de IA",
+    "aiAssistant": "Compañero",
     "language": "Idioma"
   },
   "sidebar": {
@@ -92,7 +92,7 @@
     "chars": "caracteres"
   },
   "ai": {
-    "assistant": "Asistente de IA",
+    "assistant": "Compañero",
     "newChat": "Nuevo Chat",
     "askAnything": "Pregúntame lo que quieras...",
     "sendMessage": "Enviar mensaje",

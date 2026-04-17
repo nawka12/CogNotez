@@ -48,7 +48,7 @@
     "advancedSearch": "Advanced Search",
     "templates": "Templates",
     "toggleThemeMenu": "Toggle Theme",
-    "aiAssistant": "AI Assistant",
+    "aiAssistant": "Companion",
     "language": "Language"
   },
   "sidebar": {
@@ -92,7 +92,7 @@
     "chars": "chars"
   },
   "ai": {
-    "assistant": "AI Assistant",
+    "assistant": "Companion",
     "newChat": "New Chat",
     "askAnything": "Ask me anything...",
     "sendMessage": "Send message",

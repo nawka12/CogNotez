@@ -48,7 +48,7 @@
     "advancedSearch": "高度な検索",
     "templates": "テンプレート",
     "toggleThemeMenu": "テーマを切り替え",
-    "aiAssistant": "AIアシスタント",
+    "aiAssistant": "伴走者",
     "language": "言語"
   },
   "sidebar": {
@@ -92,7 +92,7 @@
     "chars": "文字"
   },
   "ai": {
-    "assistant": "AIアシスタント",
+    "assistant": "伴走者",
     "newChat": "新しいチャット",
     "askAnything": "何でも聞いてください...",
     "sendMessage": "メッセージを送信",

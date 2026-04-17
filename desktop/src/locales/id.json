@@ -48,7 +48,7 @@
     "advancedSearch": "Pencarian Lanjutan",
     "templates": "Template",
     "toggleThemeMenu": "Ubah Tema",
-    "aiAssistant": "Asisten AI",
+    "aiAssistant": "Pendamping",
     "language": "Bahasa"
   },
   "sidebar": {
@@ -92,7 +92,7 @@
     "chars": "karakter"
   },
   "ai": {
-    "assistant": "Asisten AI",
+    "assistant": "Pendamping",
     "newChat": "Obrolan Baru",
     "askAnything": "Tanyakan apa saja...",
     "sendMessage": "Kirim pesan",

@@ -48,7 +48,7 @@
     "advancedSearch": "Panggolekan Lanjutan",
     "templates": "Templat",
     "toggleThemeMenu": "Ganti Tema",
-    "aiAssistant": "Asisten AI",
+    "aiAssistant": "Kanca",
     "language": "Basa"
   },
   "sidebar": {
@@ -92,7 +92,7 @@
     "chars": "aksara"
   },
   "ai": {
-    "assistant": "Asisten AI",
+    "assistant": "Kanca",
     "newChat": "Obrolan Anyar",
     "askAnything": "Takok apa wae...",
     "sendMessage": "Kirim pesen",
