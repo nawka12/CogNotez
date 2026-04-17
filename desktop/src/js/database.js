@@ -247,6 +247,7 @@ class DatabaseManager {
             password_protected: noteData.password_protected || false,
             password_hash: noteData.password_hash || null,
             encrypted_content: noteData.encrypted_content || null,
+            drop_cap: noteData.drop_cap || 0,
             word_count: wordCount,
             char_count: charCount,
             created_at: now,
@@ -401,6 +402,10 @@ class DatabaseManager {
 
         if (noteData.pinned !== undefined) {
             note.pinned = noteData.pinned;
+        }
+
+        if (noteData.drop_cap !== undefined) {
+            note.drop_cap = noteData.drop_cap;
         }
 
         if (noteData.password_protected !== undefined) {
