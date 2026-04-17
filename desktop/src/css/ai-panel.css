@@ -14,21 +14,21 @@
 }
 
 .ai-panel-header {
-    padding: var(--spacing-lg);
-    background: var(--surface-elevated);
+    padding: 14px 18px;
+    background: transparent;
     border-bottom: 1px solid var(--border-color);
     display: flex;
     align-items: center;
     justify-content: space-between;
-    position: relative;
 }
 
 .ai-panel-header h3 {
-    font-size: var(--font-size-lg);
-    font-weight: var(--font-weight-bold);
-    color: var(--accent-color);
-    letter-spacing: var(--letter-spacing-tight);
-    line-height: var(--line-height-tight);
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    font-weight: 400;
+    text-transform: uppercase;
+    letter-spacing: 0.25em;
+    color: var(--text-secondary);
     margin: 0;
 }
 
@@ -40,27 +40,27 @@
 
 .ai-reset-btn,
 .ai-panel-close {
-    background: var(--button-bg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    font-size: 14px;
+    width: 28px;
+    height: 28px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    font-size: 13px;
+    color: var(--text-tertiary);
     cursor: pointer;
-    color: var(--text-secondary);
-    padding: var(--spacing-sm);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    display: flex;
+    display: inline-flex;
     align-items: center;
     justify-content: center;
-    min-width: 32px;
-    min-height: 32px;
+    transition: color 150ms ease;
+    padding: 0;
 }
 
 .ai-reset-btn:hover,
 .ai-panel-close:hover {
-    background: var(--button-hover-bg);
-    transform: scale(1.05);
-    box-shadow: var(--shadow-sm);
-    border-color: var(--accent-color-light);
+    color: var(--text-primary);
+    background: transparent;
+    transform: none;
+    box-shadow: none;
 }
 
 .ai-panel-content {
