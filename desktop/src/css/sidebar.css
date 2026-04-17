@@ -10,17 +10,14 @@
 /* Modern Sidebar Design - REVAMPED */
 .sidebar {
     width: 280px;
-    background: var(--sidebar-bg);
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    background: var(--bg-secondary);
     border-right: 1px solid var(--border-color);
     display: flex;
     flex-direction: column;
-    box-shadow: 2px 0 12px rgba(0, 0, 0, 0.03);
     position: relative;
     z-index: 50;
     flex-shrink: 0;
-    transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: width 220ms ease;
 }
 
 .sidebar-header {
@@ -75,7 +72,6 @@
 .sidebar-toggle:hover {
     background: var(--button-hover-bg);
     color: var(--text-primary);
-    transform: scale(1.05);
 }
 
 /* Sidebar Resize Handle - Improved visibility */
