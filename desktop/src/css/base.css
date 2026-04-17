@@ -25,7 +25,7 @@ body {
     /* Fallback */
     display: flex;
     flex-direction: column;
-    background: var(--gradient-subtle);
+    background: var(--bg-primary);
     position: relative;
 }
 
