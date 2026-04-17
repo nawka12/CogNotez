@@ -17,7 +17,7 @@
     "ready": "Ready!",
     "almostThere": "Almost there",
     "starting": "Starting",
-    "version": "Version"
+    "version": "Version {{version}}"
   },
   "loading": {
     "preparingBackup": "Preparing backup...",

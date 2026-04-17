@@ -31,7 +31,7 @@
     "ready": "Siap!",
     "almostThere": "Hampir selesai",
     "starting": "Memulai",
-    "version": "Versi"
+    "version": "Versi {{version}}"
   },
   "header": {
     "toggleMenu": "Buka/tutup menu",

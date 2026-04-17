@@ -31,7 +31,7 @@
     "ready": "準備完了！",
     "almostThere": "もう少しで完了",
     "starting": "起動中",
-    "version": "バージョン"
+    "version": "バージョン {{version}}"
   },
   "header": {
     "toggleMenu": "メニューを切り替え",

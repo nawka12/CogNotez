@@ -31,7 +31,7 @@
     "ready": "¡Listo!",
     "almostThere": "Casi listo",
     "starting": "Iniciando",
-    "version": "Versión"
+    "version": "Versión {{version}}"
   },
   "header": {
     "toggleMenu": "Alternar menú",

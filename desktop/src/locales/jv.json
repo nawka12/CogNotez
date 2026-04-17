@@ -31,7 +31,7 @@
     "ready": "Siap!",
     "almostThere": "Meh rampung",
     "starting": "Miwi",
-    "version": "Versi"
+    "version": "Versi {{version}}"
   },
   "header": {
     "toggleMenu": "Bukak/tutup menu",
