@@ -937,38 +937,37 @@
 .note-editor {
     width: 100%;
     height: 100%;
-    min-height: 300px;
-    border: none !important;
-    background: transparent !important;
+    min-height: 400px;
+    border: none;
+    background: transparent;
     color: var(--text-primary);
     resize: none;
-    outline: none !important;
-    padding: 28px 0 80px 0;
-    /* top: breathing room after separator; bottom: prevents word count obstruction */
+    outline: none;
+    padding: 28px 0 0 0;
     overflow-y: auto;
     overflow-x: hidden;
     border-radius: 0;
     transition: none;
     position: relative;
     z-index: 1;
-    font-weight: var(--font-weight-normal);
-    letter-spacing: 0.01em;
-    box-shadow: none !important;
+    box-shadow: none;
     scroll-behavior: smooth;
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
     font-family: var(--font-family-base);
     font-size: 15px;
-    line-height: 1.9;
+    line-height: 1.7;
 }
 
-.note-editor:hover,
-.note-editor:focus,
-.note-editor:active {
-    outline: none !important;
-    border: none !important;
-    background: transparent !important;
-    box-shadow: none !important;
+.note-editor:focus {
+    outline: none;
+    background: transparent;
+    box-shadow: none;
+}
+
+.note-editor em {
+    font-style: italic;
+    color: var(--accent-color);
 }
 
 .note-editor::placeholder {
@@ -1003,7 +1002,7 @@
     min-height: 300px;
     padding: var(--spacing-xl);
     color: var(--text-primary);
-    line-height: var(--line-height-relaxed);
+    line-height: 1.7;
     overflow-y: auto;
     overflow-x: auto;
     word-wrap: break-word;
@@ -1015,7 +1014,7 @@
     scroll-behavior: smooth;
     scrollbar-width: thin;
     scrollbar-color: var(--border-color) transparent;
-    font-size: var(--font-size-base);
+    font-size: 15px;
     font-family: var(--font-family-base);
 }
 
@@ -1148,7 +1147,22 @@
 
 .markdown-preview h1,
 .markdown-preview h2,
-.markdown-preview h3,
+.markdown-preview h3 {
+    font-family: var(--font-family-display);
+    font-weight: 500;
+    letter-spacing: -0.02em;
+    margin: 28px 0 10px 0;
+    color: var(--text-primary);
+}
+
+.markdown-preview h1 em,
+.markdown-preview h2 em,
+.markdown-preview h3 em {
+    font-style: italic;
+    color: var(--accent-color);
+    font-weight: 500;
+}
+
 .markdown-preview h4,
 .markdown-preview h5,
 .markdown-preview h6 {
@@ -1190,7 +1204,7 @@
 }
 
 .markdown-preview p {
-    margin: 1em 0;
+    margin: 0 0 14px 0;
 }
 
 .markdown-preview ul,
@@ -1330,6 +1344,7 @@
 
 .markdown-preview em {
     font-style: italic;
+    color: var(--accent-color);
 }
 
 .markdown-preview del {
@@ -1360,5 +1375,51 @@ body.note-drop-cap .markdown-preview > p:first-child::first-letter {
     float: left;
     margin: 0 6px 0 0;
     color: var(--text-primary);
+}
+
+/* =====================================================
+   COLOPHON BAR
+   ===================================================== */
+.editor-colophon {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 10px 40px;
+    border-top: 1px solid var(--border-color);
+    background: var(--bg-primary);
+    font-family: var(--font-family-base);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    font-variant-numeric: tabular-nums;
+    flex-shrink: 0;
+}
+
+.colophon-tags {
+    display: inline-flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.colophon-tags .tag {
+    color: var(--text-tertiary);
+    letter-spacing: 0.18em;
+}
+
+.colophon-tags .tag .tag-name {
+    color: var(--rubric);
+    font-style: italic;
+    letter-spacing: 0.05em;
+    text-transform: lowercase;
+}
+
+.colophon-spacer {
+    flex: 1;
+}
+
+.colophon-sep {
+    color: var(--text-muted);
+    letter-spacing: 0;
 }
 

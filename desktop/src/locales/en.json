@@ -91,7 +91,8 @@
     "words": "words",
     "chars": "chars",
     "draft": "DRAFT",
-    "dropCap": "DROP-CAP"
+    "dropCap": "DROP-CAP",
+    "saved": "SAVED"
   },
   "ai": {
     "assistant": "Companion",

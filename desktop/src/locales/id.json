@@ -91,7 +91,8 @@
     "words": "kata",
     "chars": "karakter",
     "draft": "DRAF",
-    "dropCap": "KAPITAL HIAS"
+    "dropCap": "KAPITAL HIAS",
+    "saved": "TERSIMPAN"
   },
   "ai": {
     "assistant": "Pendamping",

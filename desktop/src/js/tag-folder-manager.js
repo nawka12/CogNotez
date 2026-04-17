@@ -8,54 +8,19 @@ class TagFolderManager {
         this.currentFolder = localStorage.getItem('currentFolder') || 'all';
     }
 
-    // Helper method to display tags in the note editor header
+    // Helper method to display tags in the colophon bar
     displayNoteTags(note) {
-        const tagsDisplay = document.getElementById('note-tags-display');
-        const noteDate = document.getElementById('note-date');
-        const noteInfo = document.querySelector('.note-info');
-
-        // Defensive check: ensure required elements exist
-        if (!tagsDisplay) {
-            console.warn('[displayNoteTags] note-tags-display element not found');
+        const tagsEl = document.getElementById('colophon-tags');
+        if (!tagsEl) return;
+        const tags = (note && note.tags) || [];
+        if (tags.length === 0) {
+            tagsEl.innerHTML = '';
             return;
         }
-
-        if (!note.tags || note.tags.length === 0) {
-            tagsDisplay.innerHTML = '';
-            // Unwrap tags and date if they were wrapped
-            const wrapper = document.querySelector('.tags-date-wrapper');
-            if (wrapper && noteInfo) {
-                // Move tagsDisplay back to noteInfo before removing wrapper
-                if (tagsDisplay.parentElement === wrapper) {
-                    noteInfo.appendChild(tagsDisplay);
-                }
-                // Move noteDate back to noteInfo before removing wrapper
-                if (noteDate && noteDate.parentElement === wrapper) {
-                    noteInfo.appendChild(noteDate);
-                }
-                wrapper.remove();
-            }
-            return;
-        }
-
-        let tagsHtml = '<div class="editor-note-tags">';
-        note.tags.forEach(tagId => {
+        tagsEl.innerHTML = tags.map(tagId => {
             const tagName = this.app.notesManager.getTagName(tagId);
-            tagsHtml += `<span class="editor-note-tag">${this.app.escapeHtml(tagName)}</span>`;
-        });
-        tagsHtml += '</div>';
-
-        tagsDisplay.innerHTML = tagsHtml;
-
-        // Wrap tags and date in a flex container for inline layout when tags exist
-        const existingWrapper = document.querySelector('.tags-date-wrapper');
-        if (!existingWrapper && noteDate && noteInfo && noteDate.parentElement === noteInfo) {
-            const wrapper = document.createElement('div');
-            wrapper.className = 'tags-date-wrapper';
-            noteInfo.insertBefore(wrapper, tagsDisplay.nextSibling);
-            wrapper.appendChild(tagsDisplay);
-            wrapper.appendChild(noteDate);
-        }
+            return `<span class="tag"># <span class="tag-name">${this.app.escapeHtml(tagName)}</span></span>`;
+        }).join('');
     }
 
     // Show tag management dialog

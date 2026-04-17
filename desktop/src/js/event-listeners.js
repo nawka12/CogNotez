@@ -242,6 +242,22 @@ function setupEventListeners(app) {
         }
     });
 
+    // Colophon: cursor position (LN / COL) live updates
+    (function() {
+        const noteEditorEl = document.getElementById('note-editor');
+        function updateColophonPosition() {
+            const pos = noteEditorEl.selectionStart || 0;
+            const before = noteEditorEl.value.substring(0, pos);
+            const line = before.split('\n').length;
+            const col = before.length - before.lastIndexOf('\n');
+            const el = document.getElementById('colophon-position');
+            if (el) el.textContent = `LN ${line} · COL ${col}`;
+        }
+        noteEditorEl.addEventListener('input', updateColophonPosition);
+        noteEditorEl.addEventListener('click', updateColophonPosition);
+        noteEditorEl.addEventListener('keyup', updateColophonPosition);
+    })();
+
     // Also track title changes for unsaved indicator and update tab title
     document.getElementById('note-title').addEventListener('input', (e) => {
         if (app.currentNote && !app._ignoreNextInputForUnsaved) {

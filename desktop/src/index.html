@@ -210,7 +210,6 @@
                         </div>
                         <div class="editor-rule" aria-hidden="true"></div>
                         <div class="editor-header-meta">
-                            <div id="note-tags-display" class="note-tags-display"></div>
                             <span id="note-date" class="note-date"></span>
                         </div>
                         
@@ -236,6 +235,14 @@
                     <div class="editor-wrapper">
                         <textarea id="note-editor" class="note-editor hidden" placeholder="Start writing your note..." data-i18n-placeholder="editor.startWriting"></textarea>
                         <div id="markdown-preview" class="markdown-preview"></div>
+                    </div>
+
+                    <div class="editor-colophon" id="editor-colophon">
+                      <div class="colophon-tags" id="colophon-tags"><!-- injected by JS --></div>
+                      <span class="colophon-spacer"></span>
+                      <span class="colophon-status" id="colophon-status" data-i18n="editor.saved">SAVED</span>
+                      <span class="colophon-sep">·</span>
+                      <span class="colophon-position" id="colophon-position">LN 1 · COL 1</span>
                     </div>
 
                     <!-- AI Edit Approval (Inline) -->

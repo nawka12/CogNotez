@@ -1310,8 +1310,14 @@ class CogNotezApp {
         // Initialize history for undo/redo functionality
         this.initializeHistoryForNote(note.content);
 
-        // Display tags in the editor header (this will also handle wrapping tags+date)
+        // Display tags in the colophon bar
         this.displayNoteTags(note);
+
+        // Reset colophon cursor position on note load
+        (function() {
+            const el = document.getElementById('colophon-position');
+            if (el) el.textContent = 'LN 1 · COL 1';
+        })();
 
         // Update password lock icon
         this.updatePasswordLockIcon();

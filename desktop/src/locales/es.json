@@ -91,7 +91,8 @@
     "words": "palabras",
     "chars": "caracteres",
     "draft": "BORRADOR",
-    "dropCap": "MAYÚSCULA DECORATIVA"
+    "dropCap": "MAYÚSCULA DECORATIVA",
+    "saved": "GUARDADO"
   },
   "ai": {
     "assistant": "Compañero",

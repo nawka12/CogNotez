@@ -91,7 +91,8 @@
     "words": "語",
     "chars": "文字",
     "draft": "下書き",
-    "dropCap": "ドロップキャップ"
+    "dropCap": "ドロップキャップ",
+    "saved": "保存済み"
   },
   "ai": {
     "assistant": "伴走者",
