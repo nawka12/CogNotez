@@ -105,3 +105,6 @@ Thumbs.db
 # Electron-specific
 app/dist/
 release/
+
+# Superpowers brainstorming mockups
+.superpowers/
