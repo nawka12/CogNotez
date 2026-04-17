@@ -126,6 +126,10 @@
   /* Typography */
   --font-family-base: 'Source Serif 4', Georgia, serif;
   --font-family-display: 'Fraunces', Georgia, serif;
+
+  --accent-soft: rgba(124, 95, 209, 0.08);
+  --rubric: #a33b2a;
+  --shadow-popover: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
 /* Dark Theme - Modern Dark Design */
@@ -216,6 +220,10 @@
   /* Typography */
   --font-family-base: 'Source Serif 4', Georgia, serif;
   --font-family-display: 'Fraunces', Georgia, serif;
+
+  --accent-soft: rgba(201, 169, 255, 0.1);
+  --rubric: #ff7a6b;
+  --shadow-popover: 0 4px 16px rgba(0, 0, 0, 0.5);
 }
 
 /* Base body styling that uses theme variables */
