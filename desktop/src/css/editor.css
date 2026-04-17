@@ -539,6 +539,37 @@
     margin: 0 4px;
 }
 
+/* Edit / Preview / Split mode controls */
+.editor-mode-controls {
+    display: flex;
+    gap: 14px;
+    flex-shrink: 0;
+}
+
+.editor-mode-btn {
+    background: none;
+    border: none;
+    border-bottom: 1px solid transparent;
+    padding: 4px 0 2px 0;
+    color: var(--text-tertiary);
+    cursor: pointer;
+    font-family: var(--font-family-base);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    line-height: 1;
+    transition: color 150ms ease;
+}
+
+.editor-mode-btn:hover {
+    color: var(--text-primary);
+}
+
+.editor-mode-btn.active {
+    color: var(--text-primary);
+    border-bottom-color: var(--text-primary);
+}
+
 /* Responsive editor header */
 @media (max-width: 900px) {
     .editor-header {

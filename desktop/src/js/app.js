@@ -404,27 +404,12 @@ class CogNotezApp {
         this.loadTheme();
     }
 
-    // Update preview toggle button icon to reflect current mode
+    // Update the three mode buttons to reflect current mode
     updatePreviewToggleIcon() {
-        const toggleBtn = document.getElementById('preview-toggle-btn');
-        if (!toggleBtn) return;
-
-        const t = (key) => window.i18n ? window.i18n.t(key) : key;
-
-        switch (this.previewMode) {
-            case 'edit':
-                toggleBtn.innerHTML = '<i class="fas fa-edit"></i>';
-                toggleBtn.title = t('editor.editMode');
-                break;
-            case 'preview':
-                toggleBtn.innerHTML = '<i class="fas fa-eye"></i>';
-                toggleBtn.title = t('editor.previewMode');
-                break;
-            case 'split':
-                toggleBtn.innerHTML = '<i class="fas fa-columns"></i>';
-                toggleBtn.title = t('editor.splitMode');
-                break;
-        }
+        ['edit', 'preview', 'split'].forEach(mode => {
+            const btn = document.getElementById(`${mode}-mode-btn`);
+            if (btn) btn.classList.toggle('active', this.previewMode === mode);
+        });
     }
 
     // Sync UI visibility with current preview mode

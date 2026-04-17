@@ -182,7 +182,23 @@ function setupEventListeners(app) {
     document.getElementById('redo-btn').addEventListener('click', () => app.redo());
     document.getElementById('find-btn').addEventListener('click', () => app.showFindDialog());
     document.getElementById('replace-btn').addEventListener('click', () => app.showReplaceDialog());
+    // Cycle: edit → preview → split → edit
     document.getElementById('preview-toggle-btn').addEventListener('click', () => app.togglePreview());
+    document.getElementById('edit-mode-btn')?.addEventListener('click', () => {
+        // edit-mode: from preview needs 2 hops, from split needs 1
+        if (app.previewMode !== 'edit') app.togglePreview();
+        if (app.previewMode !== 'edit') app.togglePreview();
+    });
+    document.getElementById('preview-mode-btn')?.addEventListener('click', () => {
+        // preview-mode: from edit needs 1 hop, from split needs 2
+        if (app.previewMode === 'edit') app.togglePreview();
+        else if (app.previewMode === 'split') { app.togglePreview(); app.togglePreview(); }
+    });
+    document.getElementById('split-mode-btn')?.addEventListener('click', () => {
+        // split-mode: from edit needs 2 hops, from preview needs 1
+        if (app.previewMode === 'edit') { app.togglePreview(); app.togglePreview(); }
+        else if (app.previewMode === 'preview') app.togglePreview();
+    });
     document.getElementById('drop-cap-toggle')?.addEventListener('click', async () => {
         const note = app.currentNote;
         if (!note) return;
