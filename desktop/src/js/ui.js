@@ -519,12 +519,11 @@ class UIManager {
     }
 
     setupWordCount() {
-        // Check if word count should be shown according to settings
-        const showWordCount = localStorage.getItem('showWordCount') !== 'false'; // Default to true if not set
-        if (!showWordCount) {
-            return; // Don't create word count if disabled in settings
-        }
+        // Word count is rendered in the editor meta line (`#meta-wordcount`) and
+        // the colophon (`#colophon-position`) — the old floating pill is retired.
+        return;
 
+        // eslint-disable-next-line no-unreachable
         const editor = document.getElementById('note-editor');
         const aiPanel = document.getElementById('ai-panel');
         const wordCountElement = document.createElement('div');
