@@ -445,7 +445,7 @@
 
 /* Revamped Editor Header */
 .editor-header {
-    padding: 48px 64px 0 64px;
+    padding: 48px 40px 0 40px;
     background: var(--bg-primary);
     border-bottom: 1px solid var(--border-color);
     display: flex;
@@ -454,6 +454,9 @@
     position: relative;
     z-index: 50;
     flex-shrink: 0;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .editor-header-top {
@@ -880,11 +883,14 @@
 /* Editor Wrapper */
 .editor-wrapper {
     flex: 1;
-    padding: 0 64px 48px 64px;
+    padding: 0 40px 48px 40px;
     overflow: hidden;
     min-height: 0;
     background: var(--editor-bg);
     position: relative;
+    max-width: 720px;
+    margin: 0 auto;
+    width: 100%;
 }
 
 .editor-wrapper::before {
