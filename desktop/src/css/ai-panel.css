@@ -67,54 +67,28 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    padding: var(--spacing-lg);
-    background: var(--gradient-subtle);
+    padding: 0;
+    background: transparent;
     min-height: 0;
-    /* Allow flex children to shrink */
     overflow: hidden;
-    /* Prevent content from overflowing */
 }
 
 .ai-messages {
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    margin-bottom: var(--spacing-lg);
-    padding: var(--spacing-md);
-    min-height: 0;
-    /* Allow flex shrinking */
-    max-height: 100%;
-    /* Constrain to parent */
-    scroll-behavior: smooth;
-    background: var(--surface-bg);
-    border-radius: var(--radius-lg);
-    border: 1px solid var(--border-color);
-    position: relative;
-}
-
-.ai-messages::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: radial-gradient(circle at top right, var(--accent-color-lighter) 0%, transparent 50%);
-    opacity: 0.4;
-    pointer-events: none;
-    z-index: 0;
+    padding: 16px 18px;
+    font-family: var(--font-family-base);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-primary);
 }
 
 .ai-message {
-    margin-bottom: var(--spacing-lg);
+    margin-bottom: 0;
     padding: 0;
     position: relative;
-    z-index: 10;
-    display: flex;
-    gap: var(--spacing-sm);
-    align-items: flex-start;
     animation: messageSlideIn 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 @keyframes messageSlideIn {
@@ -129,79 +103,110 @@
     }
 }
 
-.ai-message.user {
-    flex-direction: row-reverse;
-    margin-left: var(--spacing-xl);
-}
-
-.ai-message.assistant {
-    margin-right: var(--spacing-xl);
-}
-
+/* Hide avatars — editorial layout has no avatars */
 .ai-message-avatar {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 16px;
-    box-shadow: var(--shadow-sm);
-    position: relative;
-    z-index: 1;
+    display: none;
 }
 
-.ai-message.user .ai-message-avatar {
-    background: var(--gradient-primary);
-    color: white;
-}
-
-.ai-message.assistant .ai-message-avatar {
-    background: var(--accent-color-lighter);
-    color: var(--accent-color);
-    border: 2px solid var(--accent-color-light);
-}
-
+/* Content wrapper fills full width */
 .ai-message-content {
-    flex: 1;
-    min-width: 0;
-    position: relative;
+    width: 100%;
 }
 
-.ai-message-bubble {
-    padding: var(--spacing-md) var(--spacing-lg);
-    border-radius: var(--radius-lg);
-    font-size: 14px;
+/* ── User messages: italic with large opening quote ── */
+.ai-message.user,
+.user-message,
+.message.user {
+    margin-bottom: 14px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.ai-message.user .ai-message-bubble,
+.user-message .message-content,
+.message.user .message-content {
+    font-style: italic;
+    color: var(--text-primary);
+    position: relative;
+    padding-left: 16px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
     word-wrap: break-word;
     word-break: break-word;
     overflow-wrap: anywhere;
-    hyphens: auto;
-    line-height: 1.6;
-    position: relative;
-    box-shadow: var(--shadow-sm);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    line-height: 1.65;
 }
 
-.ai-message.user .ai-message-bubble {
-    background: var(--gradient-primary);
-    color: white;
-    border-bottom-right-radius: 4px;
-    box-shadow: var(--shadow-md);
-    border: 1px solid var(--accent-color-darker);
+.ai-message.user .ai-message-bubble::before,
+.user-message .message-content::before,
+.message.user .message-content::before {
+    content: '\201C';
+    position: absolute;
+    left: 0;
+    top: -4px;
+    font-family: var(--font-family-display);
+    font-size: 22px;
+    font-style: italic;
+    color: var(--accent-color);
+    line-height: 1;
 }
 
-.ai-message.assistant .ai-message-bubble {
-    background: var(--message-bg);
+/* ── Assistant messages: REPLY label + rule, then body text ── */
+.ai-message.assistant,
+.assistant-message,
+.message.assistant {
+    margin-bottom: 18px;
+    padding: 0;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+}
+
+.ai-message.assistant::before,
+.assistant-message::before,
+.message.assistant::before {
+    content: 'Reply';
+    display: block;
+    font-family: var(--font-family-base);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    padding-right: 16px;
+    background-image: linear-gradient(to right, transparent 42px, var(--border-color) 42px, var(--border-color) 100%);
+    background-size: 100% 1px;
+    background-position: 0 50%;
+    background-repeat: no-repeat;
+}
+
+.ai-message.assistant .ai-message-bubble,
+.assistant-message .message-content,
+.message.assistant .message-content {
     color: var(--text-primary);
-    border: 1px solid var(--border-color);
-    border-bottom-left-radius: 4px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    box-shadow: none;
+    padding: 0;
+    word-wrap: break-word;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+    line-height: 1.65;
 }
 
-.ai-message:hover .ai-message-bubble {
-    box-shadow: var(--shadow-md);
+.ai-message.assistant .ai-message-bubble em,
+.assistant-message em,
+.message.assistant em {
+    font-style: italic;
+    color: var(--accent-color);
 }
 
+/* ── Message meta (timestamp + actions) ── */
 .ai-message-meta {
     display: flex;
     align-items: center;
@@ -247,24 +252,10 @@
 .ai-message-action:hover {
     background: var(--bg-hover);
     color: var(--accent-color);
-    transform: scale(1.1);
 }
 
 .ai-message-action:active {
     transform: scale(0.95);
-}
-
-.ai-message.user .ai-message-timestamp {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.ai-message.user .ai-message-action {
-    color: rgba(255, 255, 255, 0.7);
-}
-
-.ai-message.user .ai-message-action:hover {
-    background: rgba(255, 255, 255, 0.2);
-    color: white;
 }
 
 /* Typing indicator */
@@ -386,7 +377,6 @@
 
 .ai-message-bubble em {
     font-style: italic;
-    color: var(--text-secondary);
 }
 
 .ai-message-bubble h1,
