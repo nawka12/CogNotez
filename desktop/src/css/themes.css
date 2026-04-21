@@ -16,46 +16,12 @@
 
   /* Enhanced Accent Color System - Keeping #bdabe3 as primary */
   --accent-color: #7c5fd1;
-  --accent-color-light: var(--accent-soft);
-  --accent-color-lighter: var(--accent-soft);
-  --accent-color-lightest: transparent;
-  --accent-color-dark: var(--accent-color);
-  --accent-color-darker: var(--accent-color);
-  --accent-color-text: var(--accent-color);
 
   /* Modern Gradient System */
-  --gradient-primary: var(--accent-color);
-  --gradient-subtle: var(--bg-primary);
-  --gradient-surface: var(--bg-primary);
-  --gradient-accent: var(--accent-soft);
 
   /* Modern Surface Colors */
-  --header-bg: var(--bg-primary);
-  --sidebar-bg: var(--bg-secondary);
-  --editor-bg: var(--bg-primary);
-  --input-bg: var(--bg-primary);
-  --button-bg: transparent;
-  --button-hover-bg: var(--bg-tertiary);
-  --button-active-bg: var(--accent-soft);
-  --note-hover-bg: var(--bg-tertiary);
-  --note-active-bg: var(--bg-tertiary);
-  --context-menu-bg: var(--bg-secondary);
-  --context-menu-hover-bg: var(--bg-tertiary);
-  --modal-bg: var(--bg-primary);
-  --message-bg: var(--bg-secondary);
-  --context-highlight-bg: var(--accent-soft);
-  --card-bg: var(--bg-secondary);
 
   /* Enhanced Shadow System */
-  --shadow-xs: none;
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: var(--shadow-popover);
-  --shadow-xl: var(--shadow-popover);
-  --shadow-2xl: var(--shadow-popover);
-  --shadow-accent: none;
-  --shadow-accent-lg: none;
-  --shadow-inner: none;
 
   /* Modern Scrollbar */
   --scrollbar-track: transparent;
@@ -80,8 +46,6 @@
   --error-light: rgba(239, 68, 68, 0.1);
 
   /* Modern Surface Colors */
-  --surface-bg: var(--bg-secondary);
-  --surface-elevated: var(--bg-tertiary);
 
   /* Modern Border Radius */
   --radius-xs: 4px;
@@ -150,46 +114,12 @@
 
   /* Enhanced Accent for Dark Mode */
   --accent-color: #c9a9ff;
-  --accent-color-light: var(--accent-soft);
-  --accent-color-lighter: var(--accent-soft);
-  --accent-color-lightest: transparent;
-  --accent-color-dark: var(--accent-color);
-  --accent-color-darker: var(--accent-color);
-  --accent-color-text: var(--accent-color);
 
   /* Dark Gradient System */
-  --gradient-primary: var(--accent-color);
-  --gradient-subtle: var(--bg-primary);
-  --gradient-surface: var(--bg-primary);
-  --gradient-accent: var(--accent-soft);
 
   /* Dark Surface Colors */
-  --header-bg: var(--bg-primary);
-  --sidebar-bg: var(--bg-secondary);
-  --editor-bg: var(--bg-primary);
-  --input-bg: var(--bg-primary);
-  --button-bg: transparent;
-  --button-hover-bg: var(--bg-tertiary);
-  --button-active-bg: var(--accent-soft);
-  --note-hover-bg: var(--bg-tertiary);
-  --note-active-bg: var(--bg-tertiary);
-  --context-menu-bg: var(--bg-secondary);
-  --context-menu-hover-bg: var(--bg-tertiary);
-  --modal-bg: var(--bg-primary);
-  --message-bg: var(--bg-secondary);
-  --context-highlight-bg: var(--accent-soft);
-  --card-bg: var(--bg-secondary);
 
   /* Enhanced Dark Shadow System */
-  --shadow-xs: none;
-  --shadow-sm: none;
-  --shadow-md: none;
-  --shadow-lg: var(--shadow-popover);
-  --shadow-xl: var(--shadow-popover);
-  --shadow-2xl: var(--shadow-popover);
-  --shadow-accent: none;
-  --shadow-accent-lg: none;
-  --shadow-inner: none;
 
   /* Dark Scrollbar */
   --scrollbar-track: transparent;
@@ -214,8 +144,6 @@
   --error-light: rgba(239, 68, 68, 0.2);
 
   /* Dark Surface Colors */
-  --surface-bg: var(--bg-secondary);
-  --surface-elevated: var(--bg-tertiary);
 
   /* Typography */
   --font-family-base: 'Source Serif 4', Georgia, serif;
@@ -260,7 +188,6 @@ body {
   position: relative;
   overflow: hidden;
 }
-
 
 /* Modern Focus States */
 .search-input:focus,
@@ -362,8 +289,6 @@ body {
   animation: spin 1s linear infinite;
 }
 
-
-
 /* Modern Hover Effects - MOVED TO STYLES.CSS */
 /* 
 .note-item {
@@ -462,7 +387,6 @@ body {
   width: 4px;
 }
 */
-
 
 /* Modern Tag Styling - REMOVED (Conflicted with styles.css) */
 /*
