@@ -309,25 +309,26 @@
 /* Notification styles */
 .notification {
     position: fixed;
-    bottom: 20px;
-    right: 20px;
+    bottom: 16px;
+    right: 16px;
     z-index: 10000;
     pointer-events: auto;
     background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-left: 2px solid var(--text-primary);
-    border-radius: 4px;
-    padding: 10px 16px 10px 14px;
+    border-radius: 2px;
+    padding: 8px 12px 8px 10px;
     box-shadow: var(--shadow-popover);
     font-family: var(--font-family-base);
-    font-size: 12px;
+    font-size: 11px;
+    letter-spacing: 0.04em;
     color: var(--text-primary);
-    min-width: 200px;
-    max-width: 320px;
+    max-width: 260px;
     animation: toastSlideIn 220ms ease-out;
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 8px;
 }
 
 .notification.success {
@@ -348,35 +349,34 @@
 
 .notification-message {
     flex: 1;
-    line-height: 1.4;
+    line-height: 1.35;
 }
 
 .notification-label {
     display: block;
-    font-size: 10px;
+    font-size: 9px;
     letter-spacing: 0.22em;
     text-transform: uppercase;
     color: var(--text-tertiary);
-    margin-bottom: 2px;
+    margin-bottom: 1px;
 }
 
 .notification-close {
     background: none;
     border: none;
     color: var(--text-tertiary);
-    font-size: 14px;
+    font-size: 13px;
     cursor: pointer;
-    margin-left: 12px;
     padding: 0;
     line-height: 1;
     transition: color 150ms ease;
+    flex-shrink: 0;
 }
 
 .notification-close:hover {
     color: var(--text-primary);
 }
 
-/* Ensure notifications are never affected by modal backdrops */
 .modal .notification,
 .modal-backdrop .notification,
 .loading-overlay .notification {
@@ -384,7 +384,7 @@
 }
 
 @keyframes toastSlideIn {
-    from { opacity: 0; transform: translateX(8px); }
+    from { opacity: 0; transform: translateX(6px); }
     to { opacity: 1; transform: translateX(0); }
 }
 
