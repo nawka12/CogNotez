@@ -8,9 +8,10 @@ class UIManager {
     // Notification system
     showNotification(message, type = 'info', duration = 3000) {
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        notification.className = `notification ${type}`;
 
         const messageSpan = document.createElement('span');
+        messageSpan.className = 'notification-message';
         messageSpan.textContent = message;
         notification.appendChild(messageSpan);
 
@@ -18,25 +19,6 @@ class UIManager {
         closeBtn.className = 'notification-close';
         closeBtn.textContent = '×';
         notification.appendChild(closeBtn);
-
-        // Style the notification
-        Object.assign(notification.style, {
-            position: 'fixed',
-            top: '20px',
-            right: '20px',
-            background: type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : 'var(--accent-color)',
-            color: 'white',
-            padding: '12px 16px',
-            borderRadius: '6px',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: '1000',
-            maxWidth: '400px',
-            fontSize: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            animation: 'slideInRight 0.3s ease'
-        });
 
         document.body.appendChild(notification);
         this.notifications.push(notification);

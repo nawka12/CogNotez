@@ -306,39 +306,49 @@
     caret-color: var(--accent-color);
 }
 
-/* Notification styles - ensure they appear above all modals and overlays */
+/* Notification styles */
 .notification {
-    position: fixed !important;
+    position: fixed;
     bottom: 20px;
     right: 20px;
-    z-index: 10000 !important;
-    pointer-events: auto !important;
-    filter: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: space-between !important;
-    background: var(--bg-secondary) !important;
-    border: 1px solid var(--border-color) !important;
-    border-left: 2px solid var(--text-primary) !important;
-    border-radius: 4px !important;
-    padding: 10px 16px 10px 14px !important;
-    box-shadow: var(--shadow-popover) !important;
-    font-family: var(--font-family-base) !important;
-    font-size: 12px !important;
-    color: var(--text-primary) !important;
-    min-width: 240px !important;
-    max-width: 360px !important;
-    animation: toastSlideIn 220ms ease-out !important;
+    z-index: 10000;
+    pointer-events: auto;
+    background: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-left: 2px solid var(--text-primary);
+    border-radius: 4px;
+    padding: 10px 16px 10px 14px;
+    box-shadow: var(--shadow-popover);
+    font-family: var(--font-family-base);
+    font-size: 12px;
+    color: var(--text-primary);
+    min-width: 200px;
+    max-width: 320px;
+    animation: toastSlideIn 220ms ease-out;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.notification.success {
+    border-left-color: #10b981;
 }
 
 .notification.info {
-    border-left-color: var(--accent-color) !important;
+    border-left-color: var(--accent-color);
 }
 
 .notification.error {
-    border-left-color: var(--rubric) !important;
+    border-left-color: var(--rubric);
+}
+
+.notification.warning {
+    border-left-color: #f59e0b;
+}
+
+.notification-message {
+    flex: 1;
+    line-height: 1.4;
 }
 
 .notification-label {
@@ -351,28 +361,26 @@
 }
 
 .notification-close {
-    background: none !important;
-    border: none !important;
-    color: var(--text-tertiary) !important;
-    font-size: 14px !important;
-    cursor: pointer !important;
-    margin-left: 12px !important;
-    padding: 0 !important;
-    line-height: 1 !important;
-    transition: color 150ms ease !important;
+    background: none;
+    border: none;
+    color: var(--text-tertiary);
+    font-size: 14px;
+    cursor: pointer;
+    margin-left: 12px;
+    padding: 0;
+    line-height: 1;
+    transition: color 150ms ease;
 }
 
 .notification-close:hover {
-    color: var(--text-primary) !important;
+    color: var(--text-primary);
 }
 
 /* Ensure notifications are never affected by modal backdrops */
 .modal .notification,
 .modal-backdrop .notification,
 .loading-overlay .notification {
-    filter: none !important;
-    opacity: 1 !important;
-    visibility: visible !important;
+    pointer-events: auto;
 }
 
 @keyframes toastSlideIn {
