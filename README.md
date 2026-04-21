@@ -1,7 +1,7 @@
 # <img src="desktop/assets/icon.svg" alt="CogNotez Logo" width="48" height="48"> CogNotez - AI-Powered Note App
 
 
-![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)
+![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)
 ![License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Linux%20%7C%20Windows%20%7C%20macOS-lightgrey.svg)
 ![Electron](https://img.shields.io/badge/Electron-30.0-9feaf9.svg)
@@ -268,7 +268,19 @@ We welcome contributions! Here's how you can help:
 
 ## Version History
 
-### v3.0.0 (Current)
+### v4.0.0 (Current)
+- **Editorial design system** — full migration off alias tokens to canonical design tokens across all CSS
+- Editor canvas centered at 640px max-width with per-note drop-cap toggle and editorial double-rule meta line
+- Editor header rebuilt: EDIT / PREVIEW / SPLIT mode controls, colophon meta bar, draft status indicator
+- Modals, context menus, find/replace, advanced search, and AI dialogs all adopt the editorial type system (small-caps labels, flat cards, left-bar hover)
+- Tag chips render as editorial `#` marks; sidebar folders use left-bar active pattern
+- Notification toast redesigned as a minimal bottom/top-right bar with a colored left-border accent
+- Fixed notes list compressing to ~21px items (flex column + `min-height: 0` was shrinking children before overflow could scroll)
+- Fixed toast stretching full-height (conflicting `top`/`bottom` anchors from inline styles vs. CSS)
+- Fixed search placeholder overlapping the icon (input padding didn't clear the absolutely-positioned `fa-search`)
+- Final cleanup sweep — removed residual slop patterns: shadow stacking, scale-hover transforms, glass panels, legacy alias tokens
+
+### v3.0.0
 - **Complete visual redesign** — Fraunces (display) + Source Serif 4 (body) typography, replacing Inter
 - Reduced gradient text overuse — lavender gradient kept only on app title as the single brand moment
 - Note sidebar redesigned from cards to compact dense list with left-border accent
