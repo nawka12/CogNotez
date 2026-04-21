@@ -3564,37 +3564,14 @@ Please provide a helpful response based on the note content and conversation his
     showNotification(message, type = 'info') {
         console.log(`Notification (${type}):`, message);
 
-        // Create a visual notification element
         const notification = document.createElement('div');
-        notification.className = `notification notification-${type}`;
+        notification.className = `notification ${type}`;
         notification.innerHTML = `
-            <span>${message}</span>
+            <span class="notification-message">${message}</span>
             <button class="notification-close">×</button>
         `;
 
-        // Style the notification
-        Object.assign(notification.style, {
-            position: 'fixed',
-            top: '80px',
-            right: '20px',
-            background: type === 'error' ? '#dc3545' : type === 'success' ? '#28a745' : '#17a2b8',
-            color: 'white',
-            padding: '12px 16px',
-            borderRadius: '6px',
-            boxShadow: '0 6px 20px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(255, 255, 255, 0.1)',
-            zIndex: '10000', // Increased to appear above all modals and overlays
-            maxWidth: '400px',
-            fontSize: '14px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
-            animation: 'slideInRight 0.3s ease',
-            pointerEvents: 'auto' // Ensure it can be interacted with
-        });
-
-        // Close button functionality
         const closeBtn = notification.querySelector('.notification-close');
-        closeBtn.style.cssText = 'background: none; border: none; color: white; font-size: 18px; cursor: pointer; margin-left: 12px;';
         closeBtn.addEventListener('click', () => {
             this.removeNotification(notification);
         });

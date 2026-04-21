@@ -419,6 +419,7 @@ body.sidebar-resizing * {
     margin: 0;
     position: relative;
     overflow: hidden;
+    flex-shrink: 0;
 }
 
 .note-item:hover {

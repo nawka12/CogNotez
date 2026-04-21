@@ -309,7 +309,7 @@
 /* Notification styles */
 .notification {
     position: fixed;
-    bottom: 16px;
+    top: 80px;
     right: 16px;
     z-index: 10000;
     pointer-events: auto;
@@ -317,13 +317,13 @@
     border: 1px solid var(--border-color);
     border-left: 2px solid var(--text-primary);
     border-radius: 2px;
-    padding: 8px 12px 8px 10px;
+    padding: 8px 12px;
     box-shadow: var(--shadow-popover);
     font-family: var(--font-family-base);
     font-size: 11px;
     letter-spacing: 0.04em;
     color: var(--text-primary);
-    max-width: 260px;
+    max-width: 280px;
     animation: toastSlideIn 220ms ease-out;
     display: flex;
     align-items: center;
