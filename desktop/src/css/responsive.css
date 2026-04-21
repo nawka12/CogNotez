@@ -19,8 +19,7 @@
 }
 
 .mobile-menu-toggle:active {
-    background: var(--button-hover-bg);
-    transform: scale(0.95);
+    background: var(--bg-tertiary);
 }
 
 /* Medium Screens (1366x768 and similar laptops) - between tablet and desktop */
