@@ -272,18 +272,18 @@ body {
 .tag-input:focus {
   outline: none;
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px var(--accent-color-light);
-  background: var(--input-bg);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--bg-primary);
 }
 
 /* Modern Selection Styling */
 ::selection {
-  background: var(--accent-color-light);
+  background: var(--accent-soft);
   color: var(--text-primary);
 }
 
 ::-moz-selection {
-  background: var(--accent-color-light);
+  background: var(--accent-soft);
   color: var(--text-primary);
 }
 
@@ -381,14 +381,13 @@ body {
 
 .available-tag:hover, .tag-item:hover {
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 */
 
 /* Modern Context Menu Animations */
 .context-menu {
   animation: slideDown 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-popover);
   border: 1px solid var(--border-color);
 }
 
@@ -407,7 +406,7 @@ body {
 /* Modern AI Panel Animation */
 .ai-panel {
   animation: slideInFromRight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-popover);
 }
 
 @keyframes slideInFromRight {
@@ -430,7 +429,7 @@ body {
   border-radius: var(--radius-md);
   margin: var(--spacing-xs) var(--spacing-sm);
   border: 1px solid transparent;
-  background: var(--surface-bg);
+  background: var(--bg-secondary);
 }
 
 .note-item::before {
@@ -440,7 +439,7 @@ body {
   top: 0;
   bottom: 0;
   width: 0;
-  background: var(--gradient-primary);
+  background: var(--accent-color);
   transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   border-radius: var(--radius-md) 0 0 var(--radius-md);
 }
@@ -450,15 +449,13 @@ body {
 }
 
 .note-item:hover {
-  background: var(--button-hover-bg);
-  border-color: var(--accent-color-light);
-  box-shadow: var(--shadow-sm);
+  background: var(--bg-tertiary);
+  border-color: var(--accent-soft);
 }
 
 .note-item.active {
-  background: var(--accent-color-lighter);
+  background: var(--accent-soft);
   border-color: var(--accent-color);
-  box-shadow: var(--shadow-accent);
 }
 
 .note-item.active::before {
@@ -476,14 +473,13 @@ body {
   font-weight: 500;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   border: 1px solid var(--accent-color);
-  background: var(--accent-color-lighter);
-  color: var(--accent-color-darker);
+  background: var(--accent-soft);
+  color: var(--accent-color);
 }
 
 .note-tag:hover, .editor-note-tag:hover, .tag-item:hover {
-  background: var(--accent-color-light);
+  background: var(--accent-soft);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-sm);
 }
 */
 
@@ -492,7 +488,7 @@ body {
 .action-btn, .search-button, .new-note-btn, .theme-toggle {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  background: var(--button-bg);
+  background: transparent;
   color: var(--text-secondary);
   font-weight: 500;
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
@@ -501,17 +497,15 @@ body {
 }
 
 .action-btn:hover, .search-button:hover, .new-note-btn:hover, .theme-toggle:hover {
-  background: var(--button-hover-bg);
+  background: var(--bg-tertiary);
   border-color: var(--accent-color);
   color: var(--accent-color);
   transform: translateY(-1px);
-  box-shadow: var(--shadow-md);
 }
 
 .action-btn.active, .search-button.active, .new-note-btn.active, .theme-toggle.active {
   background: var(--accent-color);
   color: white;
-  box-shadow: var(--shadow-accent);
 }
 */
 
@@ -520,21 +514,21 @@ body {
 .search-input, .ai-input, .ai-dialog-input, .find-input, .replace-input, .tag-input {
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
-  background: var(--input-bg);
+  background: var(--bg-primary);
   color: var(--text-primary);
   transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   font-weight: 400;
 }
 
 .search-input:hover, .ai-input:hover, .ai-dialog-input:hover, .find-input:hover, .replace-input:hover, .tag-input:hover {
-  border-color: var(--accent-color-light);
-  background: var(--surface-elevated);
+  border-color: var(--accent-soft);
+  background: var(--bg-tertiary);
 }
 
 .search-input:focus, .ai-input:focus, .ai-dialog-input:focus, .find-input:focus, .replace-input:focus, .tag-input:focus {
   border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px var(--accent-color-light);
-  background: var(--input-bg);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+  background: var(--bg-primary);
 }
 */
 

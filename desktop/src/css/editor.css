@@ -123,7 +123,7 @@
 }
 
 .available-tag:hover {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
     color: var(--accent-color);
     border-color: var(--accent-color);
 }
@@ -133,7 +133,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--editor-bg);
+    background: var(--bg-primary);
     position: relative;
     min-height: 0;
     overflow: hidden;
@@ -144,7 +144,7 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    background: var(--editor-bg);
+    background: var(--bg-primary);
     position: relative;
     overflow: auto;
 }
@@ -192,7 +192,7 @@
 .floating-shape.shape-2 {
     width: 300px;
     height: 300px;
-    background: var(--accent-color-dark);
+    background: var(--accent-color);
     bottom: -80px;
     left: -80px;
     animation-delay: -5s;
@@ -211,7 +211,7 @@
 .floating-shape.shape-4 {
     width: 80px;
     height: 80px;
-    background: var(--accent-color-darker);
+    background: var(--accent-color);
     top: 20%;
     right: 20%;
     animation-delay: -3s;
@@ -253,9 +253,9 @@
     text-align: center;
     max-width: 520px;
     padding: var(--spacing-3xl) var(--spacing-2xl);
-    background: var(--surface-elevated);
+    background: var(--bg-tertiary);
     border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-xl);
+    box-shadow: var(--shadow-popover);
     border: 1px solid var(--border-color);
     position: relative;
     z-index: 10;
@@ -289,7 +289,7 @@
     position: absolute;
     width: 120px;
     height: 120px;
-    border: 2px dashed var(--accent-color-light);
+    border: 2px dashed var(--accent-soft);
     border-radius: 50%;
     animation: spin-slow 20s linear infinite;
 }
@@ -310,9 +310,8 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--gradient-primary);
+    background: var(--accent-color);
     border-radius: 50%;
-    box-shadow: var(--shadow-accent-lg);
     animation: icon-pulse 3s ease-in-out infinite;
 }
 
@@ -326,12 +325,10 @@
     0%,
     100% {
         transform: scale(1);
-        box-shadow: var(--shadow-accent);
     }
 
     50% {
         transform: scale(1.05);
-        box-shadow: var(--shadow-accent-lg), 0 0 30px var(--accent-color-light);
     }
 }
 
@@ -364,7 +361,7 @@
     align-items: center;
     gap: var(--spacing-sm);
     padding: 14px 28px;
-    background: var(--gradient-primary);
+    background: var(--accent-color);
     color: white;
     border: none;
     border-radius: var(--radius-full);
@@ -372,7 +369,6 @@
     font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-accent);
     position: relative;
     overflow: hidden;
 }
@@ -389,8 +385,7 @@
 }
 
 .create-note-btn:hover {
-    transform: translateY(-3px) scale(1.03);
-    box-shadow: var(--shadow-accent-lg), 0 10px 40px -10px var(--accent-color);
+    transform: none;
 }
 
 .create-note-btn:hover::before {
@@ -398,7 +393,7 @@
 }
 
 .create-note-btn:active {
-    transform: translateY(-1px) scale(1.01);
+    transform: none;
 }
 
 .create-note-btn .btn-icon {
@@ -728,7 +723,7 @@
     font-size: var(--font-size-sm);
     color: var(--text-tertiary);
     font-weight: var(--font-weight-medium);
-    background: var(--surface-elevated);
+    background: var(--bg-tertiary);
     padding: var(--spacing-xs) var(--spacing-sm);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
@@ -739,7 +734,6 @@
     display: inline-flex;
     align-items: center;
     transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-xs);
 }
 
 
@@ -761,7 +755,7 @@
 /* Legacy action-btn kept for backwards compatibility */
 .action-btn {
     padding: 10px;
-    background: var(--button-bg);
+    background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -810,8 +804,8 @@
 }
 
 .action-btn:hover {
-    background: var(--button-hover-bg);
-    border-color: var(--accent-color-light);
+    background: var(--bg-tertiary);
+    border-color: var(--accent-soft);
     color: var(--accent-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1), 0 1px 2px rgba(0, 0, 0, 0.06);
@@ -856,8 +850,8 @@
 }
 
 .action-btn.active:hover {
-    background: var(--accent-color-dark);
-    border-color: var(--accent-color-dark);
+    background: var(--accent-color);
+    border-color: var(--accent-color);
     color: white;
     box-shadow: 0 4px 12px rgba(62, 207, 142, 0.4), 0 2px 4px rgba(0, 0, 0, 0.1);
 }
@@ -871,10 +865,10 @@
     position: absolute;
     top: calc(100% + 10px);
     right: 0;
-    background: var(--context-menu-bg);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-xl);
+    box-shadow: var(--shadow-popover);
     z-index: 1000;
     min-width: 220px;
     padding: var(--spacing-sm) 0;
@@ -927,7 +921,7 @@
 }
 
 .overflow-menu-item:hover {
-    background: var(--context-menu-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--accent-color);
 }
 
@@ -936,7 +930,7 @@
 }
 
 .overflow-menu-item:active {
-    background: var(--button-active-bg);
+    background: var(--accent-soft);
 }
 
 .overflow-menu-separator {
@@ -951,7 +945,7 @@
     padding: 0 40px 48px 40px;
     overflow: hidden;
     min-height: 0;
-    background: var(--editor-bg);
+    background: var(--bg-primary);
     position: relative;
 }
 
@@ -962,9 +956,9 @@
     left: 0;
     right: 0;
     bottom: 0;
-    background: radial-gradient(circle at 20% 50%, var(--accent-color-lighter) 0%, transparent 40%),
-        radial-gradient(circle at 80% 20%, var(--accent-color-lighter) 0%, transparent 40%),
-        radial-gradient(circle at 40% 80%, var(--accent-color-lighter) 0%, transparent 40%);
+    background: radial-gradient(circle at 20% 50%, var(--accent-soft) 0%, transparent 40%),
+        radial-gradient(circle at 80% 20%, var(--accent-soft) 0%, transparent 40%),
+        radial-gradient(circle at 40% 80%, var(--accent-soft) 0%, transparent 40%);
     opacity: 0.3;
     pointer-events: none;
     z-index: 0;
@@ -1029,7 +1023,7 @@
 }
 
 .note-editor::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
 }
 
 .markdown-preview {
@@ -1071,7 +1065,7 @@
 }
 
 .markdown-preview::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
 }
 
 /* Horizontal scroll indicator */
@@ -1082,7 +1076,7 @@
     right: 0;
     bottom: 0;
     width: 20px;
-    background: linear-gradient(to left, var(--editor-bg) 0%, transparent 100%);
+    background: linear-gradient(to left, var(--bg-primary) 0%, transparent 100%);
     pointer-events: none;
     opacity: 0;
     transition: opacity 0.3s ease;
@@ -1097,7 +1091,7 @@
 .editor-wrapper.split-mode {
     display: flex;
     gap: 0;
-    background: var(--editor-bg);
+    background: var(--bg-primary);
     position: relative;
 }
 
@@ -1166,7 +1160,7 @@
     top: 10px;
     right: 10px;
     padding: 4px 8px;
-    background: var(--accent-color-lightest);
+    background: transparent;
     border: 1px solid var(--accent-color);
     border-radius: var(--radius-sm);
     font-size: var(--font-size-xs);
@@ -1257,10 +1251,9 @@
     margin: 1.2em 0;
     padding: var(--spacing-md) var(--spacing-lg);
     border-left: 4px solid var(--accent-color);
-    background: var(--accent-color-lightest);
+    background: transparent;
     border-radius: var(--radius-md);
     font-style: italic;
-    box-shadow: var(--shadow-xs);
 }
 
 .markdown-preview code {
@@ -1279,7 +1272,6 @@
     border: 1px solid var(--code-border);
     overflow-x: auto;
     margin: 1.2em 0;
-    box-shadow: var(--shadow-sm);
     /* Enhanced horizontal scrolling for code blocks */
     scroll-behavior: smooth;
     scrollbar-width: thin;
@@ -1300,7 +1292,7 @@
 }
 
 .markdown-preview pre::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
 }
 
 .markdown-preview pre code {
@@ -1357,7 +1349,7 @@
 }
 
 .markdown-preview .table-container::-webkit-scrollbar-thumb:hover {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
 }
 
 .markdown-preview th,
@@ -1368,9 +1360,9 @@
 }
 
 .markdown-preview th {
-    background: var(--gradient-accent);
+    background: var(--accent-soft);
     font-weight: var(--font-weight-semibold);
-    border-color: var(--accent-color-light);
+    border-color: var(--accent-soft);
 }
 
 .markdown-preview strong {

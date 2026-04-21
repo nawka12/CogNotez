@@ -73,7 +73,7 @@
 }
 
 .sidebar-toggle:hover {
-    background: var(--button-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
@@ -247,7 +247,7 @@ body.sidebar-resizing * {
 }
 
 .tags-toggle-btn:hover {
-    background: var(--button-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--text-primary);
 }
 
@@ -285,8 +285,8 @@ body.sidebar-resizing * {
 }
 
 .create-folder-btn:hover {
-    background: var(--button-hover-bg);
-    border-color: var(--accent-color-light);
+    background: var(--bg-tertiary);
+    border-color: var(--accent-soft);
     color: var(--accent-color);
 }
 
@@ -305,7 +305,7 @@ body.sidebar-resizing * {
 }
 
 .tag-folder-item:hover {
-    background: var(--button-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--text-primary);
     transform: translateX(4px);
 }
@@ -376,7 +376,7 @@ body.sidebar-resizing * {
 }
 
 .tag-folder-context-menu .context-menu-item:hover {
-    background: var(--button-hover-bg);
+    background: var(--bg-tertiary);
 }
 
 .tag-folder-context-menu .context-menu-item i {
@@ -491,7 +491,7 @@ body.sidebar-resizing * {
 .note-lock-icon {
     color: var(--accent-color);
     font-size: 12px;
-    background: var(--accent-color-lighter);
+    background: var(--accent-soft);
     padding: 4px;
     border-radius: 4px;
 }
@@ -603,8 +603,8 @@ body.sidebar-resizing * {
 }
 
 .note-tag:hover {
-    background: var(--accent-color-lighter);
-    color: var(--accent-color-darker);
+    background: var(--accent-soft);
+    color: var(--accent-color);
     transform: none;
 }
 
@@ -637,20 +637,18 @@ body.sidebar-resizing * {
     height: 28px;
     border-radius: 50%;
     border: 1px solid var(--border-color);
-    background: var(--surface-elevated);
+    background: var(--bg-tertiary);
     display: flex;
     align-items: center;
     justify-content: center;
     cursor: pointer;
     font-size: 12px;
     color: var(--text-secondary);
-    box-shadow: var(--shadow-sm);
     transition: all 0.2s ease;
 }
 
 .note-action-btn:hover {
     transform: scale(1.1);
-    box-shadow: var(--shadow-md);
 }
 
 .note-pin-btn {
@@ -686,7 +684,7 @@ body.sidebar-resizing * {
 }
 
 #password-lock-btn:hover {
-    background: var(--context-menu-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--accent-color);
 }
 
@@ -700,7 +698,7 @@ body.sidebar-resizing * {
 }
 
 #password-lock-btn.active:hover {
-    background: var(--accent-color-dark);
+    background: var(--accent-color);
     color: white;
 }
 
@@ -779,9 +777,9 @@ body.sidebar-resizing * {
     font-size: var(--font-size-xs);
     padding: 4px var(--spacing-sm);
     border-radius: var(--radius-md);
-    background: var(--accent-color-lighter);
-    color: var(--accent-color-darker);
-    border: 1px solid var(--accent-color-light);
+    background: var(--accent-soft);
+    color: var(--accent-color);
+    border: 1px solid var(--accent-soft);
     white-space: nowrap;
     flex-shrink: 0;
     /* Prevent tags from shrinking */
@@ -795,7 +793,7 @@ body.sidebar-resizing * {
 }
 
 .editor-note-tag:hover {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
     border-color: var(--accent-color);
     transform: translateY(-1px);
     box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);

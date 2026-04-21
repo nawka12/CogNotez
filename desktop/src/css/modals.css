@@ -117,7 +117,7 @@
     padding: 8px;
     border: 1px solid var(--border-color);
     border-radius: 4px;
-    background: var(--input-bg);
+    background: var(--bg-primary);
     color: var(--text-primary);
     font-size: 14px;
 }
@@ -297,7 +297,7 @@
 }
 
 .ai-dialog-context {
-    background: var(--context-highlight-bg);
+    background: var(--accent-soft);
     padding: 12px;
     border-radius: 6px;
     margin-bottom: 16px;

@@ -5,7 +5,7 @@
 /* Mobile Hamburger Menu Button */
 .mobile-menu-toggle {
     display: none;
-    background: var(--button-bg);
+    background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     padding: var(--spacing-sm);
@@ -165,7 +165,7 @@
         left: 0;
         right: 0;
         padding: var(--spacing-md);
-        background: var(--header-bg);
+        background: var(--bg-primary);
         border-bottom: 1px solid var(--border-color);
         z-index: 99;
         transform: translateY(-100%);

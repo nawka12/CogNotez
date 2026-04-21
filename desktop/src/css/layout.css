@@ -149,7 +149,7 @@
     justify-content: center;
     width: 28px;
     height: 28px;
-    background: var(--button-bg);
+    background: transparent;
     border: 1px solid var(--border-color);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -159,7 +159,7 @@
 }
 
 .tabs-overflow-btn:hover {
-    background: var(--button-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--accent-color);
 }
 

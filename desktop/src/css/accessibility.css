@@ -46,7 +46,7 @@
     gap: 6px;
     padding: 4px 8px;
     border-radius: 999px;
-    background: var(--context-menu-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--text-primary);
     font-size: 12px;
     border: 1px solid var(--border-color-light);
@@ -92,7 +92,7 @@
 
 .model-switcher-search input {
     flex: 1;
-    background: var(--input-bg);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
     border-radius: 10px;
     padding: 12px 14px;
@@ -101,7 +101,7 @@
 }
 
 .model-switcher-search input:focus {
-    outline: 2px solid var(--accent-color-light);
+    outline: 2px solid var(--accent-soft);
     border-color: var(--accent-color);
     box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.15);
 }
@@ -109,7 +109,7 @@
 .model-switcher-hint {
     font-size: 12px;
     color: var(--text-secondary);
-    background: var(--context-menu-bg);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
     padding: 6px 10px;
     border-radius: 8px;
@@ -144,11 +144,11 @@
 }
 
 .model-switcher-item:hover {
-    background: var(--context-menu-hover-bg);
+    background: var(--bg-tertiary);
 }
 
 .model-switcher-item.active {
-    background: var(--context-menu-hover-bg);
+    background: var(--bg-tertiary);
     border-left: 3px solid var(--accent-color);
 }
 
