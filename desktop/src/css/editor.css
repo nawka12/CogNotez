@@ -22,43 +22,54 @@
 .current-tags {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
+    gap: 10px;
     min-height: 30px;
-    padding: 8px;
+    padding: 10px 12px;
     border: 1px solid var(--border-color);
-    border-radius: 6px;
+    border-radius: 4px;
     background: var(--bg-primary);
 }
 
 .tag-item {
     display: inline-flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
-    border-radius: 16px;
-    background: var(--accent-color-light);
-    color: var(--accent-color);
-    border: 1px solid var(--accent-color);
+    gap: 6px;
+    padding: 2px 0;
+    background: transparent;
+    color: var(--text-primary);
+    border: none;
+    border-radius: 0;
+    font-family: var(--font-family-base);
     font-size: 12px;
+    font-variant-numeric: normal;
+}
+
+.tag-item::before {
+    content: '#';
+    color: var(--text-tertiary);
+    margin-right: 2px;
+}
+
+.tag-item .tag-name {
+    color: var(--rubric);
+    font-style: italic;
 }
 
 .tag-remove {
-    background: none;
+    background: transparent;
     border: none;
-    color: var(--accent-color);
+    color: var(--text-tertiary);
     cursor: pointer;
-    font-size: 14px;
-    padding: 0;
-    width: 16px;
-    height: 16px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 50%;
+    font-size: 11px;
+    padding: 0 2px;
+    width: auto;
+    height: auto;
+    border-radius: 0;
+    transition: color 150ms ease;
 }
 
 .tag-remove:hover {
-    background: rgba(255, 255, 255, 0.2);
+    color: var(--rubric);
 }
 
 .no-tags {
