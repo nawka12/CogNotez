@@ -150,22 +150,32 @@
 }
 
 .find-input,
-.replace-input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid var(--border-color);
-    border-radius: 6px;
-    background: var(--input-bg);
+.replace-input,
+.search-field-input {
+    font-family: var(--font-family-base);
+    font-size: 13px;
     color: var(--text-primary);
-    font-size: 14px;
+    background: var(--bg-primary);
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    padding: 6px 10px;
+    outline: none;
+    width: 100%;
     box-sizing: border-box;
+    transition: border-color 150ms ease;
 }
 
 .find-input:focus,
-.replace-input:focus {
-    outline: none;
+.replace-input:focus,
+.search-field-input:focus {
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
+    box-shadow: none;
+}
+
+.find-input::placeholder,
+.replace-input::placeholder {
+    color: var(--text-tertiary);
+    font-style: italic;
 }
 
 .options-section {
@@ -206,55 +216,77 @@
     flex-wrap: wrap;
 }
 
-.btn-secondary,
-.btn-primary {
-    padding: var(--spacing-sm) var(--spacing-lg);
-    border: 1px solid var(--border-color);
-    border-radius: var(--radius-md);
-    background: var(--button-bg);
-    color: var(--text-primary);
-    font-size: 14px;
-    font-weight: 500;
+.find-replace-actions button,
+.buttons-section button,
+.find-count {
+    font-family: var(--font-family-base);
+    font-size: 10px;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    padding: 4px 8px;
     cursor: pointer;
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: var(--shadow-xs);
-    position: relative;
-    overflow: hidden;
+    transition: color 150ms ease;
+    font-variant-numeric: tabular-nums;
 }
 
-.btn-secondary:hover {
-    background: var(--button-hover-bg);
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-sm);
-    border-color: var(--accent-color-light);
+.find-replace-actions button:hover,
+.buttons-section button:hover {
+    color: var(--text-primary);
+    background: transparent;
+    transform: none;
+    box-shadow: none;
+}
+
+.find-count {
+    color: var(--text-tertiary);
+    cursor: default;
+}
+
+.find-count:hover {
+    color: var(--text-tertiary);
 }
 
 .btn-primary {
-    background: var(--gradient-primary);
-    color: white;
-    border-color: var(--accent-color);
-    box-shadow: var(--shadow-md);
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--bg-primary);
+    background: var(--text-primary);
+    border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    transition: background-color 150ms ease;
 }
 
 .btn-primary:hover {
-    transform: translateY(-2px) scale(1.02);
-    box-shadow: var(--shadow-lg);
-    background: var(--accent-color-dark);
+    background: var(--accent-color);
+    transform: none;
+    box-shadow: none;
 }
 
-.btn-primary::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-    transition: left 0.5s;
+.btn-secondary {
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: color 150ms ease;
 }
 
-.btn-primary:hover::before {
-    left: 100%;
+.btn-secondary:hover {
+    color: var(--text-primary);
+    background: transparent;
+    transform: none;
+    box-shadow: none;
 }
 
 /* Hide replace section when in find-only mode */
@@ -264,18 +296,18 @@
 
 /* Find highlight styling in markdown preview */
 .find-highlight {
-    background: var(--accent-color-light);
+    background: var(--accent-soft);
     padding: 2px 4px;
-    border-radius: 3px;
+    border-radius: 0;
     color: var(--text-primary);
     font-weight: var(--font-weight-medium);
 }
 
 .find-highlight-current {
     background: var(--accent-color);
-    color: white;
+    color: var(--bg-primary);
     font-weight: var(--font-weight-semibold);
-    box-shadow: 0 0 0 2px var(--accent-color-light);
+    box-shadow: none;
 }
 
 /* Enhanced selection styling for find mode in textarea */
@@ -297,6 +329,8 @@
 /* Notification styles - ensure they appear above all modals and overlays */
 .notification {
     position: fixed !important;
+    bottom: 20px;
+    right: 20px;
     z-index: 10000 !important;
     pointer-events: auto !important;
     backdrop-filter: none !important;
@@ -307,18 +341,51 @@
     display: flex !important;
     align-items: center !important;
     justify-content: space-between !important;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    background: var(--bg-secondary) !important;
+    border: 1px solid var(--border-color) !important;
+    border-left: 2px solid var(--text-primary) !important;
+    border-radius: 4px !important;
+    padding: 10px 16px 10px 14px !important;
+    box-shadow: var(--shadow-popover) !important;
+    font-family: var(--font-family-base) !important;
+    font-size: 12px !important;
+    color: var(--text-primary) !important;
+    min-width: 240px !important;
+    max-width: 360px !important;
+    animation: toastSlideIn 220ms ease-out !important;
+}
+
+.notification.info {
+    border-left-color: var(--accent-color) !important;
+}
+
+.notification.error {
+    border-left-color: var(--rubric) !important;
+}
+
+.notification-label {
+    display: block;
+    font-size: 10px;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 2px;
 }
 
 .notification-close {
     background: none !important;
     border: none !important;
-    color: white !important;
-    font-size: 18px !important;
+    color: var(--text-tertiary) !important;
+    font-size: 14px !important;
     cursor: pointer !important;
     margin-left: 12px !important;
     padding: 0 !important;
     line-height: 1 !important;
+    transition: color 150ms ease !important;
+}
+
+.notification-close:hover {
+    color: var(--text-primary) !important;
 }
 
 /* Ensure notifications are never affected by modal backdrops */
@@ -330,6 +397,11 @@
     filter: none !important;
     opacity: 1 !important;
     visibility: visible !important;
+}
+
+@keyframes toastSlideIn {
+    from { opacity: 0; transform: translateX(8px); }
+    to { opacity: 1; transform: translateX(0); }
 }
 
 /* ============================================================
@@ -368,11 +440,11 @@
 }
 
 .advanced-search-btn:hover {
-    background: var(--button-hover-bg);
+    background: var(--bg-tertiary);
     color: var(--accent-color);
-    border-color: var(--accent-color-light);
-    transform: translateY(-1px);
-    box-shadow: var(--shadow-sm);
+    border-color: var(--accent-color);
+    transform: none;
+    box-shadow: none;
 }
 
 .advanced-search-btn.active {
@@ -390,14 +462,14 @@
     width: 540px;
     max-width: 90vw;
     max-height: calc(100vh - 100px);
-    background: var(--modal-bg);
+    background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
-    box-shadow: var(--shadow-2xl);
+    border-radius: 4px;
+    box-shadow: var(--shadow-popover);
     z-index: 1000;
     overflow-y: auto;
-    backdrop-filter: blur(20px) saturate(180%);
-    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
 }
 
 .advanced-search-panel.hidden {
@@ -475,8 +547,8 @@
 .filter-input:hover,
 .filter-select:hover,
 .filter-input-date:hover {
-    border-color: var(--accent-color-light);
-    box-shadow: var(--shadow-sm);
+    border-color: var(--accent-color);
+    box-shadow: none;
 }
 
 .filter-input:focus,
@@ -484,7 +556,7 @@
 .filter-input-date:focus {
     outline: none;
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px var(--accent-color-light), var(--shadow-sm);
+    box-shadow: none;
     background: var(--bg-primary);
 }
 
@@ -573,21 +645,20 @@
 }
 
 .template-card {
-    background: var(--card-bg);
+    background: var(--bg-secondary);
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-xl);
+    border-radius: 4px;
     padding: var(--spacing-xl);
     cursor: pointer;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: background-color 150ms ease, border-color 150ms ease;
     position: relative;
-    box-shadow: var(--shadow-sm);
 }
 
 .template-card:hover {
     border-color: var(--accent-color);
-    background: var(--note-hover-bg);
-    transform: translateY(-4px);
-    box-shadow: var(--shadow-lg);
+    background: var(--bg-tertiary);
+    transform: none;
+    box-shadow: none;
 }
 
 .template-card-icon {
@@ -616,26 +687,25 @@
     right: var(--spacing-md);
     background: var(--error-color);
     border: none;
-    border-radius: var(--radius-md);
+    border-radius: 4px;
     padding: 8px 10px;
     cursor: pointer;
     color: white;
     font-size: var(--font-size-xs);
     opacity: 0;
-    transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    transition: opacity 150ms ease, background-color 150ms ease;
     z-index: 1;
-    box-shadow: var(--shadow-xs);
 }
 
 .template-card:hover .template-delete-btn {
     opacity: 1;
-    transform: scale(1.05);
+    transform: none;
 }
 
 .template-delete-btn:hover {
     background: #c62828;
-    transform: scale(1.1);
-    box-shadow: var(--shadow-md);
+    transform: none;
+    box-shadow: none;
 }
 
 .template-actions {
