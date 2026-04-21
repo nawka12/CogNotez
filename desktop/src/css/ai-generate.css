@@ -22,17 +22,18 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 16px 20px;
-    background: var(--header-bg, #f8f9fa);
+    padding: 18px 22px 12px 22px;
+    background: transparent;
     border-bottom: 1px solid var(--border-color, #dee2e6);
-    border-radius: 8px 8px 0 0;
 }
 
 .ai-generate-approval-header h3 {
     margin: 0;
+    font-family: var(--font-family-display);
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.02em;
     color: var(--text-primary, #212529);
-    font-size: 16px;
-    font-weight: 600;
 }
 
 .ai-generate-approval-header h3 i {
@@ -83,17 +84,24 @@
 }
 
 .ai-generate-content {
-    background: var(--input-bg, #ffffff);
+    background: var(--bg-primary, #ffffff);
     border: 1px solid var(--border-color, #ced4da);
     border-radius: 4px;
-    padding: 16px;
+    padding: 10px 12px;
     max-height: 300px;
     overflow-y: auto;
-    font-family: var(--font-family-mono, 'Courier New', monospace);
-    font-size: 14px;
-    line-height: 1.5;
+    font-family: var(--font-family-base);
+    font-size: 13px;
+    font-style: italic;
+    line-height: 1.65;
     white-space: pre-wrap;
     color: var(--text-primary, #212529);
+    outline: none;
+    transition: border-color 150ms ease;
+}
+
+.ai-generate-content:focus {
+    border-color: var(--accent-color);
 }
 
 .ai-generate-actions {
@@ -105,44 +113,73 @@
 }
 
 .ai-generate-actions .btn-primary {
-    background: var(--accent-color, #007bff);
-    border-color: var(--accent-color, #007bff);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 4px;
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--bg-primary);
+    background: var(--text-primary);
     border: none;
+    padding: 8px 16px;
+    border-radius: 4px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    transition: background-color 150ms ease;
 }
 
 .ai-generate-actions .btn-primary:hover {
-    background: var(--accent-hover, #0056b3);
-    border-color: var(--accent-hover, #0056b3);
+    background: var(--accent-color);
+    transform: none;
+    box-shadow: none;
 }
 
 .ai-generate-actions .btn-secondary {
-    background: var(--bg-secondary, #f8f9fa);
-    border-color: var(--border-color, #ced4da);
-    color: var(--text-primary, #212529);
-    padding: 10px 16px;
-    border-radius: 4px;
-    border: 1px solid;
+    font-family: var(--font-family-base);
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+    background: transparent;
+    border: none;
+    padding: 8px 12px;
     cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    transition: all 0.2s ease;
+    transition: color 150ms ease;
 }
 
 .ai-generate-actions .btn-secondary:hover {
-    background: var(--hover-bg, #e9ecef);
-    border-color: var(--hover-border, #adb5bd);
+    color: var(--text-primary);
+    background: transparent;
+    transform: none;
+    box-shadow: none;
 }
 
 .ai-generate-actions .btn-small {
     padding: 6px 12px;
-    font-size: 12px;
+    font-size: 10px;
+}
+
+.ai-generate-output {
+    position: relative;
+    padding: 12px 0 0 0;
+    margin-top: 16px;
+    font-family: var(--font-family-base);
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-primary);
+}
+
+.ai-generate-output::before {
+    content: 'Reply';
+    display: block;
+    font-family: var(--font-family-base);
+    font-size: 9px;
+    letter-spacing: 0.25em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+    margin-bottom: 8px;
+    background-image: linear-gradient(to right, transparent 42px, var(--border-color) 42px, var(--border-color) 100%);
+    background-size: 100% 1px;
+    background-position: 0 50%;
+    background-repeat: no-repeat;
 }
 
 /* Responsive adjustments for AI Generate Approval */
