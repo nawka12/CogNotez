@@ -1,24 +1,4 @@
 /* Splash screen animations */
-@keyframes bounceIn {
-    0% {
-        transform: scale(0.3);
-        opacity: 0;
-    }
-
-    50% {
-        transform: scale(1.05);
-    }
-
-    70% {
-        transform: scale(0.9);
-    }
-
-    100% {
-        transform: scale(1);
-        opacity: 1;
-    }
-}
-
 @keyframes fadeInUp {
     from {
         opacity: 0;
@@ -65,8 +45,8 @@
     color: var(--text-primary);
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 8px;
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border-radius: 4px;
+    box-shadow: var(--shadow-popover);
     z-index: 1000;
     position: fixed;
     width: 350px;
@@ -333,8 +313,6 @@
     right: 20px;
     z-index: 10000 !important;
     pointer-events: auto !important;
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     filter: none !important;
     opacity: 1 !important;
     visibility: visible !important;
@@ -392,8 +370,6 @@
 .modal .notification,
 .modal-backdrop .notification,
 .loading-overlay .notification {
-    backdrop-filter: none !important;
-    -webkit-backdrop-filter: none !important;
     filter: none !important;
     opacity: 1 !important;
     visibility: visible !important;
@@ -468,8 +444,6 @@
     box-shadow: var(--shadow-popover);
     z-index: 1000;
     overflow-y: auto;
-    backdrop-filter: none;
-    -webkit-backdrop-filter: none;
 }
 
 .advanced-search-panel.hidden {

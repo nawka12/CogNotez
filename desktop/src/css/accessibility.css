@@ -15,8 +15,8 @@
     width: min(720px, 100%);
     background: var(--bg-primary);
     border: 1px solid var(--border-color);
-    border-radius: 14px;
-    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.25);
+    border-radius: 4px;
+    box-shadow: var(--shadow-popover);
     overflow: hidden;
 }
 
@@ -103,7 +103,7 @@
 .model-switcher-search input:focus {
     outline: 2px solid var(--accent-soft);
     border-color: var(--accent-color);
-    box-shadow: 0 0 0 3px rgba(62, 207, 142, 0.15);
+    box-shadow: 0 0 0 3px var(--accent-soft);
 }
 
 .model-switcher-hint {

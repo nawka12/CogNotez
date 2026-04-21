@@ -289,25 +289,7 @@ body {
   animation: spin 1s linear infinite;
 }
 
-/* Modern Hover Effects - MOVED TO STYLES.CSS */
-/* 
-.note-item {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  cursor: pointer;
-}
-
-.note-item:hover {
-  transform: translateX(4px);
-}
-
-.available-tag, .tag-item {
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.available-tag:hover, .tag-item:hover {
-  transform: translateY(-1px);
-}
-*/
+/* Modern Hover Effects - migrated to component files */
 
 /* Modern Context Menu Animations */
 .context-menu {
@@ -346,115 +328,13 @@ body {
   }
 }
 
-/* Modern Note Item Styling - REMOVED (Conflicted with styles.css) */
-/*
-.note-item {
-  position: relative;
-  overflow: hidden;
-  border-radius: var(--radius-md);
-  margin: var(--spacing-xs) var(--spacing-sm);
-  border: 1px solid transparent;
-  background: var(--bg-secondary);
-}
 
-.note-item::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: 0;
-  background: var(--accent-color);
-  transition: width 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  border-radius: var(--radius-md) 0 0 var(--radius-md);
-}
 
-.note-item:hover::before {
-  width: 4px;
-}
 
-.note-item:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-soft);
-}
 
-.note-item.active {
-  background: var(--accent-soft);
-  border-color: var(--accent-color);
-}
 
-.note-item.active::before {
-  width: 4px;
-}
-*/
 
-/* Modern Tag Styling - REMOVED (Conflicted with styles.css) */
-/*
-.note-tag, .editor-note-tag, .tag-item {
-  border-radius: var(--radius-full);
-  padding: var(--spacing-xs) var(--spacing-sm);
-  font-size: 11px;
-  font-weight: 500;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  border: 1px solid var(--accent-color);
-  background: var(--accent-soft);
-  color: var(--accent-color);
-}
 
-.note-tag:hover, .editor-note-tag:hover, .tag-item:hover {
-  background: var(--accent-soft);
-  transform: translateY(-1px);
-}
-*/
-
-/* Modern Button Styling - REMOVED (Conflicted with styles.css) */
-/*
-.action-btn, .search-button, .new-note-btn, .theme-toggle {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: transparent;
-  color: var(--text-secondary);
-  font-weight: 500;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
-  overflow: hidden;
-}
-
-.action-btn:hover, .search-button:hover, .new-note-btn:hover, .theme-toggle:hover {
-  background: var(--bg-tertiary);
-  border-color: var(--accent-color);
-  color: var(--accent-color);
-  transform: translateY(-1px);
-}
-
-.action-btn.active, .search-button.active, .new-note-btn.active, .theme-toggle.active {
-  background: var(--accent-color);
-  color: white;
-}
-*/
-
-/* Modern Input Styling - REMOVED (Conflicted with styles.css) */
-/*
-.search-input, .ai-input, .ai-dialog-input, .find-input, .replace-input, .tag-input {
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-  background: var(--bg-primary);
-  color: var(--text-primary);
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  font-weight: 400;
-}
-
-.search-input:hover, .ai-input:hover, .ai-dialog-input:hover, .find-input:hover, .replace-input:hover, .tag-input:hover {
-  border-color: var(--accent-soft);
-  background: var(--bg-tertiary);
-}
-
-.search-input:focus, .ai-input:focus, .ai-dialog-input:focus, .find-input:focus, .replace-input:focus, .tag-input:focus {
-  border-color: var(--accent-color);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-  background: var(--bg-primary);
-}
-*/
 
 /* Responsive design for different screen sizes */
 

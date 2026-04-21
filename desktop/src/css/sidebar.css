@@ -321,7 +321,7 @@ body.sidebar-resizing * {
     height: 8px;
     border-radius: 4px;
     flex-shrink: 0;
-    box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.1);
+    box-shadow: 0 0 0 1px var(--border-color);
 }
 
 .tag-folder-name {
@@ -352,11 +352,11 @@ body.sidebar-resizing * {
 
 /* Create tag dialog color options */
 .color-option {
-    transition: transform 0.15s ease, box-shadow 0.15s ease;
+    transition: border-color 150ms ease;
 }
 
 .color-option:hover {
-    transform: scale(1.1);
+    border-color: var(--accent-color);
 }
 
 .color-option.active {
@@ -648,7 +648,7 @@ body.sidebar-resizing * {
 }
 
 .note-action-btn:hover {
-    transform: scale(1.1);
+    color: var(--text-primary);
 }
 
 .note-pin-btn {
@@ -787,15 +787,13 @@ body.sidebar-resizing * {
     overflow: hidden;
     text-overflow: ellipsis;
     font-weight: var(--font-weight-medium);
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: none;
+    transition: color 150ms ease;
     cursor: default;
 }
 
 .editor-note-tag:hover {
     background: var(--accent-soft);
     border-color: var(--accent-color);
-    transform: translateY(-1px);
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
