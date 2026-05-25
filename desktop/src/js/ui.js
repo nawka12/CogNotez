@@ -734,23 +734,12 @@ class UIManager {
                 }
             }
 
-            // Update editor and preview heights
+            // Editor/preview heights come from the flex layout; setting inline
+            // height here clipped the textarea past .editor-wrapper and broke wheel scroll.
             const noteEditor = document.getElementById('note-editor');
             const markdownPreview = document.getElementById('markdown-preview');
 
-            if (noteEditor) {
-                const viewportHeight = window.innerHeight;
-                // Match markdown-preview calculation for consistency, with extra room for bottom padding
-                const editorHeight = Math.max(300, viewportHeight - 200);
-                noteEditor.style.height = `${editorHeight}px`;
-                noteEditor.style.maxHeight = `${editorHeight}px`;
-            }
-
             if (markdownPreview) {
-                const viewportHeight = window.innerHeight;
-                const previewHeight = Math.max(200, viewportHeight - 180);
-                markdownPreview.style.maxHeight = `${previewHeight}px`;
-
                 // Handle text overflow for long lines in view mode
                 const viewportWidth = window.innerWidth;
                 const previewViewportHeight = window.innerHeight;
