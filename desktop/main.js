@@ -1184,9 +1184,12 @@ if (ipcMain) {
         }
         // Improve generic error messaging back to renderer
         if (mainWindow && mainWindow.webContents) {
+          const friendlyError = (global.googleDriveSyncManager && typeof global.googleDriveSyncManager._formatSyncErrorMessage === 'function')
+            ? global.googleDriveSyncManager._formatSyncErrorMessage(error)
+            : (error.message || 'Sync failed due to an unknown error');
           mainWindow.webContents.send('sync-completed', {
             success: false,
-            error: error.message || 'Sync failed due to an unknown error'
+            error: friendlyError
           });
         }
         throw error;

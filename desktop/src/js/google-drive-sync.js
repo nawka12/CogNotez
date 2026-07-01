@@ -73,6 +73,7 @@ class GoogleDriveSyncManager {
                 this.drive = google.drive({ version: 'v3', auth: this.authManager.oauth2Client });
                 await this.ensureAppFolder();
                 this.initialized = true;
+                this.lastInitError = null;
                 console.log('[GoogleDriveSync] Initialized successfully');
             } else {
                 console.warn('[GoogleDriveSync] Auth manager not available');
@@ -80,6 +81,7 @@ class GoogleDriveSyncManager {
         } catch (error) {
             console.error('[GoogleDriveSync] Initialization failed:', error);
             this.initialized = false;
+            this.lastInitError = error;
         }
     }
 
@@ -163,7 +165,7 @@ class GoogleDriveSyncManager {
             }
 
             if (!this.initialized) {
-                throw new Error('Google Drive sync manager failed to initialize');
+                throw this.lastInitError || new Error('Google Drive sync manager failed to initialize');
             }
         }
         return this.initialized;
@@ -852,7 +854,7 @@ class GoogleDriveSyncManager {
 
     _formatSyncErrorMessage(error) {
         try {
-            const t = (key, fallback, params = {}) => window.i18n ? window.i18n.t(key, params) : fallback;
+            const t = (key, fallback, params = {}) => (!isMainProcess && window.i18n) ? window.i18n.t(key, params) : fallback;
 
             if (!error) return t('settings.sync.syncFailedUnknown', 'Sync failed due to an unknown error');
             if (error.encryptionRequired) {
@@ -870,6 +872,14 @@ class GoogleDriveSyncManager {
                 return t('settings.sync.syncFailedNoInternet', 'No internet connection. Sync requires an active internet connection. Will retry when online.');
             }
 
+            // Expired/revoked refresh token (e.g. account not used for a long time)
+            if (error.message && (
+                error.message.includes('invalid_grant') ||
+                error.message.includes('No refresh token is set')
+            )) {
+                return t('settings.sync.syncFailedAccessDenied', 'Google Drive access denied. Please reconnect your account in Sync Settings.');
+            }
+
             const code = error.code || error.status || '';
             if (code === 404) return t('settings.sync.syncFailedNotFound', 'Remote backup not found on Google Drive.');
             if (code === 401 || code === 403) return t('settings.sync.syncFailedAccessDenied', 'Google Drive access denied. Please reconnect your account in Sync Settings.');
@@ -878,9 +888,9 @@ class GoogleDriveSyncManager {
                 return t('settings.sync.syncFailedServiceUnavailable', 'Google Drive service temporarily unavailable. Will retry automatically.');
             }
 
-            return t('settings.sync.syncFailedGeneric', `Sync failed: ${error.message || 'Unexpected error'}`, { error: error.message || 'Unexpected error' });
+            return error.message || t('settings.sync.syncFailedUnknown', 'Sync failed due to an unknown error');
         } catch (_) {
-            const t = (key, fallback) => window.i18n ? window.i18n.t(key) : fallback;
+            const t = (key, fallback) => (!isMainProcess && window.i18n) ? window.i18n.t(key) : fallback;
             return t('settings.sync.syncFailedUnknown', 'Sync failed due to an unknown error');
         }
     }
