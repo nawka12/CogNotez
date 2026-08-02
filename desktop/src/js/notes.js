@@ -538,22 +538,31 @@ class NotesManager {
             `;
 
             const modal = this.app.createModal(deleteTitle, content, [
-                { text: deleteButtonText, type: 'primary', action: 'delete', callback: () => resolve(true) },
-                { text: cancelButtonText, type: 'secondary', action: 'cancel', callback: () => resolve(false) }
+                { text: deleteButtonText, type: 'primary', action: 'delete', callback: () => finish(true) },
+                { text: cancelButtonText, type: 'secondary', action: 'cancel', callback: () => finish(false) }
             ]);
+
+            // Resolve once and always clean up the escape listener so it
+            // doesn't accumulate across repeated delete confirmations
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                document.removeEventListener('keydown', handleEscape);
+                resolve(result);
+            };
 
             // Also handle clicking outside or pressing Escape
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    resolve(false);
+                    finish(false);
                 }
             });
 
             // Handle escape key
             const handleEscape = (e) => {
                 if (e.key === 'Escape') {
-                    document.removeEventListener('keydown', handleEscape);
-                    resolve(false);
+                    finish(false);
                 }
             };
             document.addEventListener('keydown', handleEscape);

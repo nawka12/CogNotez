@@ -1234,11 +1234,8 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
         let fullResponse = '';
         let buffer = '';
 
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-
-            const chunk = decoder.decode(value);
+        // Process complete JSON objects from buffer
+        const processBuffer = (chunk, onChunk) => {
             buffer += chunk;
 
             // Process complete JSON objects from buffer
@@ -1305,9 +1302,14 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
                         startIndex++;
                     }
                 } catch (e) {
-                    // If we can't parse at this position, skip to next potential JSON start
-                    const nextBrace = buffer.indexOf('{', startIndex);
+                    // If we can't parse at this position, skip to the next potential
+                    // JSON start. Search from startIndex + 1 because the object at
+                    // startIndex itself is corrupt and can never parse.
+                    const nextBrace = buffer.indexOf('{', startIndex + 1);
                     if (nextBrace === -1) {
+                        // No further JSON start found - drop the remaining buffer
+                        // to avoid blocking the stream forever
+                        buffer = '';
                         break;
                     }
                     startIndex = nextBrace;
@@ -1316,6 +1318,23 @@ Remember: Use web_search first, then scrape_webpage if you need more details fro
 
             // Remove processed data from buffer
             buffer = buffer.substring(startIndex);
+        };
+
+        while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            // Use stream:true so multi-byte UTF-8 characters split across chunks
+            // are buffered instead of being decoded as garbage. Without this, a
+            // split emoji/accented char corrupts the JSON and stalls the parser.
+            const chunk = decoder.decode(value, { stream: true });
+            processBuffer(chunk, onChunk);
+        }
+
+        // Flush any trailing bytes still held by the decoder
+        const tail = decoder.decode();
+        if (tail) {
+            processBuffer(tail, onChunk);
         }
 
         return fullResponse;

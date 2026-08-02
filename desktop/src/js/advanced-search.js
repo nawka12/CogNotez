@@ -329,7 +329,9 @@ class AdvancedSearchManager {
             this.app.notesManager.renderNotesList();
         }
 
-        this.updateResultsCount(0);
+        // Show the actual count of rendered notes, not 0
+        const currentNotes = (this.app.notesManager && this.app.notesManager.currentNotes) || [];
+        this.updateResultsCount(currentNotes.length);
     }
 
     // Get current active filters as a readable string

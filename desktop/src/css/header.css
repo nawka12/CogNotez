@@ -124,6 +124,10 @@
 
 .search-input-wrapper:focus-within .search-shortcut {
     opacity: 0;
+    /* The faded shortcut still occupies space at the right edge and, with
+       opacity < 1, paints ABOVE the absolutely-positioned clear button,
+       swallowing its clicks. Make it click-transparent. */
+    pointer-events: none;
 }
 
 /* Search clear button */

@@ -132,37 +132,39 @@ class AIGenerateApproval {
     setupEventListeners() {
         if (!this.dialog) return;
 
+        // The dialog is created once and cached - attach listeners only once.
+        // Previously this ran on every showApprovalDialog() with bind()-based
+        // removes that never matched, accumulating duplicate handlers that
+        // inserted content N times after N dialog shows.
+        if (this._listenersAttached) return;
+        this._listenersAttached = true;
+
         // Close button
         const closeBtn = this.dialog.querySelector('#ai-generate-approval-close');
         if (closeBtn) {
-            closeBtn.removeEventListener('click', this.handleClose.bind(this));
-            closeBtn.addEventListener('click', this.handleClose.bind(this));
+            closeBtn.addEventListener('click', () => this.handleClose());
         }
 
         // Cancel button
         const cancelBtn = this.dialog.querySelector('#ai-generate-cancel');
         if (cancelBtn) {
-            cancelBtn.removeEventListener('click', this.handleCancel.bind(this));
-            cancelBtn.addEventListener('click', this.handleCancel.bind(this));
+            cancelBtn.addEventListener('click', () => this.handleCancel());
         }
 
         // Insert button
         const insertBtn = this.dialog.querySelector('#ai-generate-insert');
         if (insertBtn) {
-            insertBtn.removeEventListener('click', this.handleInsert.bind(this));
-            insertBtn.addEventListener('click', this.handleInsert.bind(this));
+            insertBtn.addEventListener('click', () => this.handleInsert());
         }
 
         // Help button
         const helpBtn = this.dialog.querySelector('#ai-generate-help-btn');
         if (helpBtn) {
-            helpBtn.removeEventListener('click', this.showHelp.bind(this));
-            helpBtn.addEventListener('click', this.showHelp.bind(this));
+            helpBtn.addEventListener('click', () => this.showHelp());
         }
 
         // Keyboard shortcuts
-        document.removeEventListener('keydown', this.handleKeyDown.bind(this));
-        document.addEventListener('keydown', this.handleKeyDown.bind(this));
+        document.addEventListener('keydown', (e) => this.handleKeyDown(e));
     }
 
     handleClose() {
@@ -281,7 +283,9 @@ class AIGenerateApproval {
             </div>
         `;
 
-        this.app.showModal('AI Content Generation Help', helpContent);
+        this.app.createModal('AI Content Generation Help', helpContent, [
+            { text: 'Close', type: 'primary', action: 'close' }
+        ]);
     }
 
     escapeHtml(text) {

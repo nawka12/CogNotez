@@ -46,6 +46,33 @@ function getMimeTypeFromExtension(ext) {
   return mimeTypes[ext.toLowerCase()] || 'application/octet-stream';
 }
 
+// Validate a media file ID before using it in filesystem paths.
+// Media IDs are generated as base36 strings (with optional extension for
+// backwards compatibility), so anything containing path separators or
+// '..' is rejected to prevent path traversal outside the media directory.
+function isValidMediaFileId(fileId) {
+  if (typeof fileId !== 'string' || fileId.length === 0 || fileId.length > 255) {
+    return false;
+  }
+  if (fileId === '.' || fileId === '..' || fileId.includes('..')) {
+    return false;
+  }
+  if (fileId.includes('/') || fileId.includes('\\')) {
+    return false;
+  }
+  if (fileId.charCodeAt(0) === 0) {
+    return false;
+  }
+  return true;
+}
+
+// Ensure a resolved file path stays inside the media directory
+function isPathInsideMediaDir(mediaDir, filePath) {
+  const resolved = path.resolve(mediaDir, filePath);
+  const mediaRoot = path.resolve(mediaDir) + path.sep;
+  return resolved.startsWith(mediaRoot);
+}
+
 function createWindow() {
   // Create the browser window
   mainWindow = new BrowserWindow({
@@ -374,8 +401,15 @@ async function performSyncBeforeClose() {
 function registerMediaProtocol() {
   protocol.registerFileProtocol('cognotez-media', async (request, callback) => {
     try {
-      const fileId = request.url.replace('cognotez-media://', '');
+      const fileId = request.url.replace('cognotez-media://', '').split('?')[0];
       const mediaDir = path.join(app.getPath('userData'), 'media');
+
+      // Reject empty or path-traversing IDs (e.g. 'cognotez-media://../cognotez_data.json')
+      if (!isValidMediaFileId(fileId)) {
+        console.error('[Media Protocol] Rejected invalid media file ID:', fileId);
+        callback({ error: -6 }); // FILE_NOT_FOUND
+        return;
+      }
 
       // Ensure media directory exists
       try {
@@ -1248,6 +1282,26 @@ if (ipcMain) {
             throw new Error(`Failed to import merged data: ${importResult.error || 'Unknown error'}`);
           }
           console.log('[Sync] Successfully imported merged data');
+        } else if (syncResult.action === 'upload' && localData.data && global.databaseManager) {
+          // For upload actions, apply the local data that was uploaded to the main
+          // process database. Without this, the sync-data-updated broadcast below
+          // would send stale (possibly empty) main DB data to the renderer, which
+          // force-replaces its localStorage - wiping all local notes.
+          console.log('[Sync] Applying uploaded data to main process database');
+          const importResult = global.databaseManager.importDataFromSync(localData.data, {
+            mergeStrategy: 'replace',
+            force: true,
+            preserveSyncMeta: true,
+            mergeTags: true,
+            mergeConversations: true
+          });
+
+          // Check if import succeeded
+          if (!importResult.success) {
+            console.error('[Sync] Failed to import uploaded data:', importResult.error);
+            throw new Error(`Failed to import uploaded data: ${importResult.error || 'Unknown error'}`);
+          }
+          console.log('[Sync] Successfully imported uploaded data');
         }
 
         // Send updated data back to renderer process to update localStorage
@@ -1672,6 +1726,12 @@ if (ipcMain) {
       const mediaDir = path.join(app.getPath('userData'), 'media');
       await fs.mkdir(mediaDir, { recursive: true });
 
+      // Reject path-traversing file names to prevent writes outside mediaDir
+      if (!isValidMediaFileId(fileName) || path.basename(fileName) !== fileName) {
+        console.error('[Media] Rejected invalid media file name:', fileName);
+        throw new Error('Invalid media file name');
+      }
+
       const filePath = path.join(mediaDir, fileName);
       const bufferData = Buffer.from(buffer);
       
@@ -1688,6 +1748,12 @@ if (ipcMain) {
   // Get media file from filesystem
   ipcMain.handle('get-media-file', async (event, filePath) => {
     try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      // Only allow reading files inside the media directory
+      if (typeof filePath !== 'string' || !isPathInsideMediaDir(mediaDir, filePath)) {
+        console.error('[Media] Rejected read outside media directory:', filePath);
+        throw new Error('Invalid media file path');
+      }
       const buffer = await fs.readFile(filePath);
       return {
         data: buffer,
@@ -1703,6 +1769,12 @@ if (ipcMain) {
   // Read media file directly from filesystem (for synced files)
   ipcMain.handle('read-media-file', async (event, filePath) => {
     try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      // Only allow reading files inside the media directory
+      if (typeof filePath !== 'string' || !isPathInsideMediaDir(mediaDir, filePath)) {
+        console.error('[Media] Rejected read outside media directory:', filePath);
+        throw new Error('Invalid media file path');
+      }
       // Ensure the file exists before reading
       await fs.access(filePath);
 
@@ -1719,6 +1791,13 @@ if (ipcMain) {
   ipcMain.handle('find-and-read-media-file', async (event, fileId) => {
     try {
       const mediaDir = path.join(app.getPath('userData'), 'media');
+
+      // Reject path-traversing IDs (e.g. '../cognotez_data.json') to prevent
+      // arbitrary file reads outside the media directory
+      if (!isValidMediaFileId(fileId)) {
+        console.error('[Media] Rejected invalid media file ID:', fileId);
+        throw new Error(`Media file not found: ${fileId}`);
+      }
 
       // 1. Try the fileId as-is (for backwards compatibility)
       let filePath = path.join(mediaDir, fileId);
@@ -1774,6 +1853,12 @@ if (ipcMain) {
   // Delete media file
   ipcMain.handle('delete-media-file', async (event, filePath) => {
     try {
+      const mediaDir = path.join(app.getPath('userData'), 'media');
+      // Only allow deleting files inside the media directory
+      if (typeof filePath !== 'string' || !isPathInsideMediaDir(mediaDir, filePath)) {
+        console.error('[Media] Rejected delete outside media directory:', filePath);
+        return { success: false, error: 'Invalid media file path' };
+      }
       await fs.unlink(filePath);
       console.log('[Media] Deleted media file:', filePath);
       return { success: true };
@@ -1855,6 +1940,20 @@ if (ipcMain) {
       }
       
       console.log(`[Media] Found ${referencedMediaIds.size} referenced media IDs in notes`);
+
+      // Password-protected notes always have content:'' in the main-process DB
+      // (their real content lives encrypted in encrypted_content, which cannot
+      // be scanned here). Media referenced only by such notes would be falsely
+      // classified as orphaned and deleted - so skip destructive orphan cleanup
+      // entirely when any protected note exists.
+      let hasPasswordProtectedNotes = false;
+      if (global.databaseManager && global.databaseManager.data.notes) {
+        hasPasswordProtectedNotes = Object.values(global.databaseManager.data.notes)
+          .some(note => note && note.password_protected);
+      }
+      if (hasPasswordProtectedNotes) {
+        console.log('[Media] Skipping orphan cleanup - password-protected notes exist whose media references cannot be scanned');
+      }
       
       // Upload new or modified files
       let uploaded = 0;
@@ -1886,28 +1985,32 @@ if (ipcMain) {
       
       // Delete orphaned files from Google Drive (files not referenced in any note)
       let deletedFromDrive = 0;
-      for (const driveFile of driveFiles) {
-        const mediaId = driveFile.name.split('.')[0];
-        
-        if (!referencedMediaIds.has(mediaId)) {
-          console.log(`[Media] Deleting orphaned file from Drive: ${driveFile.name}`);
-          await global.googleDriveSyncManager.deleteMediaFile(driveFile.id);
-          deletedFromDrive++;
+      if (!hasPasswordProtectedNotes) {
+        for (const driveFile of driveFiles) {
+          const mediaId = driveFile.name.split('.')[0];
+          
+          if (!referencedMediaIds.has(mediaId)) {
+            console.log(`[Media] Deleting orphaned file from Drive: ${driveFile.name}`);
+            await global.googleDriveSyncManager.deleteMediaFile(driveFile.id);
+            deletedFromDrive++;
+          }
         }
       }
       
       // Delete orphaned files from local filesystem (files not referenced in any note)
       let deletedFromLocal = 0;
-      for (const localFile of localFiles) {
-        const mediaId = localFile.name.split('.')[0];
-        
-        if (!referencedMediaIds.has(mediaId)) {
-          console.log(`[Media] Deleting orphaned file from local: ${localFile.name}`);
-          try {
-            await fs.unlink(localFile.path);
-            deletedFromLocal++;
-          } catch (error) {
-            console.warn(`[Media] Failed to delete local file ${localFile.name}:`, error.message);
+      if (!hasPasswordProtectedNotes) {
+        for (const localFile of localFiles) {
+          const mediaId = localFile.name.split('.')[0];
+          
+          if (!referencedMediaIds.has(mediaId)) {
+            console.log(`[Media] Deleting orphaned file from local: ${localFile.name}`);
+            try {
+              await fs.unlink(localFile.path);
+              deletedFromLocal++;
+            } catch (error) {
+              console.warn(`[Media] Failed to delete local file ${localFile.name}:`, error.message);
+            }
           }
         }
       }

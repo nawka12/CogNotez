@@ -679,7 +679,7 @@ async function updateModalSyncStatus(app, modal) {
             syncBtn.disabled = true;
 
             // Add a note about credentials if they're missing
-            if (status.error && (status.error.includes('credentials not found') || status.error.includes('Google Drive credentials'))) {
+            if (typeof status.error === 'string' && (status.error.includes('credentials not found') || status.error.includes('Google Drive credentials'))) {
                 const t = (key) => window.i18n ? window.i18n.t(key) : key;
                 statusText.textContent = t('settings.sync.setupRequired');
                 lastSync.textContent = t('settings.sync.importCredentialsToStart');

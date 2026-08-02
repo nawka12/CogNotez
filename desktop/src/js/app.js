@@ -2431,8 +2431,19 @@ Please provide a helpful response based on the note content and conversation his
                     // Replace selection with empty string
                     const before = editor.value.substring(0, this.selectionStart);
                     const after = editor.value.substring(this.selectionEnd);
-                    editor.value = before + after;
+                    const newContent = before + after;
+                    editor.value = newContent;
                     editor.setSelectionRange(this.selectionStart, this.selectionStart);
+                    // Keep history, autosave and currentNote.content in sync -
+                    // without this the cut is silently discarded on note switch
+                    if (!this.ignoreHistoryUpdate) {
+                        this.historyManager.pushState(newContent, this.selectionStart, this.selectionStart, this.selectionStart);
+                    }
+                    editor.dispatchEvent(new Event('input', { bubbles: true }));
+                    if (this.currentNote) {
+                        this.currentNote.content = newContent;
+                        this.saveCurrentNote();
+                    }
                     this.updateNotePreview();
                     const t = (key) => window.i18n ? window.i18n.t(key) : key;
                     this.showNotification(t('notifications.textCut'), 'success');
@@ -2453,9 +2464,20 @@ Please provide a helpful response based on the note content and conversation his
                         const text = await navigator.clipboard.readText();
                         const before = editor.value.substring(0, this.selectionStart);
                         const after = editor.value.substring(this.selectionEnd);
-                        editor.value = before + text + after;
+                        const newContent = before + text + after;
                         const newPos = this.selectionStart + text.length;
+                        editor.value = newContent;
                         editor.setSelectionRange(newPos, newPos);
+                        // Keep history, autosave and currentNote.content in sync -
+                        // without this the paste is silently discarded on note switch
+                        if (!this.ignoreHistoryUpdate) {
+                            this.historyManager.pushState(newContent, newPos, newPos, newPos);
+                        }
+                        editor.dispatchEvent(new Event('input', { bubbles: true }));
+                        if (this.currentNote) {
+                            this.currentNote.content = newContent;
+                            this.saveCurrentNote();
+                        }
                         this.updateNotePreview();
                         const t = (key) => window.i18n ? window.i18n.t(key) : key;
                         this.showNotification(t('notifications.textPasted'), 'success');
@@ -3951,11 +3973,11 @@ Please provide a helpful response based on the note content and conversation his
                     if (!e.shiftKey) {
                         e.preventDefault();
                         this.undo();
-                    } else {
-                        // Ctrl+Shift+Z is also redo
-                        e.preventDefault();
-                        this.redo();
                     }
+                    break;
+                case 'Z': // Ctrl+Shift+Z (uppercase 'Z' with Shift held)
+                    e.preventDefault();
+                    this.redo();
                     break;
                 case 'y':
                     e.preventDefault();
@@ -3978,7 +4000,7 @@ Please provide a helpful response based on the note content and conversation his
                     break;
                 case 'o':
                     e.preventDefault();
-                    this.openNoteDialog();
+                    this.importNote();
                     break;
                 case 'f':
                     e.preventDefault();
@@ -4043,7 +4065,7 @@ Please provide a helpful response based on the note content and conversation his
         switch (e.key) {
             case 'Escape':
                 // Close any open menus or dialogs
-                this.hideAIContextMenu();
+                this.hideContextMenu();
                 this.hideAIDialog();
                 break;
             case 'F1':
@@ -4742,7 +4764,7 @@ Please provide a helpful response based on the note content and conversation his
 
         const modal = this.createModal(t('notifications.shareViaGoogleDriveTitle', 'Share via Google Drive'), content, [
             { text: t('modals.cancel', 'Cancel'), type: 'secondary', action: 'close' },
-            { text: t('notifications.shareViaGoogleDrive', 'Share'), type: 'primary', action: 'share-gd' }
+            { text: t('notifications.shareViaGoogleDrive', 'Share'), type: 'primary', action: 'share-gd', callback: () => false }
         ]);
 
         // Handle share button
@@ -5325,26 +5347,18 @@ Please provide a helpful response based on the note content and conversation his
                 </div>
             `;
 
-            const modal = this.createModal(modalTitle, content, [
-                { text: t('modals.cancel', 'Cancel'), type: 'secondary', action: 'cancel-passphrase' },
-                { text: t('modals.decrypt', 'Decrypt'), type: 'primary', action: 'confirm-passphrase' }
-            ]);
-
-            const input = modal.querySelector('#modal-passphrase-input');
-            const errorText = modal.querySelector('#modal-passphrase-error');
-
             const onConfirm = async () => {
                 const passphrase = input.value;
                 if (!passphrase || passphrase.length < 8) {
                     errorText.textContent = t('encryption.passphraseMinLength', 'Passphrase must be at least 8 characters');
-                    return;
+                    return false; // keep modal open to show the error
                 }
 
                 // Derive salt from passphrase
                 const saltResult = await ipcRenderer.invoke('derive-salt-from-passphrase', passphrase);
                 if (!saltResult.success) {
                     errorText.textContent = saltResult.error || t('encryption.failedToDeriveSalt', undefined, { error: '' }).replace(': ', '');
-                    return;
+                    return false; // keep modal open to show the error
                 }
 
                 // Set decryption passphrase for this session ONLY (do not enable E2EE globally)
@@ -5355,11 +5369,10 @@ Please provide a helpful response based on the note content and conversation his
 
                 if (!sessionResult.success) {
                     errorText.textContent = sessionResult.error || 'Failed to set passphrase for sync';
-                    return;
+                    return false; // keep modal open to show the error
                 }
 
                 // Retry sync now that passphrase is set for this session
-                modal.remove();
                 this.showNotification(t('settings.sync.passphraseSetRetrying'), 'info');
                 try {
                     await this.manualSync();
@@ -5368,16 +5381,21 @@ Please provide a helpful response based on the note content and conversation his
                 }
             };
 
-            // Wire buttons
+            const modal = this.createModal(modalTitle, content, [
+                { text: t('modals.cancel', 'Cancel'), type: 'secondary', action: 'cancel-passphrase' },
+                { text: t('modals.decrypt', 'Decrypt'), type: 'primary', action: 'confirm-passphrase', callback: onConfirm }
+            ]);
+
+            const input = modal.querySelector('#modal-passphrase-input');
+            const errorText = modal.querySelector('#modal-passphrase-error');
+
             const footer = modal.querySelector('.modal-footer');
             const buttons = footer ? footer.querySelectorAll('button') : [];
-            if (buttons.length === 2) {
-                buttons[0].addEventListener('click', () => modal.remove());
-                buttons[1].addEventListener('click', onConfirm);
-            }
 
             input.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter') onConfirm();
+                if (e.key === 'Enter' && buttons.length === 2) {
+                    buttons[1].click();
+                }
             });
 
             input.focus();

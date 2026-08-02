@@ -104,8 +104,10 @@ class I18n {
         await this.loadTranslations(langCode);
         this.applyTranslations();
         
-        // Dispatch event for other modules to react to language change
-        window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: langCode } }));
+        // Dispatch the EFFECTIVE language (loadTranslations may have fallen
+        // back to English) so the selector and menu don't report a language
+        // that isn't actually in use
+        window.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: this.currentLanguage } }));
     }
 
     /**

@@ -412,7 +412,18 @@ class FindReplaceDialog {
         }
 
         const flags = this.caseSensitive ? 'g' : 'gi';
-        const regex = new RegExp(searchText, flags);
+        let regex;
+        try {
+            regex = new RegExp(searchText, flags);
+        } catch (e) {
+            // Invalid regex (e.g. unterminated group) - treat as no matches
+            // instead of throwing in the input listener and freezing the dialog
+            this.matches = [];
+            this.currentMatchIndex = -1;
+            this.updateMatchCount();
+            this.clearHighlights();
+            return;
+        }
 
         let match;
         while ((match = regex.exec(content)) !== null) {
@@ -817,13 +828,21 @@ class FindReplaceDialog {
         this.app.updateNotePreview();
 
         // Re-find matches with updated content
+        const replacedPos = match.start;
+        const replacedEnd = match.start + this.replaceText.length;
         this.findMatches();
 
-        // Adjust current index if necessary
-        if (this.currentMatchIndex >= this.matches.length) {
-            this.currentMatchIndex = Math.max(0, this.matches.length - 1);
+        // Advance to the first match that starts at or after the end of the
+        // replaced text. Without this, findMatches() resets the index to 0 and
+        // repeated clicks keep replacing the first match - when the replacement
+        // contains the search text (e.g. "a" -> "ab") this grows unboundedly.
+        let nextIndex = this.matches.findIndex(m => m.start >= replacedEnd);
+        if (nextIndex === -1) {
+            nextIndex = this.matches.length > 0 ? 0 : -1; // wrap around
         }
-
+        this.currentMatchIndex = nextIndex;
+        this.updateMatchCount();
+        this.highlightMatches();
         this.selectCurrentMatch(true); // Focus editor after replacement
     }
 

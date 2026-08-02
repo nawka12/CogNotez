@@ -63,8 +63,9 @@ function showGeneralSettings(app) {
         const wordCountEnabled = modal.querySelector('#word-count-toggle').checked;
         const theme = modal.querySelector('#theme-select').value;
 
-        // Track if auto-save setting changed
-        const previousAutoSave = localStorage.getItem('autoSave') === 'true';
+        // Track if auto-save setting changed (default is enabled when unset,
+        // matching the checkbox initial state at the top of this dialog)
+        const previousAutoSave = localStorage.getItem('autoSave') !== 'false';
         const autoSaveChanged = previousAutoSave !== autoSaveEnabled;
 
         // Save settings

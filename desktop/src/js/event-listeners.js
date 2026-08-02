@@ -63,7 +63,7 @@ function setupEventListeners(app) {
     document.getElementById('mobile-search-btn').addEventListener('click', () => app.toggleMobileSearch());
     document.getElementById('advanced-search-btn').addEventListener('click', () => {
         if (app.advancedSearchManager) {
-            app.advancedSearchManager.togglePanel();
+            app.advancedSearchManager.toggle();
         }
     });
     document.getElementById('templates-btn').addEventListener('click', () => app.showTemplateChooser());

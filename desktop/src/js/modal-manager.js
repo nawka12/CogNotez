@@ -47,9 +47,16 @@ class ModalManager {
                 btnElement.className = `btn-${btn.type || 'secondary'}`;
                 btnElement.dataset.action = btn.action;
                 btnElement.textContent = btn.text;
-                btnElement.addEventListener('click', () => {
-                    if (btn.callback) btn.callback();
-                    this.closeModal(modal);
+                btnElement.addEventListener('click', async () => {
+                    let keepOpen = false;
+                    if (btn.callback) {
+                        const result = await btn.callback();
+                        // A callback returning false (or a promise resolving to
+                        // false) vetoes the close - used for validation errors
+                        // and flows that keep the dialog open (e.g. sharing).
+                        if (result === false) keepOpen = true;
+                    }
+                    if (!keepOpen) this.closeModal(modal);
                 });
                 footer.appendChild(btnElement);
             });
@@ -105,20 +112,29 @@ class ModalManager {
             `;
 
             const modal = this.createModal(title, content, [
-                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(false) },
-                { text: confirmText, type: 'primary', action: 'confirm', callback: () => resolve(true) }
+                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => finish(false) },
+                { text: confirmText, type: 'primary', action: 'confirm', callback: () => finish(true) }
             ]);
+
+            // Resolve once and always clean up the escape listener so it
+            // doesn't accumulate across repeated confirmations
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                document.removeEventListener('keydown', handleEscape);
+                resolve(result);
+            };
 
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    resolve(false);
+                    finish(false);
                 }
             });
 
             const handleEscape = (e) => {
                 if (e.key === 'Escape') {
-                    document.removeEventListener('keydown', handleEscape);
-                    resolve(false);
+                    finish(false);
                 }
             };
             document.addEventListener('keydown', handleEscape);
@@ -145,14 +161,25 @@ class ModalManager {
             `;
 
             const modal = this.createModal(title, content, [
-                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => resolve(null) },
+                { text: cancelText, type: 'secondary', action: 'cancel', callback: () => finish(null) },
                 {
                     text: okText, type: 'primary', action: 'confirm', callback: () => {
                         const input = modal.querySelector(`#${inputId}`);
-                        resolve(input ? input.value.trim() : null);
+                        return finish(input ? input.value.trim() : null);
                     }
                 }
             ]);
+
+            // Resolve once and always clean up listeners so they don't
+            // accumulate across repeated prompts
+            let settled = false;
+            const finish = (result) => {
+                if (settled) return;
+                settled = true;
+                document.removeEventListener('keydown', handleEscape);
+                resolve(result);
+                return result;
+            };
 
             setTimeout(() => {
                 const input = modal.querySelector(`#${inputId}`);
@@ -176,14 +203,13 @@ class ModalManager {
 
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    resolve(null);
+                    finish(null);
                 }
             });
 
             const handleEscape = (e) => {
                 if (e.key === 'Escape') {
-                    document.removeEventListener('keydown', handleEscape);
-                    resolve(null);
+                    finish(null);
                 }
             };
             document.addEventListener('keydown', handleEscape);
@@ -265,19 +291,28 @@ class ModalManager {
 
             const t = (key) => window.i18n ? window.i18n.t(key) : key;
             const modal = this.createModal(title, content, [
-                { text: t('modals.ok'), type: 'primary', action: 'ok', callback: () => resolve() }
+                { text: t('modals.ok'), type: 'primary', action: 'ok', callback: () => finish() }
             ]);
+
+            // Resolve once and always clean up the escape listener so it
+            // doesn't accumulate across repeated alerts
+            let settled = false;
+            const finish = () => {
+                if (settled) return;
+                settled = true;
+                document.removeEventListener('keydown', handleEscape);
+                resolve();
+            };
 
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
-                    resolve();
+                    finish();
                 }
             });
 
             const handleEscape = (e) => {
                 if (e.key === 'Escape') {
-                    document.removeEventListener('keydown', handleEscape);
-                    resolve();
+                    finish();
                 }
             };
             document.addEventListener('keydown', handleEscape);

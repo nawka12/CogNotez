@@ -535,6 +535,13 @@ class AIEditApproval {
      * Set up event listeners for the dialog
      */
     setupEventListeners() {
+        // The dialog elements are static (created once) - attach listeners
+        // only once. Previously this ran on every showApprovalDialog() and
+        // re-attached all handlers, so Ctrl+Enter fired applyChanges N times
+        // and '?' stacked N help dialogs after N dialog shows.
+        if (this._listenersAttached) return;
+        this._listenersAttached = true;
+
         // Close button
         const closeBtn = document.getElementById('ai-edit-approval-close');
         if (closeBtn) {
