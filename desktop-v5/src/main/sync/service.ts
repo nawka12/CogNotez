@@ -1,5 +1,5 @@
 // Sync configuration, scheduling and status. Electron-free: index.ts supplies the dialog, windows and transports.
-import type { SyncSetup, SyncStatus, SyncTransportKind } from '../../shared/api'
+import type { SyncProgress, SyncSetup, SyncStatus, SyncTransportKind } from '../../shared/api'
 import type { Media } from '../media'
 import type { Secrets } from '../secrets'
 import type { Store } from '../store/notes'
@@ -20,6 +20,10 @@ export const INTERVAL = 5 * 60_000
 export const AFTER_EDIT = 30_000
 export const BACKOFF_START = 30_000
 export const BACKOFF_MAX = 30 * 60_000
+/** At most ~4 status events a second while a round reports progress. */
+const EMIT_EVERY = 250
+/** A progress line in the log every this many items of a long upload or apply. */
+const LOG_EVERY = 25
 
 export interface SyncConfig {
   transport: SyncTransportKind
@@ -42,6 +46,8 @@ export interface SyncDeps {
   onStatus(s: SyncStatus): void
   onNotesChanged(ids: string[]): void
   warn?(msg: string): void
+  /** Progress lines for the log. Ids and counts only, never note text. */
+  info?(msg: string): void
   wall?: () => number
 }
 
@@ -66,11 +72,16 @@ export function createSyncService(deps: SyncDeps) {
   const wall = deps.wall ?? Date.now
   const local = createLocal(store)
   const warn = (m: string): void => deps.warn?.(m)
+  const info = (m: string): void => deps.info?.(m)
 
   let transport: Transport | null = null
   let dek: Buffer | null = null
   let running: Promise<void> | null = null
   let state: SyncStatus['state'] = 'off'
+  let progress: SyncProgress | null = null
+  let roundStart = 0
+  let lastPhase: SyncProgress['phase'] | null = null
+  let lastEmit = 0
   let lastError: string | null = null
   let lastSyncAt: number | null = null
   let failures = 0
@@ -102,7 +113,8 @@ export function createSyncService(deps: SyncDeps) {
       lastSyncAt,
       lastError,
       conflicts: local.conflicts(),
-      deviceName: deviceName()
+      deviceName: deviceName(),
+      progress: state === 'syncing' ? progress : null
     }
   }
   const emit = (): void => deps.onStatus(status())
@@ -137,14 +149,41 @@ export function createSyncService(deps: SyncDeps) {
     }
   }
 
+  const plural = (n: number, one: string, many: string): string => `${n} ${n === 1 ? one : many}`
+
+  /** Keeps the status current and logs phase starts. Status events are throttled; a phase's first and last always go out. */
+  function onProgress(phase: SyncProgress['phase'], done: number, total: number, full: boolean): void {
+    const first = lastPhase !== phase
+    lastPhase = phase
+    progress = { phase, done, total, startedAt: roundStart }
+    if (first) {
+      if (phase === 'upload') info(`uploading ${plural(total, 'change', 'changes')}`)
+      else if (phase === 'merge') info(`merging ${plural(total, 'note', 'notes')}`)
+      else if (phase === 'apply') info(`applying ${plural(total, 'note', 'notes')}`)
+    } else if (phase === 'list' && total > 0 && done === total) info(`listed ${plural(done, 'remote file', 'remote files')}${full ? '' : ' (changes since last time)'}`)
+    else if (phase !== 'list' && done > 0 && done < total && done % LOG_EVERY === 0) info(`${phase === 'upload' ? 'uploaded' : phase === 'merge' ? 'merged' : 'applied'} ${done} of ${total}`)
+    const now = Date.now()
+    if (first || (total > 0 && done >= total) || now - lastEmit >= EMIT_EVERY) {
+      lastEmit = now
+      emit()
+    }
+  }
+
   async function round(): Promise<void> {
     const c = config()
     if (!c || needsPassphrase()) return
     state = 'syncing'
+    const startedAt = (roundStart = wall())
+    lastPhase = null
+    progress = { phase: 'upload', done: 0, total: 0, startedAt }
+    lastEmit = Date.now()
     emit()
+    info(`round started (${c.transport})`)
+    const full = local.cursor() === null
     try {
       transport ??= await transportFor(c)
-      const r = await syncRound({ store, media: deps.media, transport, remote: c.remoteId, dek, deviceName: deviceName(), warn })
+      const r = await syncRound({ store, media: deps.media, transport, remote: c.remoteId, dek, deviceName: deviceName(), warn, onProgress: (p, d, t) => onProgress(p, d, t, full) })
+      info(`round done in ${((wall() - startedAt) / 1000).toFixed(1)} s (wrote ${plural(r.written, 'file', 'files')}, changed ${plural(r.changed.length, 'note', 'notes')})`)
       if (!c.everSynced) saveConfig({ ...c, everSynced: true })
       lastSyncAt = wall()
       lastError = r.warnings.find((w) => w.includes('too large')) ?? null
@@ -157,8 +196,9 @@ export function createSyncService(deps: SyncDeps) {
       state = 'error'
       failures++
       notBefore = wall() + Math.min(BACKOFF_MAX, BACKOFF_START * 2 ** (failures - 1))
-      warn(`sync round failed: ${lastError}`)
+      warn(`round failed after ${((wall() - startedAt) / 1000).toFixed(1)} s: ${lastError}`)
     }
+    progress = null
     emit()
   }
 

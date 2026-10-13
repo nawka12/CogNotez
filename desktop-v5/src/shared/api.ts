@@ -168,6 +168,17 @@ export interface AiStatus {
 
 export type SyncTransportKind = 'folder' | 'gdrive'
 
+export interface SyncProgress {
+  /** upload: local changes going up; list: reading the remote file list; merge: writing merges and conflicted copies;
+   *  apply: bringing remote changes in (including media downloads). */
+  phase: 'upload' | 'list' | 'merge' | 'apply'
+  /** Items finished in this phase and how many there are; total is 0 when unknown (listing). */
+  done: number
+  total: number
+  /** When the current round started (ms), so the UI can show how long it has been running. */
+  startedAt: number
+}
+
 export interface SyncStatus {
   configured: boolean
   transport: SyncTransportKind | null
@@ -183,6 +194,8 @@ export interface SyncStatus {
   /** Notes with conflictOf set. */
   conflicts: number
   deviceName: string
+  /** Set while state is 'syncing', null otherwise. */
+  progress: SyncProgress | null
 }
 
 export interface SyncSetup {

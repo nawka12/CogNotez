@@ -7,6 +7,8 @@
 //   Queries understand: name = '..', '<id>' in parents, trashed = false, mimeType = '..', appProperties has { key='k' and value='v' }.
 // OAuth (base = oauth): GET /auth (redirects to redirect_uri?code&state, checks PKCE on /token), POST /token, POST /revoke.
 // Faults: fail(status, count, match?) answers the next `count` Drive requests whose "METHOD path" matches with that status.
+//         stall(count, match?) leaves the next `count` matching Drive requests unanswered (the socket stays open) until close().
+//         state.latencyMs delays every Drive request by that long before it is handled.
 //         expireAccessTokens() makes every issued access token answer 401; state.refreshInvalid = true makes refresh answer invalid_grant.
 import { createHash, randomBytes } from 'node:crypto'
 import { createServer } from 'node:http'
@@ -86,9 +88,11 @@ export function start(port = 11998) {
     requests: [], // "METHOD path" of every Drive request
     tokenRequests: [], // the form of every /token request
     revoked: [],
-    uploads: 0
+    uploads: 0,
+    latencyMs: 0
   }
   const faults = []
+  const stalls = []
   const nextId = () => `f${++counter}${randomBytes(3).toString('hex')}`
   const nextTime = () => new Date(Date.UTC(2026, 0, 1) + ++counter * 1000).toISOString() // strictly increasing
 
@@ -179,6 +183,12 @@ export function start(port = 11998) {
     state.requests.push(key)
     const bearer = /^Bearer (.+)$/.exec(req.headers.authorization ?? '')?.[1]
     if (!bearer || !accessTokens.has(bearer)) return gErr(res, 401, 'Invalid Credentials', 'authError')
+    const si = stalls.findIndex((f) => f.count > 0 && (!f.match || f.match.test(key)))
+    if (si >= 0) {
+      stalls[si].count--
+      return new Promise(() => {}) // never answers; the client's timeout has to end it
+    }
+    if (state.latencyMs) await new Promise((r) => setTimeout(r, state.latencyMs))
     const fi = faults.findIndex((f) => f.count > 0 && (!f.match || f.match.test(key)))
     if (fi >= 0) {
       faults[fi].count--
@@ -267,6 +277,7 @@ export function start(port = 11998) {
         /** All files, for assertions. */
         files: () => [...files.values()].map((f) => ({ ...meta(f), bytes: f.bytes })),
         fail: (status, count = 1, match, reason) => faults.push({ status, count, match, reason }),
+        stall: (count = 1, match) => stalls.push({ count, match }),
         expireAccessTokens: () => accessTokens.clear(),
         /** A valid access token, without going through OAuth. */
         token: issue,

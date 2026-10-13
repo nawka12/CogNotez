@@ -2,7 +2,7 @@
   import { onMount } from 'svelte'
   import type { SyncTransportKind } from '../../../shared/api'
   import { t } from '../i18n'
-  import { syncChip, syncedWhen } from '../lib/syncChip'
+  import { syncChip, syncedWhen, syncProgressText } from '../lib/syncChip'
   import { formatDateTime } from '../lib/time'
   import { loadGoogle, loadSync, sync } from '../state/sync.svelte'
   import { errorText, showToast, ui } from '../state/ui.svelte'
@@ -13,6 +13,15 @@
   const status = $derived(sync.status)
   const google = $derived(sync.google)
   const chip = $derived(syncChip(status, ui.now))
+  // ui.now only ticks every 30 s; the elapsed time of a running round needs a finer clock.
+  let tick = $state(Date.now())
+  $effect(() => {
+    if (status?.state !== 'syncing') return
+    tick = Date.now()
+    const iv = setInterval(() => (tick = Date.now()), 1000)
+    return () => clearInterval(iv)
+  })
+  const stateText = $derived(status?.state === 'syncing' && status.progress ? syncProgressText(status.progress, tick) : chip.text)
 
   let busy = $state(false)
   let connecting = $state(false)
@@ -154,7 +163,7 @@
   {#if status?.configured}
     <dl>
       <dt>{t('sync.state')}</dt>
-      <dd class:bad={chip.tone === 'bad' || chip.tone === 'warn'}>{chip.text}</dd>
+      <dd class:bad={chip.tone === 'bad' || chip.tone === 'warn'}>{stateText}</dd>
       <dt>{t('sync.lastSynced')}</dt>
       <dd title={status.lastSyncAt ? formatDateTime(status.lastSyncAt) : ''}>{status.lastSyncAt ? syncedWhen(status.lastSyncAt, ui.now) : t('sync.never')}</dd>
       <dt>{t('sync.location')}</dt>

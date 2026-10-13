@@ -31,8 +31,8 @@ export interface Transport {
   read(name: string): Promise<Uint8Array | null>
   /** Create-only. 'exists' when a file with this name is already there (same name = same content). */
   create(name: string, bytes: Uint8Array): Promise<'created' | 'exists'>
-  /** cursor null = full listing. */
-  list(cursor: string | null): Promise<ListResult>
+  /** cursor null = full listing. `onPage(n)` reports the names listed so far, for transports that page (optional). */
+  list(cursor: string | null, onPage?: (listed: number) => void): Promise<ListResult>
   /** GC only. A missing file is not an error. */
   remove(name: string): Promise<void>
 }

@@ -2,6 +2,7 @@
 import { readFileSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { randomBytes } from 'node:crypto'
+import type { SyncProgress } from '../../shared/api'
 import { sniffMime } from '../media'
 import type { Media } from '../media'
 import type { Store } from '../store/notes'
@@ -41,6 +42,8 @@ export interface RoundDeps {
   deviceName: string
   warn?: (msg: string) => void
   rand?: Rand
+  /** Purely observational. `done` of `total` items of the phase are finished (total 0 = unknown, as while listing). */
+  onProgress?: (phase: SyncProgress['phase'], done: number, total: number) => void
 }
 
 export interface RoundResult {
@@ -94,6 +97,7 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
     d.warn?.(m)
   }
   const rand = d.rand ?? randomBytes
+  const progress = d.onProgress ?? ((): void => undefined)
   let written = 0
 
   // 1. Meta. Never bootstraps here: a round only runs against a remote this device already joined.
@@ -130,7 +134,11 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
     warn(`note ${id} has an unusable rev ${rev}; not uploaded`)
     return true
   }
-  for (const o of local.dirty(d.deviceName)) {
+  const dirty = local.dirty(d.deviceName)
+  const purged = local.purged()
+  const uploads = dirty.length + purged.length
+  for (const [i, o] of dirty.entries()) {
+    if (uploads) progress('upload', i, uploads)
     if (unusable(o.id, o.rev)) continue
     const bytes = serialize(o)
     if (bytes.length > MAX_OBJECT_BYTES) {
@@ -149,17 +157,21 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
     await put(objectName(o.id, o.rev, o.parents, enc), bytes)
     local.markUploaded(o)
   }
-  for (const p of local.purged()) {
+  for (const [i, p] of purged.entries()) {
+    progress('upload', dirty.length + i, uploads)
     const tomb: Tombstone = { v: 2, id: p.id, rev: store.hlc.now(), parents: [p.rev], device: store.deviceId, deviceName: d.deviceName.slice(0, 100), deleted: true }
     if (unusable(tomb.id, tomb.rev)) continue
     await put(objectName(tomb.id, tomb.rev, tomb.parents, enc), serialize(tomb))
     local.markTombstoneUploaded(tomb, p.rev)
   }
+  if (uploads) progress('upload', uploads, uploads)
   // Step 5 applies a head only to notes unchanged since here, so a note uploaded above takes its merge this round.
   const snap = local.snapshot()
 
   // 3. List and build the graphs.
-  const listing = await t.list(local.cursor())
+  progress('list', 0, 0)
+  const listing = await t.list(local.cursor(), (n) => progress('list', n, 0))
+  progress('list', listing.added.length, listing.added.length)
   const names = listing.full ? new Set<string>() : new Set(known)
   if (!listing.full) for (const n of listing.removed) names.delete(n)
   for (const e of listing.added) names.add(e.name)
@@ -207,9 +219,10 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
   }
 
   // 4. Merge notes with several heads. Copies go up before the merge that hides the losing side.
-  for (const id of [...graphs.keys()].sort()) {
+  const toMerge = [...graphs.keys()].sort().filter((id) => graphs.get(id)!.heads().length >= 2)
+  for (const [i, id] of toMerge.entries()) {
     const g = graphs.get(id)!
-    if (g.heads().length < 2) continue
+    progress('merge', i, toMerge.length)
     const r = await foldHeads(g, loader(g))
     if (!r) {
       warn(`could not merge note ${id} this round (a head is unreadable)`)
@@ -226,28 +239,37 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
       // finds nothing yet (Drive search lag) skips the apply; the next round retries.
     }
   }
+  if (toMerge.length) progress('merge', toMerge.length, toMerge.length)
 
   // 5. Apply each note's single head, one transaction per note.
-  const changed: string[] = []
-  for (const id of [...graphs.keys()].sort()) {
+  const plan = (id: string): 'adopt' | 'restamp' | 'apply' | null => {
     const g = graphs.get(id)!
     const heads = g.heads()
-    if (heads.length !== 1) continue
-    const head = heads[0]
+    if (heads.length !== 1) return null
     const localRev = snap.revs.get(id) ?? null
     const base = snap.bases.get(id) ?? null
-    if (head === localRev) {
-      if (base !== head) local.adoptBase(id, head)
-      continue
-    }
-    if (localRev === null && head === base) continue
-    if (localRev !== null && localRev !== base) continue // edited locally and not uploaded (too large): keep it
-    if (localRev !== null && !g.has(localRev)) {
+    if (heads[0] === localRev) return base !== heads[0] ? 'adopt' : null
+    if (localRev === null && heads[0] === base) return null
+    if (localRev !== null && localRev !== base) return null // edited locally and not uploaded (too large): keep it
+    return localRev !== null && !g.has(localRev) ? 'restamp' : 'apply'
+  }
+  const todo = [...graphs.keys()].sort().map((id) => [id, plan(id)] as const)
+  const toApply = todo.filter(([, a]) => a === 'apply').length
+  let applying = 0
+  const changed: string[] = []
+  for (const [id, act] of todo) {
+    if (!act) continue
+    const g = graphs.get(id)!
+    const head = g.heads()[0]!
+    const localRev = snap.revs.get(id) ?? null
+    if (act === 'adopt') local.adoptBase(id, head)
+    if (act === 'restamp') {
       // The remote no longer has the revision we agreed on (restored or rolled back): upload ours again.
       warn(`the remote lost a revision of note ${id}; re-uploading this device's copy`)
-      local.restamp(id, localRev)
-      continue
+      local.restamp(id, localRev!)
     }
+    if (act !== 'apply') continue
+    progress('apply', applying++, toApply)
     const name = g.names.get(head)
     const o = name ? await loadByName(name) : null
     if (!o) continue
@@ -256,6 +278,7 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
     }
     if (local.apply(o, localRev)) changed.push(id)
   }
+  if (toApply) progress('apply', toApply, toApply)
 
   // 6. Save the listing and cursor.
   local.saveListing(names, listing.cursor)

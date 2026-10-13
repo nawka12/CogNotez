@@ -242,6 +242,39 @@ describe('errors and retries', () => {
     await expect(t.ensureRoot()).rejects.toThrow(/Could not reach Google Drive/)
   })
 
+  it('gives up on a request that never answers, with a readable message, and keeps working afterwards', async () => {
+    const t = make({ timeoutMs: 150 })
+    await t.ensureRoot()
+    await t.create('objects/n.dl.json', enc('y'))
+    const stalled = async (match: RegExp, call: () => Promise<unknown>): Promise<void> => {
+      drive.stall(1, match)
+      const started = Date.now()
+      await expect(call()).rejects.toThrow('Google Drive stopped responding. Sync will try again shortly.')
+      expect(Date.now() - started).toBeLessThan(2000)
+    }
+    await stalled(/GET \/drive\/v3\/changes\/startPageToken/, () => t.list(null))
+    await stalled(/POST \/upload/, () => t.create('objects/n.stall.json', enc('x')))
+    await stalled(/GET \/drive\/v3\/files\/./, () => t.read('objects/n.dl.json'))
+    expect(await t.read('objects/n.stall.json')).toBeNull() // the stalled upload left nothing behind
+    expect(dec(await t.read('objects/n.dl.json'))).toBe('y')
+    expect((await t.list(null)).added.map((e) => e.name)).toContain('objects/n.dl.json')
+  })
+
+  it('gives big uploads more time than the base timeout', async () => {
+    // Uploads take 250 ms here; the base timeout is 100 ms, so only the allowance of 1 s per 256 KB lets the big one finish.
+    const slowUploads = ((url: string, init: RequestInit) =>
+      init.method !== 'POST' || !url.includes('/upload/')
+        ? fetch(url, init)
+        : new Promise((res, rej) => {
+            const id = setTimeout(res, 250)
+            init.signal?.addEventListener('abort', () => (clearTimeout(id), rej(init.signal!.reason)))
+          }).then(() => fetch(url, init))) as unknown as typeof fetch
+    const t = make({ timeoutMs: 100, fetch: slowUploads })
+    await t.ensureRoot()
+    await expect(t.create('objects/n.small.json', enc('x'))).rejects.toThrow(/stopped responding/)
+    expect(await t.create('objects/n.big.json', new Uint8Array(300 * 1024))).toBe('created')
+  })
+
   it('explains a full Drive', async () => {
     const t = make()
     await t.ensureRoot()

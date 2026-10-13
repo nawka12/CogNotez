@@ -8,6 +8,7 @@ export const ROOT_NAME = 'CogNotez Sync'
 const TAG = 'sync-v2'
 const FOLDER = 'application/vnd.google-apps.folder'
 const MAX_TRIES = 5
+const STALLED = 'Google Drive stopped responding. Sync will try again shortly.'
 
 export interface DriveOptions {
   /** `force` asks for a fresh token (after a 401). */
@@ -19,6 +20,8 @@ export interface DriveOptions {
   email?: string
   /** Tests inject a no-op to skip backoff waits. */
   sleep?: (ms: number) => Promise<void>
+  /** Base time a request may take, body included; uploads and downloads get 1 s more per 256 KB. Default 30 s. */
+  timeoutMs?: number
 }
 
 /** Escapes a value for use inside '...' in a Drive query. */
@@ -75,23 +78,33 @@ export function createDriveTransport(opts: DriveOptions): Transport {
 
   const backoff = (attempt: number): number => Math.min(8000, 400 * 2 ** (attempt - 1)) * (0.5 + Math.random() * 0.5)
 
-  /** One request with auth, a single refresh on 401, and exponential backoff (jittered) on 429 / 5xx / network errors. */
-  async function request(url: string, init: { method?: string; headers?: Record<string, string>; body?: Uint8Array | string } = {}): Promise<Response> {
+  /**
+   * One request with auth, a single refresh on 401, and exponential backoff (jittered) on 429 / 5xx / network errors.
+   * Returns the whole body. One deadline covers the request and its body: `bytes` (upload size, or the expected download
+   * size) lengthens it, so a slow link on a big file isn't cut off while a stalled one is. A timeout is not retried here:
+   * an upload may have landed (the next round's name check sees it), and the service's backoff retries the round.
+   */
+  async function request(url: string, init: { method?: string; headers?: Record<string, string>; body?: Uint8Array | string } = {}, bytes = 0): Promise<Buffer> {
+    const ms = (opts.timeoutMs ?? 30_000) + Math.round(bytes / 262.144)
     let refreshed = false
     let force = false
     for (let attempt = 1; ; attempt++) {
       const token = await opts.getAccessToken(force) // its errors are already human-readable
       force = false
+      const signal = AbortSignal.timeout(ms)
       let res: Response
+      let buf: Buffer
       try {
-        res = await doFetch(base + url, { ...init, headers: { ...init.headers, authorization: `Bearer ${token}` } })
+        res = await doFetch(base + url, { ...init, signal, headers: { ...init.headers, authorization: `Bearer ${token}` } })
+        buf = Buffer.from(await res.arrayBuffer())
       } catch {
+        if (signal.aborted) throw new SyncError(STALLED)
         if (attempt >= MAX_TRIES) throw new SyncError('Could not reach Google Drive. Check your internet connection.')
         await sleep(backoff(attempt))
         continue
       }
-      if (res.ok) return res
-      const body = await res.text().catch(() => '')
+      if (res.ok) return buf
+      const body = buf.toString('utf8')
       if (res.status === 401 && !refreshed) {
         refreshed = true
         force = true
@@ -104,9 +117,9 @@ export function createDriveTransport(opts: DriveOptions): Transport {
     }
   }
 
-  const json = async <T>(url: string, init?: Parameters<typeof request>[1]): Promise<T> => (await request(url, init)).json() as Promise<T>
+  const json = async <T>(url: string, init?: Parameters<typeof request>[1], bytes?: number): Promise<T> => JSON.parse((await request(url, init, bytes)).toString('utf8')) as T
 
-  async function find(query: string, fields = FILE_FIELDS): Promise<DriveFile[]> {
+  async function find(query: string, fields = FILE_FIELDS, onPage?: (n: number) => void): Promise<DriveFile[]> {
     const out: DriveFile[] = []
     let pageToken = ''
     do {
@@ -114,6 +127,7 @@ export function createDriveTransport(opts: DriveOptions): Transport {
       if (pageToken) p.set('pageToken', pageToken)
       const r = await json<{ files?: DriveFile[]; nextPageToken?: string }>(`/drive/v3/files?${p}`)
       out.push(...(r.files ?? []))
+      onPage?.(out.length)
       pageToken = r.nextPageToken ?? ''
     } while (pageToken)
     return out
@@ -169,13 +183,17 @@ export function createDriveTransport(opts: DriveOptions): Transport {
     return found
   }
 
-  async function fullListing(): Promise<ListResult> {
+  async function fullListing(onPage?: (listed: number) => void): Promise<ListResult> {
     const f = await folders()
     // Take the start token first: anything that changes while we list shows up in the next incremental call.
     const { startPageToken } = await json<{ startPageToken: string }>('/drive/v3/changes/startPageToken')
     const seen = new Map<string, RemoteEntry>()
+    let before = 0
     for (const [dir, id] of [['objects', f.objects], ['media', f.media]] as const) {
-      for (const file of await find(`'${q(id)}' in parents and trashed = false and ${TAGGED}`)) {
+      const page = (n: number): void => onPage?.(before + n)
+      const listed = await find(`'${q(id)}' in parents and trashed = false and ${TAGGED}`, FILE_FIELDS, page)
+      before += listed.length
+      for (const file of listed) {
         const name = `${dir}/${file.name}`
         names.set(file.id, name)
         if (!seen.has(name)) seen.set(name, { name, size: Number(file.size ?? 0) }) // oldest first: duplicates collapse onto it
@@ -202,7 +220,7 @@ export function createDriveTransport(opts: DriveOptions): Transport {
       const [file] = await files(name)
       if (!file) return null
       try {
-        return new Uint8Array(await (await request(`/drive/v3/files/${file.id}?alt=media`)).arrayBuffer())
+        return new Uint8Array(await request(`/drive/v3/files/${file.id}?alt=media`, {}, Number(file.size ?? 0)))
       } catch (e) {
         if (e instanceof DriveError && e.status === 404) return null
         throw e
@@ -223,18 +241,19 @@ export function createDriveTransport(opts: DriveOptions): Transport {
         method: 'POST',
         headers: { 'content-type': `multipart/related; boundary=${boundary}` },
         body
-      })
+      }, body.length)
       names.set(made.id, name)
       return 'created'
     },
 
-    async list(cursor) {
-      if (cursor === null) return fullListing()
+    async list(cursor, onPage) {
+      if (cursor === null) return fullListing(onPage)
       const f = await folders()
       const added = new Map<string, RemoteEntry>()
       const removed = new Set<string>()
       let pageToken = cursor
       let next = cursor
+      let seen = 0
       while (pageToken) {
         const p = new URLSearchParams({
           pageToken,
@@ -244,6 +263,8 @@ export function createDriveTransport(opts: DriveOptions): Transport {
           fields: `nextPageToken,newStartPageToken,changes(fileId,removed,file(${FILE_FIELDS}))`
         })
         const r = await json<{ changes?: Change[]; nextPageToken?: string; newStartPageToken?: string }>(`/drive/v3/changes?${p}`)
+        seen += r.changes?.length ?? 0
+        onPage?.(seen)
         for (const c of r.changes ?? []) {
           const file = c.file
           const dir = file?.parents?.includes(f.objects) ? 'objects' : file?.parents?.includes(f.media) ? 'media' : null
@@ -258,7 +279,7 @@ export function createDriveTransport(opts: DriveOptions): Transport {
             // A removal of an id we never saw (e.g. after a restart) could be ours: fall back to a full listing.
             if (!name) {
               if (file && !dir) continue
-              return fullListing()
+              return fullListing(onPage)
             }
             removed.add(name)
           }

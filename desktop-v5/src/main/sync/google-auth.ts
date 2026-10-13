@@ -9,9 +9,11 @@ import { SyncError } from './transport'
 
 export const SCOPES = 'https://www.googleapis.com/auth/drive.file openid email'
 export const EXPIRED_MESSAGE = 'Google sign-in expired. Reconnect in Settings.'
+const STALLED = 'Google sign-in stopped responding. Try again in a moment.'
 const NOT_CONNECTED = 'Google account is not connected. Connect it in Settings.'
 const REFRESH_MARGIN_MS = 60_000
 const CONNECT_TIMEOUT_MS = 5 * 60_000
+const REQUEST_TIMEOUT_MS = 30_000
 
 export interface OAuthClient {
   clientId: string
@@ -33,6 +35,8 @@ export interface GoogleAuthDeps {
   fetch?: typeof fetch
   now?: () => number
   timeoutMs?: number
+  /** Per token request (the whole exchange, body included). Default 30 s. */
+  requestTimeoutMs?: number
 }
 
 interface StoredTokens {
@@ -96,13 +100,16 @@ export function createGoogleAuth(deps: GoogleAuthDeps) {
     if (!c) throw new SyncError('No Google OAuth client is set up. Import a client file in Settings.')
     const body = new URLSearchParams({ ...params, client_id: c.clientId })
     if (c.clientSecret) body.set('client_secret', c.clientSecret)
+    const signal = AbortSignal.timeout(deps.requestTimeoutMs ?? REQUEST_TIMEOUT_MS)
     let res: Response
+    let json: Record<string, unknown>
     try {
-      res = await doFetch(tokenUrl, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body })
+      res = await doFetch(tokenUrl, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body, signal })
+      json = (await res.json().catch(() => ({}))) as Record<string, unknown>
     } catch {
-      throw new SyncError('Could not reach Google. Check your internet connection.')
+      throw new SyncError(signal.aborted ? STALLED : 'Could not reach Google. Check your internet connection.')
     }
-    const json = (await res.json().catch(() => ({}))) as Record<string, unknown>
+    if (signal.aborted) throw new SyncError(STALLED) // the body stalled; the .catch above hid it
     if (!res.ok) {
       if (json['error'] === 'invalid_grant') throw new SyncError(EXPIRED_MESSAGE)
       const detail = typeof json['error_description'] === 'string' ? json['error_description'] : typeof json['error'] === 'string' ? json['error'] : `HTTP ${res.status}`

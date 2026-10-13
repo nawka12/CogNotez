@@ -278,7 +278,8 @@ void app.whenReady().then(async () => {
     hostname,
     onStatus: (s) => toWindows('sync:status', s),
     onNotesChanged: (ids) => toWindows('notes:changed', { ids }),
-    warn: (m) => log.warn('sync:', m)
+    warn: (m) => log.warn('sync:', m),
+    info: (m) => log.info('sync:', m)
   })
   registerSyncIpc(sync)
   // Dev-only: COGNOTEZ_UPDATE_FEED=<url of a generic update feed> lets an unpacked run exercise the update flow.

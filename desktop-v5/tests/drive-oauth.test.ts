@@ -101,6 +101,16 @@ describe('connect', () => {
     await expect(auth.connect()).rejects.toThrow('Google sign-in was cancelled.')
   })
 
+  it('gives up on a token endpoint that never answers', async () => {
+    const hang = ((_u: string, init: RequestInit) =>
+      new Promise((_, rej) => init.signal?.addEventListener('abort', () => rej(init.signal!.reason)))) as unknown as typeof fetch
+    const { auth, secrets } = rig({ fetch: hang, requestTimeoutMs: 80 })
+    secrets.set('google_oauth_tokens', JSON.stringify({ refresh_token: 'rt-fake', access_token: 'a', expires_at: 1, email: 'x@y' }))
+    const started = Date.now()
+    await expect(auth.getAccessToken()).rejects.toThrow('Google sign-in stopped responding. Try again in a moment.')
+    expect(Date.now() - started).toBeLessThan(1500)
+  })
+
   it('refuses to start without a client', async () => {
     const { auth } = rig({ builtIn: { clientId: '', clientSecret: '' } })
     expect(auth.status().clientConfigured).toBe(false)
