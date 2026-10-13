@@ -18,7 +18,23 @@ export interface ConfirmData {
   run: () => void
 }
 
+export interface PasswordDialogData {
+  docId: string
+  mode: 'set' | 'change'
+}
+
+export interface PromptData {
+  title: string
+  label: string
+  initial: string
+  confirmLabel: string
+  run: (value: string) => void
+}
+
 class Ui {
+  /** What the main column shows: the open note, or the settings page. */
+  view = $state<'notes' | 'settings'>('notes')
+  prompt = $state.raw<PromptData | null>(null)
   theme = $state<Theme>('system')
   mode = $state<Mode>('edit')
   filter = $state.raw<ListFilter>({ kind: 'all' })
@@ -27,6 +43,7 @@ class Ui {
   now = $state(Date.now())
   toast = $state.raw<ToastData | null>(null)
   confirm = $state.raw<ConfirmData | null>(null)
+  passwordDialog = $state.raw<PasswordDialogData | null>(null)
   importSummary = $state.raw<ImportStats | null>(null)
   /** Bumped to ask the open note to focus its title. */
   titleFocus = $state(0)

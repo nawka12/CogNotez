@@ -25,6 +25,7 @@
   --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
 
   --side: 284px;
+  --note-size: 1.125rem; /* Settings > Font size */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {

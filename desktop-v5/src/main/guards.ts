@@ -11,7 +11,8 @@ export const LIMITS = {
   query: 500,
   settingKey: 128,
   settingValueBytes: 64 * 1024,
-  secret: 16 * 1024
+  secret: 16 * 1024,
+  password: 1024
 } as const
 
 const ID_RE = /^[A-Za-z0-9_-]{8,64}$/
@@ -120,6 +121,12 @@ export function settingValueJson(v: unknown): string {
   if (json === undefined) fail('value is not JSON-serialisable')
   if (Buffer.byteLength(json) > LIMITS.settingValueBytes) fail('value is too large (max 64 KB)')
   return json
+}
+
+/** Only shape and size; the 8-character minimum for NEW passwords is enforced where it is set. */
+export function password(v: unknown): string {
+  if (typeof v !== 'string' || v.length < 1 || v.length > LIMITS.password) fail(`password must be 1 to ${LIMITS.password} characters`)
+  return v
 }
 
 export function secretName(v: unknown): SecretName {

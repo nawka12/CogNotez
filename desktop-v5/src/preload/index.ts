@@ -28,7 +28,32 @@ const api: Api = {
   importer: {
     detectV4: () => call('importer:detectV4'),
     runV4: (source) => call('importer:runV4', source ?? 'auto'),
-    fromFile: () => call('importer:fromFile')
+    fromFile: () => call('importer:fromFile'),
+    files: () => call('importer:files')
+  },
+  locks: {
+    unlock: (id, password) => call('locks:unlock', id, password),
+    lock: (id) => call('locks:lock', id),
+    setPassword: (id, password) => call('locks:setPassword', id, password),
+    removeLock: (id) => call('locks:removeLock', id)
+  },
+  backups: {
+    list: () => call('backups:list'),
+    create: () => call('backups:create'),
+    restore: (id) => call('backups:restore', id),
+    reveal: () => call('backups:reveal')
+  },
+  exporter: {
+    note: (id, format) => call('exporter:note', id, format),
+    allMarkdown: () => call('exporter:allMarkdown')
+  },
+  app: { info: () => call('app:info') },
+  onLocksChanged(cb) {
+    const listener = (_e: unknown, payload: NotesChanged): void => cb(payload)
+    ipcRenderer.on('locks:changed', listener)
+    return () => {
+      ipcRenderer.removeListener('locks:changed', listener)
+    }
   },
   media: {
     importBytes: (bytes, mime) => call('media:importBytes', bytes, mime)

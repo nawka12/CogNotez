@@ -2,7 +2,7 @@ import type { Note } from '../../../shared/api'
 import { t } from '../i18n'
 import { mergeTags } from '../lib/tags'
 import { refresh, scheduleRefresh } from './library.svelte'
-import { closeTab, flush, openNote, reloadOpen, saveMeta, tabs } from './tabs.svelte'
+import { adopt, closeTab, flush, openNote, reloadOpen, saveMeta, tabs } from './tabs.svelte'
 import type { Doc } from './tabs.svelte'
 import { errorText, showToast, ui } from './ui.svelte'
 
@@ -85,4 +85,37 @@ export async function addTags(doc: Doc, names: string[]): Promise<void> {
 
 export async function removeTag(doc: Doc, tag: string): Promise<void> {
   await saveMeta(doc, { tags: doc.note.tags.filter((x) => x !== tag) })
+}
+
+// ---------- locked notes ----------
+
+/** "Lock note…" on a plain note, "Change password…" on an unlocked one. */
+export function askPassword(doc: Doc): void {
+  ui.passwordDialog = { docId: doc.id, mode: doc.note.locked ? 'change' : 'set' }
+}
+
+/** Saves, then asks main to forget the key; the `locks:changed` event swaps the editor for the lock panel. */
+export async function lockNow(doc: Doc): Promise<void> {
+  if (!(await flush(doc))) {
+    showToast(t('toast.error', { message: t('save.failed') }))
+    return
+  }
+  await guarded(async () => {
+    await window.api.locks.lock(doc.id)
+    showToast(t('toast.locked'))
+  })
+}
+
+export function askRemoveLock(doc: Doc): void {
+  ui.confirm = {
+    title: t('confirm.removeLock.title'),
+    message: t('confirm.removeLock.message', { title: doc.title || t('untitled') }),
+    confirmLabel: t('confirm.removeLock.ok'),
+    run: () =>
+      void guarded(async () => {
+        await flush(doc)
+        adopt(doc, await window.api.locks.removeLock(doc.id))
+        showToast(t('toast.lockRemoved'))
+      })
+  }
 }

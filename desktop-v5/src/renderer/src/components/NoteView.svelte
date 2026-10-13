@@ -18,7 +18,7 @@
   let restoring = false
 
   const trashed = $derived(doc.note.deletedAt !== null)
-  const locked = $derived(doc.note.locked)
+  const sealed = $derived(doc.sealed)
   const mode = $derived(doc.readOnly ? 'preview' : ui.mode)
   const split = $derived(mode === 'split')
 
@@ -74,8 +74,8 @@
       onkeydown={onTitleKey}
     />
     <MetaLine {doc} />
-    {#if locked}
-      <LockedPanel />
+    {#if sealed}
+      <LockedPanel {doc} />
     {:else}
       <div class="panes" class:split>
         {#if mode !== 'preview'}<Editor {doc} />{/if}

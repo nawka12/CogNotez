@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '../i18n'
   import { createNote } from '../state/actions'
+  import { openSettings } from '../state/data'
   import { library } from '../state/library.svelte'
   import { openNote, tabs } from '../state/tabs.svelte'
   import { MOD, ui } from '../state/ui.svelte'
@@ -23,6 +24,7 @@
     <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" /><path d="M8 7v10M16 7v10M8 7l8 10" /></svg>
     <span class="wordmark">CogNotez</span>
     <button class="icon-btn" aria-label={t('note.new')} title={t('note.new')} onclick={() => void createNote()}><Icon name="plus" /></button>
+    <button class="icon-btn" aria-label={t('settings.open')} title={t('settings.open')} onclick={openSettings}><Icon name="gear" /></button>
   </div>
   <button class="search" onclick={() => (ui.paletteOpen = true)}>
     <Icon name="search" /><span>{t('search.placeholder')}</span><kbd>{MOD} K</kbd>

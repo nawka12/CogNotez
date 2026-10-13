@@ -3,3 +3,5 @@ out/
 dist/
 coverage/
 *.log
+# electron-builder resources (the repo root ignores build/)
+!build/

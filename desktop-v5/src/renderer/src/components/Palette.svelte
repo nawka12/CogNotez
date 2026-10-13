@@ -4,12 +4,15 @@
   import { t } from '../i18n'
   import type { Key } from '../i18n'
   import { filterItems } from '../lib/palette'
-  import { createNote, togglePin, trashNote } from '../state/actions'
+  import { askPassword, askRemoveLock, createNote, lockNow, togglePin, trashNote } from '../state/actions'
+  import { backupNow, exportAll, exportNote, importFiles, openSettings } from '../state/data'
   import { importFromFile, importFromV4 } from '../state/importer.svelte'
   import { library } from '../state/library.svelte'
   import { openNote, tabs } from '../state/tabs.svelte'
+  import { addTemplate, builtins, loadTemplates, newFromTemplate, templates } from '../state/templates.svelte'
   import { setTheme, ui } from '../state/ui.svelte'
   import type { Mode, Theme } from '../state/ui.svelte'
+  import type { Doc } from '../state/tabs.svelte'
 
   interface Item {
     id: string
@@ -17,6 +20,8 @@
     label: string
     hint?: string
     run: () => void
+    /** Stay open after running (used to step into a sub-list). */
+    keep?: boolean
   }
 
   let dlg: HTMLDialogElement
@@ -24,6 +29,8 @@
   let query = $state('')
   let index = $state(0)
   let hits = $state.raw<NoteSummary[]>([])
+  /** 'templates' swaps the list for the template picker. */
+  let sub = $state<'templates' | null>(null)
 
   const recent = $derived([...library.all].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8))
 
@@ -61,15 +68,65 @@
       a('all', t('palette.showAll'), () => (ui.filter = { kind: 'all' })),
       a('pinned', t('palette.showPinned'), () => (ui.filter = { kind: 'pinned' })),
       a('trash', t('palette.openTrash'), () => (ui.filter = { kind: 'trash' })),
+      a('settings', t('palette.settings'), openSettings),
+      { ...a('from-template', t('palette.newFromTemplate'), openTemplates), keep: true },
+      ...(live ? [a('save-template', t('palette.saveAsTemplate'), () => askTemplateName(live))] : []),
+      ...(doc && !doc.note.locked
+        ? [
+            a('export-md', t('palette.exportMd'), () => void exportNote(doc, 'md')),
+            a('export-txt', t('palette.exportTxt'), () => void exportNote(doc, 'txt')),
+            a('export-pdf', t('palette.exportPdf'), () => void exportNote(doc, 'pdf'))
+          ]
+        : []),
+      a('export-all', t('palette.exportAll'), () => void exportAll()),
+      a('import-files', t('palette.importFiles'), () => void importFiles()),
+      a('backup-now', t('palette.backupNow'), () => void backupNow()),
       ...(live ? [a('pin', live.note.pinned ? t('palette.unpinCurrent') : t('palette.pinCurrent'), () => void togglePin(live))] : []),
       ...(live ? [a('trash-current', t('palette.trashCurrent'), () => void trashNote(live.id))] : []),
+      ...(live && !live.note.locked ? [a('lock', t('palette.lockNote'), () => askPassword(live))] : []),
+      ...(live?.note.locked && !live.sealed
+        ? [
+            a('lock-now', t('palette.lockNow'), () => void lockNow(live)),
+            a('change-password', t('palette.changePassword'), () => askPassword(live)),
+            a('remove-lock', t('palette.removeLock'), () => askRemoveLock(live))
+          ]
+        : []),
       ...themes.map((th) => a(`theme-${th}`, t('theme.label', { name: t(`theme.${th}`) }), () => setTheme(th), 'palette.theme')),
       a('import-v4', t('palette.importV4'), () => void importFromV4(), 'palette.import'),
       a('import-file', t('palette.importFile'), () => void importFromFile(), 'palette.import')
     ]
   }
 
+  function openTemplates(): void {
+    sub = 'templates'
+    query = ''
+    void loadTemplates()
+    void tick().then(() => input.focus())
+  }
+
+  function askTemplateName(doc: Doc): void {
+    ui.prompt = {
+      title: t('templates.nameTitle'),
+      label: t('templates.nameLabel'),
+      initial: doc.title,
+      confirmLabel: t('templates.nameOk'),
+      run: (name) => void addTemplate(name, doc.cm.doc.toString())
+    }
+  }
+
+  function templateItems(): Item[] {
+    const mine = templates.custom.map((tpl) => ({ tpl, builtin: false }))
+    const all = [...mine, ...builtins.map((tpl) => ({ tpl, builtin: true }))]
+    return all.map(({ tpl, builtin }) => ({
+      id: `tpl-${tpl.id}`,
+      group: t(builtin ? 'templates.builtin' : 'templates.yours'),
+      label: tpl.name,
+      run: () => void newFromTemplate(tpl, builtin)
+    }))
+  }
+
   const items = $derived.by<Item[]>(() => {
+    if (sub === 'templates') return filterItems(templateItems(), query)
     const notes: Item[] = hits.map((n) => ({
       id: `note-${n.id}`,
       group: t('palette.notes'),
@@ -89,6 +146,7 @@
   $effect(() => {
     if (ui.paletteOpen && !dlg.open) {
       query = ''
+      sub = null
       dlg.showModal()
       void tick().then(() => input.focus())
     } else if (!ui.paletteOpen && dlg.open) dlg.close()
@@ -97,7 +155,7 @@
   function run(i: number): void {
     const it = items[i]
     if (!it) return
-    ui.paletteOpen = false
+    if (!it.keep) ui.paletteOpen = false
     it.run()
   }
 
@@ -109,6 +167,9 @@
     } else if (e.key === 'Enter') {
       e.preventDefault()
       run(index)
+    } else if (e.key === 'Backspace' && sub && !query) {
+      e.preventDefault()
+      sub = null
     }
   }
 
@@ -129,7 +190,7 @@
     aria-controls="pal-list"
     aria-autocomplete="list"
     aria-activedescendant={items.length ? `pal-${index}` : undefined}
-    placeholder={t('palette.placeholder')}
+    placeholder={sub ? t('templates.pick') : t('palette.placeholder')}
     autocomplete="off"
     spellcheck="false"
     {onkeydown}
@@ -149,7 +210,7 @@
         <span class="label">{it.label}</span>{#if it.hint}<span class="h">{it.hint}</span>{/if}
       </li>
     {:else}
-      <li class="pal-empty" role="presentation">{t('palette.empty')}</li>
+      <li class="pal-empty" role="presentation">{sub ? t('templates.empty') : t('palette.empty')}</li>
     {/each}
   </ul>
   <div class="pal-foot">

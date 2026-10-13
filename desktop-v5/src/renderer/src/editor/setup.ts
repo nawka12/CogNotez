@@ -7,12 +7,13 @@ import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/lang
 import { search, searchKeymap } from '@codemirror/search'
 import { tags as t } from '@lezer/highlight'
 import { t as tr } from '../i18n'
+import { prefs } from '../state/prefs.svelte'
 
 /** Marks a transaction that came from outside the user (a reload): it must not count as an edit. */
 export const external = Annotation.define<boolean>()
 
 // Markdown marks stay inline (CodeMirror needs real text to place the caret) but fade into the background.
-const mark = { fontFamily: 'var(--mono)', fontSize: '.75rem', fontStyle: 'normal', fontWeight: '400', color: 'var(--ink-3)', opacity: '.7' }
+const mark = { fontFamily: 'var(--mono)', fontSize: '.67em', fontStyle: 'normal', fontWeight: '400', color: 'var(--ink-3)', opacity: '.7' }
 
 const highlight = HighlightStyle.define([
   { tag: t.strong, fontWeight: '600' },
@@ -70,20 +71,21 @@ const structure = ViewPlugin.fromClass(
 )
 
 const theme = EditorView.theme({
-  '&': { font: '400 1.125rem/1.7 var(--read)', color: 'var(--ink)' },
+  '&': { font: '400 var(--note-size, 1.125rem)/1.7 var(--read)', color: 'var(--ink)' },
   '&.cm-focused': { outline: 'none' },
   '.cm-scroller': { font: 'inherit', lineHeight: 'inherit' },
   '.cm-content': { padding: '0', minHeight: '40vh', caretColor: 'var(--accent)' },
-  '.cm-line': { padding: '0' },
+  // Long unbroken tokens (a media URL, a hash) wrap anywhere instead of overflowing or leaving a ragged gap.
+  '.cm-line': { padding: '0', overflowWrap: 'anywhere' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--accent)', borderLeftWidth: '2px' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground': {
     background: 'color-mix(in srgb, var(--accent) 22%, transparent)'
   },
   '.cm-placeholder': { color: 'var(--ink-3)' },
-  '.cm-h1': { fontSize: '1.5rem', fontWeight: '600', lineHeight: '1.4', paddingTop: '.35em' },
-  '.cm-h2': { fontSize: '1.32rem', fontWeight: '600', lineHeight: '1.45', paddingTop: '.35em' },
-  '.cm-h3': { fontSize: '1.12rem', fontWeight: '600', paddingTop: '.3em' },
-  '.cm-code': { fontFamily: 'var(--mono)', fontSize: '.9rem', lineHeight: '1.65', background: 'var(--panel)', padding: '0 .9em' },
+  '.cm-h1': { fontSize: 'calc(var(--note-size, 1.125rem) * 1.33)', fontWeight: '600', lineHeight: '1.4', paddingTop: '.35em' },
+  '.cm-h2': { fontSize: 'calc(var(--note-size, 1.125rem) * 1.17)', fontWeight: '600', lineHeight: '1.45', paddingTop: '.35em' },
+  '.cm-h3': { fontSize: 'var(--note-size, 1.125rem)', fontWeight: '600', paddingTop: '.3em' },
+  '.cm-code': { fontFamily: 'var(--mono)', fontSize: '.8em', lineHeight: '1.65', background: 'var(--panel)', padding: '0 .9em' },
   '.cm-done': { color: 'var(--ink-3)', textDecoration: 'line-through', textDecorationColor: 'var(--rule)' },
   '.cm-icode': { fontFamily: 'var(--mono)', fontSize: '.85em', background: 'var(--sunk)', padding: '.1em .3em', borderRadius: '3px' },
   // search panel (Mod-F)
@@ -125,6 +127,8 @@ const extensions = [
   drawSelection(),
   EditorView.lineWrapping,
   EditorView.contentAttributes.of({ 'aria-label': tr('editor.label') }),
+  // A function, so the Settings toggle takes effect on the next update (the editor dispatches an empty one).
+  EditorView.contentAttributes.of(() => ({ spellcheck: prefs.spellcheck ? 'true' : 'false' })),
   placeholder(tr('editor.placeholder')),
   markdown({ base: markdownLanguage }),
   syntaxHighlighting(highlight),

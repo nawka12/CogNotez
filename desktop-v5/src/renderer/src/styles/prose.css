@@ -1,6 +1,6 @@
 /* Rendered Markdown (Preview and the right half of Split). Shares the editor's reading style. */
 .prose {
-  font: 400 1.125rem/1.7 var(--read);
+  font: 400 var(--note-size, 1.125rem)/1.7 var(--read);
   color: var(--ink);
 }
 .prose > :first-child {
@@ -10,18 +10,18 @@
   margin: 0 0 0.95em;
 }
 .prose h1 {
-  font: 600 1.5rem/1.35 var(--read);
+  font: 600 calc(var(--note-size, 1.125rem) * 1.33)/1.35 var(--read);
   margin: 1.5em 0 0.45em;
 }
 .prose h2 {
-  font: 600 1.32rem/1.4 var(--read);
+  font: 600 calc(var(--note-size, 1.125rem) * 1.17)/1.4 var(--read);
   margin: 1.5em 0 0.45em;
 }
 .prose h3,
 .prose h4,
 .prose h5,
 .prose h6 {
-  font: 600 1.12rem/1.4 var(--read);
+  font: 600 var(--note-size, 1.125rem)/1.4 var(--read);
   margin: 1.3em 0 0.4em;
 }
 .prose ul,
@@ -82,7 +82,7 @@
 .prose pre code {
   background: none;
   padding: 0;
-  font-size: 0.85rem;
+  font-size: 0.85em;
 }
 .prose a {
   color: var(--accent);

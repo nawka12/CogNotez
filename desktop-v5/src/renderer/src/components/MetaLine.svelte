@@ -3,7 +3,7 @@
   import { parseTagInput } from '../lib/tags'
   import { readingMinutes } from '../lib/text'
   import { relativeTime } from '../lib/time'
-  import { addTags, removeTag, togglePin, trashNote } from '../state/actions'
+  import { addTags, lockNow, removeTag, togglePin, trashNote } from '../state/actions'
   import type { Doc } from '../state/tabs.svelte'
   import { ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
@@ -76,11 +76,15 @@
   {/if}
   <span class="sep">·</span>
   <span>{t('meta.edited', { time: relativeTime(note.updatedAt, ui.now) })}</span>
-  {#if note.locked}
+  {#if doc.sealed}
     <span class="sep">·</span><span>{t('meta.locked')}</span>
   {:else}
     <span class="sep">·</span><span>{t('meta.words', { n: doc.words })}</span>
     <span class="sep">·</span><span>{t('meta.minutes', { n: readingMinutes(doc.words) })}</span>
+    {#if note.locked && !trashed}
+      <span class="sep">·</span><span>{t('meta.unlocked')}</span>
+      <button class="btn lock-now" onclick={() => void lockNow(doc)}><Icon name="lock" />{t('meta.lockNow')}</button>
+    {/if}
   {/if}
   {#if !trashed}
     <span class="actions">
@@ -168,6 +172,15 @@
     border: 1px solid var(--rule);
     border-radius: 5px;
     background: var(--paper);
+  }
+  .lock-now {
+    height: 24px;
+    padding: 0 8px;
+    gap: 5px;
+  }
+  .lock-now :global(.i) {
+    width: 13px;
+    height: 13px;
   }
   .actions {
     margin-left: auto;

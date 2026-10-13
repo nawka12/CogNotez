@@ -15,7 +15,7 @@
     <span>{status === 'saving' ? t('save.saving') : status === 'failed' ? t('save.failed') : t('save.saved')}</span>
   </span>
   <span class="sync wide"><Icon name="cloud" />{t('sync.off')}</span>
-  {#if doc && !doc.note.locked}<span>{t('meta.words', { n: doc.words })}</span>{/if}
+  {#if doc && !doc.sealed}<span>{t('meta.words', { n: doc.words })}</span>{/if}
   <span class="grow"></span>
   <button onclick={cycleTheme} title={t('theme.cycle')}>{t('theme.label', { name: themeLabel })}</button>
 </footer>

@@ -2,6 +2,9 @@
 import { randomUUID } from 'node:crypto'
 import type { SQLInputValue, SQLOutputValue } from 'node:sqlite'
 import type { ListFilter, Note, NoteInput, NotePatch, NoteSummary, Tag } from '../../shared/api'
+import { createKeyCache } from '../crypto/keycache'
+import { createLocks } from '../crypto/locks'
+import { openV5, sealV5 } from '../crypto/notecrypto'
 import { settingValueJson, tagList } from '../guards'
 import { Hlc, parseRev } from '../hlc'
 import { createBulk } from './bulk'
@@ -20,7 +23,7 @@ export function snippetOf(text: string, max = 160): string {
     .slice(0, max * 3)
     .replace(/```[^\n]*\n?/g, ' ')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^[ \t]{0,3}(#{1,6}|>|[-*+]|\d+\.)[ \t]+/gm, '')
+    .replace(/^[ \t]{0,3}(#{1,6}|>|[-*+]|\d+\.)[ \t]+(\[[ xX]\][ \t]+)?/gm, '')
     .replace(/[*~`]+/g, '')
     .replace(/(^|\W)_+|_+(?=\W|$)/g, '$1')
     .replace(/\s+/g, ' ')
@@ -100,7 +103,13 @@ const notFound = (): never => {
   throw new Error('note not found')
 }
 
-export function createStore(db: Db, wall: () => number = Date.now) {
+export interface StoreOptions {
+  /** Called with the ids of notes whose keys were dropped (idle timeout, lock-screen, quit). */
+  onLocksChanged?: (ids: string[]) => void
+}
+
+export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOptions = {}) {
+  const keys = createKeyCache((ids) => opts.onLocksChanged?.(ids))
   const getSetting = (key: string): unknown => {
     const r = db.prepare('SELECT value FROM settings WHERE key = ?').get(key) as Row | undefined
     return r ? JSON.parse(String(r.value)) : null
@@ -130,14 +139,14 @@ export function createStore(db: Db, wall: () => number = Date.now) {
   function get(id: string): Note {
     const r = db
       .prepare(
-        `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.deleted_at, n.pinned, n.locked,
+        `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.deleted_at, n.pinned, n.locked, n.cipher, n.cipher_format,
            (SELECT group_concat(t.name, char(31)) FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
              WHERE nt.note_id = n.id) AS tag_names
          FROM notes n WHERE n.id = ?`
       )
       .get(id) as Row | undefined
     if (!r) return notFound()
-    return {
+    const note: Note = {
       id: String(r.id),
       title: String(r.title),
       body: String(r.body),
@@ -148,6 +157,20 @@ export function createStore(db: Db, wall: () => number = Date.now) {
       locked: !!r.locked,
       tags: tagsOf(r)
     }
+    if (note.locked) {
+      // Plaintext only while main holds the key; otherwise the body stays ''.
+      const k = keys.get(note.id)
+      note.unlocked = false
+      if (k && r.cipher_format === 'v5' && r.cipher instanceof Uint8Array) {
+        try {
+          note.body = openV5(r.cipher, note.id, k.key)
+          note.unlocked = true
+        } catch {
+          keys.lock([note.id]) // the stored cipher no longer matches the key (e.g. a restored backup)
+        }
+      }
+    }
+    return note
   }
 
   function setTags(noteId: string, names: string[]): void {
@@ -202,7 +225,7 @@ export function createStore(db: Db, wall: () => number = Date.now) {
       return tx(db, () => {
         const cur = db.prepare('SELECT locked FROM notes WHERE id = ?').get(p.id) as Row | undefined
         if (!cur) return notFound()
-        if (p.body !== undefined && cur.locked) throw new Error('note is locked')
+        if (cur.locked) keys.get(p.id) // any save counts as activity
         const sets: string[] = []
         const params: SQLInputValue[] = []
         const set = (col: string, v: SQLInputValue): void => {
@@ -210,7 +233,12 @@ export function createStore(db: Db, wall: () => number = Date.now) {
           params.push(v)
         }
         if (p.title !== undefined) set('title', p.title)
-        if (p.body !== undefined) set('body', p.body)
+        if (p.body !== undefined && cur.locked) {
+          // Locked notes keep body = '' and store the text encrypted with the cached key.
+          const k = keys.get(p.id)
+          if (!k) throw new Error('note is locked')
+          set('cipher', sealV5(p.id, p.body, k.key, k.salt, k.iter))
+        } else if (p.body !== undefined) set('body', p.body)
         if (p.pinned !== undefined) set('pinned', p.pinned ? 1 : 0)
         touch(p.id, sets.join(''), ...params)
         if (p.tags !== undefined) setTags(p.id, p.tags)
@@ -234,6 +262,7 @@ export function createStore(db: Db, wall: () => number = Date.now) {
         db.prepare('DELETE FROM notes WHERE id = ?').run(id) // cascades note_tags, note_media, ai_messages
         gcTags()
       })
+      keys.forget(id)
     }
   }
 
@@ -291,7 +320,12 @@ export function createStore(db: Db, wall: () => number = Date.now) {
     }
   }
 
-  return { db, deviceId, hlc, notes, tags, search, settings, bulk: createBulk(db, hlc) }
+  const locks = {
+    ...createLocks({ db, hlc, keys, get, setting: getSetting }),
+    lockAll: () => keys.lockAll()
+  }
+
+  return { db, deviceId, hlc, notes, tags, search, settings, bulk: createBulk(db, hlc), locks }
 }
 
 export type Store = ReturnType<typeof createStore>

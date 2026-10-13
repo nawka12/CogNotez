@@ -9,6 +9,8 @@ export interface Note {
   deletedAt: number | null
   pinned: boolean
   locked: boolean
+  /** True while a locked note's key is held in main memory (body is then plaintext). */
+  unlocked?: boolean
   tags: string[]
 }
 
@@ -80,6 +82,21 @@ export interface MediaRef {
   url: string
 }
 
+export interface BackupInfo {
+  id: string
+  createdAt: number
+  bytes: number
+  auto: boolean
+}
+
+export type ExportFormat = 'md' | 'txt' | 'pdf'
+
+export interface AppInfo {
+  version: string
+  electron: string
+  userData: string
+}
+
 export interface NotesChanged {
   ids: string[]
 }
@@ -114,13 +131,42 @@ export interface Api {
     runV4(source?: ImportSourceKind | 'auto'): Promise<ImportStats>
     /** Opens a file dialog in main (paths never come from the renderer). Resolves null on cancel. */
     fromFile(): Promise<ImportStats | null>
+    /** Imports .md/.txt files picked in a dialog (one note each). Resolves null on cancel. */
+    files(): Promise<{ notes: number } | null>
   }
+  /** Passwords never leave main except as the argument here; keys live only in main memory. */
+  locks: {
+    /** Decrypts and keeps the key in memory until lock() or the idle timeout (5 min). */
+    unlock(id: string, password: string): Promise<Note>
+    lock(id: string): Promise<void>
+    /** Encrypts a plain note, or re-keys an unlocked one. */
+    setPassword(id: string, password: string): Promise<void>
+    /** Decrypts permanently. The note must be unlocked. */
+    removeLock(id: string): Promise<Note>
+  }
+  backups: {
+    list(): Promise<BackupInfo[]>
+    create(): Promise<BackupInfo>
+    /** Replaces the current database with this backup, then relaunches. */
+    restore(id: string): Promise<void>
+    /** Opens the backups folder in the system file manager. */
+    reveal(): Promise<void>
+  }
+  exporter: {
+    /** Save dialog in main. Resolves the written path, or null on cancel. */
+    note(id: string, format: ExportFormat): Promise<string | null>
+    /** Writes every note as Markdown, plus media, into a folder the user picks. */
+    allMarkdown(): Promise<string | null>
+  }
+  app: { info(): Promise<AppInfo> }
   media: {
     /** Stores bytes content-addressed under userData/media. */
     importBytes(bytes: Uint8Array, mime: string): Promise<MediaRef>
   }
   /** Returns an unsubscribe function. */
   onNotesChanged(cb: (e: NotesChanged) => void): () => void
+  /** Fires when main forgets keys (idle auto-lock or lock()); reload those notes. */
+  onLocksChanged(cb: (e: NotesChanged) => void): () => void
   /** Main calls this before the window closes; resolve once pending edits are saved (2 s limit). */
   onFlushRequest(cb: () => Promise<void>): () => void
 }

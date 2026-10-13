@@ -28,6 +28,8 @@ export class Doc {
   savedVersion = 0
   savedTitle: string
   savedBody: string
+  /** Text typed before the note locked underneath it; kept in memory only, re-applied after the next unlock. */
+  unsaved: string | null = null
   inflight: Promise<boolean> | null = null
   failures = 0
   timer: ReturnType<typeof setTimeout> | undefined
@@ -38,13 +40,18 @@ export class Doc {
     this.id = note.id
     this.note = $state.raw(note)
     this.title = note.title
-    this.cm = createState(note.locked ? '' : note.body)
+    const sealed = note.locked && !note.unlocked
+    this.cm = createState(sealed ? '' : note.body)
     this.savedTitle = note.title
     this.savedBody = this.cm.doc.toString()
-    this.words = note.locked ? 0 : countWords(note.body)
+    this.words = sealed ? 0 : countWords(note.body)
+  }
+  /** Locked, and main holds no key: there is no text to show. */
+  get sealed(): boolean {
+    return this.note.locked && !this.note.unlocked
   }
   get readOnly(): boolean {
-    return this.note.deletedAt !== null || this.note.locked
+    return this.note.deletedAt !== null || this.sealed
   }
 }
 
@@ -93,7 +100,7 @@ export function setTitle(doc: Doc, title: string): void {
 }
 
 function applyMeta(doc: Doc, n: Note): void {
-  doc.note = { ...doc.note, tags: n.tags, pinned: n.pinned, locked: n.locked, deletedAt: n.deletedAt, updatedAt: n.updatedAt }
+  doc.note = { ...doc.note, tags: n.tags, pinned: n.pinned, locked: n.locked, unlocked: n.unlocked, deletedAt: n.deletedAt, updatedAt: n.updatedAt }
 }
 
 /** Saves now. Resolves true when the doc is clean afterwards. Text is never dropped on failure. */
@@ -179,14 +186,79 @@ async function reload(doc: Doc): Promise<void> {
   } catch {
     return
   }
-  if (fresh.updatedAt === doc.note.updatedAt) return
+  if (fresh.locked && !fresh.unlocked) {
+    if (!doc.sealed) void seal(doc)
+    return
+  }
+  if (doc.sealed && fresh.locked) return adopt(doc, fresh)
+  if (fresh.updatedAt === doc.note.updatedAt && fresh.locked === doc.note.locked) return
   applyMeta(doc, fresh)
   if (doc.dirty) return // typed while we were fetching
   if (fresh.title !== doc.title) {
     doc.title = fresh.title
     doc.savedTitle = fresh.title
   }
-  if (!fresh.locked && fresh.body !== doc.cm.doc.toString()) applyExternalBody(doc, fresh.body)
+  if (fresh.body !== doc.cm.doc.toString()) applyExternalBody(doc, fresh.body)
+}
+
+// ---------- locked notes ----------
+
+/**
+ * Takes main's current state of a note after setPassword / removeLock / unlock. Opening a sealed doc builds a fresh
+ * editor state from the plaintext; text typed before the lock (`unsaved`) wins and is saved again.
+ */
+export function adopt(doc: Doc, n: Note): void {
+  const wasSealed = doc.sealed
+  applyMeta(doc, n)
+  if (!wasSealed || doc.sealed) return
+  const body = doc.unsaved ?? n.body
+  doc.note = { ...doc.note, body: n.body }
+  doc.cm = createState(body)
+  doc.savedBody = n.body
+  doc.words = countWords(body)
+  doc.rev++
+  if (doc.unsaved !== null) {
+    doc.unsaved = null
+    touch(doc)
+  } else doc.dirty = false
+}
+
+/** Main dropped (or is about to drop) this note's key: save what we can, then throw the plaintext away. */
+async function seal(doc: Doc): Promise<void> {
+  if (doc.sealed || !doc.note.locked) return
+  if (doc.dirty && !(await flush(doc))) {
+    // The key is already gone, so the body can't be saved. Keep the text in memory, never lose it silently.
+    doc.unsaved = doc.cm.doc.toString()
+    showToast(t('toast.lockedUnsaved'))
+    if (doc.title !== doc.savedTitle) {
+      try {
+        await window.api.notes.save({ id: doc.id, title: doc.title })
+        doc.savedTitle = doc.title
+      } catch {
+        /* the title stays in the tab; nothing sensitive is lost */
+      }
+    }
+  }
+  clearTimeout(doc.timer)
+  clearTimeout(doc.retry)
+  clearTimeout(doc.wordTimer)
+  pending.delete(doc)
+  doc.dirty = false
+  doc.failed = false
+  doc.failures = 0
+  doc.savedVersion = doc.version
+  // A new state drops the undo history, which holds plaintext.
+  doc.cm = createState('')
+  doc.view = null
+  doc.savedBody = ''
+  doc.words = 0
+  doc.rev++
+  doc.note = { ...doc.note, body: '', unlocked: false }
+}
+
+/** `locks:changed` from main. */
+export function sealOpen(ids: string[]): void {
+  for (const doc of tabs.list) if (ids.includes(doc.id)) void seal(doc)
 }
 
 export function reloadOpen(ids: string[]): void {
@@ -221,6 +293,7 @@ export async function openNote(id: string, seed?: Note): Promise<void> {
     }
   }
   tabs.currentId = id
+  ui.view = 'notes'
   ui.sideOpen = false
 }
 

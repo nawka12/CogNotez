@@ -11,6 +11,7 @@ export function openDb(path: string): Db {
     PRAGMA foreign_keys = ON;
     PRAGMA synchronous = NORMAL;
     PRAGMA busy_timeout = 3000;
+    PRAGMA secure_delete = ON;
   `)
   try {
     migrate(db)

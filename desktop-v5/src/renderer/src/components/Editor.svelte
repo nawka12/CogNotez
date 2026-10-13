@@ -5,6 +5,7 @@
   import { t } from '../i18n'
   import { bodyChanged, insertText } from '../state/tabs.svelte'
   import type { Doc } from '../state/tabs.svelte'
+  import { prefs } from '../state/prefs.svelte'
   import { notImplemented, showToast } from '../state/ui.svelte'
 
   let { doc }: { doc: Doc } = $props()
@@ -37,6 +38,11 @@
       attached = d
       d.view = view
     })
+  })
+  // Spellcheck is read from an attribute function; an empty update makes CodeMirror read it again.
+  $effect(() => {
+    void prefs.spellcheck
+    untrack(() => view?.dispatch({}))
   })
   $effect(() => () => {
     if (attached) attached.view = null

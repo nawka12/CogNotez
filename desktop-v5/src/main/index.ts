@@ -1,9 +1,11 @@
-import { app, BrowserWindow, ipcMain, net, protocol, safeStorage } from 'electron'
+import { app, BrowserWindow, ipcMain, net, powerMonitor, protocol, safeStorage, screen } from 'electron'
 import type { IpcMainEvent } from 'electron'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { applyPendingRestore, createBackups } from './backup'
+import { isVisible, parseWindowState } from './bounds'
 import { createImporter } from './import'
 import { readV4LocalStorage } from './import/v4-electron'
 import { registerIpc } from './ipc'
@@ -14,6 +16,7 @@ import { createSecrets } from './secrets'
 import { installSecurity, setAppTarget } from './security'
 import { openDb } from './store/db'
 import { createStore } from './store/notes'
+import type { Store } from './store/notes'
 
 const SMOKE = process.env['COGNOTEZ_SMOKE'] === '1'
 const IMPORT_SMOKE = process.env['COGNOTEZ_IMPORT_SMOKE'] === '1'
@@ -32,10 +35,18 @@ app.setPath(
 const devUrl = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
 const indexHtml = join(__dirname, '../renderer/index.html')
 
-function createWindow(): void {
+/** Where the window was last closed, if that spot is still on a connected display. */
+function savedBounds(store: Store): ReturnType<typeof parseWindowState> {
+  const w = parseWindowState(store.settings.get('sys.window'))
+  return w && isVisible(w, screen.getAllDisplays().map((d) => d.workArea)) ? w : null
+}
+
+function createWindow(store: Store): void {
+  const saved = savedBounds(store)
   const win = new BrowserWindow({
     width: 1100,
     height: 760,
+    ...(saved ? { x: saved.x, y: saved.y, width: saved.width, height: saved.height } : {}),
     show: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -45,7 +56,15 @@ function createWindow(): void {
       webSecurity: true
     }
   })
+  if (saved?.maximized) win.maximize()
   win.once('ready-to-show', () => win.show())
+  win.on('close', () => {
+    try {
+      store.settings.set('sys.window', { ...win.getNormalBounds(), maximized: win.isMaximized() })
+    } catch (e) {
+      log.warn('could not save window bounds:', String(e))
+    }
+  })
   flushBeforeClose(win)
   // Surface renderer warnings/errors (CSP violations included) in the main log.
   win.webContents.on('console-message', (e) => {
@@ -182,12 +201,24 @@ async function importSmoke(): Promise<void> {
   }
 }
 
-void app.whenReady().then(() => {
+void app.whenReady().then(async () => {
   if (SMOKE) return smoke()
   if (IMPORT_SMOKE) return importSmoke()
 
+  // A restore chosen in Settings is applied here, before anything opens the database.
+  const restore = await applyPendingRestore(app.getPath('userData'))
+  if (restore.restored) log.info('restored the database from a backup')
+  else if (restore.error) log.error('restore failed, kept the current database:', restore.error)
+
   const db = openDb(join(app.getPath('userData'), 'cognotez.db'))
-  const store = createStore(db)
+  const store = createStore(db, undefined, {
+    onLocksChanged(ids) {
+      for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('locks:changed', { ids })
+    }
+  })
+  // Unlocked notes lock when the screen locks or the machine sleeps, and on quit (also on idle, inside the store).
+  powerMonitor.on('lock-screen', () => store.locks.lockAll())
+  powerMonitor.on('suspend', () => store.locks.lockAll())
   const secrets = createSecrets(join(app.getPath('userData'), 'secrets.json'), safeStorage)
 
   setAppTarget(devUrl ?? pathToFileURL(indexHtml).href)
@@ -197,13 +228,18 @@ void app.whenReady().then(() => {
   const importer = createImporter({
     store, secrets, media, v4Dir: v4Dir(), readLocalStorage: () => readV4LocalStorage(v4Dir())
   })
-  registerIpc(store, secrets, importer, media)
-  createWindow()
+  const backups = createBackups(app.getPath('userData'), db)
+  registerIpc(store, secrets, importer, media, backups)
+  createWindow(store)
+  backups.autoIfDue().catch((e: unknown) => log.warn('automatic backup failed:', String(e)))
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) createWindow(store)
   })
-  app.on('will-quit', () => db.close())
+  app.on('will-quit', () => {
+    store.locks.lockAll()
+    db.close()
+  })
 })
 
 app.on('window-all-closed', () => {
