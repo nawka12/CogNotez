@@ -117,7 +117,9 @@
     grid-template-columns: var(--side) minmax(0, 1fr);
     grid-template-rows: minmax(0, 1fr) auto;
     background: var(--paper);
-    overflow: hidden;
+    /* clip, not hidden: a hidden-overflow box can still be scrolled by scrollIntoView()/focus(), which shifted the
+       whole window up with no way back (status-bar sync chip → Settings). A clip box is never scrolled. */
+    overflow: clip;
   }
   .main {
     grid-row: 1;
