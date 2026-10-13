@@ -11,7 +11,6 @@
   import Editor from './Editor.svelte'
   import LockedPanel from './LockedPanel.svelte'
   import MetaLine from './MetaLine.svelte'
-  import Preview from './Preview.svelte'
   import TrashBanner from './TrashBanner.svelte'
 
   let { doc }: { doc: Doc } = $props()
@@ -23,8 +22,6 @@
 
   const trashed = $derived(doc.note.deletedAt !== null)
   const sealed = $derived(doc.sealed)
-  const mode = $derived(doc.readOnly ? 'preview' : ui.mode)
-  const split = $derived(mode === 'split')
 
   // Each tab remembers its scroll position. CodeMirror lays out lazily, so re-apply for two frames.
   $effect(() => {
@@ -70,7 +67,7 @@
 
 <div class="scroll" bind:this={scroller} onscroll={() => !restoring && (doc.scroll = scroller.scrollTop)}>
   <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
-  <article class="canvas" class:split onkeydown={onReviewKey}>
+  <article class="canvas" onkeydown={onReviewKey}>
     {#if trashed}<TrashBanner {doc} />{:else if doc.note.conflictOf}<ConflictBanner {doc} />{/if}
     <input
       class="title"
@@ -89,12 +86,7 @@
     {#if sealed}
       <LockedPanel {doc} />
     {:else}
-      <div class="panes" class:split>
-        {#if mode !== 'preview'}<Editor {doc} />{/if}
-        {#if mode !== 'edit'}
-          <div class="pane-preview" class:alone={mode === 'preview'}><Preview {doc} /></div>
-        {/if}
-      </div>
+      <Editor {doc} />
     {/if}
   </article>
 </div>
@@ -106,12 +98,9 @@
     overflow: auto;
   }
   .canvas {
-    max-width: 42rem;
+    max-width: var(--note-max);
     margin: 0 auto;
     padding: 3rem 3.5rem 6rem;
-  }
-  .canvas.split {
-    max-width: 78rem;
   }
   .title {
     display: block;
@@ -129,26 +118,6 @@
   .title::placeholder {
     color: var(--ink-3);
     opacity: 1;
-  }
-  .panes.split {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-    gap: 3rem;
-  }
-  .panes.split .pane-preview {
-    border-left: 1px solid var(--rule);
-    padding-left: 3rem;
-  }
-  @media (max-width: 900px) {
-    .panes.split {
-      grid-template-columns: minmax(0, 1fr);
-    }
-    .panes.split .pane-preview {
-      border-left: 0;
-      padding-left: 0;
-      border-top: 1px solid var(--rule);
-      padding-top: 2rem;
-    }
   }
   @media (max-width: 760px) {
     .canvas {

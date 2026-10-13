@@ -17,9 +17,9 @@ const holders = (s: string): string[] => [...new Set([...s.matchAll(/\{(\w+)\}/g
 const DYNAMIC = [
   /^filter\.(all|pinned|trash)$/,
   /^filter\.(all|pinned|trash|conflicts)\.title$/,
-  /^mode\.(edit|split|preview)(\.view)?$/,
   /^theme\.(system|light|dark)$/,
   /^settings\.size\.(small|medium|large)$/,
+  /^settings\.width\.(narrow|wide|full)$/,
   /^ai\.provider\.(ollama|lmstudio|llamacpp|openrouter|custom)$/,
   /^updates\.chip\.(available|downloading|ready)$/
 ]

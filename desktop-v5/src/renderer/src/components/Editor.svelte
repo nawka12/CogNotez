@@ -1,7 +1,7 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { EditorView } from '@codemirror/view'
-  import { external } from '../editor/setup'
+  import { external, readOnly, readOnlyOn } from '../editor/setup'
   import { t } from '../i18n'
   import { bodyChanged, insertText } from '../state/tabs.svelte'
   import type { Doc } from '../state/tabs.svelte'
@@ -38,6 +38,12 @@
       attached = d
       d.view = view
     })
+  })
+  // Trashed notes open read-only. Runs after the swap above, so it targets the right state.
+  $effect(() => {
+    const d = doc
+    const ro = d.readOnly
+    untrack(() => view?.dispatch({ effects: readOnly.reconfigure(ro ? readOnlyOn : []) }))
   })
   // Spellcheck is read from an attribute function; an empty update makes CodeMirror read it again.
   $effect(() => {

@@ -1,4 +1,4 @@
-/* Rendered Markdown (Preview and the right half of Split). Shares the editor's reading style. */
+/* Rendered Markdown (the Companion's messages). Shares the editor's reading style. */
 .prose {
   font: 400 var(--note-size, 1.125rem)/1.7 var(--read);
   color: var(--ink);

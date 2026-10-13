@@ -26,6 +26,7 @@
 
   --side: 284px;
   --note-size: 1.125rem; /* Settings > Font size */
+  --note-max: 63rem; /* Settings > Note width */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {

@@ -25,7 +25,6 @@ export async function createNote(): Promise<void> {
   const note = await guarded<Note>(() => window.api.notes.create({}))
   if (!note) return
   if (ui.filter.kind === 'trash') ui.filter = { kind: 'all' }
-  if (ui.mode === 'preview') ui.mode = 'edit'
   await openNote(note.id, note)
   void refresh()
   ui.titleFocus++

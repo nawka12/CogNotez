@@ -5,7 +5,6 @@
   import EmptyState from './components/EmptyState.svelte'
   import Icon from './components/Icon.svelte'
   import ImportSummary from './components/ImportSummary.svelte'
-  import ModeSwitch from './components/ModeSwitch.svelte'
   import NoteView from './components/NoteView.svelte'
   import Palette from './components/Palette.svelte'
   import PasswordDialog from './components/PasswordDialog.svelte'
@@ -90,7 +89,6 @@
       <button class="icon-btn menu-btn" aria-label={t('sidebar.show')} onclick={() => (ui.sideOpen = !ui.sideOpen)}><Icon name="menu" /></button>
       <Tabs />
       <div class="bar-tools">
-        {#if doc && ui.view === 'notes'}<ModeSwitch disabled={doc.readOnly} />{/if}
         <button class="btn comp-toggle" aria-pressed={ai.open} title="{t('ai.toggle')} ({MOD} J)" onclick={toggleCompanion}>
           <Icon name="panel" /><span class="comp-label">{t('ai.title')}</span>
         </button>

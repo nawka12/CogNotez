@@ -18,8 +18,6 @@ export class Doc {
   note: Note
   title = $state('')
   words = $state(0)
-  /** Bumped on every text change; the preview watches it. */
-  rev = $state(0)
   dirty = $state(false)
   failed = $state(false)
 
@@ -90,7 +88,6 @@ export function touch(doc: Doc): void {
 }
 
 export function bodyChanged(doc: Doc): void {
-  doc.rev++
   touch(doc)
   clearTimeout(doc.wordTimer)
   doc.wordTimer = setTimeout(() => (doc.words = countWords(doc.cm.doc.toString())), 250)
@@ -175,7 +172,6 @@ function applyExternalBody(doc: Doc, body: string): void {
   if (doc.view) doc.view.dispatch(tr)
   else doc.cm = tr.state
   doc.savedBody = body
-  doc.rev++
   doc.words = countWords(body)
 }
 
@@ -218,7 +214,6 @@ export function adopt(doc: Doc, n: Note): void {
   doc.cm = createState(body)
   doc.savedBody = n.body
   doc.words = countWords(body)
-  doc.rev++
   if (doc.unsaved !== null) {
     doc.unsaved = null
     touch(doc)
@@ -254,7 +249,6 @@ async function seal(doc: Doc): Promise<void> {
   doc.view = null
   doc.savedBody = ''
   doc.words = 0
-  doc.rev++
   doc.note = { ...doc.note, body: '', unlocked: false }
 }
 

@@ -1,7 +1,6 @@
 import type { ImportStats, ListFilter } from '../../../shared/api'
 
 export type Theme = 'system' | 'light' | 'dark'
-export type Mode = 'edit' | 'split' | 'preview'
 
 export interface ToastAction {
   label: string
@@ -39,7 +38,6 @@ class Ui {
   view = $state<'notes' | 'settings'>('notes')
   prompt = $state.raw<PromptData | null>(null)
   theme = $state<Theme>('system')
-  mode = $state<Mode>('edit')
   filter = $state.raw<UiFilter>({ kind: 'all' })
   sideOpen = $state(false)
   paletteOpen = $state(false)

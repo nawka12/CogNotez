@@ -1,6 +1,7 @@
 import { isLangPref, locale, resolveLang } from '../i18n'
 import type { LangPref } from '../i18n'
-import type { Mode } from './ui.svelte'
+import { DEFAULT_WIDTH, WIDTH_CSS, isNoteWidth } from '../lib/noteWidth'
+import type { NoteWidth } from '../lib/noteWidth'
 
 export type FontSize = 'small' | 'medium' | 'large'
 
@@ -8,12 +9,10 @@ export type FontSize = 'small' | 'medium' | 'large'
 const SIZES: Record<FontSize, string> = { small: '1rem', medium: '1.125rem', large: '1.3rem' }
 export const FONT_SIZES = Object.keys(SIZES) as FontSize[]
 export const isFontSize = (v: unknown): v is FontSize => typeof v === 'string' && v in SIZES
-export const isMode = (v: unknown): v is Mode => v === 'edit' || v === 'split' || v === 'preview'
-
 class Prefs {
   fontSize = $state<FontSize>('medium')
+  noteWidth = $state<NoteWidth>(DEFAULT_WIDTH)
   spellcheck = $state(false)
-  defaultMode = $state<Mode>('edit')
   language = $state<LangPref>('system')
 }
 export const prefs = new Prefs()
@@ -26,14 +25,15 @@ export function setFontSize(v: FontSize, persist = true): void {
   if (persist) save('ui.font_size', v)
 }
 
+export function setNoteWidth(v: NoteWidth, persist = true): void {
+  prefs.noteWidth = v
+  document.documentElement.style.setProperty('--note-max', WIDTH_CSS[v])
+  if (persist) save('ui.note_width', v)
+}
+
 export function setSpellcheck(v: boolean, persist = true): void {
   prefs.spellcheck = v
   if (persist) save('editor.spellcheck', v)
-}
-
-export function setDefaultMode(v: Mode): void {
-  prefs.defaultMode = v
-  save('ui.default_mode', v)
 }
 
 /** Applies a language choice (System follows the OS locale) to `t()` and `<html lang>`. */
@@ -50,11 +50,11 @@ export async function loadLanguage(): Promise<void> {
   setLanguage(isLangPref(v) ? v : 'system', false)
 }
 
-/** Reads the saved preferences; the caller decides what to do with the default view. */
+/** Reads the saved preferences. */
 export async function loadPrefs(): Promise<void> {
   const get = (k: string): Promise<unknown> => window.api.settings.get(k).catch(() => null)
-  const [size, spell, mode] = await Promise.all([get('ui.font_size'), get('editor.spellcheck'), get('ui.default_mode')])
+  const [size, width, spell] = await Promise.all([get('ui.font_size'), get('ui.note_width'), get('editor.spellcheck')])
   setFontSize(isFontSize(size) ? size : 'medium', false)
+  setNoteWidth(isNoteWidth(width) ? width : DEFAULT_WIDTH, false)
   setSpellcheck(spell === true, false)
-  prefs.defaultMode = isMode(mode) ? mode : 'edit'
 }

@@ -14,7 +14,7 @@
   import { openNote, tabs } from '../state/tabs.svelte'
   import { addTemplate, builtins, loadTemplates, newFromTemplate, templates } from '../state/templates.svelte'
   import { errorText, setTheme, showToast, ui } from '../state/ui.svelte'
-  import type { Mode, Theme } from '../state/ui.svelte'
+  import type { Theme } from '../state/ui.svelte'
   import type { Doc } from '../state/tabs.svelte'
 
   interface Item {
@@ -58,7 +58,6 @@
     return () => clearTimeout(timer)
   })
 
-  const modes: Mode[] = ['edit', 'split', 'preview']
   const themes: Theme[] = ['system', 'light', 'dark']
 
   function actions(): Item[] {
@@ -67,7 +66,6 @@
     const a = (id: string, label: string, run: () => void, group: Key = 'palette.actions'): Item => ({ id, group: t(group), label, run })
     return [
       a('new', t('note.new'), () => void createNote()),
-      ...modes.map((m) => a(`mode-${m}`, t(`mode.${m}.view`), () => (ui.mode = m))),
       a('all', t('palette.showAll'), () => (ui.filter = { kind: 'all' })),
       a('pinned', t('palette.showPinned'), () => (ui.filter = { kind: 'pinned' })),
       a('conflicts', t('palette.showConflicts'), () => (ui.filter = { kind: 'conflicts' })),

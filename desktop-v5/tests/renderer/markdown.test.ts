@@ -4,7 +4,7 @@ import { renderMarkdown } from '../../src/renderer/src/lib/markdown'
 
 const hash = 'a'.repeat(64)
 
-describe('markdown preview sanitizer', () => {
+describe('markdown sanitizer', () => {
   it('strips event handlers and srcless images', () => {
     const html = renderMarkdown('<img src=x onerror=alert(1)>\n\nhello')
     expect(html).not.toContain('onerror')

@@ -54,7 +54,7 @@ describe('t()', () => {
 describe('palette filtering', () => {
   const items = [
     { group: 'Actions', label: 'New note' },
-    { group: 'Actions', label: 'Split view' },
+    { group: 'Actions', label: 'Edit view' },
     { group: 'Theme', label: 'Theme: Dark', hint: 'night' },
     { group: 'Notes', label: 'Ramen broth', hint: 'chicken paitan' }
   ]
@@ -62,7 +62,7 @@ describe('palette filtering', () => {
     expect(filterItems(items, '  ')).toHaveLength(4)
   })
   it('needs every word, in any order, case-insensitively', () => {
-    expect(filterItems(items, 'VIEW split').map((i) => i.label)).toEqual(['Split view'])
+    expect(filterItems(items, 'VIEW edit').map((i) => i.label)).toEqual(['Edit view'])
     expect(filterItems(items, 'note new')).toHaveLength(1)
   })
   it('matches group and hint text', () => {

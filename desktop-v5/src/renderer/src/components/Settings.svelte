@@ -2,10 +2,12 @@
   import { onMount } from 'svelte'
   import type { AppInfo, BackupInfo } from '../../../shared/api'
   import { LANGS, isLangPref, t } from '../i18n'
-  import type { Mode, Theme } from '../state/ui.svelte'
+  import type { Theme } from '../state/ui.svelte'
   import { askRestore, backupNow, exportAll, importFiles } from '../state/data'
   import { importFromFile, importFromV4 } from '../state/importer.svelte'
-  import { FONT_SIZES, prefs, setDefaultMode, setFontSize, setLanguage, setSpellcheck } from '../state/prefs.svelte'
+  import { NOTE_WIDTHS } from '../lib/noteWidth'
+  import type { NoteWidth } from '../lib/noteWidth'
+  import { FONT_SIZES, prefs, setFontSize, setLanguage, setNoteWidth, setSpellcheck } from '../state/prefs.svelte'
   import type { FontSize } from '../state/prefs.svelte'
   import { formatDateTime, formatSize } from '../lib/time'
   import { builtins, deleteTemplate, loadTemplates, templates } from '../state/templates.svelte'
@@ -21,7 +23,6 @@
   let busy = $state(false)
 
   const themes: Theme[] = ['system', 'light', 'dark']
-  const modes: Mode[] = ['edit', 'split', 'preview']
 
   async function reload(): Promise<void> {
     try {
@@ -88,22 +89,19 @@
         />
       </div>
       <div class="row">
+        <span class="lab">{t('settings.noteWidth')}</span>
+        <Seg
+          label={t('settings.noteWidth')}
+          options={NOTE_WIDTHS.map((v) => ({ value: v, label: t(`settings.width.${v}`) }))}
+          value={prefs.noteWidth}
+          onpick={(v: NoteWidth) => setNoteWidth(v)}
+        />
+      </div>
+      <div class="row">
         <label class="lab" for="spell">{t('settings.spellcheck')}</label>
         <input id="spell" type="checkbox" checked={prefs.spellcheck} onchange={(e) => setSpellcheck(e.currentTarget.checked)} />
       </div>
       <p class="help">{t('settings.spellcheckHelp')}</p>
-      <div class="row">
-        <span class="lab">{t('settings.defaultView')}</span>
-        <Seg
-          label={t('settings.defaultView')}
-          options={modes.map((v) => ({ value: v, label: t(`mode.${v}`) }))}
-          value={prefs.defaultMode}
-          onpick={(v) => {
-            setDefaultMode(v)
-            ui.mode = v
-          }}
-        />
-      </div>
     </section>
 
     <SettingsAi />

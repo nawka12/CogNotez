@@ -89,7 +89,6 @@ async function startEdit(doc: Doc, kind: EditKind, input?: string): Promise<void
   if (edit.cur) return void showToast(t('ai.busy'))
   const target = targetFor(doc, kind) // re-read: the user may have moved while the prompt was open
   if (!target) return void showToast(t(kind === 'continue' ? 'ai.writeFirst' : 'ai.selectFirst'))
-  if (ui.mode === 'preview') ui.mode = 'edit'
   const token = {}
   edit.cur = { docId: doc.id, phase: 'working', requestId: '', token, label: '' }
   dispatchTo(doc, { effects: setPending.of({ from: target.from, to: target.to, original: kind === 'continue' ? '' : target.text }) })

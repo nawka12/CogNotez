@@ -1,4 +1,4 @@
-import { Annotation, EditorState, type Range } from '@codemirror/state'
+import { Annotation, Compartment, EditorState, type Range } from '@codemirror/state'
 import { Decoration, EditorView, ViewPlugin, drawSelection, keymap, placeholder } from '@codemirror/view'
 import type { DecorationSet, ViewUpdate } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
@@ -123,7 +123,12 @@ const theme = EditorView.theme({
   '.cm-searchMatch-selected': { background: 'color-mix(in srgb, var(--accent) 30%, transparent)' }
 })
 
+/** Trashed notes are shown in the editor but cannot be changed; Editor.svelte reconfigures this per tab. */
+export const readOnly = new Compartment()
+export const readOnlyOn = [EditorState.readOnly.of(true), EditorView.editable.of(false)]
+
 const extensions = [
+  readOnly.of([]),
   history(),
   drawSelection(),
   EditorView.lineWrapping,

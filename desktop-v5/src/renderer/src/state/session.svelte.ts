@@ -1,7 +1,6 @@
-// Remembers the open tabs, the current tab and the view mode across restarts (settings ui.tabs / ui.current / ui.mode).
-import { isMode, loadPrefs, prefs } from './prefs.svelte'
+// Remembers the open tabs, and the current tab across restarts (settings ui.tabs / ui.current).
+import { loadPrefs } from './prefs.svelte'
 import { MAX_TABS, openNote, tabs } from './tabs.svelte'
-import { ui } from './ui.svelte'
 
 const state = $state({ ready: false })
 
@@ -12,8 +11,7 @@ const get = (key: string): Promise<unknown> => window.api.settings.get(key).catc
 export async function restoreSession(): Promise<void> {
   try {
     await loadPrefs()
-    const [ids, current, mode] = await Promise.all([get('ui.tabs'), get('ui.current'), get('ui.mode')])
-    ui.mode = isMode(mode) ? mode : prefs.defaultMode
+    const [ids, current] = await Promise.all([get('ui.tabs'), get('ui.current')])
     if (Array.isArray(ids)) {
       for (const id of ids.filter((x): x is string => typeof x === 'string').slice(0, MAX_TABS)) {
         try {
@@ -38,9 +36,5 @@ export function trackSession(): void {
   $effect(() => {
     const id = tabs.currentId
     if (state.ready) save('ui.current', id)
-  })
-  $effect(() => {
-    const mode = ui.mode
-    if (state.ready) save('ui.mode', mode)
   })
 }
