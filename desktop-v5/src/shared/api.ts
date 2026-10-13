@@ -12,6 +12,8 @@ export interface Note {
   /** True while a locked note's key is held in main memory (body is then plaintext). */
   unlocked?: boolean
   tags: string[]
+  /** Set on a conflicted copy created by sync: the id of the note it was split from. */
+  conflictOf?: string | null
 }
 
 export interface NoteSummary {
@@ -22,6 +24,7 @@ export interface NoteSummary {
   pinned: boolean
   locked: boolean
   tags: string[]
+  conflictOf?: string | null
 }
 
 export interface Tag {
@@ -38,11 +41,13 @@ export interface NoteInput {
 export interface NotePatch extends NoteInput {
   id: string
   pinned?: boolean
+  /** Only null is accepted: "Keep both" on a conflicted copy. */
+  conflictOf?: null
 }
 
 export type ListFilter = { kind: 'all' | 'pinned' | 'trash' } | { kind: 'tag'; tag: string }
 
-export const SECRET_NAMES = ['openrouter_api_key', 'ai_api_key', 'google_oauth_tokens', 'sync_dek'] as const
+export const SECRET_NAMES = ['openrouter_api_key', 'ai_api_key', 'google_oauth_tokens', 'google_client_secret', 'sync_dek'] as const
 export type SecretName = (typeof SECRET_NAMES)[number]
 
 export interface SecretsStatus {
@@ -151,6 +156,38 @@ export interface AiStatus {
   error?: string
 }
 
+export type SyncTransportKind = 'folder' | 'gdrive'
+
+export interface SyncStatus {
+  configured: boolean
+  transport: SyncTransportKind | null
+  /** Folder path or Google account email. */
+  target: string | null
+  encrypted: boolean
+  /** The remote is encrypted and this device has no key yet: call sync.unlock(passphrase). */
+  needsPassphrase: boolean
+  state: 'off' | 'idle' | 'syncing' | 'error'
+  lastSyncAt: number | null
+  /** Human-readable, ready to show. */
+  lastError: string | null
+  /** Notes with conflictOf set. */
+  conflicts: number
+  deviceName: string
+}
+
+export interface SyncSetup {
+  transport: SyncTransportKind
+  /** Only used when the remote does not exist yet: turns on end-to-end encryption (min 8 chars). */
+  passphrase?: string
+}
+
+export interface GoogleStatus {
+  connected: boolean
+  email: string | null
+  /** False until a Google OAuth client is available (built in, or imported). */
+  clientConfigured: boolean
+}
+
 export interface NotesChanged {
   ids: string[]
 }
@@ -226,6 +263,26 @@ export interface Api {
     clearThread(noteId: string | null): Promise<void>
   }
   onAiEvent(cb: (e: AiEvent) => void): () => void
+  sync: {
+    status(): Promise<SyncStatus>
+    /** Folder: opens a folder picker in main (null on cancel). Drive: needs google.connect() first. */
+    setup(setup: SyncSetup): Promise<SyncStatus | null>
+    /** Unlocks an encrypted remote on this device. Rejects with 'wrong passphrase'. */
+    unlock(passphrase: string): Promise<SyncStatus>
+    now(): Promise<SyncStatus>
+    /** Forgets the sync location and cached key on this device. Never touches remote data. */
+    disable(): Promise<void>
+    setDeviceName(name: string): Promise<void>
+  }
+  google: {
+    /** Opens the system browser (loopback redirect, PKCE, state). */
+    connect(): Promise<{ email: string }>
+    disconnect(): Promise<void>
+    status(): Promise<GoogleStatus>
+    /** Imports an OAuth "installed app" client JSON (like v4's credentials file) via a dialog in main. */
+    importClient(): Promise<boolean>
+  }
+  onSyncStatus(cb: (s: SyncStatus) => void): () => void
   media: {
     /** Stores bytes content-addressed under userData/media. */
     importBytes(bytes: Uint8Array, mime: string): Promise<MediaRef>

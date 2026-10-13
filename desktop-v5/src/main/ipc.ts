@@ -230,4 +230,12 @@ function registerDataIpc(store: Store, media: Media, backups: Backups): void {
   })
 
   handle('app:info', (): AppInfo => ({ version: app.getVersion(), electron: process.versions.electron, userData: app.getPath('userData') }))
+
+  // Placeholders until milestone 4 (sync) lands; the contract lives in shared/api.ts.
+  for (const ch of ['sync:status', 'sync:setup', 'sync:unlock', 'sync:now', 'sync:disable', 'sync:setDeviceName',
+    'google:connect', 'google:disconnect', 'google:status', 'google:importClient']) {
+    handle(ch, () => {
+      throw new Error('not implemented yet')
+    })
+  }
 }

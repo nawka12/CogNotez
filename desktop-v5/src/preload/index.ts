@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AiEvent, Api, NotesChanged } from '../shared/api'
+import type { AiEvent, Api, NotesChanged, SyncStatus } from '../shared/api'
 
 const call = <T>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(channel, ...args) as Promise<T>
 
@@ -57,6 +57,27 @@ const api: Api = {
     abort: (requestId) => call('ai:abort', requestId),
     thread: (noteId) => call('ai:thread', noteId),
     clearThread: (noteId) => call('ai:clearThread', noteId)
+  },
+  sync: {
+    status: () => call('sync:status'),
+    setup: (setup) => call('sync:setup', setup),
+    unlock: (passphrase) => call('sync:unlock', passphrase),
+    now: () => call('sync:now'),
+    disable: () => call('sync:disable'),
+    setDeviceName: (name) => call('sync:setDeviceName', name)
+  },
+  google: {
+    connect: () => call('google:connect'),
+    disconnect: () => call('google:disconnect'),
+    status: () => call('google:status'),
+    importClient: () => call('google:importClient')
+  },
+  onSyncStatus(cb) {
+    const listener = (_e: unknown, payload: SyncStatus): void => cb(payload)
+    ipcRenderer.on('sync:status', listener)
+    return () => {
+      ipcRenderer.removeListener('sync:status', listener)
+    }
   },
   onAiEvent(cb) {
     const listener = (_e: unknown, payload: AiEvent): void => cb(payload)
