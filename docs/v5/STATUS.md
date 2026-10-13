@@ -22,7 +22,7 @@ The AppImage at `desktop-v5/dist/` is rebuilt at M5.
 - **Fixtures for Android:** `docs/v5/sync-v2-fixtures/` (crypto, names, merge-*), see its README. `tests/sync-fixtures.test.ts` re-derives them; regenerate with `UPDATE_SYNC_FIXTURES=1`.
 - **Tests:** scenarios, a 50-seed property test (every §8 situation is asserted to occur), the shared transport contract `tests/sync-transport-conformance.ts` run against memory, folder and Drive.
 - **E2E (two real Electron instances, scratch `XDG_CONFIG_HOME`):**
-  - Folder: `npm run build && TMPDIR=<scratch> node tests/e2e/sync-folder.mjs` (CDP ports 9341/9342).
+  - Folder: `npm run build && TMPDIR=<short dir> node tests/e2e/sync-folder.mjs` (CDP ports 9341/9342). Keep TMPDIR short: the single-instance lock puts a Unix socket there (108-char path limit).
   - Drive (fake Drive + fake OAuth): `npm run build`, copy `out/` and `package.json` to `<work>/app/`, then `node tests/e2e/sync-drive.mjs <work> [folder|plain|enc]` (CDP ports 9343/9344, fake server 11999). It also writes screenshots to `<work>/screens/`.
   - Covered: create/receive, concurrent body edits → identical conflicted copy on both sides, metadata-only merge without a copy, delete vs edit (edit wins), media, encrypted remote (wrong passphrase rejected, no plaintext on the remote), `meta.json` missing → stops, expired Google sign-in.
 

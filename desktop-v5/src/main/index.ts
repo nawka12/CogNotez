@@ -39,6 +39,19 @@ app.setPath(
   SMOKE || IMPORT_SMOKE ? mkdtempSync(join(tmpdir(), 'cognotez-smoke-')) : join(app.getPath('appData'), 'cognotez-v5')
 )
 
+// One process per data folder (the lock lives in userData, so `npm run dev` and the AppImage exclude each other too):
+// two would share the database and the device id, and their separate clocks could mint the same sync rev for
+// different edits. A second launch focuses the running window instead.
+const primary = SMOKE || IMPORT_SMOKE || app.requestSingleInstanceLock()
+if (!primary) app.quit()
+app.on('second-instance', () => {
+  const w = BrowserWindow.getAllWindows()[0]
+  if (!w) return
+  if (w.isMinimized()) w.restore()
+  w.show()
+  w.focus()
+})
+
 /** Dev-only environment overrides (test servers, fake OAuth); ignored in a packaged app. */
 const devEnv = (name: string): string | undefined => (app.isPackaged ? undefined : process.env[name])
 
@@ -212,6 +225,7 @@ async function importSmoke(): Promise<void> {
 }
 
 void app.whenReady().then(async () => {
+  if (!primary) return
   if (SMOKE) return smoke()
   if (IMPORT_SMOKE) return importSmoke()
 
