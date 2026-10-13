@@ -10,7 +10,7 @@
 | `4a18489` | M2: locked notes (v4 → v5 upgrade), backups/restore, export/import, settings, templates, AppImage `5.0.0-alpha.1` |
 | `97d63f2` | M3: AI Companion: streaming, inline merge review, research mode with SSRF guard |
 | `fb37196` | Sync v2 spec (`docs/v5/sync-v2.md`) + `sync.*`/`google.*` bridge contract |
-| `882dda5` | M4: Sync v2: engine, folder + Google Drive transports, E2EE, conflict UI, fixtures |
+| `e82c340` | M4: Sync v2: engine, folder + Google Drive transports, E2EE, conflict UI, fixtures |
 
 The AppImage at `desktop-v5/dist/` is rebuilt at M4 (AI + sync included).
 
