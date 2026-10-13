@@ -1,0 +1,26 @@
+name: v5
+
+on:
+  push:
+    paths: ['desktop-v5/**', '.github/workflows/v5.yml']
+  pull_request:
+    paths: ['desktop-v5/**', '.github/workflows/v5.yml']
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: desktop-v5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop-v5/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build

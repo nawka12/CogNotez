@@ -1,0 +1,108 @@
+/* Rendered Markdown (Preview and the right half of Split). Shares the editor's reading style. */
+.prose {
+  font: 400 1.125rem/1.7 var(--read);
+  color: var(--ink);
+}
+.prose > :first-child {
+  margin-top: 0;
+}
+.prose p {
+  margin: 0 0 0.95em;
+}
+.prose h1 {
+  font: 600 1.5rem/1.35 var(--read);
+  margin: 1.5em 0 0.45em;
+}
+.prose h2 {
+  font: 600 1.32rem/1.4 var(--read);
+  margin: 1.5em 0 0.45em;
+}
+.prose h3,
+.prose h4,
+.prose h5,
+.prose h6 {
+  font: 600 1.12rem/1.4 var(--read);
+  margin: 1.3em 0 0.4em;
+}
+.prose ul,
+.prose ol {
+  margin: 0 0 1em;
+  padding-left: 1.4em;
+}
+.prose li {
+  margin: 0.15em 0;
+}
+.prose li:has(> .box, > p > .box) {
+  list-style: none;
+  margin-left: -1.4em;
+}
+.prose li:has(> .box, > p > .box) > :not(.box) {
+  display: inline;
+}
+.prose .box {
+  display: inline-grid;
+  place-items: center;
+  width: 0.95em;
+  height: 0.95em;
+  margin-right: 0.55em;
+  border: 1.5px solid var(--ink-3);
+  border-radius: 3px;
+  font: 700 0.7em/1 var(--ui);
+  transform: translateY(0.1em);
+}
+.prose .box.done {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.prose blockquote {
+  margin: 1.2em 0;
+  padding-left: 1em;
+  border-left: 2px solid var(--mark);
+  font-style: italic;
+  color: var(--ink-2);
+}
+.prose blockquote p {
+  margin: 0;
+}
+.prose code {
+  font: 0.85em var(--mono);
+  background: var(--sunk);
+  padding: 0.1em 0.3em;
+  border-radius: 3px;
+}
+.prose pre {
+  margin: 0 0 1em;
+  padding: 0.8em 1em;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 6px;
+  overflow-x: auto;
+}
+.prose pre code {
+  background: none;
+  padding: 0;
+  font-size: 0.85rem;
+}
+.prose a {
+  color: var(--accent);
+}
+.prose img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+.prose hr {
+  border: 0;
+  border-top: 1px solid var(--rule);
+  margin: 1.6em 0;
+}
+.prose table {
+  border-collapse: collapse;
+  margin: 0 0 1em;
+}
+.prose th,
+.prose td {
+  border: 1px solid var(--rule);
+  padding: 0.3em 0.7em;
+}

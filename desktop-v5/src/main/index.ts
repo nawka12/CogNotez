@@ -1,0 +1,212 @@
+import { app, BrowserWindow, ipcMain, net, protocol, safeStorage } from 'electron'
+import type { IpcMainEvent } from 'electron'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { pathToFileURL } from 'node:url'
+import { createImporter } from './import'
+import { readV4LocalStorage } from './import/v4-electron'
+import { registerIpc } from './ipc'
+import { log } from './log'
+import { createMedia, MEDIA_SCHEME } from './media'
+import type { Media } from './media'
+import { createSecrets } from './secrets'
+import { installSecurity, setAppTarget } from './security'
+import { openDb } from './store/db'
+import { createStore } from './store/notes'
+
+const SMOKE = process.env['COGNOTEZ_SMOKE'] === '1'
+const IMPORT_SMOKE = process.env['COGNOTEZ_IMPORT_SMOKE'] === '1'
+
+// Must run before `ready`. `stream` lets <video>/<audio> seek with Range requests.
+protocol.registerSchemesAsPrivileged([{ scheme: MEDIA_SCHEME, privileges: { standard: true, secure: true, stream: true } }])
+
+// v5 keeps its data apart from v4 (~/.config/cognotez), which must never be touched.
+// The final userData path is decided at release; this is a development placeholder.
+// Must run before `ready`.
+app.setPath(
+  'userData',
+  SMOKE || IMPORT_SMOKE ? mkdtempSync(join(tmpdir(), 'cognotez-smoke-')) : join(app.getPath('appData'), 'cognotez-v5')
+)
+
+const devUrl = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
+const indexHtml = join(__dirname, '../renderer/index.html')
+
+function createWindow(): void {
+  const win = new BrowserWindow({
+    width: 1100,
+    height: 760,
+    show: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      contextIsolation: true,
+      sandbox: true,
+      nodeIntegration: false,
+      webSecurity: true
+    }
+  })
+  win.once('ready-to-show', () => win.show())
+  flushBeforeClose(win)
+  // Surface renderer warnings/errors (CSP violations included) in the main log.
+  win.webContents.on('console-message', (e) => {
+    if (e.level === 'warning' || e.level === 'error') log.warn('renderer:', e.message)
+  })
+  if (devUrl) void win.loadURL(devUrl)
+  else void win.loadFile(indexHtml)
+}
+
+/** Lets the renderer save pending edits before the window goes away (gives up after 2 s). */
+function flushBeforeClose(win: BrowserWindow): void {
+  let closing = false
+  win.on('close', (e) => {
+    if (closing) return
+    e.preventDefault()
+    closing = true
+    const finish = (): void => {
+      ipcMain.removeListener('app:flushed', onFlushed)
+      clearTimeout(timer)
+      if (!win.isDestroyed()) win.destroy()
+    }
+    const onFlushed = (ev: IpcMainEvent): void => {
+      if (ev.sender === win.webContents) finish()
+    }
+    const timer = setTimeout(finish, 2000)
+    ipcMain.on('app:flushed', onFlushed)
+    win.webContents.send('app:flush')
+  })
+}
+
+/** Proves node:sqlite + FTS5 work inside Electron: prints one JSON line and exits. */
+function smoke(): void {
+  try {
+    const db = openDb(join(app.getPath('userData'), 'cognotez.db'))
+    const store = createStore(db)
+    const note = store.notes.create({ title: 'Smoke note', body: 'Hello from Electron SQLite', tags: ['smoke/test'] })
+    store.notes.save({ id: note.id, tags: ['smoke/test', 'Extra'] })
+    const hits = store.search('tag:smoke hel')
+    const sqlite = (db.prepare('SELECT sqlite_version() AS v').get() as { v: string }).v
+    db.close()
+    const ok = hits.length === 1 && hits[0]?.id === note.id
+    process.stdout.write(
+      JSON.stringify({
+        ok,
+        electron: process.versions.electron,
+        node: process.versions.node,
+        sqlite,
+        hits: hits.map((h) => ({ title: h.title, snippet: h.snippet, tags: h.tags })),
+        secrets: createSecrets(join(app.getPath('userData'), 'secrets.json'), safeStorage).status()
+      }) + '\n'
+    )
+    rmSync(app.getPath('userData'), { recursive: true, force: true })
+    app.exit(ok ? 0 : 1)
+  } catch (e) {
+    process.stderr.write(`smoke failed: ${String(e)}\n`)
+    app.exit(1)
+  }
+}
+
+/** v4's userData dir. Only ever read from. */
+const v4Dir = (): string => process.env['COGNOTEZ_V4_DIR'] ?? join(app.getPath('appData'), 'cognotez')
+
+function serveMedia(media: Media): void {
+  protocol.handle(MEDIA_SCHEME, (req) => media.serve(req.url, req.headers.get('range')))
+}
+
+/**
+ * Dry-runs the importer against the real v4 profile into a temp v5 userData and prints ONE JSON line of counts
+ * (never note text). Also fetches a media URL through the real protocol handler.
+ */
+async function importSmoke(): Promise<void> {
+  const root = app.getPath('userData')
+  let ok = false
+  try {
+    const db = openDb(join(root, 'cognotez.db'))
+    const store = createStore(db)
+    const media = createMedia(join(root, 'media'), db)
+    serveMedia(media)
+    let openrouterKey = false
+    const importer = createImporter({
+      store, media, v4Dir: v4Dir(),
+      secrets: { has: () => false, set: () => void (openrouterKey = true) }, // never touch the keyring in a dry run
+      readLocalStorage: () => readV4LocalStorage(v4Dir())
+    })
+    const detect = await importer.detect()
+    const { stats } = await importer.run('auto')
+    const again = (await importer.run('auto')).stats
+
+    const row = db.prepare("SELECT hash, mime, bytes FROM media ORDER BY (mime LIKE 'image/%') DESC LIMIT 1").get() as
+      | { hash: string; mime: string; bytes: number }
+      | undefined
+    const status = async (url: string): Promise<number> => {
+      try {
+        return (await net.fetch(url)).status
+      } catch {
+        return -1
+      }
+    }
+    let protocolCheck: Record<string, unknown> = { fetched: false }
+    if (row) {
+      const res = await net.fetch(`${MEDIA_SCHEME}://${row.hash}`)
+      const body = await res.arrayBuffer()
+      protocolCheck = {
+        fetched: true,
+        status: res.status,
+        mimeMatches: res.headers.get('content-type') === row.mime,
+        sizeMatches: body.byteLength === row.bytes,
+        traversal: await status(`${MEDIA_SCHEME}://../etc/passwd`),
+        nonHex: await status(`${MEDIA_SCHEME}://not-a-hash`),
+        shortHex: await status(`${MEDIA_SCHEME}://${row.hash.slice(1)}`),
+        unknownHash: await status(`${MEDIA_SCHEME}://${'0'.repeat(64)}`)
+      }
+    }
+    const searchHits = store.search('the').length
+    ok = stats.notes > 0 && again.notes === 0 && again.skippedExisting === stats.notes
+    process.stdout.write(
+      JSON.stringify({
+        ok,
+        source: detect.sources.map((s) => ({ kind: s.kind, notes: s.notes })),
+        used: (store.settings.get('import.v4') as { source: string } | null)?.source ?? null,
+        notes: stats.notes, tags: stats.tags, media: stats.media, mediaMissing: stats.mediaMissing,
+        locked: stats.locked, lockedWithoutCipher: stats.lockedWithoutCipher, conversations: stats.conversations,
+        skippedExisting: stats.skippedExisting, warnings: stats.warnings.length, firstWarnings: stats.warnings.slice(0, 5),
+        rerun: { notes: again.notes, skippedExisting: again.skippedExisting },
+        openrouterKey, searchHits, protocol: protocolCheck
+      }) + '\n'
+    )
+    db.close()
+  } catch (e) {
+    process.stderr.write(`import smoke failed: ${String(e)}\n`)
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+    app.exit(ok ? 0 : 1)
+  }
+}
+
+void app.whenReady().then(() => {
+  if (SMOKE) return smoke()
+  if (IMPORT_SMOKE) return importSmoke()
+
+  const db = openDb(join(app.getPath('userData'), 'cognotez.db'))
+  const store = createStore(db)
+  const secrets = createSecrets(join(app.getPath('userData'), 'secrets.json'), safeStorage)
+
+  setAppTarget(devUrl ?? pathToFileURL(indexHtml).href)
+  installSecurity(devUrl)
+  const media = createMedia(join(app.getPath('userData'), 'media'), db)
+  serveMedia(media)
+  const importer = createImporter({
+    store, secrets, media, v4Dir: v4Dir(), readLocalStorage: () => readV4LocalStorage(v4Dir())
+  })
+  registerIpc(store, secrets, importer, media)
+  createWindow()
+
+  app.on('activate', () => {
+    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+  })
+  app.on('will-quit', () => db.close())
+})
+
+app.on('window-all-closed', () => {
+  if (IMPORT_SMOKE) return // the importer's hidden reader window closes while the dry run is still going
+  if (process.platform !== 'darwin') app.quit()
+})

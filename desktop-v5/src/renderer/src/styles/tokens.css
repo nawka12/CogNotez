@@ -1,0 +1,68 @@
+/* Design tokens, ported from docs/v5/interface-sample.html. Light values are AA-checked; keep them. */
+:root {
+  --desk: #ebe5d7;
+  --paper: #fbf9f4;
+  --panel: #f5f1e7;
+  --hover: #efe9dc;
+  --sunk: #e9e2d0;
+  --ink: #1a1715;
+  --ink-2: #4a4439;
+  --ink-3: #6b6457;
+  --rule: #e2dac8;
+  --accent: #6548c0;
+  --accent-soft: rgba(101, 72, 192, 0.11);
+  --on-accent: #ffffff;
+  --rubric: #a33b2a;
+  --ok: #2f7a4a;
+  --mark: #bdabe3;
+  --tile: #221d2b;
+  --invert-accent: #cbb8f5;
+  --shadow: 0 18px 40px rgba(60, 45, 15, 0.14), 0 2px 6px rgba(60, 45, 15, 0.06);
+
+  --ui: system-ui, -apple-system, 'Segoe UI', Cantarell, Ubuntu, 'Noto Sans', sans-serif;
+  --read: 'Source Serif 4 Variable', 'Source Serif 4', 'Source Serif Pro', Georgia, serif;
+  --display: 'Fraunces Variable', Fraunces, Georgia, serif;
+  --mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  --side: 284px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    --desk: #050407;
+    --paper: #0c0b10;
+    --panel: #131119;
+    --hover: #1b1823;
+    --sunk: #241f2e;
+    --ink: #f0ebf5;
+    --ink-2: #c8c0d4;
+    --ink-3: #a89ebb;
+    --rule: #2a2533;
+    --accent: #c9a9ff;
+    --accent-soft: rgba(201, 169, 255, 0.13);
+    --on-accent: #16121f;
+    --rubric: #ff8a7a;
+    --ok: #6fcf97;
+    --invert-accent: #5a3fb0;
+    --shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+    color-scheme: dark;
+  }
+}
+:root[data-theme='dark'] {
+  --desk: #050407;
+  --paper: #0c0b10;
+  --panel: #131119;
+  --hover: #1b1823;
+  --sunk: #241f2e;
+  --ink: #f0ebf5;
+  --ink-2: #c8c0d4;
+  --ink-3: #a89ebb;
+  --rule: #2a2533;
+  --accent: #c9a9ff;
+  --accent-soft: rgba(201, 169, 255, 0.13);
+  --on-accent: #16121f;
+  --rubric: #ff8a7a;
+  --ok: #6fcf97;
+  --invert-accent: #5a3fb0;
+  --shadow: 0 18px 40px rgba(0, 0, 0, 0.55), 0 2px 6px rgba(0, 0, 0, 0.4);
+  color-scheme: dark;
+}
