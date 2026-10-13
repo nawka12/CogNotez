@@ -14,7 +14,7 @@ export const MARKER = 'restore-pending.json'
 const ID_RE = /^cognotez-(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})(-auto)?$/
 
 const pad = (n: number, w = 2): string => String(n).padStart(w, '0')
-const stamp = (d: Date): string =>
+export const stamp = (d: Date): string =>
   `${pad(d.getFullYear(), 4)}${pad(d.getMonth() + 1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`
 
 export const isBackupId = (v: unknown): v is string => typeof v === 'string' && ID_RE.test(v)

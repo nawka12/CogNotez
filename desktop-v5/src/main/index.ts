@@ -5,7 +5,7 @@ import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createAi } from './ai'
-import { applyPendingRestore, createBackups } from './backup'
+import { applyPendingRestore, createBackups, stamp } from './backup'
 import { isVisible, parseWindowState } from './bounds'
 import { createImporter } from './import'
 import { readV4LocalStorage } from './import/v4-electron'
@@ -220,7 +220,9 @@ void app.whenReady().then(async () => {
   if (restore.restored) log.info('restored the database from a backup')
   else if (restore.error) log.error('restore failed, kept the current database:', restore.error)
 
-  const db = openDb(join(app.getPath('userData'), 'cognotez.db'))
+  // A database from an older version is copied into backups/ before it migrates (it shows in Settings as a backup).
+  const userData = app.getPath('userData')
+  const db = openDb(join(userData, 'cognotez.db'), join(userData, 'backups', `cognotez-${stamp(new Date())}.db`))
   const store = createStore(db, undefined, {
     onLocksChanged(ids) {
       for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send('locks:changed', { ids })

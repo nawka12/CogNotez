@@ -44,6 +44,13 @@ The AppImage at `desktop-v5/dist/` is rebuilt at M5.
 - **Fixes:** research fetch pins the vetted DNS answer (DNS rebinding closed); closing a tab whose locked note holds unsaved text asks first; no tab looks active while Settings is open; the note info line no longer wraps next to the Companion; AI review Esc/Mod-Enter work anywhere in the note view.
 - **Data folder decision:** v5 keeps `~/.config/cognotez-v5`. Sharing v4's folder would let v5's Chromium open v4's Local Storage in place, risking the rollback and import source.
 
+## Acceptance run on the packaged AppImage (2026-10-13)
+On scratch copies of the real data, launched like a user (sandbox on, no `--no-sandbox`):
+- **Upgrade of the existing v5 DB (schema 1 → 2):** 162 notes, 9 locked, 2 pinned, 10 tags, 21 media, identical id/title set, search and media intact. A pre-migration copy now lands in Backups first.
+- **Fresh install + v4 import:** 162 notes / 9 locked / 21 media, identical to the upgraded data.
+- **Daily use, restart persistence, two-instance folder sync with conflict banner, updates row:** all pass. Window in about 1.1 s (3–8 s through the AppImageLauncher wrapper on this machine).
+- **Fixed from the run:** video in notes was blocked by the CSP (`media-src` was missing in both the header and the `<meta>` copy; a test now keeps the two equal); no backup before a schema migration.
+
 ## Needs the user (before a public release)
 - Register the Google OAuth client and add `MAIN_VITE_GOOGLE_CLIENT_ID/SECRET` as GitHub secrets (steps in `RELEASING.md`). Until then users import their own client JSON.
 - Optional signing secrets (Windows, macOS + notarization).
@@ -59,4 +66,6 @@ The AppImage at `desktop-v5/dist/` is rebuilt at M5.
 - **Sync, startup clock corner:** at startup the store receives only the greatest rev; this device's own far-future revs from a past wrong clock are received at the first round.
 - **Untested here:** the macOS and Windows release jobs, notarization, `quitAndInstall`, and Drive 429/5xx/storage-full in the real app (unit-tested only).
 - **Meta line:** with many tags the stats can start a new row with a stray "·"; at es 1100 px the pin/trash icons wrap.
+- **Trash view:** a locked note that is still unlocked in memory shows its body in Trash while its row says "Locked".
+- **Import summary** after a v4 import doesn't show the tag count.
 - **Research rebinding test** dials a real public IP for up to 700 ms (TEST-NET ranges are blocked by the guard, by design).

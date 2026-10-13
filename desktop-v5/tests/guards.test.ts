@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import * as g from '../src/main/guards'
 
@@ -98,9 +99,11 @@ describe('sender check and navigation policy', () => {
   it('CSP matches the spec; dev adds only the dev server to connect-src', () => {
     const prod = g.buildCsp()
     expect(prod).toBe(
-      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: cognotez-media:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
+      "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: cognotez-media:; media-src 'self' cognotez-media:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'"
     )
     expect(g.buildCsp(DEV)).toContain("connect-src 'self' http://localhost:5173 ws://localhost:5173;")
     expect(g.buildCsp(DEV).replace(/connect-src [^;]*/, '')).toBe(prod.replace(/connect-src [^;]*/, ''))
+    // The browser enforces the <meta> copy too, so it must never drift from the header.
+    expect(/http-equiv="Content-Security-Policy"\s+content="([^"]+)"/.exec(readFileSync('src/renderer/index.html', 'utf8'))?.[1]).toBe(prod)
   })
 })

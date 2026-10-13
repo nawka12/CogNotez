@@ -1,10 +1,13 @@
 // No Electron imports here: tests open DBs with a path or ':memory:'.
+import { mkdirSync } from 'node:fs'
+import { dirname } from 'node:path'
 import { DatabaseSync } from 'node:sqlite'
 import { MIGRATIONS } from './migrations'
 
 export type Db = DatabaseSync
 
-export function openDb(path: string): Db {
+/** `backupTo`: before migrating an existing database, copy it there first (no copy for a new or current one). */
+export function openDb(path: string, backupTo?: string): Db {
   const db = new DatabaseSync(path)
   db.exec(`
     PRAGMA journal_mode = WAL;
@@ -14,6 +17,15 @@ export function openDb(path: string): Db {
     PRAGMA secure_delete = ON;
   `)
   try {
+    const v = (db.prepare('PRAGMA user_version').get() as { user_version: number }).user_version
+    if (backupTo && v > 0 && v < MIGRATIONS.length) {
+      // Fails loudly: better not to start than to migrate the only copy without a way back.
+      mkdirSync(dirname(backupTo), { recursive: true })
+      db.exec(`VACUUM INTO '${backupTo.replace(/'/g, "''")}'`)
+      const copy = new DatabaseSync(backupTo)
+      copy.exec('PRAGMA journal_mode = DELETE') // one self-contained file, like every other backup
+      copy.close()
+    }
     migrate(db)
   } catch (e) {
     db.close()

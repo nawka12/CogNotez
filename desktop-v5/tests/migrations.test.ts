@@ -57,3 +57,26 @@ describe('migrations', () => {
     expect(() => migrate(db)).toThrow(/newer/)
   })
 })
+
+describe('pre-migration backup', () => {
+  it('copies an older database before migrating it, and only then', () => {
+    const path = join(dir, 'cognotez.db')
+    const old = new DatabaseSync(path)
+    migrate(old, MIGRATIONS.slice(0, 1))
+    old.prepare("INSERT INTO settings(key, value) VALUES ('marker', '\"v1 data\"')").run()
+    old.close()
+
+    const backupTo = join(dir, 'backups', 'cognotez-20261013-120000.db')
+    openDb(path, backupTo).close()
+    const copy = new DatabaseSync(backupTo, { readOnly: true })
+    expect(copy.prepare('PRAGMA user_version').get()).toEqual({ user_version: 1 })
+    expect(copy.prepare('PRAGMA journal_mode').get()).toEqual({ journal_mode: 'delete' })
+    expect(copy.prepare("SELECT value FROM settings WHERE key = 'marker'").get()).toEqual({ value: '"v1 data"' })
+    copy.close()
+
+    const again = join(dir, 'backups', 'cognotez-20261013-120001.db')
+    openDb(path, again).close() // already current: no copy
+    openDb(join(dir, 'fresh.db'), again).close() // brand new: no copy
+    expect(() => new DatabaseSync(again, { readOnly: true })).toThrow()
+  })
+})

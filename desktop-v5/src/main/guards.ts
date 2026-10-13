@@ -185,6 +185,7 @@ export function buildCsp(devUrl?: string): string {
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'", // styles only: CodeMirror injects <style> tags at runtime
     "img-src 'self' data: cognotez-media:",
+    "media-src 'self' cognotez-media:",
     "font-src 'self' data:",
     `connect-src ${connect}`,
     "object-src 'none'",
