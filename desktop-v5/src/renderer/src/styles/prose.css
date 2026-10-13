@@ -2,6 +2,7 @@
 .prose {
   font: 400 var(--note-size, 1.125rem)/1.7 var(--read);
   color: var(--ink);
+  overflow-wrap: anywhere; /* a long word or URL breaks instead of widening the page (pre keeps its own scroll) */
 }
 .prose > :first-child {
   margin-top: 0;
@@ -87,7 +88,8 @@
 .prose a {
   color: var(--accent);
 }
-.prose img {
+.prose img,
+.prose video {
   max-width: 100%;
   height: auto;
   border-radius: 4px;
@@ -100,9 +102,13 @@
 .prose table {
   border-collapse: collapse;
   margin: 0 0 1em;
+  display: block; /* a wide table scrolls inside itself */
+  max-width: 100%;
+  overflow-x: auto;
 }
 .prose th,
 .prose td {
   border: 1px solid var(--rule);
   padding: 0.3em 0.7em;
+  overflow-wrap: normal; /* cells keep whole words; the table scrolls instead */
 }
