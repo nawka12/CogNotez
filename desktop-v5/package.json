@@ -58,7 +58,12 @@
         "AppImage"
       ],
       "category": "Office",
-      "icon": "icon.png"
+      "icon": "icon.png",
+      "desktop": {
+        "entry": {
+          "Name": "CogNotez 5"
+        }
+      }
     },
     "win": {
       "target": [
