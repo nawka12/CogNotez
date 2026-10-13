@@ -1,14 +1,14 @@
-import { Annotation, Compartment, EditorState, type Range } from '@codemirror/state'
-import { Decoration, EditorView, ViewPlugin, drawSelection, keymap, placeholder } from '@codemirror/view'
-import type { DecorationSet, ViewUpdate } from '@codemirror/view'
+import { Annotation, Compartment, EditorState } from '@codemirror/state'
+import { EditorView, drawSelection, keymap, placeholder } from '@codemirror/view'
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands'
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown'
-import { HighlightStyle, syntaxHighlighting, syntaxTree } from '@codemirror/language'
+import { HighlightStyle, syntaxHighlighting } from '@codemirror/language'
 import { search, searchKeymap } from '@codemirror/search'
 import { tags as t } from '@lezer/highlight'
 import { t as tr } from '../i18n'
 import { prefs } from '../state/prefs.svelte'
 import { aiEditExtensions } from './aiEdit'
+import { livePreview } from './livePreview'
 
 /** Marks a transaction that came from outside the user (a reload): it must not count as an edit. */
 export const external = Annotation.define<boolean>()
@@ -23,53 +23,9 @@ const highlight = HighlightStyle.define([
   { tag: t.quote, fontStyle: 'italic', color: 'var(--ink-2)' },
   { tag: [t.heading1, t.heading2, t.heading3, t.heading4, t.heading5, t.heading6], fontWeight: '600' },
   { tag: t.link, color: 'var(--accent)' },
-  { tag: t.url, ...mark },
+  { tag: t.url, color: 'var(--ink-3)' }, // revealed link targets; bare URLs are drawn as links on top
   { tag: [t.processingInstruction, t.atom, t.labelName], ...mark }
 ])
-
-const HEADING = /^(?:ATX|Setext)Heading([1-6])$/
-
-function decorate(view: EditorView): DecorationSet {
-  const { state } = view
-  const lines = new Map<number, Set<string>>()
-  const ranges: Range<Decoration>[] = []
-  const addLines = (from: number, to: number, cls: string): void => {
-    for (let pos = from; pos <= to; ) {
-      const line = state.doc.lineAt(pos)
-      const set = lines.get(line.from) ?? new Set<string>()
-      lines.set(line.from, set.add(cls))
-      pos = line.to + 1
-    }
-  }
-  for (const { from, to } of view.visibleRanges) {
-    syntaxTree(state).iterate({
-      from,
-      to,
-      enter(node) {
-        const h = HEADING.exec(node.name)
-        if (h) addLines(node.from, node.to, `cm-h${Math.min(Number(h[1]), 3)}`)
-        else if (node.name === 'FencedCode' || node.name === 'CodeBlock') addLines(node.from, node.to, 'cm-code')
-        else if (node.name === 'Task' && /^\[[xX]\]/.test(state.sliceDoc(node.from, node.from + 3))) addLines(node.from, node.to, 'cm-done')
-        else if (node.name === 'InlineCode') ranges.push(Decoration.mark({ class: 'cm-icode' }).range(node.from, node.to))
-      }
-    })
-  }
-  for (const [pos, set] of lines) ranges.push(Decoration.line({ class: [...set].join(' ') }).range(pos))
-  return Decoration.set(ranges, true)
-}
-
-const structure = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet
-    constructor(view: EditorView) {
-      this.decorations = decorate(view)
-    }
-    update(u: ViewUpdate): void {
-      if (u.docChanged || u.viewportChanged || syntaxTree(u.startState) !== syntaxTree(u.state)) this.decorations = decorate(u.view)
-    }
-  },
-  { decorations: (v) => v.decorations }
-)
 
 const theme = EditorView.theme({
   '&': { font: '400 var(--note-size, 1.125rem)/1.7 var(--read)', color: 'var(--ink)' },
@@ -139,7 +95,7 @@ const extensions = [
   placeholder(() => Object.assign(document.createElement('span'), { textContent: tr('editor.placeholder') })),
   markdown({ base: markdownLanguage }),
   syntaxHighlighting(highlight),
-  structure,
+  livePreview,
   search({ top: true }),
   keymap.of([...searchKeymap, ...historyKeymap, ...defaultKeymap]),
   ...aiEditExtensions,

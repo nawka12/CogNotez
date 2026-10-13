@@ -44,6 +44,12 @@ The AppImage at `desktop-v5/dist/` is rebuilt at M5.
 - **Fixes:** research fetch pins the vetted DNS answer (DNS rebinding closed); closing a tab whose locked note holds unsaved text asks first; no tab looks active while Settings is open; the note info line no longer wraps next to the Companion; AI review Esc/Mod-Enter work anywhere in the note view.
 - **Data folder decision:** v5 keeps `~/.config/cognotez-v5`. Sharing v4's folder would let v5's Chromium open v4's Local Storage in place, risking the rollback and import source.
 
+## After M5 (2026-10-13, from the user's own testing)
+- **One note view:** Split and Preview are gone. The editor renders Markdown in place (Obsidian-style live preview, `editor/livePreview.ts`): syntax shows only on the line or block the cursor is in; images, v4 video/audio embeds, tables, checkboxes, bullets, quotes, code and rules render inline; Ctrl/Cmd+click opens links. Raw source while an AI review is open. About 1 ms extra editor work per keystroke on a 5,000-line note.
+- **Note width:** Settings → Editor: Narrow (old 560 px), Wide (default), Full.
+- **Sync:** live progress (status bar, Settings, dev terminal) and 30 s+ timeouts on every Drive request; an actionable message when encryption is asked for on an existing plain location.
+- **Fixes:** the app no longer shifts up after clicking the status-bar sync chip (`overflow: clip` on the shell); long words wrap in rendered Markdown.
+
 ## Acceptance run on the packaged AppImage (2026-10-13)
 On scratch copies of the real data, launched like a user (sandbox on, no `--no-sandbox`):
 - **Upgrade of the existing v5 DB (schema 1 → 2):** 162 notes, 9 locked, 2 pinned, 10 tags, 21 media, identical id/title set, search and media intact. A pre-migration copy now lands in Backups first.
@@ -68,4 +74,5 @@ On scratch copies of the real data, launched like a user (sandbox on, no `--no-s
 - **Meta line:** with many tags the stats can start a new row with a stray "·"; at es 1100 px the pin/trash icons wrap.
 - **Trash view:** a locked note that is still unlocked in memory shows its body in Trash while its row says "Locked".
 - **Import summary** after a v4 import doesn't show the tag count.
+- **Live preview gaps:** tables/HTML nested in a list or quote stay as source; a revealed table shows plain source; reference links `[text][ref]` don't open; a Setext underline leaves an empty line; wrapped list items have no hanging indent; an image's first load in a session can shift layout once.
 - **Research rebinding test** dials a real public IP for up to 700 ms (TEST-NET ranges are blocked by the guard, by design).

@@ -20,5 +20,6 @@
     "tests/**/*",
     "electron.vite.config.ts",
     "vitest.config.ts"
-  ]
+  ],
+  "exclude": ["tests/renderer/livePreview.test.ts"]
 }

@@ -13,5 +13,5 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true
   },
-  "include": ["src/renderer/src/**/*", "src/shared/**/*"]
+  "include": ["src/renderer/src/**/*", "src/shared/**/*", "tests/renderer/livePreview.test.ts"]
 }
