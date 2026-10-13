@@ -280,7 +280,11 @@ export function createSyncService(deps: SyncDeps) {
         const sameLocation = !!cur && cur.transport === s.transport && (s.transport !== 'folder' || cur.folderPath === folderPath)
         opened = await openRemote(t, { known: sameLocation ? cur.remoteId : null, deviceId: store.deviceId, passphrase, wall })
         if (!opened.created && passphrase !== undefined && !opened.meta.enc) {
-          throw new Error('This sync location already exists without encryption. Encryption can only be chosen when a location is first set up.')
+          throw new Error(
+            s.transport === 'gdrive'
+              ? 'This Google Drive location already exists without encryption, and that can\'t be changed. To encrypt: turn sync off on this device, delete the "CogNotez Sync" folder in Google Drive (and empty the Drive trash), then turn sync on again with encryption.'
+              : 'This folder already holds an unencrypted sync location, and that can\'t be changed. To encrypt, pick an empty folder instead.'
+          )
         }
         key = opened.dek
         if (!key && opened.meta.enc && passphrase !== undefined) key = await unwrapDek(passphrase, opened.meta.enc).catch(() => null)

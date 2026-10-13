@@ -77,3 +77,29 @@ describe('sync service', () => {
     expect(lines.join('\n')).not.toMatch(/secret/)
   })
 })
+
+describe('switching an existing plaintext location to encryption', () => {
+  it('is refused in place, and works after turning sync off and emptying the location', async () => {
+    const { readdirSync, readFileSync } = await import('node:fs')
+    const folder = mkdtempSync(join(tmpdir(), 'cognotez-svc-folder-'))
+    dirs.push(folder)
+    const a = service(folder)
+    a.store.notes.create({ title: 'zebracorn title', body: 'zebracorn body' })
+    await a.sync.setup({ transport: 'folder' })
+    expect((await a.sync.now()).lastError).toBeNull()
+
+    // Asking for encryption on the existing plaintext location: refused, with the way out in the message.
+    await expect(a.sync.setup({ transport: 'folder', passphrase: 'correct horse battery' })).rejects.toThrow(/pick an empty folder/)
+
+    // The documented way: turn sync off, empty the location, set up again with a passphrase.
+    await a.sync.disable()
+    for (const n of readdirSync(folder)) rmSync(join(folder, n), { recursive: true, force: true })
+    expect(await a.sync.setup({ transport: 'folder', passphrase: 'correct horse battery' })).toMatchObject({ encrypted: true, needsPassphrase: false })
+    expect((await a.sync.now()).lastError).toBeNull()
+    const objects = readdirSync(join(folder, 'objects'))
+    expect(objects.length).toBe(1)
+    expect(objects.every((n) => n.endsWith('.bin'))).toBe(true)
+    for (const n of objects) expect(readFileSync(join(folder, 'objects', n)).includes('zebracorn')).toBe(false)
+    a.sync.stop()
+  })
+})
