@@ -94,8 +94,13 @@ export function createUpdater(deps: UpdaterDeps) {
   let u: UpdaterLike | null = null
   const ready: Promise<void> = deps
     .supported()
-    .then(async (ok) => (ok ? (u = await deps.updater()) : null))
-    .catch(() => null)
+    .then(async (ok) => {
+      if (!ok) return null
+      u = await deps.updater()
+      if (!u) throw new Error('electron-updater did not load') // a build problem; never hide it as "unsupported"
+      return u
+    })
+    .catch((e: unknown) => (warn(`updates unavailable: ${e instanceof Error ? e.message : String(e)}`), null))
     .then((u) => {
       if (!u) return set({ state: 'unsupported' })
       u.autoDownload = false
