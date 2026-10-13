@@ -4,13 +4,16 @@
   import { t } from '../i18n'
   import type { Key } from '../i18n'
   import { filterItems } from '../lib/palette'
+  import { ai, loadModels, setModel, toggleCompanion } from '../state/ai.svelte'
+  import { aiReady, askEdit, suggestTags } from '../state/aiedit.svelte'
+  import { askClearHistory, runQuick } from '../state/companion.svelte'
   import { askPassword, askRemoveLock, createNote, lockNow, togglePin, trashNote } from '../state/actions'
   import { backupNow, exportAll, exportNote, importFiles, openSettings } from '../state/data'
   import { importFromFile, importFromV4 } from '../state/importer.svelte'
   import { library } from '../state/library.svelte'
   import { openNote, tabs } from '../state/tabs.svelte'
   import { addTemplate, builtins, loadTemplates, newFromTemplate, templates } from '../state/templates.svelte'
-  import { setTheme, ui } from '../state/ui.svelte'
+  import { errorText, setTheme, showToast, ui } from '../state/ui.svelte'
   import type { Mode, Theme } from '../state/ui.svelte'
   import type { Doc } from '../state/tabs.svelte'
 
@@ -29,8 +32,8 @@
   let query = $state('')
   let index = $state(0)
   let hits = $state.raw<NoteSummary[]>([])
-  /** 'templates' swaps the list for the template picker. */
-  let sub = $state<'templates' | null>(null)
+  /** A sub-list replaces the normal results: the template picker, the model list, the Companion's edit actions. */
+  let sub = $state<'templates' | 'models' | 'edits' | null>(null)
 
   const recent = $derived([...library.all].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8))
 
@@ -91,6 +94,16 @@
             a('remove-lock', t('palette.removeLock'), () => askRemoveLock(live))
           ]
         : []),
+      a('companion', t(ai.open ? 'palette.hideCompanion' : 'palette.showCompanion'), toggleCompanion, 'palette.companion'),
+      { ...a('switch-model', t('palette.switchModel'), () => openSub('models'), 'palette.companion'), keep: true },
+      ...(aiReady(live) ? editItems().map((it) => ({ ...it, group: t('palette.companion') })) : []),
+      ...(aiReady(live)
+        ? [
+            a('ai-summarize', t('palette.summarize'), () => summarize(live), 'palette.companion'),
+            a('ai-tags', t('palette.suggestTags'), () => void suggestTags(), 'palette.companion'),
+            a('ai-clear', t('palette.clearHistory'), () => askClearHistory(live.id), 'palette.companion')
+          ]
+        : []),
       ...themes.map((th) => a(`theme-${th}`, t('theme.label', { name: t(`theme.${th}`) }), () => setTheme(th), 'palette.theme')),
       a('import-v4', t('palette.importV4'), () => void importFromV4(), 'palette.import'),
       a('import-file', t('palette.importFile'), () => void importFromFile(), 'palette.import')
@@ -98,10 +111,41 @@
   }
 
   function openTemplates(): void {
-    sub = 'templates'
-    query = ''
+    openSub('templates')
     void loadTemplates()
+  }
+
+  function openSub(name: 'templates' | 'models' | 'edits'): void {
+    sub = name
+    query = ''
+    if (name === 'models') loadModels().catch((e) => showToast(t('ai.modelsFailed', { message: errorText(e) })))
     void tick().then(() => input.focus())
+  }
+
+  function summarize(doc: Doc): void {
+    if (!ai.open) toggleCompanion()
+    void runQuick(doc, 'summarize')
+  }
+
+  /** The inline edit actions; also the Mod-Shift-E menu. */
+  function editItems(): Item[] {
+    const item = (id: string, label: string, run: () => void): Item => ({ id, group: t('palette.companion'), label, run })
+    return [
+      item('ai-rewrite', t('palette.rewrite'), () => askEdit('rewrite')),
+      item('ai-fix', t('palette.fix'), () => askEdit('fix')),
+      item('ai-translate', t('palette.translate'), () => askEdit('translate')),
+      item('ai-continue', t('palette.continue'), () => askEdit('continue'))
+    ]
+  }
+
+  function modelItems(): Item[] {
+    return ai.models.map((m) => ({
+      id: `model-${m.id}`,
+      group: t('palette.models'),
+      label: m.id,
+      hint: m.id === ai.config?.model ? t('palette.current') : '',
+      run: () => void setModel(m.id)
+    }))
   }
 
   function askTemplateName(doc: Doc): void {
@@ -127,6 +171,8 @@
 
   const items = $derived.by<Item[]>(() => {
     if (sub === 'templates') return filterItems(templateItems(), query)
+    if (sub === 'models') return filterItems(modelItems(), query)
+    if (sub === 'edits') return filterItems(editItems(), query)
     const notes: Item[] = hits.map((n) => ({
       id: `note-${n.id}`,
       group: t('palette.notes'),
@@ -148,6 +194,9 @@
       query = ''
       sub = null
       dlg.showModal()
+      const want = ui.paletteSub
+      ui.paletteSub = null
+      if (want) openSub(want)
       void tick().then(() => input.focus())
     } else if (!ui.paletteOpen && dlg.open) dlg.close()
   })
@@ -190,7 +239,7 @@
     aria-controls="pal-list"
     aria-autocomplete="list"
     aria-activedescendant={items.length ? `pal-${index}` : undefined}
-    placeholder={sub ? t('templates.pick') : t('palette.placeholder')}
+    placeholder={sub === 'models' ? t('palette.pickModel') : sub === 'edits' ? t('palette.pickEdit') : sub ? t('templates.pick') : t('palette.placeholder')}
     autocomplete="off"
     spellcheck="false"
     {onkeydown}
@@ -210,7 +259,7 @@
         <span class="label">{it.label}</span>{#if it.hint}<span class="h">{it.hint}</span>{/if}
       </li>
     {:else}
-      <li class="pal-empty" role="presentation">{sub ? t('templates.empty') : t('palette.empty')}</li>
+      <li class="pal-empty" role="presentation">{sub === 'models' ? t('palette.noModels') : sub ? t('templates.empty') : t('palette.empty')}</li>
     {/each}
   </ul>
   <div class="pal-foot">

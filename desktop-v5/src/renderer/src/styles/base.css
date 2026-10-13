@@ -127,3 +127,9 @@ dialog.modal::backdrop {
     scroll-behavior: auto !important;
   }
 }
+
+@keyframes cm-ai-pulse {
+  50% {
+    opacity: 0.55;
+  }
+}

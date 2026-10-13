@@ -42,7 +42,7 @@ export interface NotePatch extends NoteInput {
 
 export type ListFilter = { kind: 'all' | 'pinned' | 'trash' } | { kind: 'tag'; tag: string }
 
-export const SECRET_NAMES = ['openrouter_api_key', 'google_oauth_tokens', 'sync_dek'] as const
+export const SECRET_NAMES = ['openrouter_api_key', 'ai_api_key', 'google_oauth_tokens', 'sync_dek'] as const
 export type SecretName = (typeof SECRET_NAMES)[number]
 
 export interface SecretsStatus {
@@ -95,6 +95,60 @@ export interface AppInfo {
   version: string
   electron: string
   userData: string
+}
+
+export type AiProvider = 'ollama' | 'lmstudio' | 'llamacpp' | 'openrouter' | 'custom'
+
+export interface AiConfig {
+  provider: AiProvider
+  /** OpenAI-compatible base URL, e.g. http://localhost:11434 (Ollama) or https://openrouter.ai/api/v1. */
+  baseUrl: string
+  model: string
+  /** Context window to budget prompts against (and to request from Ollama). */
+  contextTokens: number
+  /** Empty = research mode unavailable. */
+  searxngUrl: string
+}
+
+export type AiTaskKind = 'chat' | 'summarize' | 'keyPoints' | 'rewrite' | 'fix' | 'translate' | 'continue' | 'tags'
+
+export interface AiRequest {
+  kind: AiTaskKind
+  /** Locked notes are refused, even while unlocked. null = no note (chat only). */
+  noteId: string | null
+  /** The selection, or the whole note when nothing is selected. For chat: the current note text. */
+  text: string
+  /** Chat message, rewrite instruction, or target language for translate. */
+  input?: string
+  /** Chat only: search SearXNG first and pass results as untrusted context. Never used for edits. */
+  research?: boolean
+}
+
+export type AiEvent =
+  | { type: 'chunk'; requestId: string; delta: string }
+  | { type: 'done'; requestId: string; text: string; model: string }
+  | { type: 'error'; requestId: string; error: string; aborted: boolean }
+
+export interface AiMessage {
+  id: string
+  noteId: string | null
+  role: 'user' | 'assistant'
+  content: string
+  model: string | null
+  createdAt: number
+}
+
+export interface AiModel {
+  id: string
+}
+
+export interface AiStatus {
+  ok: boolean
+  provider: AiProvider
+  model: string
+  /** True when baseUrl points at this computer (localhost / 127.0.0.1 / ::1). */
+  local: boolean
+  error?: string
 }
 
 export interface NotesChanged {
@@ -159,6 +213,19 @@ export interface Api {
     allMarkdown(): Promise<string | null>
   }
   app: { info(): Promise<AppInfo> }
+  /** All model traffic runs in main; keys stay in main. Results stream through onAiEvent. */
+  ai: {
+    getConfig(): Promise<AiConfig>
+    setConfig(patch: Partial<AiConfig>): Promise<AiConfig>
+    models(): Promise<AiModel[]>
+    test(): Promise<AiStatus>
+    run(req: AiRequest): Promise<{ requestId: string }>
+    abort(requestId: string): Promise<void>
+    /** Chat history for a note (null = the global thread), oldest first. */
+    thread(noteId: string | null): Promise<AiMessage[]>
+    clearThread(noteId: string | null): Promise<void>
+  }
+  onAiEvent(cb: (e: AiEvent) => void): () => void
   media: {
     /** Stores bytes content-addressed under userData/media. */
     importBytes(bytes: Uint8Array, mime: string): Promise<MediaRef>

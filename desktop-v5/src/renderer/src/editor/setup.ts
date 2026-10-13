@@ -8,6 +8,7 @@ import { search, searchKeymap } from '@codemirror/search'
 import { tags as t } from '@lezer/highlight'
 import { t as tr } from '../i18n'
 import { prefs } from '../state/prefs.svelte'
+import { aiEditExtensions } from './aiEdit'
 
 /** Marks a transaction that came from outside the user (a reload): it must not count as an edit. */
 export const external = Annotation.define<boolean>()
@@ -135,6 +136,7 @@ const extensions = [
   structure,
   search({ top: true }),
   keymap.of([...searchKeymap, ...historyKeymap, ...defaultKeymap]),
+  ...aiEditExtensions,
   theme
 ]
 

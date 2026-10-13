@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
+import { createAi } from './ai'
 import { applyPendingRestore, createBackups } from './backup'
 import { isVisible, parseWindowState } from './bounds'
 import { createImporter } from './import'
@@ -229,7 +230,8 @@ void app.whenReady().then(async () => {
     store, secrets, media, v4Dir: v4Dir(), readLocalStorage: () => readV4LocalStorage(v4Dir())
   })
   const backups = createBackups(app.getPath('userData'), db)
-  registerIpc(store, secrets, importer, media, backups)
+  const ai = createAi({ store, secrets, warn: log.warn })
+  registerIpc(store, secrets, importer, media, backups, ai)
   createWindow(store)
   backups.autoIfDue().catch((e: unknown) => log.warn('automatic backup failed:', String(e)))
 

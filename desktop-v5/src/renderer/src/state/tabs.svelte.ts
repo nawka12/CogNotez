@@ -1,5 +1,6 @@
 import { SvelteSet } from 'svelte/reactivity'
 import { EditorState, Transaction } from '@codemirror/state'
+import type { TransactionSpec } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import type { Note, NotePatch } from '../../../shared/api'
 import { createState, external } from '../editor/setup'
@@ -320,5 +321,15 @@ export function insertText(doc: Doc, text: string, pos?: number): void {
   else {
     doc.cm = doc.cm.update(spec).state
     bodyChanged(doc)
+  }
+}
+
+/** Dispatches to a doc whether or not it is on screen. A hidden doc's state is updated in place and still saved. */
+export function dispatchTo(doc: Doc, spec: TransactionSpec): void {
+  if (doc.view) doc.view.dispatch(spec)
+  else {
+    const tr = doc.cm.update(spec)
+    doc.cm = tr.state
+    if (tr.docChanged) bodyChanged(doc)
   }
 }

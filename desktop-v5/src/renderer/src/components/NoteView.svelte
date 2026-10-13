@@ -4,6 +4,7 @@
   import { setTitle } from '../state/tabs.svelte'
   import type { Doc } from '../state/tabs.svelte'
   import { ui } from '../state/ui.svelte'
+  import AiReviewBar from './AiReviewBar.svelte'
   import Editor from './Editor.svelte'
   import LockedPanel from './LockedPanel.svelte'
   import MetaLine from './MetaLine.svelte'
@@ -74,6 +75,7 @@
       onkeydown={onTitleKey}
     />
     <MetaLine {doc} />
+    <AiReviewBar docId={doc.id} />
     {#if sealed}
       <LockedPanel {doc} />
     {:else}

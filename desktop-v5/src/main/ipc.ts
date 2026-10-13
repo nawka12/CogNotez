@@ -1,7 +1,9 @@
 import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
+import type { WebContents } from 'electron'
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AppInfo, ExportFormat, ImportSourceKind, NotesChanged } from '../shared/api'
+import type { AiEvent, AppInfo, ExportFormat, ImportSourceKind, NotesChanged } from '../shared/api'
+import type { Ai } from './ai'
 import type { Backups } from './backup'
 import { exportAllMarkdown, noteHtml, noteMarkdown, noteText, slugify } from './export'
 import * as g from './guards'
@@ -22,6 +24,14 @@ function handle(channel: string, fn: (...args: unknown[]) => unknown): void {
   })
 }
 
+/** Like `handle`, but the handler also gets the calling webContents (AI events go to that window only). */
+function handleFrom(channel: string, fn: (sender: WebContents, ...args: unknown[]) => unknown): void {
+  ipcMain.handle(channel, (event, ...args) => {
+    assertSender(event)
+    return fn(event.sender, ...args)
+  })
+}
+
 function notify(ids: string[]): void {
   const payload: NotesChanged = { ids }
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('notes:changed', payload)
@@ -34,7 +44,7 @@ function importSource(v: unknown): ImportSourceKind | 'auto' {
   throw new Error('invalid argument: unknown import source')
 }
 
-export function registerIpc(store: Store, secrets: Secrets, importer: Importer, media: Media, backups: Backups): void {
+export function registerIpc(store: Store, secrets: Secrets, importer: Importer, media: Media, backups: Backups, ai: Ai): void {
   const { notes } = store
 
   handle('notes:list', (f) => notes.list(g.listFilter(f)))
@@ -112,7 +122,34 @@ export function registerIpc(store: Store, secrets: Secrets, importer: Importer, 
     return note
   })
 
+  registerAiIpc(ai)
   registerDataIpc(store, media, backups)
+}
+
+// ---- AI -------------------------------------------------------------------------------------
+
+const watched = new WeakSet<WebContents>()
+
+function registerAiIpc(ai: Ai): void {
+  handle('ai:getConfig', () => ai.getConfig())
+  handle('ai:setConfig', (patch) => ai.setConfig(patch))
+  handle('ai:models', () => ai.models())
+  handle('ai:test', () => ai.test())
+  handleFrom('ai:run', (wc, req) => {
+    if (!watched.has(wc)) {
+      watched.add(wc)
+      wc.once('destroyed', () => ai.abortOwner(wc)) // a closed window must not leave a model generating
+    }
+    return ai.run(req, {
+      owner: wc,
+      send: (e: AiEvent) => {
+        if (!wc.isDestroyed()) wc.send('ai:event', e)
+      }
+    })
+  })
+  handleFrom('ai:abort', (wc, requestId) => ai.abort(g.id(requestId), wc))
+  handle('ai:thread', (noteId) => ai.thread(noteId === null ? null : g.id(noteId)))
+  handle('ai:clearThread', (noteId) => ai.clearThread(noteId === null ? null : g.id(noteId)))
 }
 
 // ---- backups, export, file import, app info ------------------------------------------------

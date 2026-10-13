@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { Api, NotesChanged } from '../shared/api'
+import type { AiEvent, Api, NotesChanged } from '../shared/api'
 
 const call = <T>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(channel, ...args) as Promise<T>
 
@@ -48,6 +48,23 @@ const api: Api = {
     allMarkdown: () => call('exporter:allMarkdown')
   },
   app: { info: () => call('app:info') },
+  ai: {
+    getConfig: () => call('ai:getConfig'),
+    setConfig: (patch) => call('ai:setConfig', patch),
+    models: () => call('ai:models'),
+    test: () => call('ai:test'),
+    run: (req) => call('ai:run', req),
+    abort: (requestId) => call('ai:abort', requestId),
+    thread: (noteId) => call('ai:thread', noteId),
+    clearThread: (noteId) => call('ai:clearThread', noteId)
+  },
+  onAiEvent(cb) {
+    const listener = (_e: unknown, payload: AiEvent): void => cb(payload)
+    ipcRenderer.on('ai:event', listener)
+    return () => {
+      ipcRenderer.removeListener('ai:event', listener)
+    }
+  },
   onLocksChanged(cb) {
     const listener = (_e: unknown, payload: NotesChanged): void => cb(payload)
     ipcRenderer.on('locks:changed', listener)

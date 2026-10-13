@@ -1,5 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n'
+  import { ai, openModelList } from '../state/ai.svelte'
   import { saveStatus, tabs } from '../state/tabs.svelte'
   import { cycleTheme, ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
@@ -16,7 +17,13 @@
   </span>
   <span class="sync wide"><Icon name="cloud" />{t('sync.off')}</span>
   {#if doc && !doc.sealed}<span>{t('meta.words', { n: doc.words })}</span>{/if}
+  {#if ai.working > 0}<span class="working" role="status"><span class="spin"></span>{t('ai.working')}</span>{/if}
   <span class="grow"></span>
+  {#if ai.config?.model}
+    <button class="wide" onclick={openModelList} title={t('ai.switchModel')}>
+      {t(ai.local ? 'ai.chip.local' : 'ai.chip.remote', { model: ai.config.model })}
+    </button>
+  {/if}
   <button onclick={cycleTheme} title={t('theme.cycle')}>{t('theme.label', { name: themeLabel })}</button>
 </footer>
 
@@ -70,6 +77,24 @@
   }
   .failed .dot {
     background: var(--rubric);
+  }
+  .working {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+  }
+  .spin {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--accent);
+    animation: pulse 1.2s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    50% {
+      opacity: 0.25;
+    }
   }
   .sync {
     display: inline-flex;

@@ -40,6 +40,10 @@ class Ui {
   filter = $state.raw<ListFilter>({ kind: 'all' })
   sideOpen = $state(false)
   paletteOpen = $state(false)
+  /** Which sub-list the palette opens on (set just before opening it). */
+  paletteSub = $state<'models' | 'edits' | null>(null)
+  /** Tags the Companion suggested, waiting for the user's pick. */
+  tagSuggest = $state.raw<{ docId: string; title: string; tags: string[] } | null>(null)
   now = $state(Date.now())
   toast = $state.raw<ToastData | null>(null)
   confirm = $state.raw<ConfirmData | null>(null)
