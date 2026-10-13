@@ -74,6 +74,6 @@ describe('Hlc', () => {
     const s2 = createStore(db, () => 1_700_000_000_000) // clock is 5s behind
     s2.notes.save({ id: n.id, title: 'x' })
     expect(rev() > r1).toBe(true)
-    expect(FORMAT.test(rev().replace(/-[0-9a-f-]{36}$/, '-dev'))).toBe(true)
+    expect(FORMAT.test(rev().replace(/-[a-z0-9]{8,32}$/, '-dev'))).toBe(true)
   })
 })

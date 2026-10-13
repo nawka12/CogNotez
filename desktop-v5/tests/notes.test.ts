@@ -153,7 +153,7 @@ describe('settings', () => {
 
   it('creates a device id once and keeps it', () => {
     const s = memStore()
-    expect(s.deviceId).toMatch(/^[0-9a-f-]{36}$/)
+    expect(s.deviceId).toMatch(/^[a-z0-9]{8,32}$/) // sync-v2.md §2
     expect(s.settings.get('sys.device_id')).toBe(s.deviceId)
   })
 })

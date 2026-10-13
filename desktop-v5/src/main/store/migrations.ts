@@ -33,5 +33,12 @@ export const MIGRATIONS: readonly string[] = [
     INSERT INTO notes_fts(notes_fts, rowid, title, body) VALUES ('delete', old.rowid, old.title, old.body);
     INSERT INTO notes_fts(rowid, title, body) VALUES (new.rowid, new.title, new.body);
   END;
+  `,
+  // 2: Sync v2 (docs/v5/sync-v2.md §6). sync_names caches the remote listing for incremental lists.
+  `
+  ALTER TABLE notes ADD COLUMN conflict_of TEXT;
+  CREATE TABLE purged(id TEXT PRIMARY KEY, rev TEXT NOT NULL, purged_at INTEGER NOT NULL);
+  CREATE TABLE sync_names(name TEXT PRIMARY KEY);
+  CREATE INDEX notes_conflict ON notes(conflict_of) WHERE conflict_of IS NOT NULL;
   `
 ]

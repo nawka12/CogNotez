@@ -70,6 +70,7 @@
       ...modes.map((m) => a(`mode-${m}`, t(`mode.${m}.view`), () => (ui.mode = m))),
       a('all', t('palette.showAll'), () => (ui.filter = { kind: 'all' })),
       a('pinned', t('palette.showPinned'), () => (ui.filter = { kind: 'pinned' })),
+      a('conflicts', t('palette.showConflicts'), () => (ui.filter = { kind: 'conflicts' })),
       a('trash', t('palette.openTrash'), () => (ui.filter = { kind: 'trash' })),
       a('settings', t('palette.settings'), openSettings),
       { ...a('from-template', t('palette.newFromTemplate'), openTemplates), keep: true },
@@ -176,7 +177,7 @@
     const notes: Item[] = hits.map((n) => ({
       id: `note-${n.id}`,
       group: t('palette.notes'),
-      label: n.title || t('untitled'),
+      label: (n.title || t('untitled')) + (n.conflictOf ? ` ${t('palette.conflictSuffix')}` : ''),
       hint: n.locked ? '' : n.snippet.replace(/\s+/g, ' '),
       run: () => void openNote(n.id)
     }))

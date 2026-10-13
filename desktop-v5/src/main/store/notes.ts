@@ -1,5 +1,5 @@
 // Notes, tags, search and settings. Pure SQLite + Node: no Electron imports.
-import { randomUUID } from 'node:crypto'
+import { randomBytes, randomUUID } from 'node:crypto'
 import type { SQLInputValue, SQLOutputValue } from 'node:sqlite'
 import type { ListFilter, Note, NoteInput, NotePatch, NoteSummary, Tag } from '../../shared/api'
 import { createKeyCache } from '../crypto/keycache'
@@ -7,6 +7,7 @@ import { createLocks } from '../crypto/locks'
 import { openV5, sealV5 } from '../crypto/notecrypto'
 import { settingValueJson, tagList } from '../guards'
 import { Hlc, parseRev } from '../hlc'
+import { DEVICE_RE, REV_RE } from '../sync/format'
 import { createBulk } from './bulk'
 import { tx } from './db'
 import type { Db } from './db'
@@ -29,6 +30,36 @@ export function snippetOf(text: string, max = 160): string {
     .replace(/\s+/g, ' ')
     .trim()
     .slice(0, max)
+}
+
+const MEDIA_REF_RE = /cognotez-media:\/\/\/?([0-9a-fA-F]{64})(?![0-9a-fA-F])/g
+
+/** sha256 hashes of every `cognotez-media://<hash>` in a body. */
+export function mediaRefs(text: string): Set<string> {
+  return new Set([...text.matchAll(MEDIA_REF_RE)].map((m) => m[1].toLowerCase()))
+}
+
+/** Replaces a note's tags (validated, case-insensitively de-duplicated) and drops unused tags. */
+export function setNoteTags(db: Db, noteId: string, names: string[]): void {
+  db.prepare('DELETE FROM note_tags WHERE note_id = ?').run(noteId)
+  for (const name of tagList(names)) {
+    const found = db.prepare('SELECT id FROM tags WHERE name = ?').get(name) as Row | undefined // NOCASE column
+    const tagId = found ? String(found.id) : randomUUID()
+    if (!found) db.prepare('INSERT INTO tags(id, name) VALUES (?, ?)').run(tagId, name)
+    db.prepare('INSERT OR IGNORE INTO note_tags(note_id, tag_id) VALUES (?, ?)').run(noteId, tagId)
+  }
+  gcTags(db)
+}
+
+export const gcTags = (db: Db): void => {
+  db.exec('DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM note_tags)')
+}
+
+/** Links a note to the stored media its body references (sync uploads exactly these, §5). */
+export function linkMedia(db: Db, noteId: string, hashes: Iterable<string>): void {
+  db.prepare('DELETE FROM note_media WHERE note_id = ?').run(noteId)
+  const link = db.prepare('INSERT OR IGNORE INTO note_media(note_id, hash) SELECT ?, hash FROM media WHERE hash = ?')
+  for (const h of hashes) link.run(noteId, h)
 }
 
 const likeEscape = (s: string): string => s.replace(/[\\%_]/g, '\\$&')
@@ -92,7 +123,7 @@ export function ftsMatch(words: string[]): string {
 
 // ---- store --------------------------------------------------------------------------------
 
-const SUMMARY_COLS = `n.id, n.title, substr(n.body, 1, 480) AS head, n.updated_at, n.pinned, n.locked,
+const SUMMARY_COLS = `n.id, n.title, substr(n.body, 1, 480) AS head, n.updated_at, n.pinned, n.locked, n.conflict_of,
   (SELECT group_concat(t.name, char(31)) FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
     WHERE nt.note_id = n.id) AS tag_names`
 
@@ -118,13 +149,21 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
     db.prepare('INSERT INTO settings(key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value').run(key, json)
   }
 
+  // Sync v2 needs [a-z0-9]{8,32} (§2). Older v5 builds stored a UUID; nothing has synced with it yet, so replace it.
   const stored = getSetting(DEVICE_KEY)
-  const deviceId = typeof stored === 'string' ? stored : randomUUID()
+  const deviceId = typeof stored === 'string' && DEVICE_RE.test(stored) ? stored : randomBytes(8).toString('hex')
   if (stored !== deviceId) putSetting(DEVICE_KEY, JSON.stringify(deviceId))
   const hlc = new Hlc(deviceId, wall)
   // Stay monotonic across restarts even if the wall clock moved backwards in between.
   const top = (db.prepare('SELECT max(rev) AS r FROM notes').get() as Row).r
   if (typeof top === 'string' && parseRev(top)) hlc.receive(top)
+  // Revs stamped with an old-format device id can't go into sync file names: give those notes fresh revs.
+  tx(db, () => {
+    const restamp = db.prepare('UPDATE notes SET rev = ? WHERE id = ?')
+    for (const r of db.prepare('SELECT id, rev FROM notes').all() as Row[]) {
+      if (!REV_RE.test(String(r.rev))) restamp.run(hlc.now(), String(r.id))
+    }
+  })
 
   const summary = (r: Row, snip?: string): NoteSummary => ({
     id: String(r.id),
@@ -133,13 +172,14 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
     updatedAt: Number(r.updated_at),
     pinned: !!r.pinned,
     locked: !!r.locked,
-    tags: tagsOf(r)
+    tags: tagsOf(r),
+    conflictOf: r.conflict_of === null ? null : String(r.conflict_of)
   })
 
   function get(id: string): Note {
     const r = db
       .prepare(
-        `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.deleted_at, n.pinned, n.locked, n.cipher, n.cipher_format,
+        `SELECT n.id, n.title, n.body, n.created_at, n.updated_at, n.deleted_at, n.pinned, n.locked, n.cipher, n.cipher_format, n.conflict_of,
            (SELECT group_concat(t.name, char(31)) FROM note_tags nt JOIN tags t ON t.id = nt.tag_id
              WHERE nt.note_id = n.id) AS tag_names
          FROM notes n WHERE n.id = ?`
@@ -155,7 +195,8 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
       deletedAt: r.deleted_at === null ? null : Number(r.deleted_at),
       pinned: !!r.pinned,
       locked: !!r.locked,
-      tags: tagsOf(r)
+      tags: tagsOf(r),
+      conflictOf: r.conflict_of === null ? null : String(r.conflict_of)
     }
     if (note.locked) {
       // Plaintext only while main holds the key; otherwise the body stays ''.
@@ -163,7 +204,7 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
       note.unlocked = false
       if (k && r.cipher_format === 'v5' && r.cipher instanceof Uint8Array) {
         try {
-          note.body = openV5(r.cipher, note.id, k.key)
+          note.body = openV5(r.cipher, note.conflictOf ? [note.id, note.conflictOf] : note.id, k.key)
           note.unlocked = true
         } catch {
           keys.lock([note.id]) // the stored cipher no longer matches the key (e.g. a restored backup)
@@ -173,20 +214,7 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
     return note
   }
 
-  function setTags(noteId: string, names: string[]): void {
-    db.prepare('DELETE FROM note_tags WHERE note_id = ?').run(noteId)
-    for (const name of tagList(names)) {
-      const found = db.prepare('SELECT id FROM tags WHERE name = ?').get(name) as Row | undefined // NOCASE column
-      const tagId = found ? String(found.id) : randomUUID()
-      if (!found) db.prepare('INSERT INTO tags(id, name) VALUES (?, ?)').run(tagId, name)
-      db.prepare('INSERT OR IGNORE INTO note_tags(note_id, tag_id) VALUES (?, ?)').run(noteId, tagId)
-    }
-    gcTags()
-  }
-
-  const gcTags = (): void => {
-    db.exec('DELETE FROM tags WHERE id NOT IN (SELECT tag_id FROM note_tags)')
-  }
+  const setTags = (noteId: string, names: string[]): void => setNoteTags(db, noteId, names)
 
   function touch(id: string, extra: string, ...params: SQLInputValue[]): void {
     const r = db.prepare(`UPDATE notes SET updated_at = ?, rev = ?${extra} WHERE id = ?`).run(wall(), hlc.now(), ...params, id)
@@ -216,6 +244,7 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
           id, input.title ?? '', input.body ?? '', t, t, hlc.now()
         )
         if (input.tags) setTags(id, input.tags)
+        if (input.body) linkMedia(db, id, mediaRefs(input.body))
         return get(id)
       })
     },
@@ -223,7 +252,7 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
     /** Updates only the given fields, bumps updated_at and rev, atomically. */
     save(p: NotePatch): Note {
       return tx(db, () => {
-        const cur = db.prepare('SELECT locked FROM notes WHERE id = ?').get(p.id) as Row | undefined
+        const cur = db.prepare('SELECT locked, cipher, conflict_of FROM notes WHERE id = ?').get(p.id) as Row | undefined
         if (!cur) return notFound()
         if (cur.locked) keys.get(p.id) // any save counts as activity
         const sets: string[] = []
@@ -239,9 +268,18 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
           if (!k) throw new Error('note is locked')
           set('cipher', sealV5(p.id, p.body, k.key, k.salt, k.iter))
         } else if (p.body !== undefined) set('body', p.body)
+        else if (p.conflictOf === null && cur.locked && cur.conflict_of !== null && cur.cipher instanceof Uint8Array) {
+          // "Keep both" on a locked conflicted copy: re-seal under the copy's own id before the link is dropped.
+          const k = keys.get(p.id)
+          if (!k) throw new Error('note is locked')
+          const plain = openV5(cur.cipher, [p.id, String(cur.conflict_of)], k.key)
+          set('cipher', sealV5(p.id, plain, k.key, k.salt, k.iter))
+        }
         if (p.pinned !== undefined) set('pinned', p.pinned ? 1 : 0)
+        if (p.conflictOf === null) set('conflict_of', null)
         touch(p.id, sets.join(''), ...params)
         if (p.tags !== undefined) setTags(p.id, p.tags)
+        if (p.body !== undefined) linkMedia(db, p.id, mediaRefs(p.body))
         return get(p.id)
       })
     },
@@ -259,8 +297,13 @@ export function createStore(db: Db, wall: () => number = Date.now, opts: StoreOp
         const r = db.prepare('SELECT deleted_at FROM notes WHERE id = ?').get(id) as Row | undefined
         if (!r) return notFound()
         if (r.deleted_at === null) throw new Error('note is not in the trash')
+        // A note the sync remote knows about needs a tombstone (sync-v2.md §6); one it never saw needs nothing.
+        const base = db.prepare('SELECT base_rev FROM sync_state WHERE id = ?').get(id) as Row | undefined
+        if (typeof base?.base_rev === 'string') {
+          db.prepare('INSERT OR REPLACE INTO purged(id, rev, purged_at) VALUES (?, ?, ?)').run(id, base.base_rev, wall())
+        }
         db.prepare('DELETE FROM notes WHERE id = ?').run(id) // cascades note_tags, note_media, ai_messages
-        gcTags()
+        gcTags(db)
       })
       keys.forget(id)
     }

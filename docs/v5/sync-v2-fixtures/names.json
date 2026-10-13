@@ -1,0 +1,240 @@
+{
+  "valid": {
+    "objects": [
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+        "id": "note-0000-aaaa",
+        "rev": "1791860000001-0000-devaaaaaaaa",
+        "parents": [],
+        "encrypted": false
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+        "id": "note-0000-aaaa",
+        "rev": "1791860000002-0000-devbbbbbbbb",
+        "parents": [
+          "1791860000001-0000-devaaaaaaaa"
+        ],
+        "encrypted": false
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb~bdd7485f.1791860000001-0000-devaaaaaaaa+1791860000002-0000-devbbbbbbbb.json",
+        "id": "note-0000-aaaa",
+        "rev": "1791860000002-0000-devbbbbbbbb~bdd7485f",
+        "parents": [
+          "1791860000001-0000-devaaaaaaaa",
+          "1791860000002-0000-devbbbbbbbb"
+        ],
+        "encrypted": false
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0001-devbbbbbbbb~0fa1e2b8.1791860000001-0000-devbbbbbbbb+1791860000002-0000-devbbbbbbbb~bdd7485f.bin",
+        "id": "note-0000-aaaa",
+        "rev": "1791860000002-0001-devbbbbbbbb~0fa1e2b8",
+        "parents": [
+          "1791860000001-0000-devbbbbbbbb",
+          "1791860000002-0000-devbbbbbbbb~bdd7485f"
+        ],
+        "encrypted": true
+      },
+      {
+        "name": "objects/n.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.1791860000001-0000-devaaaaaaaa.0.bin",
+        "id": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        "rev": "1791860000001-0000-devaaaaaaaa",
+        "parents": [],
+        "encrypted": true
+      },
+      {
+        "name": "objects/n.Ab_-0123.1791860000002-0000-devbbbbbbbb.1791860000002-0000-devbbbbbbbb~bdd7485f.json",
+        "id": "Ab_-0123",
+        "rev": "1791860000002-0000-devbbbbbbbb",
+        "parents": [
+          "1791860000002-0000-devbbbbbbbb~bdd7485f"
+        ],
+        "encrypted": false
+      }
+    ],
+    "media": [
+      {
+        "name": "media/m.abababababababababababababababababababababababababababababababab",
+        "key": "abababababababababababababababababababababababababababababababab",
+        "encrypted": false
+      },
+      {
+        "name": "media/m.0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f.bin",
+        "key": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
+        "encrypted": true
+      }
+    ]
+  },
+  "invalid": [
+    {
+      "name": "media/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+      "why": "wrong folder"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.txt",
+      "why": "unknown extension"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json.tmp",
+      "why": "trailing suffix"
+    },
+    {
+      "name": "objects/.syncthing.n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+      "why": "sync-tool temp file"
+    },
+    {
+      "name": "objects/n.short.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+      "why": "note id under 8 characters"
+    },
+    {
+      "name": "objects/n.xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx.1791860000001-0000-devaaaaaaaa.0.json",
+      "why": "note id over 64 characters"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000002-0000-DEVBBBBBBBB.1791860000001-0000-devaaaaaaaa.json",
+      "why": "upper-case rev"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa+1791860000001-0000-devaaaaaaaa.json",
+      "why": "duplicate parents"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb~bdd7485f.1791860000002-0000-devbbbbbbbb+1791860000001-0000-devaaaaaaaa.json",
+      "why": "parents not sorted"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb~bdd7485f.1791860000001-0000-devaaaaaaaa+1791860000002-0000-devbbbbbbbb+1791860000003-0000-devaaaaaaaa.json",
+      "why": "three parents"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.1791860000001-0000-devaaaaaaaa.json",
+      "why": "own parent"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000001-0000-dev.0.json",
+      "why": "device id under 8 characters"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000001-0000-zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz.0.json",
+      "why": "device id over 32 characters"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa~12345678~abcdef01.0.json",
+      "why": "nested merge rev"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa~1234567.0.json",
+      "why": "merge hash not 8 hex"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.sync-conflict-20261013.json",
+      "why": "Syncthing conflict file"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa (conflicted copy).1791860000001-0000-devaaaaaaaa.0.json",
+      "why": "Dropbox conflict file"
+    },
+    {
+      "name": "objects/../n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+      "why": "path traversal"
+    },
+    {
+      "name": "media/m.ABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABABAB",
+      "why": "upper-case media hash"
+    },
+    {
+      "name": "media/m.ababababababababababababababababababababababababababababababab",
+      "why": "media hash too short"
+    },
+    {
+      "name": "media/m.abababababababababababababababababababababababababababababababab.json",
+      "why": "media with .json"
+    },
+    {
+      "name": "objects/m.abababababababababababababababababababababababababababababababab",
+      "why": "media in objects/"
+    },
+    {
+      "name": "meta.json",
+      "why": "not an object or media name (meta.json is read by name only)"
+    },
+    {
+      "name": "",
+      "why": "empty"
+    }
+  ],
+  "mergeRevs": [
+    {
+      "parents": [
+        "1791860000001-0000-devaaaaaaaa",
+        "1791860000002-0000-devbbbbbbbb"
+      ],
+      "hashInput": "1791860000001-0000-devaaaaaaaa+1791860000002-0000-devbbbbbbbb",
+      "rev": "1791860000002-0000-devbbbbbbbb~bdd7485f"
+    },
+    {
+      "parents": [
+        "1791860000002-0000-devbbbbbbbb",
+        "1791860000001-0000-devaaaaaaaa"
+      ],
+      "hashInput": "1791860000001-0000-devaaaaaaaa+1791860000002-0000-devbbbbbbbb",
+      "rev": "1791860000002-0000-devbbbbbbbb~bdd7485f"
+    },
+    {
+      "parents": [
+        "1791860000002-0000-devbbbbbbbb~bdd7485f",
+        "1791860000001-0000-devbbbbbbbb"
+      ],
+      "hashInput": "1791860000001-0000-devbbbbbbbb+1791860000002-0000-devbbbbbbbb~bdd7485f",
+      "rev": "1791860000002-0001-devbbbbbbbb~0fa1e2b8"
+    },
+    {
+      "parents": [
+        "1791860000000-0005-devbbbbbbbb",
+        "1791860000000-zzzz-devaaaaaaaa"
+      ],
+      "hashInput": "1791860000000-0005-devbbbbbbbb+1791860000000-zzzz-devaaaaaaaa",
+      "rev": "1791860000000-zzzz-devaaaaaaaa~790ccbc3"
+    },
+    {
+      "parents": [
+        "1791860000000-zzzz-devaaaaaaaa~790ccbc3",
+        "1791860000000-0005-devbbbbbbbb"
+      ],
+      "hashInput": "1791860000000-0005-devbbbbbbbb+1791860000000-zzzz-devaaaaaaaa~790ccbc3",
+      "rev": "1791860000001-0000-devaaaaaaaa~6dcfec87"
+    },
+    {
+      "parents": [
+        "1791860000001-0000-devaaaaaaaa",
+        "1791860000001-0000-devaaaaaaaa0"
+      ],
+      "hashInput": "1791860000001-0000-devaaaaaaaa+1791860000001-0000-devaaaaaaaa0",
+      "rev": "1791860000001-0000-devaaaaaaaa0~894f0506"
+    },
+    {
+      "parents": [
+        "1791860000001-0000-devaaaaaaaa0~894f0506",
+        "1791860000001-0000-devaaaaaaaa0"
+      ],
+      "hashInput": "1791860000001-0000-devaaaaaaaa0+1791860000001-0000-devaaaaaaaa0~894f0506",
+      "rev": "1791860000001-0001-devaaaaaaaa0~de14ffcd"
+    }
+  ],
+  "copyIds": [
+    {
+      "noteId": "note-0000-aaaa",
+      "losingRev": "1791860000001-0000-devaaaaaaaa",
+      "input": "note-0000-aaaa:1791860000001-0000-devaaaaaaaa",
+      "id": "cae9960dc744165dcf20fcb58edcf0e2"
+    },
+    {
+      "noteId": "note-0000-aaaa",
+      "losingRev": "1791860000002-0000-devbbbbbbbb~bdd7485f",
+      "input": "note-0000-aaaa:1791860000002-0000-devbbbbbbbb~bdd7485f",
+      "id": "ce3024c4b5867e355874ecb112c2fb6b"
+    }
+  ]
+}

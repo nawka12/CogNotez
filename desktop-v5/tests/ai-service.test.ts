@@ -231,6 +231,15 @@ describe('run', () => {
     expect(() => t.ai.run({ kind: 'chat', noteId: null, text: '', input: 'q', research: true }, t.sink)).toThrow(/SearXNG/)
   })
 
+  it('research results never trigger the fake server (their URLs hold a random port that may contain "401")', async () => {
+    const content = '<search_results>\n[1] r\nURL: http://127.0.0.1:40123/page/1 SLOW\n</search_results>\n\nhi'
+    const res = await fetch(`http://127.0.0.1:${fake.port}/v1/chat/completions`, {
+      method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content }] })
+    })
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('[DONE]') // a SLOW trigger would still be streaming ticks after 30 s
+  })
+
   it('reports an unreachable SearXNG instead of silently skipping research', async () => {
     t.ai.setConfig({ searxngUrl: 'http://127.0.0.1:1' })
     const ev = await t.ask({ kind: 'chat', noteId: null, text: '', input: 'q', research: true })

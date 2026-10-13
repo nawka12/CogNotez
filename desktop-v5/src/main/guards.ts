@@ -74,11 +74,16 @@ export function noteInput(v: unknown): NoteInput {
 }
 
 export function notePatch(v: unknown): NotePatch {
-  const o = plainObject(v, 'patch', ['id', 'title', 'body', 'tags', 'pinned'])
+  const o = plainObject(v, 'patch', ['id', 'title', 'body', 'tags', 'pinned', 'conflictOf'])
   const patch: NotePatch = { id: id(o.id), ...optionalFields(o) }
   if (o.pinned !== undefined) {
     if (typeof o.pinned !== 'boolean') fail('pinned must be a boolean')
     patch.pinned = o.pinned
+  }
+  if (o.conflictOf !== undefined) {
+    // "Keep both" on a sync conflicted copy; setting a conflict link is sync's job alone.
+    if (o.conflictOf !== null) fail('conflictOf can only be set to null')
+    patch.conflictOf = null
   }
   return patch
 }

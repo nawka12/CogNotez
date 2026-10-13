@@ -2,7 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron'
 import type { WebContents } from 'electron'
 import { mkdirSync, readdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import type { AiEvent, AppInfo, ExportFormat, ImportSourceKind, NotesChanged } from '../shared/api'
+import type { AiEvent, AppInfo, ExportFormat, ImportSourceKind, NotesChanged, SyncSetup } from '../shared/api'
 import type { Ai } from './ai'
 import type { Backups } from './backup'
 import { exportAllMarkdown, noteHtml, noteMarkdown, noteText, slugify } from './export'
@@ -14,6 +14,8 @@ import type { Media } from './media'
 import { fraunces, htmlToPdf } from './pdf'
 import { assertSender } from './security'
 import type { Secrets } from './secrets'
+import type { SyncService } from './sync/service'
+import type { GoogleAuth } from './sync/google-auth'
 import type { Store } from './store/notes'
 
 /** Every channel goes through here: sender check first, then the handler (which validates its own args). */
@@ -32,9 +34,13 @@ function handleFrom(channel: string, fn: (sender: WebContents, ...args: unknown[
   })
 }
 
+/** Set by registerSyncIpc: local note changes schedule a sync round. */
+let onLocalChange: (() => void) | null = null
+
 function notify(ids: string[]): void {
   const payload: NotesChanged = { ids }
   for (const w of BrowserWindow.getAllWindows()) w.webContents.send('notes:changed', payload)
+  onLocalChange?.()
 }
 
 /** `undefined` means 'auto'. */
@@ -230,12 +236,60 @@ function registerDataIpc(store: Store, media: Media, backups: Backups): void {
   })
 
   handle('app:info', (): AppInfo => ({ version: app.getVersion(), electron: process.versions.electron, userData: app.getPath('userData') }))
+}
 
-  // Placeholders until milestone 4 (sync) lands; the contract lives in shared/api.ts.
-  for (const ch of ['sync:status', 'sync:setup', 'sync:unlock', 'sync:now', 'sync:disable', 'sync:setDeviceName',
-    'google:connect', 'google:disconnect', 'google:status', 'google:importClient']) {
-    handle(ch, () => {
-      throw new Error('not implemented yet')
-    })
+// ---- Sync ------------------------------------------------------------------------------------
+
+function syncSetup(v: unknown): SyncSetup {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) throw new Error('invalid argument: setup must be an object')
+  const o = v as Record<string, unknown>
+  for (const k of Object.keys(o)) if (k !== 'transport' && k !== 'passphrase') throw new Error(`invalid argument: setup.${k} is not allowed`)
+  if (o.transport !== 'folder' && o.transport !== 'gdrive') throw new Error('invalid argument: unknown sync transport')
+  if (o.passphrase === undefined) return { transport: o.transport }
+  if (typeof o.passphrase !== 'string' || o.passphrase.length < 8 || o.passphrase.length > g.LIMITS.password) {
+    throw new Error('invalid argument: the passphrase must be 8 to 1024 characters')
   }
+  return { transport: o.transport, passphrase: o.passphrase }
+}
+
+function deviceName(v: unknown): string {
+  // eslint-disable-next-line no-control-regex
+  if (typeof v !== 'string' || !v.trim() || v.length > 100 || /[\u0000-\u001f\u007f]/.test(v)) {
+    throw new Error('invalid argument: the device name must be 1 to 100 characters')
+  }
+  return v.trim()
+}
+
+export function registerSyncIpc(sync: SyncService): void {
+  onLocalChange = () => sync.noteChanged()
+  handle('sync:status', () => sync.status())
+  handle('sync:setup', (s) => sync.setup(syncSetup(s)))
+  handle('sync:unlock', (p) => sync.unlock(g.password(p)))
+  handle('sync:now', () => sync.now())
+  handle('sync:disable', () => sync.disable())
+  handle('sync:setDeviceName', (n) => sync.setDeviceName(deviceName(n)))
+}
+
+/** The sync folder picker; COGNOTEZ_TEST_SYNC_FOLDER stands in for the dialog in dev (ignored when packaged). */
+export async function pickSyncFolder(): Promise<string | null> {
+  const [path] = await pickPaths({ properties: ['openDirectory', 'createDirectory'] }, testEnv('COGNOTEZ_TEST_SYNC_FOLDER'))
+  return path ?? null
+}
+
+// ---- Google account (Drive sync sign-in) ---------------------------------------------------
+
+export function registerGoogleIpc(google: GoogleAuth): void {
+  handle('google:connect', () => google.connect())
+  handle('google:disconnect', () => google.disconnect())
+  handle('google:status', () => google.status())
+  handle('google:importClient', () => google.importClient())
+}
+
+/** The OAuth client JSON picker for `google.importClient()`; COGNOTEZ_TEST_GOOGLE_CLIENT_FILE stands in for the dialog in dev. */
+export async function pickGoogleClientFile(): Promise<string | null> {
+  const [path] = await pickPaths(
+    { properties: ['openFile'], filters: [{ name: 'Google OAuth client', extensions: ['json'] }] },
+    testEnv('COGNOTEZ_TEST_GOOGLE_CLIENT_FILE')
+  )
+  return path ?? null
 }

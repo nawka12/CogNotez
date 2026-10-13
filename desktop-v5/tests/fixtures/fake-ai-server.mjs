@@ -2,7 +2,8 @@
 //   node tests/fixtures/fake-ai-server.mjs [port]      (default 11999, prints "listening <port>")
 //   import { start } from './fake-ai-server.mjs'        (start(port) resolves { port, state, close })
 //
-// Triggers (found anywhere in the last user message): SLOW streams for 30 s (to test abort); 401 answers HTTP 401.
+// Triggers (found anywhere in the user's question, i.e. the last user message minus any <search_results> block, whose URLs
+// carry the random port and could contain "401"): SLOW streams for 30 s (to test abort); 401 answers HTTP 401.
 // Ollama model name "missing" answers 404 "model not found".
 // Replies:
 //   edit tasks (system says "Return only the resulting text"): the <text> with its FIRST WORD UPPERCASED + " (edited)";
@@ -16,6 +17,9 @@ import { pathToFileURL } from 'node:url'
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms))
 
+/** The user's own words: the text after </search_results> when research results were prepended. */
+const questionOf = (last) => (last.includes('</search_results>') ? last.split('</search_results>').pop().trim() : last)
+
 function replyFor(messages) {
   const system = messages.find((m) => m.role === 'system')?.content ?? ''
   const last = [...messages].reverse().find((m) => m.role === 'user')?.content ?? ''
@@ -26,8 +30,7 @@ function replyFor(messages) {
   }
   if (system.includes('JSON array')) return '["fake","test"]'
   const sources = (last.match(/^\[\d+\] /gm) ?? []).length
-  const question = last.includes('</search_results>') ? last.split('</search_results>').pop().trim() : last
-  return `Echo: ${question}` + (last.includes('<search_results>') ? ` [${sources} sources]` : '')
+  return `Echo: ${questionOf(last)}` + (last.includes('<search_results>') ? ` [${sources} sources]` : '')
 }
 
 function chunksOf(text, n = 5) {
@@ -125,9 +128,10 @@ export function start(port = 11999) {
       if (isOllama) state.lastOllama = { model: body.model, num_ctx: body.options?.num_ctx, temperature: body.options?.temperature }
       const messages = Array.isArray(body.messages) ? body.messages : []
       const last = [...messages].reverse().find((m) => m.role === 'user')?.content ?? ''
-      if (last.includes('401')) return json(res, 401, { error: { message: 'Invalid API key' } })
+      const question = questionOf(last)
+      if (question.includes('401')) return json(res, 401, { error: { message: 'Invalid API key' } })
       if (isOllama && body.model === 'missing') return json(res, 404, { error: "model 'missing' not found" })
-      return stream(req, res, isOllama ? 'ndjson' : 'sse', chunksOf(replyFor(messages)), last.includes('SLOW'))
+      return stream(req, res, isOllama ? 'ndjson' : 'sse', chunksOf(replyFor(messages)), question.includes('SLOW'))
     }
     json(res, 404, { error: 'not found' })
   })

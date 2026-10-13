@@ -1,0 +1,731 @@
+[
+  {
+    "name": "body changed on one side, title on the other",
+    "rule": "§8 content: only one side changed: take it; no copy",
+    "graph": [
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000001-0000-devaaaaaaaa",
+          "parents": [],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "Body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000001,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devaaaaaaaa.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000002-0000-devaaaaaaaa",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "A body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000002,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000003-0000-devbbbbbbbb",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devbbbbbbbb",
+          "deviceName": "devbbbbbbbb",
+          "deleted": false,
+          "title": "B title",
+          "body": "Body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000003,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      }
+    ],
+    "expected": {
+      "writes": [
+        {
+          "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb~dda9ed3a.1791860000002-0000-devaaaaaaaa+1791860000003-0000-devbbbbbbbb.json",
+          "object": {
+            "v": 2,
+            "id": "note-0000-aaaa",
+            "rev": "1791860000003-0000-devbbbbbbbb~dda9ed3a",
+            "parents": [
+              "1791860000002-0000-devaaaaaaaa",
+              "1791860000003-0000-devbbbbbbbb"
+            ],
+            "device": "merge",
+            "deviceName": "merge",
+            "deleted": false,
+            "title": "B title",
+            "body": "A body",
+            "tags": [
+              "a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000000,
+            "updatedAt": 1791860000003,
+            "locked": false,
+            "cipher": null,
+            "cipherFormat": null,
+            "media": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "conflictOf": null
+          }
+        }
+      ],
+      "head": "1791860000003-0000-devbbbbbbbb~dda9ed3a"
+    }
+  },
+  {
+    "name": "both changed the body",
+    "rule": "§8 content: conflict: b keeps its content, a goes to a conflicted copy (copy written first)",
+    "graph": [
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000001-0000-devaaaaaaaa",
+          "parents": [],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "Body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000001,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devaaaaaaaa.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000002-0000-devaaaaaaaa",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "A body",
+          "tags": [
+            "a",
+            "from-a"
+          ],
+          "pinned": true,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000002,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000003-0000-devbbbbbbbb",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devbbbbbbbb",
+          "deviceName": "devbbbbbbbb",
+          "deleted": false,
+          "title": "Title",
+          "body": "B body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000003,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      }
+    ],
+    "expected": {
+      "writes": [
+        {
+          "name": "objects/n.cb3f631caac53f872663f5bef10c6810.1791860000002-0000-devaaaaaaaa.0.json",
+          "object": {
+            "v": 2,
+            "id": "cb3f631caac53f872663f5bef10c6810",
+            "rev": "1791860000002-0000-devaaaaaaaa",
+            "parents": [],
+            "device": "devaaaaaaaa",
+            "deviceName": "devaaaaaaaa",
+            "deleted": false,
+            "title": "Title (conflicted copy)",
+            "body": "A body",
+            "tags": [
+              "a",
+              "from-a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000002,
+            "updatedAt": 1791860000002,
+            "locked": false,
+            "cipher": null,
+            "cipherFormat": null,
+            "media": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            ],
+            "conflictOf": "note-0000-aaaa"
+          }
+        },
+        {
+          "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb~dda9ed3a.1791860000002-0000-devaaaaaaaa+1791860000003-0000-devbbbbbbbb.json",
+          "object": {
+            "v": 2,
+            "id": "note-0000-aaaa",
+            "rev": "1791860000003-0000-devbbbbbbbb~dda9ed3a",
+            "parents": [
+              "1791860000002-0000-devaaaaaaaa",
+              "1791860000003-0000-devbbbbbbbb"
+            ],
+            "device": "merge",
+            "deviceName": "merge",
+            "deleted": false,
+            "title": "Title",
+            "body": "B body",
+            "tags": [
+              "a",
+              "from-a"
+            ],
+            "pinned": true,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000000,
+            "updatedAt": 1791860000003,
+            "locked": false,
+            "cipher": null,
+            "cipherFormat": null,
+            "media": [],
+            "conflictOf": null
+          }
+        }
+      ],
+      "head": "1791860000003-0000-devbbbbbbbb~dda9ed3a"
+    }
+  },
+  {
+    "name": "both made the same body change",
+    "rule": "§8 content: equal on both sides: keep it; media is the union",
+    "graph": [
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000001-0000-devaaaaaaaa",
+          "parents": [],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "Body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000001,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devaaaaaaaa.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000002-0000-devaaaaaaaa",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "same",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000002,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [
+            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+          ],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000003-0000-devbbbbbbbb",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devbbbbbbbb",
+          "deviceName": "devbbbbbbbb",
+          "deleted": false,
+          "title": "Title",
+          "body": "same",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000003,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+          ],
+          "conflictOf": null
+        }
+      }
+    ],
+    "expected": {
+      "writes": [
+        {
+          "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb~dda9ed3a.1791860000002-0000-devaaaaaaaa+1791860000003-0000-devbbbbbbbb.json",
+          "object": {
+            "v": 2,
+            "id": "note-0000-aaaa",
+            "rev": "1791860000003-0000-devbbbbbbbb~dda9ed3a",
+            "parents": [
+              "1791860000002-0000-devaaaaaaaa",
+              "1791860000003-0000-devbbbbbbbb"
+            ],
+            "device": "merge",
+            "deviceName": "merge",
+            "deleted": false,
+            "title": "Title",
+            "body": "same",
+            "tags": [
+              "a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000000,
+            "updatedAt": 1791860000003,
+            "locked": false,
+            "cipher": null,
+            "cipherFormat": null,
+            "media": [
+              "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+            ],
+            "conflictOf": null
+          }
+        }
+      ],
+      "head": "1791860000003-0000-devbbbbbbbb~dda9ed3a"
+    }
+  },
+  {
+    "name": "a locked note re-sealed on both sides",
+    "rule": "§8 content: body, locked, cipher and cipherFormat move together",
+    "graph": [
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000001-0000-devaaaaaaaa",
+          "parents": [],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000001,
+          "locked": true,
+          "cipher": "AAAA",
+          "cipherFormat": "v5",
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devaaaaaaaa.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000002-0000-devaaaaaaaa",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000002,
+          "locked": true,
+          "cipher": "AAAB",
+          "cipherFormat": "v5",
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000003-0000-devbbbbbbbb",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devbbbbbbbb",
+          "deviceName": "devbbbbbbbb",
+          "deleted": false,
+          "title": "Title",
+          "body": "",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000003,
+          "locked": true,
+          "cipher": "AAAC",
+          "cipherFormat": "v5",
+          "media": [],
+          "conflictOf": null
+        }
+      }
+    ],
+    "expected": {
+      "writes": [
+        {
+          "name": "objects/n.cb3f631caac53f872663f5bef10c6810.1791860000002-0000-devaaaaaaaa.0.json",
+          "object": {
+            "v": 2,
+            "id": "cb3f631caac53f872663f5bef10c6810",
+            "rev": "1791860000002-0000-devaaaaaaaa",
+            "parents": [],
+            "device": "devaaaaaaaa",
+            "deviceName": "devaaaaaaaa",
+            "deleted": false,
+            "title": "Title (conflicted copy)",
+            "body": "",
+            "tags": [
+              "a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000002,
+            "updatedAt": 1791860000002,
+            "locked": true,
+            "cipher": "AAAB",
+            "cipherFormat": "v5",
+            "media": [],
+            "conflictOf": "note-0000-aaaa"
+          }
+        },
+        {
+          "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb~dda9ed3a.1791860000002-0000-devaaaaaaaa+1791860000003-0000-devbbbbbbbb.json",
+          "object": {
+            "v": 2,
+            "id": "note-0000-aaaa",
+            "rev": "1791860000003-0000-devbbbbbbbb~dda9ed3a",
+            "parents": [
+              "1791860000002-0000-devaaaaaaaa",
+              "1791860000003-0000-devbbbbbbbb"
+            ],
+            "device": "merge",
+            "deviceName": "merge",
+            "deleted": false,
+            "title": "Title",
+            "body": "",
+            "tags": [
+              "a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000000,
+            "updatedAt": 1791860000003,
+            "locked": true,
+            "cipher": "AAAC",
+            "cipherFormat": "v5",
+            "media": [],
+            "conflictOf": null
+          }
+        }
+      ],
+      "head": "1791860000003-0000-devbbbbbbbb~dda9ed3a"
+    }
+  },
+  {
+    "name": "the loser title is cut so the copy title fits 1000",
+    "rule": "§8 conflicted copy title",
+    "graph": [
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa.0.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000001-0000-devaaaaaaaa",
+          "parents": [],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "Title",
+          "body": "Body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000001,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000002-0000-devaaaaaaaa.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000002-0000-devaaaaaaaa",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devaaaaaaaa",
+          "deviceName": "devaaaaaaaa",
+          "deleted": false,
+          "title": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+          "body": "A body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000002,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.json",
+        "object": {
+          "v": 2,
+          "id": "note-0000-aaaa",
+          "rev": "1791860000003-0000-devbbbbbbbb",
+          "parents": [
+            "1791860000001-0000-devaaaaaaaa"
+          ],
+          "device": "devbbbbbbbb",
+          "deviceName": "devbbbbbbbb",
+          "deleted": false,
+          "title": "Title",
+          "body": "B body",
+          "tags": [
+            "a"
+          ],
+          "pinned": false,
+          "archived": false,
+          "trashedAt": null,
+          "createdAt": 1791860000000,
+          "updatedAt": 1791860000003,
+          "locked": false,
+          "cipher": null,
+          "cipherFormat": null,
+          "media": [],
+          "conflictOf": null
+        }
+      }
+    ],
+    "expected": {
+      "writes": [
+        {
+          "name": "objects/n.cb3f631caac53f872663f5bef10c6810.1791860000002-0000-devaaaaaaaa.0.json",
+          "object": {
+            "v": 2,
+            "id": "cb3f631caac53f872663f5bef10c6810",
+            "rev": "1791860000002-0000-devaaaaaaaa",
+            "parents": [],
+            "device": "devaaaaaaaa",
+            "deviceName": "devaaaaaaaa",
+            "deleted": false,
+            "title": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt (conflicted copy)",
+            "body": "A body",
+            "tags": [
+              "a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000002,
+            "updatedAt": 1791860000002,
+            "locked": false,
+            "cipher": null,
+            "cipherFormat": null,
+            "media": [],
+            "conflictOf": "note-0000-aaaa"
+          }
+        },
+        {
+          "name": "objects/n.note-0000-aaaa.1791860000003-0000-devbbbbbbbb~dda9ed3a.1791860000002-0000-devaaaaaaaa+1791860000003-0000-devbbbbbbbb.json",
+          "object": {
+            "v": 2,
+            "id": "note-0000-aaaa",
+            "rev": "1791860000003-0000-devbbbbbbbb~dda9ed3a",
+            "parents": [
+              "1791860000002-0000-devaaaaaaaa",
+              "1791860000003-0000-devbbbbbbbb"
+            ],
+            "device": "merge",
+            "deviceName": "merge",
+            "deleted": false,
+            "title": "tttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttttt",
+            "body": "B body",
+            "tags": [
+              "a"
+            ],
+            "pinned": false,
+            "archived": false,
+            "trashedAt": null,
+            "createdAt": 1791860000000,
+            "updatedAt": 1791860000003,
+            "locked": false,
+            "cipher": null,
+            "cipherFormat": null,
+            "media": [],
+            "conflictOf": null
+          }
+        }
+      ],
+      "head": "1791860000003-0000-devbbbbbbbb~dda9ed3a"
+    }
+  }
+]

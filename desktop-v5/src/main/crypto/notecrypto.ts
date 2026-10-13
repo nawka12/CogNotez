@@ -84,12 +84,30 @@ function gcmOpen(env: Envelope, key: Buffer, aad: Buffer | null): string {
   }
 }
 
+/**
+ * v5 AAD candidates: the note id first, then (for a sync conflicted copy, docs/v5/sync-v2.md §8) the id of the
+ * note it was split from, whose AAD the copied ciphertext still carries until it is re-sealed.
+ */
+function openAad(env: Envelope, key: Buffer, ids: string | readonly string[]): string {
+  const list = typeof ids === 'string' ? [ids] : ids
+  for (const id of list.slice(0, -1)) {
+    try {
+      return gcmOpen(env, key, Buffer.from(id, 'utf8'))
+    } catch {
+      /* try the next id */
+    }
+  }
+  return gcmOpen(env, key, Buffer.from(list[list.length - 1] ?? '', 'utf8'))
+}
+
 /** Decrypts with a password. Throws Error('wrong password') for anything that does not open. */
-export async function openWithPassword(cipher: Uint8Array, format: string | null, id: string, password: string): Promise<Opened> {
+export async function openWithPassword(
+  cipher: Uint8Array, format: string | null, id: string | readonly string[], password: string
+): Promise<Opened> {
   const env = parseEnvelope(cipher, format)
   const key = await deriveKey(password, env.salt, env.iter)
   try {
-    const text = gcmOpen(env, key, format === 'v5' ? Buffer.from(id, 'utf8') : null)
+    const text = format === 'v5' ? openAad(env, key, id) : gcmOpen(env, key, null)
     const json = JSON.parse(text) as Record<string, unknown>
     const field = format === 'v5' ? json.body : json.content
     if (typeof field !== 'string') return wrong()
@@ -101,9 +119,9 @@ export async function openWithPassword(cipher: Uint8Array, format: string | null
 }
 
 /** Decrypts a v5 cipher with an already derived key. */
-export function openV5(cipher: Uint8Array, id: string, key: Buffer): string {
+export function openV5(cipher: Uint8Array, id: string | readonly string[], key: Buffer): string {
   const env = parseEnvelope(cipher, 'v5')
-  const json = JSON.parse(gcmOpen(env, key, Buffer.from(id, 'utf8'))) as Record<string, unknown>
+  const json = JSON.parse(openAad(env, key, id)) as Record<string, unknown>
   return typeof json.body === 'string' ? json.body : wrong()
 }
 

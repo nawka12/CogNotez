@@ -19,10 +19,11 @@ Non-goals for 2.0: character-level merging of concurrent body edits, syncing AI 
 | Device id | `[a-z0-9]{8,32}`, random, generated once per install and stored in local settings |
 | Note id | `[A-Za-z0-9_-]{8,64}` |
 | Rev (edit) | `<ms 13 digits>-<counter 4 base36>-<deviceId>`, a hybrid logical clock (HLC) value |
-| Rev (merge) | `<rev of greatest parent>~<first 8 hex of sha256(parents joined by "+")>` |
+| Rev (merge) | `<prefix>~<first 8 hex of sha256(sorted parents joined by "+")>` |
 
-- **Revs order by plain string comparison.** All fields are fixed-width, and `~` sorts after every alphanumeric character, so a merge rev sorts after all of its parents.
-- **Clocks.** Every device applies HLC `receive()` to each rev it reads, so its next local rev is greater than anything it has seen. Wall-clock time is never used for merge decisions.
+- **Merge rev prefix.** If the greatest parent is an edit rev, the prefix is that rev. If it is a merge rev `E~h`, the prefix is the HLC successor of `E`: the same device part with the counter + 1, or the next millisecond with counter `0000` when the counter was `zzzz`. Merge revs therefore never nest, and a rev is at most 60 characters.
+- **Revs order by plain string comparison.** The ms and counter fields are fixed-width, and `~` sorts after every character of a device id, so a merge rev sorts after all of its parents, also when one device id is a prefix of another.
+- **Clocks.** Every device applies HLC `receive()` to each rev it reads, so its next local rev is greater than anything it has seen. `receive()` uses only the ms and counter fields, so it takes merge revs too. Wall-clock time is never used for merge decisions.
 
 ## 3. Remote layout
 
@@ -34,8 +35,8 @@ Non-goals for 2.0: character-level merging of concurrent body edits, syncing AI 
 <root>/media/m.<hmachex>.bin                     encrypted remote
 ```
 
-- **`<parents>` field.** `0` marks a root revision. Otherwise it holds 1 to 8 revs joined by `+` and sorted ascending.
-- **Names are never reused.** A writer that finds a name already present treats the write as done. The same name always means the same content, because content is determined by the name together with the deterministic rules below.
+- **`<parents>` field.** `0` marks a root revision. Otherwise it holds 1 rev (an edit or a tombstone) or 2 distinct revs (a merge), joined by `+` and sorted ascending. A name with more parents is invalid. Two parents keep every name under 255 bytes.
+- **Names are never reused.** A writer that finds a name already present treats the write as done, and the file that is there is the truth. Devices that see the same graph compute the same content for a name (§8 covers when they don't).
 - **Readers ignore** any name that doesn't match these patterns: temp files, sync-tool conflict files and stray files.
 - **Size limits.** Reject objects over 8 MB and media over 50 MB.
 
@@ -52,7 +53,7 @@ or, for an encrypted remote:
            "wrap": { "iv": "<b64 12B>", "ct": "<b64 32B>", "tag": "<b64 16B>" } } }
 ```
 
-- **Create-only.** If a race leaves two candidates, the one with the smallest `(created, createdBy)` wins, and the losing device deletes its own copy and adopts the winner.
+- **Create-only.** After creating it, a device reads `meta.json` back. If a race left two candidates (only Drive allows duplicate names), every device reads the same one, the oldest (§10), and a device whose own copy lost adopts the winner and discards the key it made.
 - **KEK** (key-encryption key) = PBKDF2-SHA256(passphrase UTF-8, salt, clamp(iter, 100 000, 2 000 000), 32 bytes).
 - **DEK** (data key, 32 random bytes) = AES-256-GCM-open(KEK, wrap.iv, wrap.ct, wrap.tag, AAD = `"cognotez-sync-v2-dek"`). A failed open means the passphrase is wrong.
 - **Caching.** The DEK is cached per device in the OS keychain (secret `sync_dek`). The passphrase itself is never stored.
@@ -61,7 +62,7 @@ or, for an encrypted remote:
 
 ## 5. Revision object
 
-UTF-8 JSON:
+UTF-8 JSON, written with keys sorted and no whitespace (strings escaped as `JSON.stringify` does):
 
 ```json
 { "v": 2, "id": "<noteId>", "rev": "<rev>", "parents": ["<rev>"],
@@ -125,35 +126,37 @@ UTF-8 JSON:
 
 ## 8. Deterministic merge
 
-**Base selection.** Sort the heads ascending by rev and fold them pairwise: `acc = merge(acc, next)`. For each step, the base is the lowest common ancestor in the graph:
-- take the common ancestors that are not ancestors of other common ancestors;
-- if several remain (criss-cross), use the greatest rev;
-- if none exist or the base object is unreadable, the base is unknown.
+**Base selection.** Sort the heads ascending by rev and fold them pairwise: `acc = merge(acc, next)`. For each step, the base is the lowest common ancestor in the graph (each side counts as its own ancestor; an unknown parent is an ancestor with no parents):
+- take the common ancestors that are not ancestors of other common ancestors, and leave out unreadable ones;
+- if one remains, it is the base;
+- if several remain (criss-cross), the base is their virtual merge: fold them in ascending rev order with these same rules, each step with its own base found this way. Virtual merges are never written, and their conflicted copies are dropped;
+- if none remain, the base is unknown. A tombstone base counts as unknown for the field rules below.
 
 **Rules for `merge(a, b)`** (`b` has the greater rev):
 - **Tombstones.**
   - A tombstone on one side and a changed note on the other: the *change wins*, and the result is not deleted.
   - A tombstone against an unchanged side: the result is a tombstone.
   - With an unknown base, any non-tombstone wins.
-- **Scalar fields** (`title`, `pinned`, `archived`, `trashedAt`): take the value from the side that changed it relative to the base. If both changed it, or the base is unknown, and the values differ, take `b`.
-- **`tags`:** (tags in either side not in base) ∪ (base tags still present on both sides). With an unknown base, the union.
+- **Scalar fields** (`title`, `pinned`, `archived`, `trashedAt`, `conflictOf`): take the value from the side that changed it relative to the base. If both changed it, or the base is unknown, and the values differ, take `b`.
+- **`tags`:** (tags in either side not in base) ∪ (base tags still present on both sides). With an unknown base, the union. Then sort by UTF-16 code units, drop a tag whose lower-case form an earlier one already has, and keep the first 50.
 - **Content** (`body`, `locked`, `cipher` and `cipherFormat` together):
   - Equal on both sides: keep it.
   - Only one side changed relative to the base: take that side.
   - Otherwise: **conflict.** `b` keeps its content, and `a`'s content goes into a conflicted copy.
-- **`media`:** the union of the media that the chosen contents reference.
+- **`media`:** when the content was equal on both sides, the union of both sides' `media`; otherwise the `media` of the side whose content was taken.
 - **`createdAt`:** the minimum. **`updatedAt`:** the maximum.
 
-**The merge revision** has rev = merge rev (§2), parents = all heads, `device` and `deviceName` = `"merge"`, and `updatedAt` = the maximum of the heads.
+**The merge revision** has rev = merge rev (§2), parents = the two revs it merges, `device` and `deviceName` = `"merge"`, and `updatedAt` = the maximum of the two. A fold over three or more heads writes one merge revision per step, each step's conflicted copy before its merge revision, so a round that stops halfway never hides a losing edit behind a merge.
 
 **A conflicted copy** is a new note:
 - id = `c` + the first 31 hex characters of sha256(`noteId + ":" + losingRev`);
-- one root revision with `rev = losingRev`, parents `0`, `device` = the loser's device, the loser's content and tags;
-- title = loser title + ` (conflicted copy)`;
+- one root revision with `rev = losingRev`, parents `0`, the loser's `device`, `deviceName`, content, tags and `media` (the loser may itself be a merge revision, with device `"merge"`);
+- title = the loser title cut to its first 982 UTF-16 code units + ` (conflicted copy)` (1000 at most);
+- `pinned` and `archived` = `false`, `trashedAt` = `null`;
 - `conflictOf = noteId`;
 - `createdAt` and `updatedAt` = the loser's `updatedAt`.
 
-Every field is a function of remote data, so every device writes the same file.
+Every field is a function of remote data, so every device that sees the same graph writes the same file. If two devices see different graphs (a file not listed yet, an unreadable base), they can compute different content for the same name. The first file created wins and the others read it back, so the cost is at most an extra conflicted copy, or a scalar field decided as if both sides had changed it. A body is never lost.
 
 **Resolving.** When the user picks "Keep both", `conflictOf` is set to `null`. That is a normal local edit, so it syncs.
 

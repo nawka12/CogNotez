@@ -1,7 +1,7 @@
-import { app, BrowserWindow, ipcMain, net, powerMonitor, protocol, safeStorage, screen } from 'electron'
+import { app, BrowserWindow, ipcMain, net, powerMonitor, protocol, safeStorage, screen, shell } from 'electron'
 import type { IpcMainEvent } from 'electron'
-import { mkdtempSync, rmSync } from 'node:fs'
-import { tmpdir } from 'node:os'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
+import { hostname, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { createAi } from './ai'
@@ -9,7 +9,7 @@ import { applyPendingRestore, createBackups } from './backup'
 import { isVisible, parseWindowState } from './bounds'
 import { createImporter } from './import'
 import { readV4LocalStorage } from './import/v4-electron'
-import { registerIpc } from './ipc'
+import { pickGoogleClientFile, pickSyncFolder, registerGoogleIpc, registerIpc, registerSyncIpc } from './ipc'
 import { log } from './log'
 import { createMedia, MEDIA_SCHEME } from './media'
 import type { Media } from './media'
@@ -17,6 +17,10 @@ import { createSecrets } from './secrets'
 import { installSecurity, setAppTarget } from './security'
 import { openDb } from './store/db'
 import { createStore } from './store/notes'
+import { createDriveTransport } from './sync/drive'
+import { createFolderTransport } from './sync/folder'
+import { createGoogleAuth } from './sync/google-auth'
+import { createSyncService } from './sync/service'
 import type { Store } from './store/notes'
 
 const SMOKE = process.env['COGNOTEZ_SMOKE'] === '1'
@@ -32,6 +36,9 @@ app.setPath(
   'userData',
   SMOKE || IMPORT_SMOKE ? mkdtempSync(join(tmpdir(), 'cognotez-smoke-')) : join(app.getPath('appData'), 'cognotez-v5')
 )
+
+/** Dev-only environment overrides (test servers, fake OAuth); ignored in a packaged app. */
+const devEnv = (name: string): string | undefined => (app.isPackaged ? undefined : process.env[name])
 
 const devUrl = app.isPackaged ? undefined : process.env['ELECTRON_RENDERER_URL']
 const indexHtml = join(__dirname, '../renderer/index.html')
@@ -232,13 +239,54 @@ void app.whenReady().then(async () => {
   const backups = createBackups(app.getPath('userData'), db)
   const ai = createAi({ store, secrets, warn: log.warn })
   registerIpc(store, secrets, importer, media, backups, ai)
+  const google = createGoogleAuth({
+    secrets,
+    settings: store.settings,
+    // Dev-only: COGNOTEZ_TEST_OAUTH_AUTO=1 follows the fake consent page's redirect instead of opening a browser.
+    openUrl: devEnv('COGNOTEZ_TEST_OAUTH_AUTO') === '1' ? async (url) => void (await fetch(url)) : (url) => shell.openExternal(url),
+    pickClientFile: pickGoogleClientFile,
+    readFile: (path) => readFileSync(path, 'utf8'),
+    builtIn: {
+      clientId: import.meta.env.MAIN_VITE_GOOGLE_CLIENT_ID ?? devEnv('MAIN_VITE_GOOGLE_CLIENT_ID') ?? '',
+      clientSecret: import.meta.env.MAIN_VITE_GOOGLE_CLIENT_SECRET ?? devEnv('MAIN_VITE_GOOGLE_CLIENT_SECRET') ?? ''
+    },
+    oauthBase: devEnv('COGNOTEZ_OAUTH_BASE')
+  })
+  registerGoogleIpc(google)
+  const toWindows = (channel: string, payload: unknown): void => {
+    for (const w of BrowserWindow.getAllWindows()) if (!w.isDestroyed()) w.webContents.send(channel, payload)
+  }
+  const sync = createSyncService({
+    store, media, secrets,
+    transports: {
+      folder: (path) => createFolderTransport(path),
+      // Fails with the human-readable sign-in message (not connected / expired) when the token can't be had.
+      gdrive: async () => {
+        await google.getAccessToken()
+        return createDriveTransport({
+          getAccessToken: (force) => google.getAccessToken(force),
+          email: google.email() ?? undefined,
+          apiBase: devEnv('COGNOTEZ_DRIVE_BASE')
+        })
+      }
+    },
+    pickFolder: pickSyncFolder,
+    hostname,
+    onStatus: (s) => toWindows('sync:status', s),
+    onNotesChanged: (ids) => toWindows('notes:changed', { ids }),
+    warn: (m) => log.warn('sync:', m)
+  })
+  registerSyncIpc(sync)
   createWindow(store)
+  // Only arms timers: the first round runs STARTUP_DELAY after launch, never before the window (sync-v2.md §7).
+  sync.start()
   backups.autoIfDue().catch((e: unknown) => log.warn('automatic backup failed:', String(e)))
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow(store)
   })
   app.on('will-quit', () => {
+    sync.stop()
     store.locks.lockAll()
     db.close()
   })

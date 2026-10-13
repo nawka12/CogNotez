@@ -25,7 +25,7 @@ interface Deps {
 
 export function createLocks({ db, hlc, keys, get, setting }: Deps) {
   const load = (id: string): Row => {
-    const r = db.prepare('SELECT body, locked, cipher, cipher_format FROM notes WHERE id = ?').get(id) as Row | undefined
+    const r = db.prepare('SELECT body, locked, cipher, cipher_format, conflict_of FROM notes WHERE id = ?').get(id) as Row | undefined
     if (!r) throw new Error('note not found')
     return r
   }
@@ -33,11 +33,13 @@ export function createLocks({ db, hlc, keys, get, setting }: Deps) {
     if (!(r.cipher instanceof Uint8Array)) throw new Error('note has no ciphertext')
     return r.cipher
   }
+  /** AAD candidates: a sync conflicted copy may still carry its original note's AAD. */
+  const aadIds = (id: string, r: Row): string[] => (typeof r.conflict_of === 'string' ? [id, r.conflict_of] : [id])
   /** Plaintext of a locked v5 note using the cached key; throws 'note is locked' without one. */
   const plainOf = (id: string, r: Row): string => {
     const k = keys.get(id)
     if (!k || r.cipher_format !== 'v5') throw new Error('note is locked')
-    return openV5(cipherOf(r), id, k.key)
+    return openV5(cipherOf(r), aadIds(id, r), k.key)
   }
   const checkNew = (pw: string): void => {
     if (typeof pw !== 'string' || pw.length < PASSWORD_MIN || pw.length > PASSWORD_MAX) {
@@ -73,7 +75,7 @@ export function createLocks({ db, hlc, keys, get, setting }: Deps) {
       const r = load(id)
       if (!r.locked) throw new Error('note is not locked')
       const cipher = cipherOf(r)
-      const opened = await openWithPassword(cipher, r.cipher_format === null ? null : String(r.cipher_format), id, password)
+      const opened = await openWithPassword(cipher, r.cipher_format === null ? null : String(r.cipher_format), aadIds(id, r), password)
       if (r.cipher_format === 'v5') {
         keys.set(id, opened.key, opened.salt, opened.iter)
         return get(id)

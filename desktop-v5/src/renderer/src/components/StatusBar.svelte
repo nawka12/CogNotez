@@ -1,6 +1,8 @@
 <script lang="ts">
   import { t } from '../i18n'
   import { ai, openModelList } from '../state/ai.svelte'
+  import { syncChip } from '../lib/syncChip'
+  import { openSyncSettings, sync } from '../state/sync.svelte'
   import { saveStatus, tabs } from '../state/tabs.svelte'
   import { cycleTheme, ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
@@ -8,6 +10,8 @@
   const status = $derived(saveStatus())
   const doc = $derived(tabs.current)
   const themeLabel = $derived(t(`theme.${ui.theme}`))
+  // ui.now ticks every 30 s, so "Synced 2 min ago" stays fresh without its own timer.
+  const chip = $derived(syncChip(sync.status, ui.now))
 </script>
 
 <footer class="status">
@@ -15,7 +19,9 @@
     <span class="dot"></span>
     <span>{status === 'saving' ? t('save.saving') : status === 'failed' ? t('save.failed') : t('save.saved')}</span>
   </span>
-  <span class="sync wide"><Icon name="cloud" />{t('sync.off')}</span>
+  <button class="sync wide {chip.tone}" title={chip.title} onclick={openSyncSettings}>
+    <Icon name="cloud" /><span>{chip.text}</span>
+  </button>
   {#if doc && !doc.sealed}<span>{t('meta.words', { n: doc.words })}</span>{/if}
   {#if ai.working > 0}<span class="working" role="status"><span class="spin"></span>{t('ai.working')}</span>{/if}
   <span class="grow"></span>
@@ -104,6 +110,13 @@
   .sync :global(.i) {
     width: 14px;
     height: 14px;
+  }
+  .sync.bad,
+  .sync.warn {
+    color: var(--rubric);
+  }
+  .sync.busy {
+    color: var(--accent);
   }
   @media (max-width: 760px) {
     .wide {

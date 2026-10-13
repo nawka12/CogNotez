@@ -31,7 +31,7 @@ export async function createNote(): Promise<void> {
   ui.titleFocus++
 }
 
-export async function trashNote(id: string): Promise<void> {
+export async function trashNote(id: string, message = t('toast.trashed')): Promise<void> {
   const doc = tabs.list.find((d) => d.id === id)
   if (doc) await flush(doc)
   const ok = await guarded(async () => {
@@ -40,7 +40,7 @@ export async function trashNote(id: string): Promise<void> {
   })
   if (!ok) return
   closeTab(id)
-  showToast(t('toast.trashed'), {
+  showToast(message, {
     label: t('toast.undo'),
     run: () =>
       void guarded(async () => {

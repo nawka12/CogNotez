@@ -8,6 +8,7 @@ const same = (a: NoteSummary, b: NoteSummary): boolean =>
   a.updatedAt === b.updatedAt &&
   a.pinned === b.pinned &&
   a.locked === b.locked &&
+  (a.conflictOf ?? null) === (b.conflictOf ?? null) &&
   a.tags.length === b.tags.length &&
   a.tags.every((t, i) => t === b.tags[i])
 
@@ -31,6 +32,7 @@ class Library {
     const f = ui.filter
     if (f.kind === 'trash') return this.trash
     if (f.kind === 'pinned') return this.all.filter((n) => n.pinned)
+    if (f.kind === 'conflicts') return this.all.filter((n) => n.conflictOf)
     if (f.kind === 'tag') return this.all.filter((n) => hasTag(n.tags, f.tag))
     return this.all
   }

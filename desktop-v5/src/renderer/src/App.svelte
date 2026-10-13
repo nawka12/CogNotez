@@ -23,6 +23,7 @@
   import './state/aiedit.svelte'
   import { refresh } from './state/library.svelte'
   import { restoreSession, trackSession } from './state/session.svelte'
+  import { startSyncStatus } from './state/sync.svelte'
   import { flushAll, sealOpen, tabs } from './state/tabs.svelte'
   import { MOD, isTheme, setTheme, ui } from './state/ui.svelte'
 
@@ -53,6 +54,7 @@
     window.api.settings.get('ui.companion').then((v) => setCompanionOpen(v === true, false)).catch(() => undefined)
     void loadAiConfig()
     const offAi = startAiEvents()
+    const offSync = startSyncStatus()
     void refresh()
     void restoreSession()
     const offChanged = window.api.onNotesChanged(({ ids }) => notesChanged(ids))
@@ -68,6 +70,7 @@
       offLocks()
       offFlush()
       offAi()
+      offSync()
       clearInterval(tick)
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('keydown', onKey, true)

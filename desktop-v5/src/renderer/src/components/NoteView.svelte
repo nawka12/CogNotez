@@ -5,6 +5,7 @@
   import type { Doc } from '../state/tabs.svelte'
   import { ui } from '../state/ui.svelte'
   import AiReviewBar from './AiReviewBar.svelte'
+  import ConflictBanner from './ConflictBanner.svelte'
   import Editor from './Editor.svelte'
   import LockedPanel from './LockedPanel.svelte'
   import MetaLine from './MetaLine.svelte'
@@ -61,7 +62,7 @@
 
 <div class="scroll" bind:this={scroller} onscroll={() => !restoring && (doc.scroll = scroller.scrollTop)}>
   <article class="canvas" class:split>
-    {#if trashed}<TrashBanner {doc} />{/if}
+    {#if trashed}<TrashBanner {doc} />{:else if doc.note.conflictOf}<ConflictBanner {doc} />{/if}
     <input
       class="title"
       bind:this={titleEl}

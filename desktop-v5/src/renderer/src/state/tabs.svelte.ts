@@ -101,7 +101,7 @@ export function setTitle(doc: Doc, title: string): void {
 }
 
 function applyMeta(doc: Doc, n: Note): void {
-  doc.note = { ...doc.note, tags: n.tags, pinned: n.pinned, locked: n.locked, unlocked: n.unlocked, deletedAt: n.deletedAt, updatedAt: n.updatedAt }
+  doc.note = { ...doc.note, tags: n.tags, pinned: n.pinned, locked: n.locked, unlocked: n.unlocked, deletedAt: n.deletedAt, updatedAt: n.updatedAt, conflictOf: n.conflictOf ?? null }
 }
 
 /** Saves now. Resolves true when the doc is clean afterwards. Text is never dropped on failure. */
@@ -192,7 +192,7 @@ async function reload(doc: Doc): Promise<void> {
     return
   }
   if (doc.sealed && fresh.locked) return adopt(doc, fresh)
-  if (fresh.updatedAt === doc.note.updatedAt && fresh.locked === doc.note.locked) return
+  if (fresh.updatedAt === doc.note.updatedAt && fresh.locked === doc.note.locked && (fresh.conflictOf ?? null) === (doc.note.conflictOf ?? null)) return
   applyMeta(doc, fresh)
   if (doc.dirty) return // typed while we were fetching
   if (fresh.title !== doc.title) {

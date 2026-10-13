@@ -31,11 +31,16 @@
       <button class="row" aria-current={n.id === currentId} onclick={() => onopen(n.id)}>
         <span class="row-title">
           {#if n.locked}<Icon name="lock" /><span class="sr">{t('row.locked')}</span>
+          {:else if n.conflictOf}<Icon name="copy" class="warn" /><span class="sr">{t('row.conflict')}</span>
           {:else if n.pinned}<Icon name="pin" /><span class="sr">{t('row.pinned')}</span>{/if}
           <span>{n.title || t('untitled')}</span>
         </span>
         <span class="row-snip">{n.locked ? t('row.lockedSnippet') : n.snippet || t('row.empty')}</span>
-        <span class="row-meta">{relativeTime(n.updatedAt, ui.now)}{n.tags[0] ? ` · #${n.tags[0]}` : ''}</span>
+        {#if n.conflictOf}
+          <span class="row-meta warn">{t('row.conflictMeta')}</span>
+        {:else}
+          <span class="row-meta">{relativeTime(n.updatedAt, ui.now)}{n.tags[0] ? ` · #${n.tags[0]}` : ''}</span>
+        {/if}
       </button>
     </li>
   {:else}
@@ -89,6 +94,10 @@
     width: 14px;
     height: 14px;
     color: var(--ink-3);
+  }
+  .row-title :global(.i.warn),
+  .row-meta.warn {
+    color: var(--rubric);
   }
   .row-snip {
     color: var(--ink-3);

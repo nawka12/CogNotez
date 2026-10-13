@@ -12,6 +12,7 @@
   import Icon from './Icon.svelte'
   import Seg from './Seg.svelte'
   import SettingsAi from './SettingsAi.svelte'
+  import SettingsSync from './SettingsSync.svelte'
 
   let backups = $state.raw<BackupInfo[]>([])
   let info = $state.raw<AppInfo | null>(null)
@@ -101,6 +102,8 @@
     </section>
 
     <SettingsAi />
+
+    <SettingsSync />
 
     <section aria-labelledby="h-templates">
       <h2 id="h-templates">{t('settings.templates')}</h2>

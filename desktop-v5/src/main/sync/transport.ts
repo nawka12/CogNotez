@@ -2,6 +2,9 @@
 // "meta.json", "objects/n.<id>.<rev>.<parents>.json|.bin", "media/m.<hash>[.bin]".
 // Writers only ever create; remove() exists for GC alone.
 
+/** A round-stopping problem whose message is ready to show as is. Transports throw it for user-facing failures. */
+export class SyncError extends Error {}
+
 export interface RemoteEntry {
   name: string
   size: number

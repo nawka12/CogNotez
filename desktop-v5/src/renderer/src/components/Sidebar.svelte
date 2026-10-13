@@ -38,7 +38,7 @@
   </div>
   <TagTree />
   <div class="list-head"><span>{heading}</span><span class="n">{visible.length}</span></div>
-  <NoteList notes={visible} currentId={tabs.currentId} empty={ui.filter.kind === 'trash' ? t('list.trashEmpty') : t('list.empty')} onopen={(id) => void openNote(id)} />
+  <NoteList notes={visible} currentId={tabs.currentId} empty={ui.filter.kind === 'trash' ? t('list.trashEmpty') : ui.filter.kind === 'conflicts' ? t('list.conflictsEmpty') : t('list.empty')} onopen={(id) => void openNote(id)} />
 </aside>
 
 <style>

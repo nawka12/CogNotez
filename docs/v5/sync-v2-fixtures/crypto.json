@@ -1,0 +1,44 @@
+{
+  "kdf": [
+    {
+      "passphrase": "correct horse battery staple",
+      "salt": "000102030405060708090a0b0c0d0e0f",
+      "iter": 100000,
+      "iterUsed": 100000,
+      "kek": "49d49c25f597846209f0d92e7770ab64e1c75e94b4ce6c509265ee67175d2a1e"
+    },
+    {
+      "passphrase": "pässwörd 🔑 ключ",
+      "salt": "000102030405060708090a0b0c0d0e0f",
+      "iter": 1,
+      "iterUsed": 100000,
+      "kek": "76d4fcc2ee939163c66435db6d24702ebfdc6d26dcaf7759511909b54c8ebdba"
+    }
+  ],
+  "meta": {
+    "passphrase": "correct horse battery staple",
+    "wrongPassphrase": "wrong horse battery staple",
+    "json": "{\"created\":1791860000000,\"createdBy\":\"devaaaaaaaa\",\"enc\":{\"iter\":100000,\"kdf\":\"pbkdf2-sha256\",\"salt\":\"AAECAwQFBgcICQoLDA0ODw==\",\"wrap\":{\"ct\":\"Nk1mSV5c5i+AmNICsMxyh3EYqBap1Bnm864ANSp+H4A=\",\"iv\":\"oKGio6Slpqeoqaqr\",\"tag\":\"MFl4hjIHMcDkF3T4grtN9w==\"}},\"format\":2}",
+    "dek": "1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100",
+    "wrapAad": "cognotez-sync-v2-dek"
+  },
+  "object": {
+    "dek": "1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100",
+    "name": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa.bin",
+    "aad": "objects/n.note-0000-aaaa.1791860000002-0000-devbbbbbbbb.1791860000001-0000-devaaaaaaaa",
+    "iv": "b0b1b2b3b4b5b6b7b8b9babb",
+    "plaintext": "{\"archived\":false,\"body\":\"line 1\\nline 2 \\\"quoted\\\" \\\\ tab\\t✓\",\"cipher\":null,\"cipherFormat\":null,\"conflictOf\":null,\"createdAt\":1791860000000,\"deleted\":false,\"device\":\"devbbbbbbbb\",\"deviceName\":\"devbbbbbbbb\",\"id\":\"note-0000-aaaa\",\"locked\":false,\"media\":[],\"parents\":[\"1791860000001-0000-devaaaaaaaa\"],\"pinned\":false,\"rev\":\"1791860000002-0000-devbbbbbbbb\",\"tags\":[\"a\",\"b/c\"],\"title\":\"Grüße\",\"trashedAt\":null,\"updatedAt\":1791860000002,\"v\":2}",
+    "blob": "sLGys7S1tre4ubq753JsbDoQKlyhBbR6CapZD87eq5RfcnbjdwoSZFpPjWoIMmu5uCpzAdM14blIKisp+bpYWXC1WM0PaJS7h4RbjGoBK+Y/sYK/PKYW3AWfe8ELloxj76imBLJGSVx/4XTpOw3HfCWm7W+8Tu2eLtESk4yhegWitbWa4xuonsIKlYfteoakODE3bvpTPFVHdXXznSUSyN50qLu3OMOAlKQNMGmSu6Y9I79XXE9165ZUVC3hEOObUXg/l4fF76EvNspCLBs5jFyj8luPnzXnrmjgDyvedAkU92zcLgtc+MxA1+KDmm2oVAMYQ5tlQT1gvIUyRnGCjlcQPbglsqX7hY3/a88SqwpwHQ+xVm/KnwoIf3UmugAzDeMF96tQ+fz5R3evPtXdUF/QyeDWFrLY6ecHYrrS+8Y+Yig08khFPgCpPoy2q08ujbZQ0w5KKEwGCoCxI3JvOH6qFjTBQadtJX1dz34UdDKfFe/w1eb5Dsy7l5Nhu49I2lBzGW3/B0uLF+YBnZMkuiWdbNZ8B7dFMG2BTN6+711vpj4BlfEwvVtmHYugkaf2+e1NXkAlpGARd//V8qkH6mVmVYcMaoaZGAxdiodvS2H/O3D53dU="
+  },
+  "media": {
+    "dek": "1f1e1d1c1b1a191817161514131211100f0e0d0c0b0a09080706050403020100",
+    "plaintext": "89504e470d0a1a0a0000000d49484452",
+    "sha256": "02a3e298f1533f62558c58e4c70edcab9af5a50d62d925fd5390942020fb0fb8",
+    "hmacInput": "media:02a3e298f1533f62558c58e4c70edcab9af5a50d62d925fd5390942020fb0fb8",
+    "name": "media/m.a0bf74c498744d577e243349e0e08c7de8ed9510c2bd56aa9299a678b24df73b.bin",
+    "aad": "media/m.a0bf74c498744d577e243349e0e08c7de8ed9510c2bd56aa9299a678b24df73b",
+    "iv": "c0c1c2c3c4c5c6c7c8c9cacb",
+    "blob": "wMHCw8TFxsfIycrLGGdBuJwU2z6jgG8z9hDZjDLkSGIYp1+QXQPlEbadU3M=",
+    "plaintextName": "media/m.02a3e298f1533f62558c58e4c70edcab9af5a50d62d925fd5390942020fb0fb8"
+  }
+}

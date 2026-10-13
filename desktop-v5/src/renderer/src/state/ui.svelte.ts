@@ -18,6 +18,9 @@ export interface ConfirmData {
   run: () => void
 }
 
+/** The list filters main knows, plus the client-side "conflicted copies" view. */
+export type UiFilter = ListFilter | { kind: 'conflicts' }
+
 export interface PasswordDialogData {
   docId: string
   mode: 'set' | 'change'
@@ -37,7 +40,7 @@ class Ui {
   prompt = $state.raw<PromptData | null>(null)
   theme = $state<Theme>('system')
   mode = $state<Mode>('edit')
-  filter = $state.raw<ListFilter>({ kind: 'all' })
+  filter = $state.raw<UiFilter>({ kind: 'all' })
   sideOpen = $state(false)
   paletteOpen = $state(false)
   /** Which sub-list the palette opens on (set just before opening it). */
