@@ -11,6 +11,7 @@
 | `97d63f2` | M3: AI Companion: streaming, inline merge review, research mode with SSRF guard |
 | `fb37196` | Sync v2 spec (`docs/v5/sync-v2.md`) + `sync.*`/`google.*` bridge contract |
 | `e82c340` | M4: Sync v2: engine, folder + Google Drive transports, E2EE, conflict UI, fixtures |
+| `74628d1`, `9778157` | M5: translations, auto-update, release pipeline, v4 Drive import, sync hardening, fixes |
 
 The AppImage at `desktop-v5/dist/` is rebuilt at M5.
 
