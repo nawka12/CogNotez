@@ -24,6 +24,7 @@
   import { refresh } from './state/library.svelte'
   import { restoreSession, trackSession } from './state/session.svelte'
   import { startSyncStatus } from './state/sync.svelte'
+  import { startUpdateStatus } from './state/updates.svelte'
   import { flushAll, sealOpen, tabs } from './state/tabs.svelte'
   import { MOD, isTheme, setTheme, ui } from './state/ui.svelte'
 
@@ -55,6 +56,7 @@
     void loadAiConfig()
     const offAi = startAiEvents()
     const offSync = startSyncStatus()
+    const offUpdates = startUpdateStatus()
     void refresh()
     void restoreSession()
     const offChanged = window.api.onNotesChanged(({ ids }) => notesChanged(ids))
@@ -71,6 +73,7 @@
       offFlush()
       offAi()
       offSync()
+      offUpdates()
       clearInterval(tick)
       window.removeEventListener('blur', onBlur)
       window.removeEventListener('keydown', onKey, true)
@@ -162,6 +165,7 @@
     }
     .comp-open :global(.comp) {
       position: absolute;
+      grid-area: auto; /* else its containing block is the (zero-width) third grid column and it renders 1px wide */
       top: 0;
       right: 0;
       bottom: 30px;

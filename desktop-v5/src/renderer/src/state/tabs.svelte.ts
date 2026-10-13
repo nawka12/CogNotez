@@ -5,6 +5,7 @@ import type { EditorView } from '@codemirror/view'
 import type { Note, NotePatch } from '../../../shared/api'
 import { createState, external } from '../editor/setup'
 import { t } from '../i18n'
+import { pickVictim } from '../lib/tabs'
 import { countWords } from '../lib/text'
 import { errorText, showToast, ui } from './ui.svelte'
 
@@ -286,7 +287,7 @@ export async function openNote(id: string, seed?: Note): Promise<void> {
     if (!tabs.list.includes(doc)) {
       let list = [...tabs.list, doc]
       if (list.length > MAX_TABS) {
-        const victim = list.find((d) => d !== doc && d.id !== tabs.currentId) ?? list[0]!
+        const victim = pickVictim(list, doc, tabs.currentId)
         void flush(victim)
         list = list.filter((d) => d !== victim)
       }
@@ -298,10 +299,21 @@ export async function openNote(id: string, seed?: Note): Promise<void> {
   ui.sideOpen = false
 }
 
-export function closeTab(id: string): void {
+/** Closes a tab. Text typed into a note that locked underneath it can't be saved, so the user decides first (`force` skips that). */
+export function closeTab(id: string, force = false): void {
   const i = tabs.list.findIndex((d) => d.id === id)
   if (i < 0) return
   const doc = tabs.list[i]!
+  if (doc.unsaved !== null && !force) {
+    void openNote(id) // show its unlock form behind the dialog
+    ui.confirm = {
+      title: t('tabs.discard.title'),
+      message: t('tabs.discard.message', { title: doc.title || t('untitled') }),
+      confirmLabel: t('tabs.discard.ok'),
+      run: () => closeTab(id, true)
+    }
+    return
+  }
   void flush(doc)
   const list = tabs.list.filter((d) => d !== doc)
   tabs.list = list

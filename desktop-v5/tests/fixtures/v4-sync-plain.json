@@ -1,0 +1,49 @@
+{
+  "notes": {
+    "1758187139402": {
+      "id": "1758187139402",
+      "title": "Drive note",
+      "content": "Synced **body** from Drive",
+      "preview": "Synced",
+      "tags": [
+        "tagdrive0000001"
+      ],
+      "is_archived": false,
+      "pinned": true,
+      "password_protected": false,
+      "created_at": "2025-09-18T10:00:00.000Z",
+      "updated_at": "2025-09-19T11:30:00.000Z"
+    },
+    "drivenote2xx": {
+      "id": "drivenote2xx",
+      "title": "Second",
+      "content": "Other note",
+      "preview": "Other",
+      "tags": [],
+      "is_archived": false,
+      "created_at": "2025-09-20T10:00:00.000Z",
+      "updated_at": "2025-09-20T10:00:00.000Z"
+    }
+  },
+  "ai_conversations": {},
+  "tags": {
+    "tagdrive0000001": {
+      "id": "tagdrive0000001",
+      "name": "Drive",
+      "color": "#336699",
+      "created_at": "2025-09-18T10:00:00.000Z"
+    }
+  },
+  "note_tags": {},
+  "metadata": {
+    "version": "1.0",
+    "exportedForSync": true,
+    "exportedAt": "2025-09-21T08:00:00.000Z",
+    "exportVersion": "1.0"
+  },
+  "_syncMeta": {
+    "syncVersion": 3,
+    "uploadedAt": "2025-09-21T08:00:01.000Z",
+    "uploadedBy": "test-device"
+  }
+}

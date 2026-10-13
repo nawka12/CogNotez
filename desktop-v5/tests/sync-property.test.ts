@@ -56,13 +56,14 @@ interface Edit {
 }
 
 /** How often each §8 situation occurred, summed over all seeds: the test must actually exercise every rule. */
-const seen = { merges: 0, copies: 0, deleteVsChange: 0, deleteVsUnchanged: 0, unknownBase: 0, crissCross: 0, foldSteps: 0, encryptedSeeds: 0 }
+const seen = { merges: 0, copies: 0, deleteVsChange: 0, deleteVsUnchanged: 0, unknownBase: 0, crissCross: 0, foldSteps: 0, encryptedSeeds: 0, duplicates: 0 }
 
 async function run(seed: number): Promise<void> {
   idCounter = seed * 1_000_000
   const rng = mulberry32(seed)
   const pick = <T>(xs: readonly T[]): T => xs[Math.floor(rng() * xs.length)]
   const remote = new MemoryRemote()
+  remote.atomicCreate = seed % 2 === 0 // odd seeds race like Drive: a losing duplicate create still says 'created'
   const devs: Device[] = []
   // Every fourth seed runs against an encrypted remote (one KDF per seed; the others reuse the unwrapped key).
   const encrypted = seed % 4 === 0
@@ -138,6 +139,8 @@ async function run(seed: number): Promise<void> {
   // Quiesce: no failures, sync everyone until nothing changes.
   failRate = 0
   await settle(devs, remote, 20)
+
+  seen.duplicates += remote.duplicates
 
   // (a) Convergence.
   const final = stateOf(devs[0])

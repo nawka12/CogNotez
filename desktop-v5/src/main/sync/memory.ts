@@ -17,6 +17,12 @@ export class MemoryRemote {
   readonly log: { name: string; removed: boolean }[] = []
   /** Count of files created (not 'exists'). */
   writes = 0
+  /**
+   * false = create behaves like Drive's check-then-upload losing a race: a name that exists still answers 'created',
+   * the duplicate is counted and readers keep seeing the first (oldest) file.
+   */
+  atomicCreate = true
+  duplicates = 0
 }
 
 export function memoryTransport(remote: MemoryRemote, hooks: Hooks = {}): Transport & { hooks: Hooks } {
@@ -38,7 +44,10 @@ export function memoryTransport(remote: MemoryRemote, hooks: Hooks = {}): Transp
     async create(name, bytes) {
       await step('create', name)
       let r: 'created' | 'exists' = 'exists'
-      if (!remote.files.has(name)) {
+      if (remote.files.has(name) && !remote.atomicCreate) {
+        remote.duplicates++
+        r = 'created'
+      } else if (!remote.files.has(name)) {
         remote.files.set(name, new Uint8Array(bytes))
         remote.log.push({ name, removed: false })
         remote.writes++

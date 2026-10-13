@@ -9,12 +9,14 @@ import { applyPendingRestore, createBackups } from './backup'
 import { isVisible, parseWindowState } from './bounds'
 import { createImporter } from './import'
 import { readV4LocalStorage } from './import/v4-electron'
-import { pickGoogleClientFile, pickSyncFolder, registerGoogleIpc, registerIpc, registerSyncIpc } from './ipc'
+import { pickGoogleClientFile, pickSyncFolder, registerGoogleIpc, registerIpc, registerSyncIpc, registerUpdatesIpc } from './ipc'
 import { log } from './log'
 import { createMedia, MEDIA_SCHEME } from './media'
 import type { Media } from './media'
 import { createSecrets } from './secrets'
 import { installSecurity, setAppTarget } from './security'
+import { createUpdater, macAppSigned, updateSupported } from './updater'
+import type { UpdaterLike } from './updater'
 import { openDb } from './store/db'
 import { createStore } from './store/notes'
 import { createDriveTransport } from './sync/drive'
@@ -277,6 +279,31 @@ void app.whenReady().then(async () => {
     warn: (m) => log.warn('sync:', m)
   })
   registerSyncIpc(sync)
+  // Dev-only: COGNOTEZ_UPDATE_FEED=<url of a generic update feed> lets an unpacked run exercise the update flow.
+  const updateFeed = devEnv('COGNOTEZ_UPDATE_FEED')
+  const updates = createUpdater({
+    updater: async () => {
+      const { autoUpdater } = await import('electron-updater')
+      if (updateFeed) {
+        autoUpdater.forceDevUpdateConfig = true
+        autoUpdater.setFeedURL({ provider: 'generic', url: updateFeed })
+      }
+      return autoUpdater as unknown as UpdaterLike
+    },
+    supported: () =>
+      updateSupported({
+        packaged: app.isPackaged,
+        platform: process.platform,
+        appImage: process.env['APPIMAGE'],
+        macSigned: () => macAppSigned(process.execPath),
+        feedOverride: !!updateFeed
+      }),
+    settings: store.settings,
+    onStatus: (s) => toWindows('updates:status', s),
+    warn: (m) => log.warn('updates:', m)
+  })
+  registerUpdatesIpc(updates)
+  updates.start()
   createWindow(store)
   // Only arms timers: the first round runs STARTUP_DELAY after launch, never before the window (sync-v2.md §7).
   sync.start()
@@ -287,6 +314,7 @@ void app.whenReady().then(async () => {
   })
   app.on('will-quit', () => {
     sync.stop()
+    updates.stop()
     store.locks.lockAll()
     db.close()
   })

@@ -1,3 +1,5 @@
+import { isLangPref, locale, resolveLang } from '../i18n'
+import type { LangPref } from '../i18n'
 import type { Mode } from './ui.svelte'
 
 export type FontSize = 'small' | 'medium' | 'large'
@@ -12,6 +14,7 @@ class Prefs {
   fontSize = $state<FontSize>('medium')
   spellcheck = $state(false)
   defaultMode = $state<Mode>('edit')
+  language = $state<LangPref>('system')
 }
 export const prefs = new Prefs()
 
@@ -31,6 +34,20 @@ export function setSpellcheck(v: boolean, persist = true): void {
 export function setDefaultMode(v: Mode): void {
   prefs.defaultMode = v
   save('ui.default_mode', v)
+}
+
+/** Applies a language choice (System follows the OS locale) to `t()` and `<html lang>`. */
+export function setLanguage(v: LangPref, persist = true): void {
+  prefs.language = v
+  locale.lang = resolveLang(v, navigator.languages)
+  document.documentElement.lang = locale.lang
+  if (persist) save('ui.language', v)
+}
+
+/** Read before the first render, so the window never flashes English. */
+export async function loadLanguage(): Promise<void> {
+  const v = await window.api.settings.get('ui.language').catch(() => null)
+  setLanguage(isLangPref(v) ? v : 'system', false)
 }
 
 /** Reads the saved preferences; the caller decides what to do with the default view. */

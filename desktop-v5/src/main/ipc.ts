@@ -16,6 +16,7 @@ import { assertSender } from './security'
 import type { Secrets } from './secrets'
 import type { SyncService } from './sync/service'
 import type { GoogleAuth } from './sync/google-auth'
+import type { Updater } from './updater'
 import type { Store } from './store/notes'
 
 /** Every channel goes through here: sender check first, then the handler (which validates its own args). */
@@ -98,13 +99,11 @@ export function registerIpc(store: Store, secrets: Secrets, importer: Importer, 
     notify(r.ids)
     return r.stats
   })
-  handle('importer:fromFile', async () => {
-    const opts = { properties: ['openFile' as const], filters: [{ name: 'CogNotez 4 backup', extensions: ['json'] }] }
-    const win = BrowserWindow.getFocusedWindow()
-    const picked = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts)
-    const path = picked.filePaths[0]
-    if (picked.canceled || !path) return null
-    const r = await importer.fromFile(path)
+  handle('importer:fromFile', async (passphrase) => {
+    const pick = async (): Promise<string | null> =>
+      (await pickPaths({ properties: ['openFile'], filters: [{ name: 'CogNotez 4 backup or sync file', extensions: ['json'] }] }, testEnv('COGNOTEZ_TEST_IMPORT_FILE')))[0] ?? null
+    const r = await importer.fromFile(pick, passphrase === undefined ? undefined : g.password(passphrase))
+    if (!r) return null
     notify(r.ids)
     return r.stats
   })
@@ -230,9 +229,8 @@ function registerDataIpc(store: Store, media: Media, backups: Backups): void {
     if (!paths.length) return null
     const r = importMarkdownFiles(store, media, paths)
     if (r.skipped.length) log.warn('import skipped:', r.skipped.map((s) => `${s.name} (${s.reason})`).join('; '))
-    if (!r.ids.length) throw new Error(`nothing imported: ${r.skipped.map((s) => `${s.name} (${s.reason})`).join('; ')}`)
-    notify(r.ids)
-    return { notes: r.ids.length }
+    if (r.ids.length) notify(r.ids)
+    return { notes: r.ids.length, skipped: r.skipped }
   })
 
   handle('app:info', (): AppInfo => ({ version: app.getVersion(), electron: process.versions.electron, userData: app.getPath('userData') }))
@@ -292,4 +290,13 @@ export async function pickGoogleClientFile(): Promise<string | null> {
     testEnv('COGNOTEZ_TEST_GOOGLE_CLIENT_FILE')
   )
   return path ?? null
+}
+
+// ---- App updates (GitHub Releases) -----------------------------------------------------------
+
+export function registerUpdatesIpc(updates: Updater): void {
+  handle('updates:status', () => updates.status())
+  handle('updates:check', () => updates.check())
+  handle('updates:download', () => updates.download())
+  handle('updates:install', () => updates.install())
 }

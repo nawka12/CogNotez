@@ -1,8 +1,12 @@
 // Hybrid logical clock. Rev format: `${ms(13)}-${counter(base36, 4)}-${deviceId}`.
-// Plain string comparison orders revs by (ms, counter, deviceId).
+// Plain string comparison orders revs by (ms, counter, deviceId). See docs/v5/sync-v2.md §2.
 
 const REV_RE = /^(\d{13})-([0-9a-z]{4})-(.+)$/
 const COUNTER_MAX = 36 ** 4 - 1
+/** Edit revs stay below 9 000 000 000 000 ms (year 2255), so merge-rev carries can never need a 14th digit. */
+export const MAX_MS = 8_999_999_999_999
+/** How far ahead of the wall clock another device's rev may pull this clock. */
+export const MAX_DRIFT_MS = 24 * 60 * 60_000
 
 export interface ParsedRev {
   ms: number
@@ -27,7 +31,7 @@ export class Hlc {
 
   /** A new rev for a local event. Strictly greater than any rev returned or received before. */
   now(): string {
-    const w = this.wall()
+    const w = Math.min(this.wall(), MAX_MS)
     if (w > this.ms) {
       this.ms = w
       this.counter = 0
@@ -37,11 +41,21 @@ export class Hlc {
     return this.stamp()
   }
 
-  /** Merge a remote rev (sync) and return a rev that is greater than both it and everything local. */
+  /**
+   * Merge a remote rev (sync) and return a rev that is greater than everything local and than the remote rev, unless
+   * that rev is from another device and more than MAX_DRIFT_MS ahead of the wall clock: then it counts as wall +
+   * MAX_DRIFT_MS, so one device with a wrong clock can't move every clock forward for good. This device's own revs
+   * always count in full, so its revs stay unique (the device id is part of every rev).
+   */
   receive(remoteRev: string): string {
     const r = parseRev(remoteRev)
     if (!r) throw new Error('invalid rev')
-    const w = this.wall()
+    const w = Math.min(this.wall(), MAX_MS)
+    const cap = r.deviceId === this.deviceId ? MAX_MS : Math.min(w + MAX_DRIFT_MS, MAX_MS)
+    if (r.ms > cap) {
+      r.ms = cap
+      r.counter = 0
+    }
     const ms = Math.max(this.ms, r.ms, w)
     let counter = 0
     if (ms === this.ms && ms === r.ms) counter = Math.max(this.counter, r.counter) + 1

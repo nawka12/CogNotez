@@ -1,7 +1,11 @@
 // Research mode: main searches SearXNG itself and fetches a few result pages. The model never gets tools.
 // Everything fetched here is untrusted: it is only ever handed to the model inside <search_results>.
 import { lookup } from 'node:dns/promises'
+import { request as httpRequest } from 'node:http'
+import { request as httpsRequest } from 'node:https'
+import type { LookupFunction } from 'node:net'
 import { BlockList, isIP } from 'node:net'
+import { Readable } from 'node:stream'
 
 export interface SearchResult {
   title: string
@@ -52,11 +56,47 @@ export function isBlockedIp(ip: string): boolean {
 
 const defaultResolve: Resolver = async (host) => (await lookup(host, { all: true })).map((a) => a.address)
 
-async function assertPublic(host: string, resolve: Resolver): Promise<void> {
+/** Resolves `host` once and returns the addresses if every one of them is public; the connection is then pinned to them. */
+async function assertPublic(host: string, resolve: Resolver): Promise<string[]> {
   const h = host.replace(/^\[|\]$/g, '')
   if (/(^|\.)localhost$/i.test(h)) throw new Error('blocked host')
   const addrs = isIP(h) ? [h] : await resolve(h)
   if (!addrs.length || addrs.some(isBlockedIp)) throw new Error('blocked address')
+  return addrs
+}
+
+/** A DNS lookup that never asks DNS: it answers with the addresses that already passed the guard. */
+export const pinnedLookup = (addrs: string[]): LookupFunction => (_host, opts, cb) => {
+  const entries = addrs.map((address) => ({ address, family: isIP(address) }))
+  if (opts.all) cb(null, entries)
+  else cb(null, entries[0]!.address, entries[0]!.family)
+}
+
+/**
+ * fetch() for one hop, connecting only to `addrs` (the vetted DNS answer), so a second, different DNS answer cannot matter.
+ * The URL's hostname still drives the Host header, TLS SNI and certificate check. A fresh socket per request (agent: false)
+ * means no pooled connection made for another hop or host is ever reused.
+ */
+export function pinnedFetch(u: URL, addrs: string[], init: { signal: AbortSignal; headers: Record<string, string> }): Promise<Response> {
+  return new Promise((resolve, reject) => {
+    const secure = u.protocol === 'https:'
+    const req = (secure ? httpsRequest : httpRequest)(
+      {
+        host: u.hostname.replace(/^\[|\]$/g, ''), port: u.port || undefined, path: u.pathname + u.search, headers: init.headers,
+        lookup: pinnedLookup(addrs), agent: false, signal: init.signal
+      },
+      (res) => {
+        const headers = new Headers()
+        for (const [k, v] of Object.entries(res.headers)) for (const x of Array.isArray(v) ? v : v === undefined ? [] : [v]) headers.append(k, x)
+        const status = res.statusCode ?? 502
+        const empty = status === 204 || status === 205 || status === 304
+        if (empty) res.resume()
+        resolve(new Response(empty ? null : (Readable.toWeb(res) as ReadableStream<Uint8Array>), { status, headers }))
+      }
+    )
+    req.on('error', reject)
+    req.end()
+  })
 }
 
 // ---- fetching -----------------------------------------------------------------------------
@@ -98,11 +138,10 @@ export function htmlToText(html: string): string {
 
 /**
  * Fetches one result page as text. Only http(s); every hop (at most 3 redirects) is resolved and checked.
- * ponytail: the check resolves DNS separately from the connection, so a rebinding server could still slip through;
- * pin the validated address with a custom dispatcher if the threat model ever needs it.
+ * DNS is resolved once per hop and the connection is pinned to the vetted answer (pinnedFetch), so rebinding cannot swap in
+ * a private address between the check and the connect. `deps.fetch` replaces the transport (tests only).
  */
 export async function fetchPageText(url: string, deps: ResearchDeps = {}): Promise<string> {
-  const doFetch = deps.fetch ?? fetch
   const resolve = deps.resolve ?? defaultResolve
   const signal = AbortSignal.any([AbortSignal.timeout(PAGE_MS), ...(deps.signal ? [deps.signal] : [])])
   let current = url
@@ -110,8 +149,9 @@ export async function fetchPageText(url: string, deps: ResearchDeps = {}): Promi
     const u = new URL(current)
     if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new Error('only http(s) pages can be fetched')
     if (u.username || u.password) throw new Error('credentials in URL')
-    await assertPublic(u.hostname, resolve)
-    const res = await doFetch(u, { redirect: 'manual', signal, headers: { accept: 'text/html,text/plain;q=0.9', 'user-agent': 'CogNotez' } })
+    const addrs = await assertPublic(u.hostname, resolve)
+    const headers = { accept: 'text/html,text/plain;q=0.9', 'user-agent': 'CogNotez' }
+    const res = deps.fetch ? await deps.fetch(u, { redirect: 'manual', signal, headers }) : await pinnedFetch(u, addrs, { signal, headers })
     const location = res.headers.get('location')
     if (res.status >= 300 && res.status < 400 && location) {
       void res.body?.cancel().catch(() => undefined)

@@ -1,7 +1,12 @@
 <script lang="ts">
   import { t } from '../i18n'
+  import { activeTabId } from '../lib/tabs'
   import { closeTab, openNote, tabs } from '../state/tabs.svelte'
+  import { ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
+
+  // No tab looks selected while Settings is shown; the current one keeps tabindex 0 so the list stays reachable.
+  const active = $derived(activeTabId(ui.view, tabs.currentId))
 
   /** Left/Right move between tabs, as a tablist should. */
   function onkey(e: KeyboardEvent, i: number): void {
@@ -23,7 +28,7 @@
         class="tab-open"
         id="tab-{d.id}"
         role="tab"
-        aria-selected={d.id === tabs.currentId}
+        aria-selected={d.id === active}
         tabindex={d.id === tabs.currentId ? 0 : -1}
         onclick={() => void openNote(d.id)}
         onkeydown={(e) => onkey(e, i)}

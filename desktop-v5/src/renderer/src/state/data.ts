@@ -1,6 +1,8 @@
 // Export, import and backup actions shared by the palette and the settings page.
 import type { BackupInfo, ExportFormat } from '../../../shared/api'
 import { t } from '../i18n'
+import { formatDateTime } from '../lib/time'
+import { importer } from './importer.svelte'
 import { refresh } from './library.svelte'
 import { flush, flushAll } from './tabs.svelte'
 import type { Doc } from './tabs.svelte'
@@ -35,7 +37,8 @@ export async function importFiles(): Promise<void> {
   const r = await guarded(() => window.api.importer.files())
   if (!r) return
   await refresh()
-  showToast(t('toast.importedFiles', { n: r.notes }))
+  if (r.skipped.length) importer.files = r // ImportSummary lists what was left out
+  else showToast(t('toast.importedFiles', { n: r.notes }))
 }
 
 export async function backupNow(): Promise<BackupInfo | undefined> {
@@ -48,7 +51,7 @@ export async function backupNow(): Promise<BackupInfo | undefined> {
 export function askRestore(b: BackupInfo): void {
   ui.confirm = {
     title: t('backups.restoreTitle'),
-    message: t('backups.restoreMessage', { date: new Date(b.createdAt).toLocaleString() }),
+    message: t('backups.restoreMessage', { date: formatDateTime(b.createdAt) }),
     confirmLabel: t('backups.restore'),
     run: () =>
       void guarded(async () => {

@@ -3,6 +3,7 @@
   import { ai, openModelList } from '../state/ai.svelte'
   import { syncChip } from '../lib/syncChip'
   import { openSyncSettings, sync } from '../state/sync.svelte'
+  import { openAboutSettings, updates } from '../state/updates.svelte'
   import { saveStatus, tabs } from '../state/tabs.svelte'
   import { cycleTheme, ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
@@ -22,6 +23,11 @@
   <button class="sync wide {chip.tone}" title={chip.title} onclick={openSyncSettings}>
     <Icon name="cloud" /><span>{chip.text}</span>
   </button>
+  {#if updates.status?.state === 'available' || updates.status?.state === 'downloading' || updates.status?.state === 'ready'}
+    <button class="upd wide" class:ready={updates.status.state === 'ready'} onclick={openAboutSettings} title={t('updates.open')}>
+      <Icon name="up" /><span>{t(`updates.chip.${updates.status.state}`, { version: updates.status.version ?? '', percent: updates.status.percent ?? 0 })}</span>
+    </button>
+  {/if}
   {#if doc && !doc.sealed}<span>{t('meta.words', { n: doc.words })}</span>{/if}
   {#if ai.working > 0}<span class="working" role="status"><span class="spin"></span>{t('ai.working')}</span>{/if}
   <span class="grow"></span>
@@ -108,6 +114,19 @@
     gap: 6px;
   }
   .sync :global(.i) {
+    width: 14px;
+    height: 14px;
+  }
+  .upd {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: var(--accent);
+  }
+  .upd.ready {
+    color: var(--ok);
+  }
+  .upd :global(.i) {
     width: 14px;
     height: 14px;
   }

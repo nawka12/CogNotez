@@ -18,12 +18,13 @@ Non-goals for 2.0: character-level merging of concurrent body edits, syncing AI 
 |---|---|
 | Device id | `[a-z0-9]{8,32}`, random, generated once per install and stored in local settings |
 | Note id | `[A-Za-z0-9_-]{8,64}` |
-| Rev (edit) | `<ms 13 digits>-<counter 4 base36>-<deviceId>`, a hybrid logical clock (HLC) value |
+| Rev (edit) | `<ms 13 digits, below 9000000000000>-<counter 4 base36>-<deviceId>`, a hybrid logical clock (HLC) value |
 | Rev (merge) | `<prefix>~<first 8 hex of sha256(sorted parents joined by "+")>` |
 
-- **Merge rev prefix.** If the greatest parent is an edit rev, the prefix is that rev. If it is a merge rev `E~h`, the prefix is the HLC successor of `E`: the same device part with the counter + 1, or the next millisecond with counter `0000` when the counter was `zzzz`. Merge revs therefore never nest, and a rev is at most 60 characters.
+- **Merge rev prefix.** If the greatest parent is an edit rev, the prefix is that rev. If it is a merge rev `E~h`, the prefix is the HLC successor of `E`: the same device part with the counter + 1, or the next millisecond with counter `0000` when the counter was `zzzz`. Merge revs therefore never nest, and a rev is at most 60 characters. Only a merge rev's prefix may reach ms 9000000000000, through that carry; reaching 9999999999999 would take about 10¹⁸ merges, so the ms always fits in 13 digits.
 - **Revs order by plain string comparison.** The ms and counter fields are fixed-width, and `~` sorts after every character of a device id, so a merge rev sorts after all of its parents, also when one device id is a prefix of another.
 - **Clocks.** Every device applies HLC `receive()` to each rev it reads, so its next local rev is greater than anything it has seen. `receive()` uses only the ms and counter fields, so it takes merge revs too. Wall-clock time is never used for merge decisions.
+- **Drift cap.** A rev from another device whose ms is more than 24 hours ahead of the local wall clock counts as `wall + 24 h` with counter `0000`, so one device with a wrong clock can't push every clock forward for good. A device's own revs always count in full, which keeps its revs unique. The HLC never reads the wall clock as more than 8999999999999. Local revs may then sort below a far-future rev. That is safe: rev order only makes the merge deterministic and picks `b` (§8), and every other rule compares revs for equality.
 
 ## 3. Remote layout
 
@@ -115,6 +116,7 @@ UTF-8 JSON, written with keys sorted and no whitespace (strings escaped as `JSON
 4. **Merge.** For each note with **more than one head** (a head is a rev that no other rev names as a parent), compute the deterministic merge (§8). Write the merge revision and any conflicted copies with create-only semantics. Every device computes identical files, so duplicate work converges.
 5. **Apply** each note's single resulting head locally, in one transaction per note:
    - Skip the note if `notes.rev` changed since step 2. The user typed during the sync; the next round handles it.
+   - Read the head from the remote, also when this device wrote it in step 4: where `create` isn't atomic (Drive), a losing duplicate still reports `created`, and readers see only the oldest file. If the read finds nothing yet (listing lag), skip the note until the next round.
    - Write the fields, set `notes.rev = head` and `base_rev = head`, and download missing media first.
    - For a tombstone head, delete the local row.
 6. **Save** the cursor.
@@ -176,7 +178,7 @@ Every field is a function of remote data, so every device that sees the same gra
   - `list` scans the folder. Cursors are optional.
 - **Google Drive** (scope `drive.file`):
   - The root is the folder `CogNotez Sync` in My Drive, containing `objects/` and `media/`.
-  - `create` checks for the name and then uploads. Duplicate names are harmless; readers deduplicate by name.
+  - `create` checks for the name and then uploads. Duplicate names are harmless: listings deduplicate by name, and `read` returns the oldest file (by `createdTime`, then file id).
   - Incremental listing uses `changes.list` with a stored page token. OAuth uses a loopback redirect with PKCE and `state`.
 
 ## 11. Fixtures

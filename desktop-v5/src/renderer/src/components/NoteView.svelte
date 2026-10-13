@@ -1,6 +1,8 @@
 <script lang="ts">
   import { untrack } from 'svelte'
   import { t } from '../i18n'
+  import { reviewKey } from '../lib/reviewKey'
+  import { acceptAll, edit, rejectAll } from '../state/aiedit.svelte'
   import { setTitle } from '../state/tabs.svelte'
   import type { Doc } from '../state/tabs.svelte'
   import { ui } from '../state/ui.svelte'
@@ -58,10 +60,17 @@
     e.preventDefault()
     doc.view?.focus()
   }
+
+  /** The editor binds these itself; this covers focus anywhere else in the note (the review bar, the title). */
+  function onReviewKey(e: KeyboardEvent): void {
+    const k = reviewKey(e)
+    if (k && edit.cur?.docId === doc.id && (k === 'accept' ? acceptAll() : rejectAll())) e.preventDefault()
+  }
 </script>
 
 <div class="scroll" bind:this={scroller} onscroll={() => !restoring && (doc.scroll = scroller.scrollTop)}>
-  <article class="canvas" class:split>
+  <!-- svelte-ignore a11y_no_noninteractive_element_interactions -->
+  <article class="canvas" class:split onkeydown={onReviewKey}>
     {#if trashed}<TrashBanner {doc} />{:else if doc.note.conflictOf}<ConflictBanner {doc} />{/if}
     <input
       class="title"

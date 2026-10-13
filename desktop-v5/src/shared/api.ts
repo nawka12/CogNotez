@@ -96,6 +96,16 @@ export interface BackupInfo {
 
 export type ExportFormat = 'md' | 'txt' | 'pdf'
 
+export interface UpdateStatus {
+  /** 'unsupported': dev runs, and builds that can't update themselves (unsigned macOS, Linux outside an AppImage). */
+  state: 'idle' | 'checking' | 'none' | 'available' | 'downloading' | 'ready' | 'error' | 'unsupported'
+  /** The newer version, when one is available, downloading or ready. */
+  version: string | null
+  /** 0..100 while downloading. */
+  percent: number | null
+  error: string | null
+}
+
 export interface AppInfo {
   version: string
   electron: string
@@ -220,10 +230,14 @@ export interface Api {
   importer: {
     detectV4(): Promise<ImportDetect>
     runV4(source?: ImportSourceKind | 'auto'): Promise<ImportStats>
-    /** Opens a file dialog in main (paths never come from the renderer). Resolves null on cancel. */
-    fromFile(): Promise<ImportStats | null>
+    /**
+     * Opens a file dialog in main (paths never come from the renderer). Resolves null on cancel. Takes a v4 JSON backup
+     * or a v4 Google Drive sync file (cognotez_sync_backup.json). An encrypted sync file rejects with 'needs passphrase'
+     * or 'wrong passphrase'; call again with the passphrase and main re-uses the file picked last, without a dialog.
+     */
+    fromFile(passphrase?: string): Promise<ImportStats | null>
     /** Imports .md/.txt files picked in a dialog (one note each). Resolves null on cancel. */
-    files(): Promise<{ notes: number } | null>
+    files(): Promise<{ notes: number; skipped: { name: string; reason: string }[] } | null>
   }
   /** Passwords never leave main except as the argument here; keys live only in main memory. */
   locks: {
@@ -250,6 +264,15 @@ export interface Api {
     allMarkdown(): Promise<string | null>
   }
   app: { info(): Promise<AppInfo> }
+  /** GitHub Releases via electron-updater. Nothing downloads without download(). */
+  updates: {
+    status(): Promise<UpdateStatus>
+    check(): Promise<UpdateStatus>
+    download(): Promise<void>
+    /** Quits and installs a downloaded update. */
+    install(): Promise<void>
+  }
+  onUpdateStatus(cb: (s: UpdateStatus) => void): () => void
   /** All model traffic runs in main; keys stay in main. Results stream through onAiEvent. */
   ai: {
     getConfig(): Promise<AiConfig>

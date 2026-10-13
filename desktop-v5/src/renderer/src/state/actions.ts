@@ -39,7 +39,7 @@ export async function trashNote(id: string, message = t('toast.trashed')): Promi
     return true
   })
   if (!ok) return
-  closeTab(id)
+  closeTab(id, true)
   showToast(message, {
     label: t('toast.undo'),
     run: () =>
@@ -67,7 +67,7 @@ export function askDeleteForever(id: string, title: string): void {
     confirmLabel: t('confirm.delete.ok'),
     run: () =>
       void guarded(async () => {
-        closeTab(id)
+        closeTab(id, true)
         await window.api.notes.deleteForever(id)
         showToast(t('toast.deleted'))
       })

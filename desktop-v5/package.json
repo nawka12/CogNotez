@@ -68,10 +68,26 @@
     },
     "mac": {
       "target": [
-        "dmg"
+        {
+          "target": "dmg",
+          "arch": "universal"
+        },
+        {
+          "target": "zip",
+          "arch": "universal"
+        }
       ],
       "category": "public.app-category.productivity"
     },
-    "artifactName": "CogNotez-${version}.${ext}"
+    "artifactName": "CogNotez-${version}.${ext}",
+    "publish": {
+      "provider": "github",
+      "owner": "nawka12",
+      "repo": "CogNotez",
+      "releaseType": "draft"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
   }
 }

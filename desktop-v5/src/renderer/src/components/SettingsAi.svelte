@@ -182,7 +182,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 4px 16px;
     min-height: 38px;
   }
   .lab {
@@ -237,10 +238,5 @@
   }
   .res.bad {
     color: var(--rubric);
-  }
-  @media (max-width: 760px) {
-    .row {
-      flex-wrap: wrap;
-    }
   }
 </style>

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AiEvent, Api, NotesChanged, SyncStatus } from '../shared/api'
+import type { AiEvent, Api, NotesChanged, SyncStatus, UpdateStatus } from '../shared/api'
 
 const call = <T>(channel: string, ...args: unknown[]): Promise<T> => ipcRenderer.invoke(channel, ...args) as Promise<T>
 
@@ -28,7 +28,7 @@ const api: Api = {
   importer: {
     detectV4: () => call('importer:detectV4'),
     runV4: (source) => call('importer:runV4', source ?? 'auto'),
-    fromFile: () => call('importer:fromFile'),
+    fromFile: (passphrase) => call('importer:fromFile', passphrase),
     files: () => call('importer:files')
   },
   locks: {
@@ -48,6 +48,19 @@ const api: Api = {
     allMarkdown: () => call('exporter:allMarkdown')
   },
   app: { info: () => call('app:info') },
+  updates: {
+    status: () => call('updates:status'),
+    check: () => call('updates:check'),
+    download: () => call('updates:download'),
+    install: () => call('updates:install')
+  },
+  onUpdateStatus(cb) {
+    const listener = (_e: unknown, payload: UpdateStatus): void => cb(payload)
+    ipcRenderer.on('updates:status', listener)
+    return () => {
+      ipcRenderer.removeListener('updates:status', listener)
+    }
+  },
   ai: {
     getConfig: () => call('ai:getConfig'),
     setConfig: (patch) => call('ai:setConfig', patch),

@@ -96,7 +96,8 @@ describe('names.json', () => {
     const carry = mergeRev([mergeRev([rev(0, DEV_B, 5), `1791860000000-zzzz-${DEV_A}`]), rev(0, DEV_B, 5)])
     const objects = [
       objectName(NOTE, R1, [], false), objectName(NOTE, R2, [R1], false), objectName(NOTE, M, [R1, R2], false),
-      objectName(NOTE, M2, [M, rev(1, DEV_B)], true), objectName('x'.repeat(64), R1, [], true), objectName('Ab_-0123', R2, [M], false)
+      objectName(NOTE, M2, [M, rev(1, DEV_B)], true), objectName('x'.repeat(64), R1, [], true), objectName('Ab_-0123', R2, [M], false),
+      objectName(NOTE, `9000000000000-0000-${DEV_A}~0123abcd`, [`8999999999999-0001-${DEV_B}`], false) // a merge prefix may carry past
     ]
     const media = [mediaName('ab'.repeat(32), false), mediaName('0f'.repeat(32), true)]
     const invalid: Record<string, string> = {
@@ -114,6 +115,7 @@ describe('names.json', () => {
       [`objects/n.${NOTE}.${R1.replace(DEV_A, 'dev')}.0.json`]: 'device id under 8 characters',
       [`objects/n.${NOTE}.${R1.replace(DEV_A, 'z'.repeat(33))}.0.json`]: 'device id over 32 characters',
       [`objects/n.${NOTE}.${R1}~12345678~abcdef01.0.json`]: 'nested merge rev',
+      [`objects/n.${NOTE}.9000000000000-0000-${DEV_A}.0.json`]: 'edit rev ms not below 9000000000000',
       [`objects/n.${NOTE}.${R1}~1234567.0.json`]: 'merge hash not 8 hex',
       [`objects/n.${NOTE}.${R1}.0.sync-conflict-20261013.json`]: 'Syncthing conflict file',
       [`objects/n.${NOTE} (conflicted copy).${R1}.0.json`]: 'Dropbox conflict file',
@@ -130,7 +132,8 @@ describe('names.json', () => {
 
     const mergeRevs = [[R1, R2], [R2, R1], [M, rev(1, DEV_B)], [rev(0, DEV_B, 5), `1791860000000-zzzz-${DEV_A}`],
       [mergeRev([rev(0, DEV_B, 5), `1791860000000-zzzz-${DEV_A}`]), rev(0, DEV_B, 5)], [rev(1, DEV_A), rev(1, `${DEV_A}0`)],
-      [mergeRev([rev(1, DEV_A), rev(1, `${DEV_A}0`)]), rev(1, `${DEV_A}0`)]]
+      [mergeRev([rev(1, DEV_A), rev(1, `${DEV_A}0`)]), rev(1, `${DEV_A}0`)],
+      [mergeRev([`8999999999999-0001-${DEV_B}`, `8999999999999-zzzz-${DEV_A}`]), `8999999999999-0001-${DEV_B}`]]
     matches('names.json', {
       valid: {
         objects: objects.map((name) => {

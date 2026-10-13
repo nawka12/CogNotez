@@ -1,0 +1,94 @@
+name: Release v5
+
+# Pushing a tag like v5.0.0 or v5.0.0-alpha.2 builds desktop-v5/ on Linux, Windows and macOS and publishes it to GitHub Releases.
+# The release is created as a draft, every platform uploads into it, and only when all three succeeded it is published
+# (as a prerelease when the version has a "-" suffix). v4 tags (v4.x.y) are handled by release.yml.
+on:
+  push:
+    tags:
+      - 'v5.*'
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    outputs:
+      prerelease: ${{ steps.version.outputs.prerelease }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check the tag against package.json
+        id: version
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          pkg="$(node -p "require('./desktop-v5/package.json').version")"
+          if [ "$version" != "$pkg" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match desktop-v5/package.json version $pkg"
+            exit 1
+          fi
+          case "$version" in *-*) echo "prerelease=true" >> "$GITHUB_OUTPUT" ;; *) echo "prerelease=false" >> "$GITHUB_OUTPUT" ;; esac
+
+      - name: Create the draft release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if gh release view "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" > /dev/null 2>&1; then
+            echo "Release $GITHUB_REF_NAME already exists; reusing it"
+          else
+            flags=""
+            if [ "${{ steps.version.outputs.prerelease }}" = "true" ]; then flags="--prerelease"; fi
+            gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft --verify-tag --title "CogNotez ${GITHUB_REF_NAME#v}" --generate-notes $flags
+          fi
+
+  build:
+    needs: draft
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    defaults:
+      run:
+        working-directory: desktop-v5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: desktop-v5/package-lock.json
+
+      - run: npm ci
+
+      # electron-builder uploads every artifact and the latest*.yml files to the draft release for this tag.
+      # Everything signing-related is optional: with the secrets unset the build is unsigned, like v4's.
+      - name: Build and upload
+        shell: bash
+        run: npm run dist -- --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Baked into the app by electron-vite (src/main/env.d.ts). Empty means "ask the user to import a client file".
+          MAIN_VITE_GOOGLE_CLIENT_ID: ${{ secrets.MAIN_VITE_GOOGLE_CLIENT_ID }}
+          MAIN_VITE_GOOGLE_CLIENT_SECRET: ${{ secrets.MAIN_VITE_GOOGLE_CLIENT_SECRET }}
+          # electron-builder reads CSC_LINK / CSC_KEY_PASSWORD for whichever platform it builds, so each runner gets its own certificate.
+          CSC_LINK: ${{ runner.os == 'macOS' && secrets.MAC_CSC_LINK || runner.os == 'Windows' && secrets.WIN_CSC_LINK || '' }}
+          CSC_KEY_PASSWORD: ${{ runner.os == 'macOS' && secrets.MAC_CSC_KEY_PASSWORD || runner.os == 'Windows' && secrets.WIN_CSC_KEY_PASSWORD || '' }}
+          # macOS notarization (needs the signing certificate above).
+          APPLE_ID: ${{ runner.os == 'macOS' && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ runner.os == 'macOS' && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ runner.os == 'macOS' && secrets.APPLE_TEAM_ID || '' }}
+
+  publish:
+    needs: [draft, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PRERELEASE: ${{ needs.draft.outputs.prerelease }}
+        run: |
+          # A prerelease never becomes "latest", which is what keeps it away from v4 users (see docs/v5/RELEASING.md).
+          gh release edit "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --draft=false --prerelease="$PRERELEASE" --latest="$([ "$PRERELEASE" = true ] && echo false || echo true)"

@@ -52,6 +52,15 @@
           "1791860000002-0000-devbbbbbbbb~bdd7485f"
         ],
         "encrypted": false
+      },
+      {
+        "name": "objects/n.note-0000-aaaa.9000000000000-0000-devaaaaaaaa~0123abcd.8999999999999-0001-devbbbbbbbb.json",
+        "id": "note-0000-aaaa",
+        "rev": "9000000000000-0000-devaaaaaaaa~0123abcd",
+        "parents": [
+          "8999999999999-0001-devbbbbbbbb"
+        ],
+        "encrypted": false
       }
     ],
     "media": [
@@ -123,6 +132,10 @@
     {
       "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa~12345678~abcdef01.0.json",
       "why": "nested merge rev"
+    },
+    {
+      "name": "objects/n.note-0000-aaaa.9000000000000-0000-devaaaaaaaa.0.json",
+      "why": "edit rev ms not below 9000000000000"
     },
     {
       "name": "objects/n.note-0000-aaaa.1791860000001-0000-devaaaaaaaa~1234567.0.json",
@@ -221,6 +234,14 @@
       ],
       "hashInput": "1791860000001-0000-devaaaaaaaa0+1791860000001-0000-devaaaaaaaa0~894f0506",
       "rev": "1791860000001-0001-devaaaaaaaa0~de14ffcd"
+    },
+    {
+      "parents": [
+        "8999999999999-zzzz-devaaaaaaaa~6670fb2b",
+        "8999999999999-0001-devbbbbbbbb"
+      ],
+      "hashInput": "8999999999999-0001-devbbbbbbbb+8999999999999-zzzz-devaaaaaaaa~6670fb2b",
+      "rev": "9000000000000-0000-devaaaaaaaa~49926dc7"
     }
   ],
   "copyIds": [

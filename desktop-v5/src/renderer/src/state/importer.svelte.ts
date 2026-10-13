@@ -13,6 +13,10 @@ class Importer {
   detected = $state(false)
   running = $state(false)
   error = $state('')
+  /** Set while an encrypted sync file waits for its passphrase; `wrong` after a failed try. */
+  ask = $state.raw<{ wrong: boolean } | null>(null)
+  /** Result of importing Markdown files when some were skipped (shown in ImportSummary). */
+  files = $state.raw<{ notes: number; skipped: { name: string; reason: string }[] } | null>(null)
 }
 export const importer = new Importer()
 
@@ -41,11 +45,18 @@ export async function runImport(run: () => Promise<ImportStats | null>): Promise
   try {
     const stats = await run()
     if (stats) {
+      importer.ask = null
       importer.found = null
       ui.importSummary = stats
       await refresh()
     }
   } catch (e) {
+    const m = errorText(e)
+    if (m === 'needs passphrase' || m === 'wrong passphrase') {
+      importer.ask = { wrong: m === 'wrong passphrase' }
+      return
+    }
+    importer.ask = null
     importer.error = notImplemented(e) ? t('import.unavailable') : t('import.failed', { message: errorText(e) })
     showToast(importer.error)
   } finally {
@@ -54,4 +65,4 @@ export async function runImport(run: () => Promise<ImportStats | null>): Promise
 }
 
 export const importFromV4 = (): Promise<void> => runImport(() => window.api.importer.runV4())
-export const importFromFile = (): Promise<void> => runImport(() => window.api.importer.fromFile())
+export const importFromFile = (passphrase?: string): Promise<void> => runImport(() => window.api.importer.fromFile(passphrase))

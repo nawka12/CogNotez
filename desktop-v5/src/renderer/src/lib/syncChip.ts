@@ -1,5 +1,5 @@
 import type { SyncStatus } from '../../../shared/api'
-import { t } from '../i18n'
+import { locale, t } from '../i18n'
 import { relativeTime } from './time'
 
 export type ChipTone = 'off' | 'busy' | 'ok' | 'warn' | 'bad'
@@ -13,7 +13,8 @@ export interface SyncChip {
 
 /** "just now", "2 min ago", ... for the status bar and the settings page. */
 export function syncedWhen(ts: number, now: number): string {
-  return relativeTime(ts, now).replace(/^Yesterday$/, 'yesterday')
+  const r = relativeTime(ts, now)
+  return r === t('time.yesterday') ? r.toLocaleLowerCase(locale.lang) : r
 }
 
 /** What the status bar's sync chip shows for a given status. */

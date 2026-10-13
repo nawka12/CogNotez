@@ -3,6 +3,7 @@
   import type { SyncTransportKind } from '../../../shared/api'
   import { t } from '../i18n'
   import { syncChip, syncedWhen } from '../lib/syncChip'
+  import { formatDateTime } from '../lib/time'
   import { loadGoogle, loadSync, sync } from '../state/sync.svelte'
   import { errorText, showToast, ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
@@ -155,7 +156,7 @@
       <dt>{t('sync.state')}</dt>
       <dd class:bad={chip.tone === 'bad' || chip.tone === 'warn'}>{chip.text}</dd>
       <dt>{t('sync.lastSynced')}</dt>
-      <dd title={status.lastSyncAt ? new Date(status.lastSyncAt).toLocaleString() : ''}>{status.lastSyncAt ? syncedWhen(status.lastSyncAt, ui.now) : t('sync.never')}</dd>
+      <dd title={status.lastSyncAt ? formatDateTime(status.lastSyncAt) : ''}>{status.lastSyncAt ? syncedWhen(status.lastSyncAt, ui.now) : t('sync.never')}</dd>
       <dt>{t('sync.location')}</dt>
       <dd class="path">{where}</dd>
       <dt>{t('sync.encryption')}</dt>
@@ -312,7 +313,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 4px 16px;
     min-height: 38px;
   }
   .lab {
@@ -412,10 +414,5 @@
     margin: 1.4rem 0 0;
     color: var(--ink-3);
     font-size: 13px;
-  }
-  @media (max-width: 760px) {
-    .row {
-      flex-wrap: wrap;
-    }
   }
 </style>

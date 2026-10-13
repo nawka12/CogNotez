@@ -26,6 +26,7 @@
     border-radius: 5px;
     background: transparent;
     color: var(--ink-2);
+    white-space: nowrap;
   }
   button:hover {
     color: var(--ink);

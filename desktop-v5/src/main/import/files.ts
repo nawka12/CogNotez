@@ -96,6 +96,10 @@ export function titleAndBody(text: string, fileName: string): { title: string; b
 
 const IMG_RE = /!\[([^\]]*)\]\(\s*(<[^>]+>|[^)\s]+)(?:\s+"[^"]*")?\s*\)/g
 
+/** Short, path-free reasons only: Node's own error messages quote the full path. */
+class Skip extends Error {}
+const UTF8 = new TextDecoder('utf-8', { fatal: true })
+
 export interface FilesResult {
   ids: string[]
   skipped: { name: string; reason: string }[]
@@ -112,9 +116,15 @@ export function importMarkdownFiles(store: Store, media: Media, paths: readonly 
       const name = basename(path)
       try {
         const st = lstatSync(path)
-        if (!st.isFile()) throw new Error('not a regular file')
-        if (st.size > MAX_IMPORT_BYTES) throw new Error('larger than 5 MB')
-        const raw = readFileSync(path, 'utf8').replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
+        if (!st.isFile()) throw new Skip('not a regular file')
+        if (st.size > MAX_IMPORT_BYTES) throw new Skip(`over ${MAX_IMPORT_BYTES / 1e6} MB`)
+        let raw: string
+        try {
+          raw = UTF8.decode(readFileSync(path))
+        } catch (e) {
+          throw e instanceof TypeError ? new Skip('not UTF-8 text') : e
+        }
+        raw = raw.replace(/^\uFEFF/, '').replace(/\r\n?/g, '\n')
         const { title, body: text, data } = titleAndBody(raw, basename(name, extname(name)))
         const dir = realpathSync(dirname(path))
         const hashes = new Set<string>()
@@ -137,7 +147,7 @@ export function importMarkdownFiles(store: Store, media: Media, paths: readonly 
             return whole // missing or unreadable image: leave the link as written
           }
         })
-        if (body.length > LIMITS.body) throw new Error('text is too long')
+        if (body.length > LIMITS.body) throw new Skip('text is too long')
         notes.push({
           id: randomUUID(),
           title: title.slice(0, LIMITS.title),
@@ -152,7 +162,7 @@ export function importMarkdownFiles(store: Store, media: Media, paths: readonly 
           media: [...hashes]
         })
       } catch (e) {
-        skipped.push({ name, reason: e instanceof Error ? e.message : String(e) })
+        skipped.push({ name, reason: e instanceof Skip ? e.message : 'unreadable' })
       }
     }
     const r = store.bulk.insert({ notes, media: [], messages: [] })

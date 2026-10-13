@@ -3,7 +3,7 @@ import type { Server } from 'node:http'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { isLocalUrl, LineBuffer, listModels, parseNdjsonLine, parseSseLine, streamChat, testConnection } from '../src/main/ai/client'
 import type { AiConfig } from '../src/shared/api'
-import { start } from './fixtures/fake-ai-server.mjs'
+import { deadPort, start } from './fixtures/fake-ai-server.mjs'
 import type { FakeAiServer } from './fixtures/fake-ai-server.mjs'
 
 describe('stream parsing', () => {
@@ -82,8 +82,8 @@ describe('against a real HTTP server', () => {
   })
 
   it('reports an unreachable host in plain words', async () => {
-    const dead = ollama({ baseUrl: 'http://127.0.0.1:1' })
-    await expect(collect(dead, 'x')).rejects.toThrow("Can't reach Ollama at http://127.0.0.1:1. Is it running?")
+    const at = `http://127.0.0.1:${await deadPort()}`
+    await expect(collect(ollama({ baseUrl: at }), 'x')).rejects.toThrow(`Can't reach Ollama at ${at}. Is it running?`)
     await expect(collect(cfg({ provider: 'openrouter', baseUrl: 'https://nonexistent.invalid/api/v1' }), 'x')).rejects.toThrow(/Can't reach OpenRouter at .*connection/)
   })
 
@@ -104,7 +104,7 @@ describe('against a real HTTP server', () => {
   it('lists models for both provider styles (sorted)', async () => {
     expect(await listModels(cfg(), 'k')).toEqual(['fake', 'fake-large'])
     expect(await listModels(ollama(), null)).toEqual(['fake-small:latest', 'fake:latest'])
-    await expect(listModels(ollama({ baseUrl: 'http://127.0.0.1:1' }), null)).rejects.toThrow(/Can't reach Ollama/)
+    await expect(listModels(ollama({ baseUrl: `http://127.0.0.1:${await deadPort()}` }), null)).rejects.toThrow(/Can't reach Ollama/)
   })
 
   it('test(): ok, missing model, no model chosen, unreachable', async () => {
@@ -112,15 +112,14 @@ describe('against a real HTTP server', () => {
     expect(await testConnection(ollama({ model: 'fake' }), null)).toMatchObject({ ok: true }) // matches fake:latest
     expect(await testConnection(cfg({ model: 'x' }), null)).toMatchObject({ ok: false, error: "Model 'x' isn't installed." })
     expect(await testConnection(cfg({ model: '' }), null)).toMatchObject({ ok: true })
-    expect(await testConnection(ollama({ baseUrl: 'http://127.0.0.1:1' }), null)).toMatchObject({
-      ok: false, error: "Can't reach Ollama at http://127.0.0.1:1. Is it running?"
-    })
+    const at = `http://127.0.0.1:${await deadPort()}`
+    expect(await testConnection(ollama({ baseUrl: at }), null)).toMatchObject({ ok: false, error: `Can't reach Ollama at ${at}. Is it running?` })
   })
 
   it('test(): reports local vs remote', async () => {
     for (const url of ['http://localhost:11434', 'http://127.0.0.1:1', 'http://127.5.5.5/v1', 'http://[::1]:8080/v1']) expect(isLocalUrl(url)).toBe(true)
     for (const url of ['https://openrouter.ai/api/v1', 'http://192.168.1.5:11434', 'http://localhost.evil.com', 'http://128.0.0.1']) expect(isLocalUrl(url)).toBe(false)
-    const remote = await testConnection(cfg({ provider: 'openrouter', baseUrl: 'http://127.0.0.2:1/v1' }), null)
+    const remote = await testConnection(cfg({ provider: 'openrouter', baseUrl: `http://127.0.0.2:${await deadPort()}/v1` }), null)
     expect(remote).toMatchObject({ ok: false, local: true, provider: 'openrouter' })
     expect((await testConnection({ ...cfg(), baseUrl: 'https://nonexistent.invalid/v1' }, null)).local).toBe(false)
   })

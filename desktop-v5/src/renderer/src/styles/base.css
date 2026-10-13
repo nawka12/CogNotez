@@ -61,11 +61,12 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  height: 30px;
-  padding: 0 12px;
+  min-height: 30px;
+  padding: 3px 12px;
   border: 1px solid var(--rule);
   border-radius: 6px;
   background: var(--paper);
+  text-align: center;
   color: var(--ink);
   font-weight: 500;
 }

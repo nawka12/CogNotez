@@ -2,7 +2,7 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createAi } from '../src/main/ai'
 import { createConfig } from '../src/main/ai/config'
 import type { AiEvent, AiRequest } from '../src/shared/api'
-import { start } from './fixtures/fake-ai-server.mjs'
+import { deadPort, start } from './fixtures/fake-ai-server.mjs'
 import type { FakeAiServer } from './fixtures/fake-ai-server.mjs'
 import { memStore } from './helpers'
 
@@ -162,7 +162,7 @@ describe('run', () => {
     expect((await t.ask({ kind: 'chat', noteId: null, text: '', input: 'please 401' })).at(-1)).toMatchObject({
       type: 'error', error: 'The provider rejected the API key.', aborted: false
     })
-    t.ai.setConfig({ baseUrl: 'http://127.0.0.1:1/v1' })
+    t.ai.setConfig({ baseUrl: `http://127.0.0.1:${await deadPort()}/v1` })
     const ev = await t.ask({ kind: 'chat', noteId: null, text: '', input: 'hi' })
     expect(ev.at(-1)).toMatchObject({ type: 'error', aborted: false })
     expect(ev.at(-1)).toHaveProperty('error', expect.stringContaining("Can't reach"))
@@ -241,7 +241,7 @@ describe('run', () => {
   })
 
   it('reports an unreachable SearXNG instead of silently skipping research', async () => {
-    t.ai.setConfig({ searxngUrl: 'http://127.0.0.1:1' })
+    t.ai.setConfig({ searxngUrl: `http://127.0.0.1:${await deadPort()}` })
     const ev = await t.ask({ kind: 'chat', noteId: null, text: '', input: 'q', research: true })
     expect(ev.at(-1)).toMatchObject({ type: 'error', error: expect.stringContaining('SearXNG') as string, aborted: false })
   })

@@ -6,5 +6,6 @@ import './styles/base.css'
 import './styles/prose.css'
 import { mount } from 'svelte'
 import App from './App.svelte'
+import { loadLanguage } from './state/prefs.svelte'
 
-export default mount(App, { target: document.getElementById('app')! })
+void loadLanguage().then(() => mount(App, { target: document.getElementById('app')! }))

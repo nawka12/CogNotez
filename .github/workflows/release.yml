@@ -4,6 +4,7 @@ on:
   push:
     tags:
       - 'v*.*.*'
+      - '!v5.*'  # v5 releases are built by release-v5.yml
 
 jobs:
   build:

@@ -83,6 +83,17 @@ describe('sync names', () => {
     expect(copyId(NOTE, R1)).toMatch(/^c[0-9a-f]{31}$/)
   })
 
+  it('edit revs stay below 9e12 ms; a merge rev prefix may carry to it and is still valid', () => {
+    const atMax = `8999999999999-zzzz-${DEV_A}`
+    const low = `8999999999999-0001-${DEV_B}`
+    expect(REV_RE.test(atMax)).toBe(true)
+    expect(REV_RE.test(`9000000000000-0000-${DEV_A}`)).toBe(false)
+    expect(parseObjectName(`objects/n.${NOTE}.9000000000000-0000-${DEV_A}.0.json`)).toBeNull()
+    const m = mergeRev([mergeRev([low, atMax]), low]) // bump(atMax) carries into 9000000000000
+    expect(m.startsWith(`9000000000000-0000-${DEV_A}~`)).toBe(true)
+    expect(parseObjectName(objectName(NOTE, m, [mergeRev([low, atMax]), low], false))).not.toBeNull()
+  })
+
   it('keeps names under 255 bytes at the maximum sizes', () => {
     const long = (ms: number, c: number) => `${1791860000000 + ms}-${c.toString(36).padStart(4, '0')}-${'z'.repeat(32)}`
     const a = mergeRev([long(1, 0), long(2, 0)])

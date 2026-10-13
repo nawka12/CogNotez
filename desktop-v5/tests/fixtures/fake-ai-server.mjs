@@ -51,6 +51,18 @@ async function readJson(req) {
   }
 }
 
+/** A loopback port that was just free and has no listener: connecting is refused (unlike port 1, which fetch rejects as a "bad port"). */
+export function deadPort() {
+  return new Promise((resolve, reject) => {
+    const srv = createServer()
+    srv.once('error', reject)
+    srv.listen(0, '127.0.0.1', () => {
+      const { port } = srv.address()
+      srv.close(() => resolve(port))
+    })
+  })
+}
+
 export function start(port = 11999) {
   const state = { count: 0, lastAuth: null, lastBody: null, lastOllama: null }
   const json = (res, status, body, headers = {}) => {

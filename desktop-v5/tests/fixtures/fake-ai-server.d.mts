@@ -4,3 +4,4 @@ export interface FakeAiServer {
   close(): Promise<void>
 }
 export function start(port?: number): Promise<FakeAiServer>
+export function deadPort(): Promise<number>

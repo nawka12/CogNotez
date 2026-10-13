@@ -4,8 +4,9 @@ import { LIMITS } from '../guards'
 
 export const DEVICE_RE = /^[a-z0-9]{8,32}$/
 export const NOTE_ID_RE = /^[A-Za-z0-9_-]{8,64}$/
-const EDIT = '\\d{13}-[0-9a-z]{4}-[a-z0-9]{8,32}'
-const REV = `${EDIT}(?:~[0-9a-f]{8})?`
+// An edit rev's ms is below 9e12 (hlc.MAX_MS); a merge rev's prefix may carry one past it, so it gets all 13 digits.
+const EDIT = '[0-8]\\d{12}-[0-9a-z]{4}-[a-z0-9]{8,32}'
+const REV = `(?:${EDIT}|\\d{13}-[0-9a-z]{4}-[a-z0-9]{8,32}~[0-9a-f]{8})`
 /** An edit rev (HLC) or a merge rev. */
 export const REV_RE = new RegExp(`^${REV}$`)
 const EDIT_RE = new RegExp(`^${EDIT}$`)

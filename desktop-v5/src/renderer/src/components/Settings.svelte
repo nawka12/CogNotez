@@ -1,18 +1,20 @@
 <script lang="ts">
   import { onMount } from 'svelte'
   import type { AppInfo, BackupInfo } from '../../../shared/api'
-  import { t } from '../i18n'
+  import { LANGS, isLangPref, t } from '../i18n'
   import type { Mode, Theme } from '../state/ui.svelte'
   import { askRestore, backupNow, exportAll, importFiles } from '../state/data'
-  import { importFromV4 } from '../state/importer.svelte'
-  import { FONT_SIZES, prefs, setDefaultMode, setFontSize, setSpellcheck } from '../state/prefs.svelte'
+  import { importFromFile, importFromV4 } from '../state/importer.svelte'
+  import { FONT_SIZES, prefs, setDefaultMode, setFontSize, setLanguage, setSpellcheck } from '../state/prefs.svelte'
   import type { FontSize } from '../state/prefs.svelte'
+  import { formatDateTime, formatSize } from '../lib/time'
   import { builtins, deleteTemplate, loadTemplates, templates } from '../state/templates.svelte'
   import { setTheme, ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
   import Seg from './Seg.svelte'
   import SettingsAi from './SettingsAi.svelte'
   import SettingsSync from './SettingsSync.svelte'
+  import SettingsUpdates from './SettingsUpdates.svelte'
 
   let backups = $state.raw<BackupInfo[]>([])
   let info = $state.raw<AppInfo | null>(null)
@@ -34,10 +36,6 @@
     await backupNow()
     await reload()
     busy = false
-  }
-
-  function size(bytes: number): string {
-    return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`
   }
 
   function askDelete(id: string, name: string): void {
@@ -68,6 +66,13 @@
       <div class="row">
         <span class="lab">{t('settings.theme')}</span>
         <Seg label={t('settings.theme')} options={themes.map((v) => ({ value: v, label: t(`theme.${v}`) }))} value={ui.theme} onpick={(v) => setTheme(v)} />
+      </div>
+      <div class="row">
+        <label class="lab" for="lang">{t('settings.language')}</label>
+        <select id="lang" value={prefs.language} onchange={(e) => isLangPref(e.currentTarget.value) && setLanguage(e.currentTarget.value)}>
+          <option value="system">{t('settings.languageSystem')}</option>
+          {#each LANGS as l (l.code)}<option value={l.code} lang={l.code}>{l.name}</option>{/each}
+        </select>
       </div>
     </section>
 
@@ -138,8 +143,8 @@
         <ul class="list">
           {#each backups as b (b.id)}
             <li>
-              <span class="name">{new Date(b.createdAt).toLocaleString()}</span>
-              <span class="meta">{b.auto ? t('backups.auto') : t('backups.manual')} · {size(b.bytes)}</span>
+              <span class="name">{formatDateTime(b.createdAt)}</span>
+              <span class="meta">{b.auto ? t('backups.auto') : t('backups.manual')} · {formatSize(b.bytes)}</span>
               <button class="btn" onclick={() => askRestore(b)}>{t('backups.restore')}</button>
             </li>
           {/each}
@@ -152,6 +157,7 @@
         <button class="btn" onclick={() => void exportAll()}>{t('data.exportAll')}</button>
         <button class="btn" onclick={() => void importFiles()}>{t('data.importFiles')}</button>
         <button class="btn" onclick={() => void importFromV4()}>{t('data.importV4')}</button>
+        <button class="btn" onclick={() => void importFromFile()}>{t('palette.importFile')}</button>
       </div>
     </section>
 
@@ -162,6 +168,7 @@
         <dt>{t('about.electron')}</dt><dd>{info?.electron ?? ''}</dd>
         <dt>{t('about.dataFolder')}</dt><dd class="path">{info?.userData ?? ''}</dd>
       </dl>
+      <SettingsUpdates />
     </section>
   </div>
 </div>
@@ -206,10 +213,21 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 16px;
+    flex-wrap: wrap;
+    gap: 4px 16px;
     min-height: 38px;
   }
   .lab {
+    color: var(--ink);
+    font-size: 14px;
+  }
+  select {
+    height: 30px;
+    max-width: 100%;
+    padding: 0 8px;
+    border: 1px solid var(--rule);
+    border-radius: 6px;
+    background: var(--paper);
     color: var(--ink);
     font-size: 14px;
   }
@@ -281,9 +299,6 @@
   @media (max-width: 760px) {
     .page {
       padding: 1.5rem 1.25rem 4rem;
-    }
-    .row {
-      flex-wrap: wrap;
     }
   }
 </style>

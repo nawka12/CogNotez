@@ -9,7 +9,7 @@ import { decryptBlob, encryptBlob, mediaKey, newEnc, parseMeta, serializeMeta } 
 import type { Meta, Rand } from './crypto'
 import {
   aadOf, MAX_MEDIA_BYTES, MAX_OBJECT_BYTES, META_NAME, mediaName, objectName, parseMediaName, parseObject, parseObjectName,
-  serialize, sha256hex
+  REV_RE, serialize, sha256hex
 } from './format'
 import type { ObjectName, RevObject, Tombstone } from './format'
 import { buildGraphs, NoteGraph } from './graph'
@@ -124,7 +124,14 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
   }
 
   // 2. Upload local changes first (media before the revisions that use them), then tombstones.
+  // A rev outside the name grammar (only a clock pinned at hlc.MAX_MS can make one) is skipped, never thrown.
+  const unusable = (id: string, rev: string): boolean => {
+    if (REV_RE.test(rev)) return false
+    warn(`note ${id} has an unusable rev ${rev}; not uploaded`)
+    return true
+  }
   for (const o of local.dirty(d.deviceName)) {
+    if (unusable(o.id, o.rev)) continue
     const bytes = serialize(o)
     if (bytes.length > MAX_OBJECT_BYTES) {
       warn(`"${o.title || 'Untitled'}" is too large to sync (over 8 MB).`)
@@ -144,6 +151,7 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
   }
   for (const p of local.purged()) {
     const tomb: Tombstone = { v: 2, id: p.id, rev: store.hlc.now(), parents: [p.rev], device: store.deviceId, deviceName: d.deviceName.slice(0, 100), deleted: true }
+    if (unusable(tomb.id, tomb.rev)) continue
     await put(objectName(tomb.id, tomb.rev, tomb.parents, enc), serialize(tomb))
     local.markTombstoneUploaded(tomb, p.rev)
   }
@@ -163,10 +171,18 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
   }
   const graphs = buildGraphs(objects)
 
-  // 5 (clock). The next local rev must be greater than anything seen. Receiving the greatest rev is enough.
+  // 5 (clock). The next local rev must be greater than anything seen (within hlc.MAX_DRIFT_MS of the wall clock).
+  // receive() caps another device's far-future rev, so also receive this device's own greatest rev in full: own revs
+  // must stay unique.
   let top = ''
-  for (const o of objects) for (const r of [o.rev, ...o.parents]) if (r > top) top = r
-  if (top) store.hlc.receive(top)
+  let own = ''
+  for (const o of objects) {
+    for (const r of [o.rev, ...o.parents]) {
+      if (r > top) top = r
+      if (r > own && r.endsWith(`-${store.deviceId}`)) own = r
+    }
+  }
+  for (const r of [top, own]) if (r) store.hlc.receive(r)
 
   const cache = new Map<string, RevObject>()
   const loadByName = async (name: string): Promise<RevObject | null> => {
@@ -201,12 +217,13 @@ export async function syncRound(d: RoundDeps): Promise<RoundResult> {
     }
     for (const w of r.writes) {
       const name = objectName(w.id, w.rev, w.parents, enc)
-      const result = await put(name, serialize(w))
+      await put(name, serialize(w))
       let wg = graphs.get(w.id)
       if (!wg) graphs.set(w.id, (wg = new NoteGraph()))
       wg.add(w.rev, w.parents, name)
-      // What is on the remote is the truth: when the file already existed, read it back rather than trust ours.
-      if (result === 'created') cache.set(name, w)
+      // Never cached: step 5 applies what the remote holds. Where create isn't atomic (Drive), two devices that saw
+      // different graphs can both get 'created' for one name, and readers see only the oldest file. A read-back that
+      // finds nothing yet (Drive search lag) skips the apply; the next round retries.
     }
   }
 

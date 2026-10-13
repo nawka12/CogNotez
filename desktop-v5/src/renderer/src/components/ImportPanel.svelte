@@ -1,6 +1,6 @@
 <script lang="ts">
   import { t } from '../i18n'
-  import { importer, importFromV4 } from '../state/importer.svelte'
+  import { importer, importFromFile, importFromV4 } from '../state/importer.svelte'
 </script>
 
 {#if importer.found}
@@ -13,6 +13,10 @@
     {#if importer.error}<p class="err" role="alert">{importer.error}</p>{/if}
   </section>
 {/if}
+<p class="drive">
+  {t('import.driveHint')}
+  <button class="btn" disabled={importer.running} onclick={() => void importFromFile()}>{t('import.driveButton')}</button>
+</p>
 
 <style>
   .import {
@@ -29,6 +33,13 @@
   }
   p {
     margin: 0 0 0.8rem;
+  }
+  .drive {
+    display: grid;
+    gap: 6px;
+    justify-items: start;
+    margin: 0 0 1.6rem;
+    font-size: 13px;
   }
   .err {
     margin: 0.6rem 0 0;

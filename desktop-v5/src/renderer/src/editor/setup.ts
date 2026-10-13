@@ -127,10 +127,11 @@ const extensions = [
   history(),
   drawSelection(),
   EditorView.lineWrapping,
-  EditorView.contentAttributes.of({ 'aria-label': tr('editor.label') }),
+  // Functions, so the text is read when the editor (re)builds, in the language chosen by then.
+  EditorView.contentAttributes.of(() => ({ 'aria-label': tr('editor.label') })),
   // A function, so the Settings toggle takes effect on the next update (the editor dispatches an empty one).
   EditorView.contentAttributes.of(() => ({ spellcheck: prefs.spellcheck ? 'true' : 'false' })),
-  placeholder(tr('editor.placeholder')),
+  placeholder(() => Object.assign(document.createElement('span'), { textContent: tr('editor.placeholder') })),
   markdown({ base: markdownLanguage }),
   syntaxHighlighting(highlight),
   structure,

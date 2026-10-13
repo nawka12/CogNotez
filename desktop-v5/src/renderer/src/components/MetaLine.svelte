@@ -71,20 +71,22 @@
         use:focusOnMount
       />
     {:else}
-      <button class="addtag" onclick={() => (adding = true)}><Icon name="plus" />{t('meta.addTag')}</button>
+      <button class="addtag" aria-label={t('meta.addTag')} onclick={() => (adding = true)}><Icon name="plus" /><span class="lo2">{t('meta.addTag')}</span></button>
     {/if}
   {/if}
-  <span class="sep">·</span>
-  <span>{t('meta.edited', { time: relativeTime(note.updatedAt, ui.now) })}</span>
-  {#if doc.sealed}
-    <span class="sep">·</span><span>{t('meta.locked')}</span>
-  {:else}
-    <span class="sep">·</span><span>{t('meta.words', { n: doc.words })}</span>
-    <span class="sep">·</span><span>{t('meta.minutes', { n: readingMinutes(doc.words) })}</span>
-    {#if note.locked && !trashed}
-      <span class="sep">·</span><span>{t('meta.unlocked')}</span>
-      <button class="btn lock-now" onclick={() => void lockNow(doc)}><Icon name="lock" />{t('meta.lockNow')}</button>
+  <span class="stats">
+    <span class="sep">·</span>
+    <span>{t('meta.edited', { time: relativeTime(note.updatedAt, ui.now) })}</span>
+    {#if doc.sealed}
+      <span class="sep">·</span><span>{t('meta.locked')}</span>
+    {:else}
+      <span class="sep lo2">·</span><span class="lo2">{t('meta.words', { n: doc.words })}</span>
+      <span class="sep lo">·</span><span class="lo">{t('meta.minutes', { n: readingMinutes(doc.words) })}</span>
+      {#if note.locked && !trashed}<span class="sep lo2">·</span><span class="lo2">{t('meta.unlocked')}</span>{/if}
     {/if}
+  </span>
+  {#if note.locked && !trashed && !doc.sealed}
+    <button class="btn lock-now" onclick={() => void lockNow(doc)}><Icon name="lock" />{t('meta.lockNow')}</button>
   {/if}
   {#if !trashed}
     <span class="actions">
@@ -98,6 +100,7 @@
 
 <style>
   .meta {
+    container-type: inline-size;
     display: flex;
     flex-wrap: wrap;
     align-items: center;
@@ -110,6 +113,28 @@
   }
   .sep {
     opacity: 0.6;
+  }
+  /* Basis is small so the line shrinks this block before it wraps; whatever still doesn't fit ends in an ellipsis. */
+  .stats {
+    flex: 1 1 8rem;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .stats > * + * {
+    margin-left: 10px;
+  }
+  /* Narrow column (Companion open): drop the low-priority bits before the line wraps. */
+  @container (max-width: 33rem) {
+    .lo {
+      display: none;
+    }
+  }
+  @container (max-width: 26rem) {
+    .lo2 {
+      display: none;
+    }
   }
   .tagw {
     display: inline-flex;

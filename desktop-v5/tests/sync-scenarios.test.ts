@@ -4,6 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GONE, NEEDS_PASSPHRASE, openRemote, SyncError, syncRound } from '../src/main/sync/engine'
 import { createLocal } from '../src/main/sync/local'
+import { revMs } from '../src/main/sync/format'
 import { humanError } from '../src/main/sync/service'
 import { unwrapDek } from '../src/main/sync/crypto'
 import { MemoryRemote, memoryTransport } from '../src/main/sync/memory'
@@ -373,6 +374,83 @@ describe('sync scenarios', () => {
     const c = copies(a)
     expect(c.map((n) => n.conflict_of)).toEqual([differs]) // two root revisions of one note, different bodies
     expect(bodies(a).filter((x) => x === 'A only' || x === 'v1').sort()).toEqual(['A only', 'v1'])
+  })
+
+  it('14. a duplicate-name race on a non-atomic remote: every device applies the file readers see', async () => {
+    const remote = new MemoryRemote()
+    remote.atomicCreate = false // Drive: check-then-upload, so two creators can both get 'created'
+    const a = await makeDevice('alpha', remote)
+    const b = await makeDevice('bravo', remote, { start: Date.UTC(2026, 9, 13) + 1 })
+    const d = await makeDevice('delta', remote, { start: Date.UTC(2026, 9, 13) + 2 })
+    const id = await shared(a, b, remote)
+    await settle([a, b, d], remote)
+    const old = new Set(remote.files.keys())
+    a.store.notes.save({ id, body: 'A body' })
+    b.store.notes.save({ id, pinned: true })
+    for (const x of [a, b]) {
+      x.hooks.before = (op) => {
+        if (op === 'list') throw new Error('offline')
+      }
+      await expect(x.sync()).rejects.toThrow('offline')
+      x.hooks.before = undefined
+    }
+
+    // C joins while the old revisions aren't listed yet, so it merges A's and B's heads with an unknown base (a copy,
+    // different content); D sees the base and merges without one. D's file lands first; C's create is a duplicate.
+    const c = await makeDevice('charlie', remote, { start: Date.UTC(2026, 9, 13) + 3 })
+    const list = c.transport.list.bind(c.transport)
+    c.transport.list = async (cursor) => {
+      const r = await list(cursor)
+      return { ...r, added: r.added.filter((e) => !old.has(e.name)) }
+    }
+    // And Drive search lag: C's first read of a file it just created finds nothing.
+    const mine = new Set<string>()
+    const lagged = new Set<string>()
+    c.hooks.created = (name) => void mine.add(name)
+    const read = c.transport.read.bind(c.transport)
+    c.transport.read = async (name) => (mine.has(name) && !lagged.has(name) && lagged.add(name) ? null : read(name))
+    let release: () => void = () => undefined
+    const gate = new Promise<void>((r) => (release = r))
+    c.hooks.before = async (op) => {
+      if (op === 'create') await gate
+    }
+    const cRound = c.sync()
+    await d.sync()
+    release()
+    await cRound
+    c.hooks.before = undefined
+    c.transport.list = list
+
+    expect(remote.duplicates).toBeGreaterThan(0)
+    expect(lagged.size).toBeGreaterThan(0)
+    expect(() => c.store.notes.get(id)).toThrow('note not found') // the read-back found nothing: skipped, not guessed
+    await c.sync()
+    expect(c.store.notes.get(id)).toMatchObject({ body: 'A body', pinned: true }) // D's file, not C's own merge
+    expect(stateOf(c).find((n) => n.id === id)).toEqual(stateOf(d).find((n) => n.id === id))
+
+    await settle([a, b, c, d], remote)
+    for (const x of [b, c, d]) expect(stateOf(x)).toEqual(stateOf(a))
+    expect(bodies(a)).toContain('A body')
+  })
+
+  it('15. a device whose clock is years ahead: other clocks stay near their wall clock, and nothing is lost', async () => {
+    const remote = new MemoryRemote()
+    const a = await makeDevice('alpha', remote)
+    const x = await makeDevice('future', remote, { start: Date.UTC(2036, 0, 1) })
+    const id = await shared(a, x, remote)
+    x.store.notes.save({ id, body: 'from the future' })
+    a.store.notes.save({ id, body: 'from now' })
+    await settle([a, x], remote)
+    expect(bodies(a)).toEqual(['from now', 'from the future'])
+    expect(stateOf(a)).toEqual(stateOf(x))
+    // A's new revs sort below X's, which is fine; A's clock was not dragged ten years ahead.
+    const n = a.store.notes.create({ title: 'after' })
+    const rev = (d: Device, nid: string): string => (d.store.db.prepare('SELECT rev FROM notes WHERE id = ?').get(nid) as { rev: string }).rev
+    expect(revMs(rev(a, n.id))).toBeLessThan(Date.UTC(2026, 9, 15))
+    a.store.notes.save({ id, body: 'edited after the merge' })
+    await settle([a, x], remote)
+    expect(x.store.notes.get(id).body).toBe('edited after the merge') // a later edit still wins, whatever its rev
+    expect(stateOf(a)).toEqual(stateOf(x))
   })
 
   it('humanError passes transport messages through and prefixes unexpected ones', () => {
