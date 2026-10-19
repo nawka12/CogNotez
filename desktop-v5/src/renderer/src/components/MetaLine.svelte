@@ -3,7 +3,7 @@
   import { parseTagInput } from '../lib/tags'
   import { readingMinutes } from '../lib/text'
   import { relativeTime } from '../lib/time'
-  import { addTags, lockNow, removeTag, togglePin, trashNote } from '../state/actions'
+  import { addTags, askPassword, lockNow, removeTag, togglePin, trashNote } from '../state/actions'
   import type { Doc } from '../state/tabs.svelte'
   import { ui } from '../state/ui.svelte'
   import Icon from './Icon.svelte'
@@ -93,6 +93,9 @@
       <button class="icon-btn" aria-pressed={note.pinned} aria-label={note.pinned ? t('note.unpin') : t('note.pin')} title={note.pinned ? t('note.unpin') : t('note.pin')} onclick={() => void togglePin(doc)}>
         <Icon name="pin" class={note.pinned ? 'on' : ''} />
       </button>
+      {#if !note.locked}
+        <button class="icon-btn" aria-label={t('palette.lockNote')} title={t('palette.lockNote')} onclick={() => askPassword(doc)}><Icon name="lock" /></button>
+      {/if}
       <button class="icon-btn" aria-label={t('note.trash')} title={t('note.trash')} onclick={() => void trashNote(doc.id)}><Icon name="trash" /></button>
     </span>
   {/if}
